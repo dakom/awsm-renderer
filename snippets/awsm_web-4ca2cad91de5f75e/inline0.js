@@ -1,0 +1,1 @@
+export function process_env_var(key) { const value = process.env[key]; return value == undefined ? '' : value; }
