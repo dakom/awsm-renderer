@@ -3,75 +3,89 @@ use std::hash::Hash;
 
 use crate::prelude::*;
 
-pub static GLTF_SETS:LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::new(|| {
+pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::new(|| {
     let mut h = HashMap::new();
 
-    h.insert("Todo", vec![
-        GltfId::EnvironmentTest,
-        GltfId::EnvironmentIblTest,
-        GltfId::MetalRoughSpheres,
-        GltfId::MetalRoughSpheresTextureless,
-        GltfId::MorphStressTest,
-        GltfId::NormalTangent,
-        GltfId::NormalTangentMirror,
-        GltfId::RecursiveSkeletons,
-        GltfId::NegativeScale,
-    ]);
+    h.insert(
+        "Todo",
+        vec![
+            GltfId::EnvironmentTest,
+            GltfId::EnvironmentIblTest,
+            GltfId::MetalRoughSpheres,
+            GltfId::MetalRoughSpheresTextureless,
+            GltfId::MorphStressTest,
+            GltfId::NormalTangent,
+            GltfId::NormalTangentMirror,
+            GltfId::RecursiveSkeletons,
+            GltfId::NegativeScale,
+        ],
+    );
 
-    h.insert("Feature tests", vec![
-        GltfId::AlphaBlendMode,
-        GltfId::BoomBoxAxes,
-        //GltfId::MetalRoughSpheres,
-        //GltfId::MetalRoughSpheresTextureless,
-        GltfId::MorphPrimitives,
-        //GltfId::MorphStressTest,
-        GltfId::MultiUv,
-        //GltfId::NegativeScale,
-        // GltfId::NormalTangent,
-        // GltfId::NormalTangentMirror,
-        GltfId::Orientation,
-        //GltfId::RecursiveSkeletons,
-        GltfId::TextureCoordinate,
-        GltfId::TextureLinearInterpolation,
-        GltfId::TextureSettings,
-        GltfId::VertexColor,
-    ]);
+    h.insert(
+        "Feature tests",
+        vec![
+            GltfId::AlphaBlendMode,
+            GltfId::BoomBoxAxes,
+            //GltfId::MetalRoughSpheres,
+            //GltfId::MetalRoughSpheresTextureless,
+            GltfId::MorphPrimitives,
+            //GltfId::MorphStressTest,
+            GltfId::MultiUv,
+            //GltfId::NegativeScale,
+            // GltfId::NormalTangent,
+            // GltfId::NormalTangentMirror,
+            GltfId::Orientation,
+            //GltfId::RecursiveSkeletons,
+            GltfId::TextureCoordinate,
+            GltfId::TextureLinearInterpolation,
+            GltfId::TextureSettings,
+            GltfId::VertexColor,
+        ],
+    );
 
-    h.insert("Minimal", vec![
-        GltfId::TriangleWithoutIndices,
-        GltfId::Triangle,
-        GltfId::SimpleSparseAccessor,
-        GltfId::SimpleMeshes,
-        GltfId::SimpleMorph,
-        GltfId::AnimatedTriangle,
-        GltfId::AnimatedMorphCube,
-        GltfId::AnimatedMorphSphere,
-        GltfId::SimpleSkin,
-        GltfId::InterpolationTest,
-    ]);
+    h.insert(
+        "Minimal",
+        vec![
+            GltfId::TriangleWithoutIndices,
+            GltfId::Triangle,
+            GltfId::SimpleSparseAccessor,
+            GltfId::SimpleMeshes,
+            GltfId::SimpleMorph,
+            GltfId::AnimatedTriangle,
+            GltfId::AnimatedMorphCube,
+            GltfId::AnimatedMorphSphere,
+            GltfId::SimpleSkin,
+            GltfId::InterpolationTest,
+        ],
+    );
 
-    h.insert("Standard", vec![
-        GltfId::Box,
-        GltfId::BoxInterleaved,
-        GltfId::BoxTextured,
-        GltfId::BoxTexturedNpoT,
-        GltfId::BoxWithSpaces,
-        GltfId::BoxVertexColors,
-        GltfId::Cube,
-    ]);
+    h.insert(
+        "Standard",
+        vec![
+            GltfId::Box,
+            GltfId::BoxInterleaved,
+            GltfId::BoxTextured,
+            GltfId::BoxTexturedNpoT,
+            GltfId::BoxWithSpaces,
+            GltfId::BoxVertexColors,
+            GltfId::Cube,
+        ],
+    );
 
-    h.insert("Extension Tests", vec![
-        // GltfId::EnvironmentTest,
-        // GltfId::EnvironmentIblTest,
-    ]);
+    h.insert(
+        "Extension Tests",
+        vec![
+            // GltfId::EnvironmentTest,
+            // GltfId::EnvironmentIblTest,
+        ],
+    );
 
     h
 });
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GltfId {
-
-    // FEATURE TESTS 
+    // FEATURE TESTS
     // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#feature-tests
     AlphaBlendMode,
     BoomBoxAxes,
@@ -90,7 +104,6 @@ pub enum GltfId {
     TextureSettings,
     VertexColor,
 
-
     // MINIMAL
     // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#minimal-tests
     TriangleWithoutIndices,
@@ -105,8 +118,8 @@ pub enum GltfId {
     InterpolationTest,
     // skipping unicode test...
 
-    // STANDARD 
-    // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#standard 
+    // STANDARD
+    // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#standard
     Box,
     BoxInterleaved,
     BoxTextured,
@@ -121,22 +134,26 @@ pub enum GltfId {
     EnvironmentIblTest,
 }
 
-impl From<&str> for GltfId {
-    fn from(s:&str) -> Self {
-        let list:Vec<&GltfId> = GLTF_SETS
-            .iter()
-            .map(|x| x.1)
-            .flatten()
-            .collect();
+impl TryFrom<&str> for GltfId {
+    type Error = String;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        let list: Vec<&GltfId> = GLTF_SETS.iter().map(|x| x.1).flatten().collect();
 
         for id in list {
-            let label = format!("{:?}", id);
-            if label == s {
-                return *id
+            let id_str = id.to_string();
+            if id_str == s {
+                return Ok(*id);
             }
         }
 
-        panic!("{} is not a valid GltfId", s);
+        Err(format!("{} is not a valid GltfId", s))
+    }
+}
+
+impl std::fmt::Display for GltfId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
@@ -152,21 +169,29 @@ impl GltfId {
             Self::AlphaBlendMode => "AlphaBlendModeTest/glTF/AlphaBlendModeTest.gltf",
             Self::BoomBoxAxes => "BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf",
             Self::MetalRoughSpheres => "MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
-            Self::MetalRoughSpheresTextureless => "MetalRoughSpheresNoTextures/glTF/MetalRoughSpheresNoTextures.gltf",
+            Self::MetalRoughSpheresTextureless => {
+                "MetalRoughSpheresNoTextures/glTF/MetalRoughSpheresNoTextures.gltf"
+            }
             Self::MorphPrimitives => "MorphPrimitivesTest/glTF/MorphPrimitivesTest.gltf",
             Self::MorphStressTest => "MorphStressTest/glTF/MorphStressTest.gltf",
             Self::MultiUv => "MultiUVTest/glTF/MultiUVTest.gltf",
             Self::NegativeScale => "NegativeScaleTest/glTF/NegativeScaleTest.gltf",
             Self::NormalTangent => "NormalTangentTest/glTF/NormalTangentTest.gltf",
-            Self::NormalTangentMirror => "NormalTangentMirrorTest/glTF/NormalTangentMirrorTest.gltf",
+            Self::NormalTangentMirror => {
+                "NormalTangentMirrorTest/glTF/NormalTangentMirrorTest.gltf"
+            }
             Self::Orientation => "OrientationTest/glTF/OrientationTest.gltf",
             Self::RecursiveSkeletons => "RecursiveSkeletons/glTF/RecursiveSkeletons.gltf",
             Self::TextureCoordinate => "TextureCoordinateTest/glTF/TextureCoordinateTest.gltf",
-            Self::TextureLinearInterpolation => "TextureLinearInterpolationTest/glTF/TextureLinearInterpolationTest.gltf",
+            Self::TextureLinearInterpolation => {
+                "TextureLinearInterpolationTest/glTF/TextureLinearInterpolationTest.gltf"
+            }
             Self::TextureSettings => "TextureSettingsTest/glTF/TextureSettingsTest.gltf",
             Self::VertexColor => "VertexColorTest/glTF/VertexColorTest.gltf",
             // Minimal
-            Self::TriangleWithoutIndices => "TriangleWithoutIndices/glTF/TriangleWithoutIndices.gltf",
+            Self::TriangleWithoutIndices => {
+                "TriangleWithoutIndices/glTF/TriangleWithoutIndices.gltf"
+            }
             Self::Triangle => "Triangle/glTF/Triangle.gltf",
             Self::SimpleSparseAccessor => "SimpleSparseAccessor/glTF/SimpleSparseAccessor.gltf",
             Self::SimpleMeshes => "SimpleMeshes/glTF/SimpleMeshes.gltf",

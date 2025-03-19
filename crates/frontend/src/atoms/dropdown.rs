@@ -140,6 +140,7 @@ where
                 .style("top", "100%")
                 .style("left", "0")
                 .style("width", "max-content")
+                .style("z-index", Zindex::DropdownOptions.value())
             }
         });
 

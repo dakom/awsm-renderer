@@ -1,4 +1,7 @@
-use crate::{prelude::*, theme::{responsive::Breakpoint, typography::FONT_FAMILY_NOTO}};
+use crate::{
+    prelude::*,
+    theme::{responsive::Breakpoint, typography::FONT_FAMILY_NOTO},
+};
 use dominator::stylesheet;
 
 pub fn init() {

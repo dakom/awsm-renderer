@@ -1,22 +1,12 @@
 #![allow(unused_imports)]
-pub use wasm_bindgen::prelude::*;
-pub use crate::config::CONFIG;
 pub use super::{
+    atoms::{buttons::*, dropdown::*, label::*, modal::*, text_area::*, text_input::*},
     route::*,
     theme::{color::*, misc::*, typography::*, z_index::*},
-    atoms::{
-        buttons::*, 
-        dropdown::*, 
-        text_input::*,
-        text_area::*,
-        modal::*,
-        label::*
-    },
-    util::{
-        mixins::*,
-        signal::*
-    }
+    util::{mixins::*, signal::*},
 };
+pub use crate::config::CONFIG;
+pub use wasm_bindgen::prelude::*;
 
 pub use anyhow::{anyhow, bail, Context as AnyhowContext, Result};
 use dominator::DomBuilder;

@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{models::collections::GltfId, prelude::*};
 
 #[derive(Debug, Clone)]
 pub enum Route {
@@ -15,6 +15,7 @@ pub enum TopLevelRoute {
 #[derive(Debug, Clone)]
 pub enum AppRoute {
     Init,
+    Model(GltfId),
 }
 
 impl Route {
@@ -34,10 +35,17 @@ impl Route {
 
         match paths {
             [""] => Self::App(AppRoute::Init),
-            ["app", app_route] => match *app_route {
-                "init" => Self::App(AppRoute::Init),
+            ["app", app_route @ ..] => match *app_route {
+                ["init"] => Self::App(AppRoute::Init),
+                ["model", model] => Self::App(AppRoute::Model(match GltfId::try_from(model) {
+                    Ok(gltf_id) => gltf_id,
+                    Err(_) => {
+                        tracing::error!("Invalid GltfId: {}", model);
+                        return Self::NotFound;
+                    }
+                })),
                 _ => Self::NotFound,
-            }
+            },
             _ => Self::NotFound,
         }
     }
@@ -65,16 +73,18 @@ impl Route {
             .signal_cloned()
             .map(|url| Route::from_url(&url))
     }
+
+    pub fn get() -> Route {
+        Route::from_url(&*dominator::routing::url().lock_ref())
+    }
 }
 
 impl TopLevelRoute {
     pub fn signal() -> impl Signal<Item = TopLevelRoute> {
         Route::signal()
-            .map(|route| {
-                match route {
-                    Route::App(_) => Self::App,
-                    Route::NotFound => Self::NotFound,
-                }
+            .map(|route| match route {
+                Route::App(_) => Self::App,
+                Route::NotFound => Self::NotFound,
             })
             .dedupe()
     }
@@ -87,7 +97,7 @@ impl std::fmt::Display for Route {
                 AppRoute::Init => "/".to_string(),
                 _ => format!("app/{}", app_route),
             },
-            Route::NotFound => "404".to_string(), 
+            Route::NotFound => "404".to_string(),
         };
         write!(f, "{}", s)
     }
@@ -97,6 +107,7 @@ impl std::fmt::Display for AppRoute {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s: String = match self {
             AppRoute::Init => "init".to_string(),
+            AppRoute::Model(gltf_id) => format!("model/{}", gltf_id),
         };
         write!(f, "{}", s)
     }

@@ -1,14 +1,14 @@
 #![allow(warnings)]
-mod theme;
 mod atoms;
-mod util;
-mod prelude;
-mod pages;
-mod route;
-mod logger;
 mod config;
 mod header;
+mod logger;
 mod models;
+mod pages;
+mod prelude;
+mod route;
+mod theme;
+mod util;
 
 use header::Header;
 use pages::{app::AppUi, not_found::NotFoundUi};
@@ -28,8 +28,8 @@ async fn init() {
         init_url.go_to_url();
     }
 
-
-    dominator::append_dom(&dominator::body(), 
+    dominator::append_dom(
+        &dominator::body(),
         html!("div", {
             .child_signal(TopLevelRoute::signal().map(|route| {
                 match route {
@@ -44,6 +44,6 @@ async fn init() {
                 })
             }))
             .fragment(&Modal::render())
-        })
+        }),
     );
 }

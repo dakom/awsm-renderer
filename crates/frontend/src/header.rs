@@ -1,7 +1,6 @@
 use crate::prelude::*;
 
-pub struct Header {
-}
+pub struct Header {}
 
 impl Header {
     pub fn new() -> Arc<Self> {

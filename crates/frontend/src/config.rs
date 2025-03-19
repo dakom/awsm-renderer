@@ -1,8 +1,11 @@
 #![allow(dead_code)]
-use std::{collections::{BTreeMap, HashMap}, sync::{Arc, LazyLock, Mutex}};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::{Arc, LazyLock, Mutex},
+};
 
 use crate::route::{AppRoute, Route};
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use dominator::clone;
 use futures_signals::signal::Mutable;
 use serde::Deserialize;

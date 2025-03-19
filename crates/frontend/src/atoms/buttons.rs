@@ -1,6 +1,6 @@
+use crate::prelude::*;
 use std::pin::Pin;
 use web_sys::HtmlElement;
-use crate::prelude::*;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ButtonSize {
@@ -47,127 +47,91 @@ pub enum ButtonColor {
 impl ButtonColor {
     pub fn bg_class(&self, style: ButtonStyle) -> &'static str {
         match style {
-            ButtonStyle::Solid => {
-                match self {
-                    Self::Primary => ColorBackground::ButtonPrimary.class(),
-                    Self::Red => ColorBackground::ButtonRed.class(),
-                }
-            } 
-            ButtonStyle::Outline => {
-                ColorBackground::Initial.class()
-            } 
+            ButtonStyle::Solid => match self {
+                Self::Primary => ColorBackground::ButtonPrimary.class(),
+                Self::Red => ColorBackground::ButtonRed.class(),
+            },
+            ButtonStyle::Outline => ColorBackground::Initial.class(),
         }
     }
 
     pub fn bg_hover_class(&self, style: ButtonStyle) -> &'static str {
         match style {
-            ButtonStyle::Solid => {
-                match self {
-                    Self::Primary => ColorBackground::ButtonPrimaryHover.class(),
-                    Self::Red => ColorBackground::ButtonRedHover.class(),
-                }
-            } 
-            ButtonStyle::Outline => {
-                ColorBackground::Initial.class()
-            } 
+            ButtonStyle::Solid => match self {
+                Self::Primary => ColorBackground::ButtonPrimaryHover.class(),
+                Self::Red => ColorBackground::ButtonRedHover.class(),
+            },
+            ButtonStyle::Outline => ColorBackground::Initial.class(),
         }
     }
 
     pub fn border_class(&self, style: ButtonStyle) -> &'static str {
         match style {
-            ButtonStyle::Solid => {
-                ColorBorder::Initial.class()
-            } 
-            ButtonStyle::Outline => {
-                match self {
-                    Self::Primary => ColorBorder::ButtonOutlinePrimary.class(),
-                    Self::Red => ColorBorder::ButtonOutlineRed.class(),
-                }
-            } 
+            ButtonStyle::Solid => ColorBorder::Initial.class(),
+            ButtonStyle::Outline => match self {
+                Self::Primary => ColorBorder::ButtonOutlinePrimary.class(),
+                Self::Red => ColorBorder::ButtonOutlineRed.class(),
+            },
         }
     }
 
     pub fn border_hover_class(&self, style: ButtonStyle) -> &'static str {
         match style {
-            ButtonStyle::Solid => {
-                ColorBorder::Initial.class()
-            } 
-            ButtonStyle::Outline => {
-                match self {
-                    Self::Primary => ColorBorder::ButtonOutlinePrimaryHover.class(),
-                    Self::Red => ColorBorder::ButtonOutlineRedHover.class(),
-                }
-            } 
+            ButtonStyle::Solid => ColorBorder::Initial.class(),
+            ButtonStyle::Outline => match self {
+                Self::Primary => ColorBorder::ButtonOutlinePrimaryHover.class(),
+                Self::Red => ColorBorder::ButtonOutlineRedHover.class(),
+            },
         }
     }
 
     pub fn color_class(&self, style: ButtonStyle) -> &'static str {
         match style {
-            ButtonStyle::Solid => {
-                match self {
-                    Self::Primary => ColorText::ButtonPrimary.class(),
-                    Self::Red => ColorText::ButtonPrimary.class(),
-                }
-            } 
-            ButtonStyle::Outline => {
-                match self {
-                    Self::Primary => ColorText::ButtonOutlinePrimary.class(),
-                    Self::Red => ColorText::ButtonOutlineRed.class(),
-                }
-            } 
+            ButtonStyle::Solid => match self {
+                Self::Primary => ColorText::ButtonPrimary.class(),
+                Self::Red => ColorText::ButtonPrimary.class(),
+            },
+            ButtonStyle::Outline => match self {
+                Self::Primary => ColorText::ButtonOutlinePrimary.class(),
+                Self::Red => ColorText::ButtonOutlineRed.class(),
+            },
         }
     }
 
     pub fn color_hover_class(&self, style: ButtonStyle) -> &'static str {
         match style {
-            ButtonStyle::Solid => {
-                match self {
-                    Self::Primary => ColorText::ButtonPrimary.class(),
-                    Self::Red => ColorText::ButtonPrimary.class(),
-                }
+            ButtonStyle::Solid => match self {
+                Self::Primary => ColorText::ButtonPrimary.class(),
+                Self::Red => ColorText::ButtonPrimary.class(),
             },
-            ButtonStyle::Outline => {
-                match self {
-                    Self::Primary => ColorText::ButtonOutlinePrimaryHover.class(),
-                    Self::Red => ColorText::ButtonOutlineRedHover.class(),
-                }
-            }
+            ButtonStyle::Outline => match self {
+                Self::Primary => ColorText::ButtonOutlinePrimaryHover.class(),
+                Self::Red => ColorText::ButtonOutlineRedHover.class(),
+            },
         }
     }
 
     pub fn bg_disabled_class(self, style: ButtonStyle) -> &'static str {
         match style {
-            ButtonStyle::Solid => {
-                ColorBackground::ButtonDisabled.class()
-            } 
-            ButtonStyle::Outline => {
-                ColorBackground::Initial.class()
-            } 
+            ButtonStyle::Solid => ColorBackground::ButtonDisabled.class(),
+            ButtonStyle::Outline => ColorBackground::Initial.class(),
         }
     }
 
     pub fn border_disabled_class(self, style: ButtonStyle) -> &'static str {
         match style {
-            ButtonStyle::Solid => {
-                ColorBorder::Initial.class()
-            } 
-            ButtonStyle::Outline => {
-                ColorBorder::ButtonDisabled.class()
-            } 
+            ButtonStyle::Solid => ColorBorder::Initial.class(),
+            ButtonStyle::Outline => ColorBorder::ButtonDisabled.class(),
         }
     }
 
     pub fn color_disabled_class(self, style: ButtonStyle) -> &'static str {
         match style {
-            ButtonStyle::Solid => {
-                match self {
-                    Self::Primary => ColorText::ButtonPrimary.class(),
-                    Self::Red => ColorText::ButtonPrimary.class(),
-                }
-            } 
-            ButtonStyle::Outline => {
-                ColorBackground::Initial.class()
-            } 
+            ButtonStyle::Solid => match self {
+                Self::Primary => ColorText::ButtonPrimary.class(),
+                Self::Red => ColorText::ButtonPrimary.class(),
+            },
+            ButtonStyle::Outline => ColorBackground::Initial.class(),
         }
     }
 }
@@ -175,7 +139,7 @@ impl ButtonColor {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ButtonStyle {
     Solid,
-    Outline
+    Outline,
 }
 
 pub struct Button {
@@ -272,7 +236,7 @@ impl Button {
             }
         });
 
-        static BORDER_CLASS:LazyLock<String> = LazyLock::new(|| {
+        static BORDER_CLASS: LazyLock<String> = LazyLock::new(|| {
             class! {
                 .style("border-width", "1px")
                 .style("border-style", "solid")

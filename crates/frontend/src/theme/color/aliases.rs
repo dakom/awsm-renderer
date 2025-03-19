@@ -4,6 +4,7 @@ use crate::prelude::*;
 pub enum ColorBackground {
     SidebarSelected,
     Sidebar,
+    GltfContent,
     ModalContent,
     UnderlinePrimary,
     UnderlineSecondary,
@@ -13,14 +14,15 @@ pub enum ColorBackground {
     ButtonRed,
     ButtonRedHover,
     Dropdown,
-    Initial
+    Initial,
 }
 
 impl ColorBackground {
     pub fn value(self) -> &'static str {
         match self {
             Self::SidebarSelected => ColorRaw::GreyAlt1.value(),
-            Self::Sidebar => ColorRaw::Darkish.value(),
+            Self::Sidebar => ColorRaw::Darkest.value(),
+            Self::GltfContent => ColorRaw::Darkish.value(),
             Self::ModalContent => ColorRaw::Whiteish.value(),
             Self::UnderlinePrimary => ColorRaw::Accent.value(),
             Self::UnderlineSecondary => ColorRaw::MidGrey.value(),
@@ -44,6 +46,12 @@ impl ColorBackground {
         static SIDEBAR: LazyLock<String> = LazyLock::new(|| {
             class! {
               .style("background-color", ColorBackground::Sidebar.value())
+            }
+        });
+
+        static GLTF_CONTENT: LazyLock<String> = LazyLock::new(|| {
+            class! {
+              .style("background-color", ColorBackground::GltfContent.value())
             }
         });
 
@@ -120,6 +128,7 @@ impl ColorBackground {
             Self::ButtonRedHover => &*BUTTON_RED_HOVER,
             Self::Dropdown => &*DROPDOWN,
             Self::Initial => &*INITIAL,
+            Self::GltfContent => &*GLTF_CONTENT,
         }
     }
 }
@@ -263,7 +272,6 @@ impl ColorText {
             }
         });
 
-
         match self {
             Self::ButtonPrimary => &*BUTTON_PRIMARY,
             Self::Header => &*HEADER,
@@ -381,13 +389,11 @@ impl ColorBorder {
             }
         });
 
-
         static BUTTON_DISABLED: LazyLock<String> = LazyLock::new(|| {
             class! {
               .style("border-color", ColorBorder::ButtonDisabled.value())
             }
         });
-
 
         static BUTTON_OUTLINE_PRIMARY: LazyLock<String> = LazyLock::new(|| {
             class! {
@@ -432,7 +438,6 @@ impl ColorBorder {
             Self::ButtonOutlinePrimaryHover => &*BUTTON_OUTLINE_PRIMARY_HOVER,
             Self::ButtonOutlineRed => &*BUTTON_OUTLINE_RED,
             Self::ButtonOutlineRedHover => &*BUTTON_OUTLINE_RED_HOVER,
-
         }
     }
 }
