@@ -73,7 +73,7 @@ impl From<FragmentState<'_>> for web_sys::GpuFragmentState {
         let state_js = web_sys::GpuFragmentState::new(state.module, &targets);
 
         if let Some(entry_point) = state.entry_point {
-            state_js.set_entry_point(&entry_point);
+            state_js.set_entry_point(entry_point);
         }
 
         if !state.constants.is_empty() {

@@ -9,7 +9,7 @@ use awsm_renderer_core::{
         vertex::VertexState,
         PipelineDescriptor,
     },
-    renderer::{AwsmRenderer, AwsmRendererBuilder},
+    renderer::AwsmRenderer,
     shaders::ShaderCode,
 };
 
@@ -20,7 +20,7 @@ pub trait AwsmRendererWipExt {
 
 impl AwsmRendererWipExt for AwsmRenderer {
     async fn temp_render(&self) -> Result<()> {
-        static INIT_SHADER_CODE: &'static str = include_str!("wip-shaders/init.wgsl");
+        static INIT_SHADER_CODE: &str = include_str!("wip-shaders/init.wgsl");
         let shader = self.compile_shader(&ShaderCode::new(INIT_SHADER_CODE, None).into());
 
         let vertex = VertexState::new(&shader, None);

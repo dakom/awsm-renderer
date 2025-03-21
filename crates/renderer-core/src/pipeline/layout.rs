@@ -1,15 +1,10 @@
 use wasm_bindgen::prelude::*;
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub enum PipelineLayoutKind {
+    #[default]
     Auto,
     Custom(web_sys::GpuPipelineLayout),
-}
-
-impl Default for PipelineLayoutKind {
-    fn default() -> Self {
-        PipelineLayoutKind::Auto
-    }
 }
 
 impl From<PipelineLayoutKind> for JsValue {

@@ -175,7 +175,7 @@ impl From<DepthStencilAttachment<'_>> for web_sys::GpuRenderPassDepthStencilAtta
 impl From<RenderTimestampWrites<'_>> for web_sys::GpuRenderPassTimestampWrites {
     fn from(timestamp_writes: RenderTimestampWrites) -> web_sys::GpuRenderPassTimestampWrites {
         let timestamp_writes_js =
-            web_sys::GpuRenderPassTimestampWrites::new(&timestamp_writes.query_set);
+            web_sys::GpuRenderPassTimestampWrites::new(timestamp_writes.query_set);
 
         if let Some(beginning_index) = timestamp_writes.beginning_index {
             timestamp_writes_js.set_beginning_of_pass_write_index(beginning_index);

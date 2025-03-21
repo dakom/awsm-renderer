@@ -20,7 +20,7 @@ pub struct TextureDescriptor<'a> {
     pub view_formats: Vec<TextureFormat>,
 }
 
-impl<'a> TextureDescriptor<'a> {
+impl TextureDescriptor<'_> {
     pub fn new(
         format: TextureFormat,
         size: TextureDescriptorSize,

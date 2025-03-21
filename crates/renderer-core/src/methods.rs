@@ -33,7 +33,7 @@ impl AwsmRenderer {
         &self,
         shader_code: &web_sys::GpuShaderModuleDescriptor,
     ) -> web_sys::GpuShaderModule {
-        self.device.create_shader_module(&shader_code)
+        self.device.create_shader_module(shader_code)
     }
 
     pub async fn create_pipeline(
@@ -96,7 +96,7 @@ impl AwsmRenderer {
             None => self.device.create_command_encoder(),
             Some(label) => {
                 let descriptor = web_sys::GpuCommandEncoderDescriptor::new();
-                descriptor.set_label(&label);
+                descriptor.set_label(label);
                 self.device
                     .create_command_encoder_with_descriptor(&descriptor)
             }

@@ -55,7 +55,7 @@ impl From<ComputePassDescriptor<'_>> for web_sys::GpuComputePassDescriptor {
 impl From<ComputeTimestampWrites<'_>> for web_sys::GpuComputePassTimestampWrites {
     fn from(timestamp_writes: ComputeTimestampWrites) -> web_sys::GpuComputePassTimestampWrites {
         let timestamp_writes_js =
-            web_sys::GpuComputePassTimestampWrites::new(&timestamp_writes.query_set);
+            web_sys::GpuComputePassTimestampWrites::new(timestamp_writes.query_set);
 
         if let Some(beginning_index) = timestamp_writes.beginning_index {
             timestamp_writes_js.set_beginning_of_pass_write_index(beginning_index);
