@@ -3,11 +3,15 @@ use crate::{
     prelude::*,
 };
 
-pub struct AppSidebar {}
+use super::renderer::AppRenderer;
+
+pub struct AppSidebar {
+    pub renderer: AppRenderer,
+}
 
 impl AppSidebar {
-    pub fn new() -> Arc<Self> {
-        Arc::new(Self {})
+    pub fn new(renderer: AppRenderer) -> Arc<Self> {
+        Arc::new(Self {renderer})
     }
 
     pub fn render(self: &Arc<Self>) -> Dom {

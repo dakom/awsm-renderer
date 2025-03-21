@@ -1,0 +1,17 @@
+[package]
+name = "awsm-renderer"
+description = "awsm-renderer"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[features]
+default = ["core"]
+core = ["dep:awsm-renderer-core"]
+
+[dependencies]
+awsm-renderer-core = {workspace = true, optional = true} 
+web-sys = {workspace = true}
+tracing = {workspace = true}

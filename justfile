@@ -11,7 +11,7 @@ frontend-dev:
     wait
 
 inner_frontend-dev:
-	@cd crates/frontend && trunk serve --port {{FRONTEND_DEV_PORT}} --watch . --watch "../../../media"
+	@cd crates/frontend && trunk serve --port {{FRONTEND_DEV_PORT}} --watch . --watch "../../../media" --watch ../renderer
 
 frontend-dev-localmedia:
     @cd media && http-server --gzip --cors -p {{FRONTEND_MEDIA_DEV_PORT}} 

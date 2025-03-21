@@ -28,3 +28,5 @@ tracing-subscriber = { workspace = true}
 tracing-web = { workspace = true}
 tracing-panic = { workspace = true}
 web-sys = { workspace = true}
+awsm-renderer = { workspace = true}
+awsm_web = { workspace = true}

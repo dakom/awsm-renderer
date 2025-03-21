@@ -83,7 +83,7 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
     h
 });
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GltfId {
     // FEATURE TESTS
     // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#feature-tests

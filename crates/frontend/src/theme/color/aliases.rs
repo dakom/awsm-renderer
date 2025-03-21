@@ -135,6 +135,7 @@ impl ColorBackground {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ColorText {
+    GltfContent,
     ButtonPrimary,
     ButtonOutlinePrimary,
     ButtonOutlinePrimaryHover,
@@ -158,6 +159,7 @@ impl ColorText {
         match self {
             Self::SidebarHeader => ColorRaw::Whiteish.value(),
             Self::ButtonPrimary => ColorRaw::Whiteish.value(),
+            Self::GltfContent => ColorRaw::Whiteish.value(),
             Self::ButtonOutlinePrimary => ColorRaw::Accent.value(),
             Self::ButtonOutlinePrimaryHover => ColorRaw::AccentLite.value(),
             Self::ButtonOutlineRed => ColorRaw::Red.value(),
@@ -176,6 +178,12 @@ impl ColorText {
     }
 
     pub fn class(self) -> &'static str {
+        static GLTF_CONTENT: LazyLock<String> = LazyLock::new(|| {
+            class! {
+              .style("color", ColorText::GltfContent.value())
+            }
+        });
+
         static BUTTON_PRIMARY: LazyLock<String> = LazyLock::new(|| {
             class! {
               .style("color", ColorText::ButtonPrimary.value())
@@ -273,6 +281,7 @@ impl ColorText {
         });
 
         match self {
+            Self::GltfContent => &*GLTF_CONTENT,
             Self::ButtonPrimary => &*BUTTON_PRIMARY,
             Self::Header => &*HEADER,
             Self::SidebarHeader => &*SIDEBAR_HEADER,

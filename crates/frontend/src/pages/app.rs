@@ -1,16 +1,22 @@
 mod content;
 mod sidebar;
+mod renderer;
 
 use content::AppContent;
+use renderer::AppRenderer;
 use sidebar::AppSidebar;
 
 use crate::prelude::*;
 
-pub struct AppUi {}
+pub struct AppUi {
+    renderer: AppRenderer
+}
 
 impl AppUi {
     pub fn new() -> Arc<Self> {
-        Arc::new(Self {})
+        Arc::new(Self {
+            renderer: AppRenderer::new(),
+        })
     }
 
     pub fn render(self: &Arc<Self>) -> Dom {
@@ -34,14 +40,14 @@ impl AppUi {
                 .style("overflow-y", "auto")  // scroll if content overflows
                 .style("height", "100%")
                 .class(ColorBackground::Sidebar.class())
-                .child(AppSidebar::new().render())
+                .child(AppSidebar::new(self.renderer.clone()).render())
             }))
             .child(html!("div", {  // right column
                 .style("flex", "1")  // grow to fill remaining space
                 .style("overflow-y", "auto")  // scroll if content overflows
                 .style("height", "100%")
                 .class(ColorBackground::GltfContent.class())
-                .child(AppContent::new().render())
+                .child(AppContent::new(self.renderer.clone()).render())
             }))
         })
     }
