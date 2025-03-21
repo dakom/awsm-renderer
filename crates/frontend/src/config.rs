@@ -35,7 +35,8 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         media_baseurl: if cfg!(debug_assertions) {
             "http://localhost:9082".to_string()
         } else {
-            format!("{}/media", web_sys::window().unwrap().origin())
+            "/awsm-renderer/media".to_string()
+            //format!("{}/media", web_sys::window().unwrap().origin())
         },
     };
 

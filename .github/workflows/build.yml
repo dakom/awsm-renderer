@@ -8,6 +8,9 @@ on:
     branches:
       - main        # Run build only when changes are pushed (merged) to `main`
 
+env:
+  RUSTFLAGS: "--cfg=web_sys_unstable_apis --cfg=getrandom_backend=\"wasm_js\""
+
 jobs:
   test:
     name: Test Suite
@@ -60,8 +63,6 @@ jobs:
         uses: extractions/setup-just@v3
       - name: Build frontend
         run: just frontend-build
-        env:
-          RUSTFLAGS: "--cfg=web_sys_unstable_apis --cfg=getrandom_backend=\"wasm_js\""
 
       - name: Upload artifacts
         uses: actions/upload-pages-artifact@v3
