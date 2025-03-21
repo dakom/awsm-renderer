@@ -20,8 +20,12 @@ pub struct TextureDescriptor<'a> {
     pub view_formats: Vec<TextureFormat>,
 }
 
-impl <'a> TextureDescriptor<'a> {
-    pub fn new(format: TextureFormat, size: TextureDescriptorSize, usage: TextureDescriptorUsage) -> Self {
+impl<'a> TextureDescriptor<'a> {
+    pub fn new(
+        format: TextureFormat,
+        size: TextureDescriptorSize,
+        usage: TextureDescriptorUsage,
+    ) -> Self {
         Self {
             dimension: None,
             format,
@@ -57,16 +61,36 @@ impl TextureDescriptorUsage {
 
     pub fn as_u32(&self) -> u32 {
         let mut usage = 0;
-        if self.copy_dst { usage |= web_sys::gpu_buffer_usage::COPY_DST; }
-        if self.copy_src { usage |= web_sys::gpu_buffer_usage::COPY_SRC; }
-        if self.index { usage |= web_sys::gpu_buffer_usage::INDEX; }
-        if self.indirect { usage |= web_sys::gpu_buffer_usage::INDIRECT; }
-        if self.map_read { usage |= web_sys::gpu_buffer_usage::MAP_READ; }
-        if self.map_write { usage |= web_sys::gpu_buffer_usage::MAP_WRITE; }
-        if self.query_resolve { usage |= web_sys::gpu_buffer_usage::QUERY_RESOLVE; }
-        if self.storage { usage |= web_sys::gpu_buffer_usage::STORAGE; }
-        if self.uniform { usage |= web_sys::gpu_buffer_usage::UNIFORM; }
-        if self.vertex { usage |= web_sys::gpu_buffer_usage::VERTEX; }
+        if self.copy_dst {
+            usage |= web_sys::gpu_buffer_usage::COPY_DST;
+        }
+        if self.copy_src {
+            usage |= web_sys::gpu_buffer_usage::COPY_SRC;
+        }
+        if self.index {
+            usage |= web_sys::gpu_buffer_usage::INDEX;
+        }
+        if self.indirect {
+            usage |= web_sys::gpu_buffer_usage::INDIRECT;
+        }
+        if self.map_read {
+            usage |= web_sys::gpu_buffer_usage::MAP_READ;
+        }
+        if self.map_write {
+            usage |= web_sys::gpu_buffer_usage::MAP_WRITE;
+        }
+        if self.query_resolve {
+            usage |= web_sys::gpu_buffer_usage::QUERY_RESOLVE;
+        }
+        if self.storage {
+            usage |= web_sys::gpu_buffer_usage::STORAGE;
+        }
+        if self.uniform {
+            usage |= web_sys::gpu_buffer_usage::UNIFORM;
+        }
+        if self.vertex {
+            usage |= web_sys::gpu_buffer_usage::VERTEX;
+        }
         usage
     }
 
@@ -121,7 +145,6 @@ impl TextureDescriptorUsage {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct TextureDescriptorSize {
     pub width: u32,
@@ -133,7 +156,11 @@ impl TextureDescriptorSize {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createTexture#size
 
     pub fn new(width: u32, height: Option<u32>, depth_or_array_layers: Option<u32>) -> Self {
-        Self { width, height, depth_or_array_layers }
+        Self {
+            width,
+            height,
+            depth_or_array_layers,
+        }
     }
 
     pub fn with_height(mut self, height: u32) -> Self {
@@ -146,7 +173,6 @@ impl TextureDescriptorSize {
         self
     }
 }
-
 
 #[derive(Debug, Clone, Default)]
 pub struct TextureViewDescriptor<'a> {
@@ -163,9 +189,12 @@ pub struct TextureViewDescriptor<'a> {
     pub usage: Option<TextureDescriptorUsage>,
 }
 
-impl <'a> TextureViewDescriptor<'a> {
+impl<'a> TextureViewDescriptor<'a> {
     pub fn new(label: Option<&'a str>) -> Self {
-        Self { label, ..Default::default() }
+        Self {
+            label,
+            ..Default::default()
+        }
     }
 }
 
@@ -174,7 +203,7 @@ pub struct ExternalTextureDescriptor<'a> {
     pub label: Option<&'a str>,
 }
 
-impl <'a> ExternalTextureDescriptor<'a> {
+impl<'a> ExternalTextureDescriptor<'a> {
     pub fn new(source: ExternalTextureDescriptorSource, label: Option<&'a str>) -> Self {
         Self { source, label }
     }
@@ -189,7 +218,11 @@ pub enum ExternalTextureDescriptorSource {
 
 impl From<TextureDescriptor<'_>> for web_sys::GpuTextureDescriptor {
     fn from(descriptor: TextureDescriptor) -> Self {
-        let descriptor_js = web_sys::GpuTextureDescriptor::new(descriptor.format, &js_sys::Object::from(descriptor.size), descriptor.usage.as_u32());
+        let descriptor_js = web_sys::GpuTextureDescriptor::new(
+            descriptor.format,
+            &js_sys::Object::from(descriptor.size),
+            descriptor.usage.as_u32(),
+        );
 
         if let Some(dimension) = descriptor.dimension {
             descriptor_js.set_dimension(dimension);
@@ -273,17 +306,31 @@ impl From<TextureDescriptorSize> for js_sys::Object {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createTexture#size
         let obj = js_sys::Object::new();
 
-        js_sys::Reflect::set(&obj, &JsValue::from_str("width"), &JsValue::from_f64(size.width as f64)).unwrap();
+        js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("width"),
+            &JsValue::from_f64(size.width as f64),
+        )
+        .unwrap();
 
         if let Some(height) = size.height {
-            js_sys::Reflect::set(&obj, &JsValue::from_str("height"), &JsValue::from_f64(height as f64)).unwrap();
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("height"),
+                &JsValue::from_f64(height as f64),
+            )
+            .unwrap();
         }
 
         if let Some(depth_or_array_layers) = size.depth_or_array_layers {
-            js_sys::Reflect::set(&obj, &JsValue::from_str("depthOrArrayLayers"), &JsValue::from_f64(depth_or_array_layers as f64)).unwrap();
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("depthOrArrayLayers"),
+                &JsValue::from_f64(depth_or_array_layers as f64),
+            )
+            .unwrap();
         }
 
-        obj 
-
+        obj
     }
 }

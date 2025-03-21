@@ -1,12 +1,12 @@
+pub mod color;
 pub mod compute_pass;
 pub mod render_pass;
-pub mod color;
 
 use std::ops::Deref;
 
+use crate::error::{AwsmError, Result};
 use compute_pass::ComputePassEncoder;
 use render_pass::RenderPassEncoder;
-use crate::error::{Result, AwsmError};
 
 #[derive(Debug, Clone)]
 pub struct CommandEncoder {
@@ -23,21 +23,27 @@ impl Deref for CommandEncoder {
 
 impl CommandEncoder {
     pub fn new(inner: web_sys::GpuCommandEncoder) -> Self {
-        Self {
-            inner
-        }
+        Self { inner }
     }
 
-    pub fn begin_compute_pass(&self, descriptor: Option<&web_sys::GpuComputePassDescriptor>) -> ComputePassEncoder {
+    pub fn begin_compute_pass(
+        &self,
+        descriptor: Option<&web_sys::GpuComputePassDescriptor>,
+    ) -> ComputePassEncoder {
         ComputePassEncoder::new(match descriptor {
             Some(descriptor) => self.inner.begin_compute_pass_with_descriptor(descriptor),
             None => self.inner.begin_compute_pass(),
         })
     }
 
-    pub fn begin_render_pass(&self, descriptor: &web_sys::GpuRenderPassDescriptor) -> Result<RenderPassEncoder> {
+    pub fn begin_render_pass(
+        &self,
+        descriptor: &web_sys::GpuRenderPassDescriptor,
+    ) -> Result<RenderPassEncoder> {
         Ok(RenderPassEncoder::new(
-            self.inner.begin_render_pass(descriptor).map_err(AwsmError::command_render_pass)?,
+            self.inner
+                .begin_render_pass(descriptor)
+                .map_err(AwsmError::command_render_pass)?,
         ))
     }
 

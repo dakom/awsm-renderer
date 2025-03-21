@@ -37,73 +37,108 @@ pub enum AwsmError {
 
 impl AwsmError {
     pub fn gpu_adapter(err: JsValue) -> Self {
-        Self::GpuAdapter(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
+        Self::GpuAdapter(
+            err.as_string()
+                .unwrap_or_else(|| "Unknown error".to_string()),
+        )
     }
 
     pub fn gpu_device(err: JsValue) -> Self {
-        Self::GpuDevice(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
+        Self::GpuDevice(
+            err.as_string()
+                .unwrap_or_else(|| "Unknown error".to_string()),
+        )
     }
 
     pub fn canvas_context(err: JsValue) -> Self {
-        Self::CanvasContext(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
+        Self::CanvasContext(
+            err.as_string()
+                .unwrap_or_else(|| "Unknown error".to_string()),
+        )
     }
 
     pub fn context_configuration(err: JsValue) -> Self {
-        Self::ContextConfiguration(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
+        Self::ContextConfiguration(
+            err.as_string()
+                .unwrap_or_else(|| "Unknown error".to_string()),
+        )
     }
 
     pub fn pipeline_creation(err: JsValue) -> Self {
         match err.dyn_into::<web_sys::GpuPipelineError>() {
             Ok(err) => {
                 let reason = match err.reason() {
-                    web_sys::GpuPipelineErrorReason::Validation => {
-                        "Validation"
-                    },
-                    web_sys::GpuPipelineErrorReason::Internal => {
-                        "Internal"
-                    },
-                    _ => {
-                        "Unknown"
-                    }
+                    web_sys::GpuPipelineErrorReason::Validation => "Validation",
+                    web_sys::GpuPipelineErrorReason::Internal => "Internal",
+                    _ => "Unknown",
                 };
 
-                Self::PipelineCreation(format!("Pipeline creation [{}] error: {}", reason, err.message()))
+                Self::PipelineCreation(format!(
+                    "Pipeline creation [{}] error: {}",
+                    reason,
+                    err.message()
+                ))
             }
-            Err(err) => {
-                Self::PipelineCreation(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
-            }
+            Err(err) => Self::PipelineCreation(
+                err.as_string()
+                    .unwrap_or_else(|| "Unknown error".to_string()),
+            ),
         }
     }
 
     pub fn pipeline_descriptor(err: JsValue) -> Self {
-        Self::PipelineDescriptor(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
+        Self::PipelineDescriptor(
+            err.as_string()
+                .unwrap_or_else(|| "Unknown error".to_string()),
+        )
     }
 
     pub fn query_set_creation(err: JsValue) -> Self {
-        Self::QuerySetCreation(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
+        Self::QuerySetCreation(
+            err.as_string()
+                .unwrap_or_else(|| "Unknown error".to_string()),
+        )
     }
 
     pub fn bind_group_layout(err: JsValue) -> Self {
-        Self::BindGroupLayout(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
+        Self::BindGroupLayout(
+            err.as_string()
+                .unwrap_or_else(|| "Unknown error".to_string()),
+        )
     }
 
     pub fn external_texture_creation(err: JsValue) -> Self {
-        Self::ExternalTextureCreation(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
+        Self::ExternalTextureCreation(
+            err.as_string()
+                .unwrap_or_else(|| "Unknown error".to_string()),
+        )
     }
 
     pub fn texture_creation(err: JsValue) -> Self {
-        Self::TextureCreation(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
+        Self::TextureCreation(
+            err.as_string()
+                .unwrap_or_else(|| "Unknown error".to_string()),
+        )
     }
 
     pub fn command_render_pass(err: JsValue) -> Self {
-        Self::CommandRenderPass(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
+        Self::CommandRenderPass(
+            err.as_string()
+                .unwrap_or_else(|| "Unknown error".to_string()),
+        )
     }
 
     pub fn current_context_texture(err: JsValue) -> Self {
-        Self::CurrentContextTexture(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
+        Self::CurrentContextTexture(
+            err.as_string()
+                .unwrap_or_else(|| "Unknown error".to_string()),
+        )
     }
 
     pub fn current_context_texture_view(err: JsValue) -> Self {
-        Self::CurrentContextTextureView(err.as_string().unwrap_or_else(|| "Unknown error".to_string()))
+        Self::CurrentContextTextureView(
+            err.as_string()
+                .unwrap_or_else(|| "Unknown error".to_string()),
+        )
     }
 }

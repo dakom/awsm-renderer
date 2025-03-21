@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 use super::constants::ConstantOverride;
 
 #[derive(Debug, Clone)]
-pub struct VertexState <'a> {
+pub struct VertexState<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#vertex_object_structure
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuVertexState.html
     pub constants: Vec<(u16, ConstantOverride)>,
@@ -21,7 +21,6 @@ pub struct VertexBufferLayout {
     pub step_mode: Option<VertexStepMode>,
 }
 
-
 // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#attributes
 pub type VertexAttribute = web_sys::GpuVertexAttribute;
 
@@ -32,7 +31,7 @@ pub type VertexFormat = web_sys::GpuVertexFormat;
 
 // JS conversion
 
-impl <'a> VertexState <'a> {
+impl<'a> VertexState<'a> {
     pub fn new(module: &'a web_sys::GpuShaderModule, entry_point: Option<&'a str>) -> Self {
         Self {
             constants: Vec::new(),
@@ -54,7 +53,8 @@ impl From<VertexState<'_>> for web_sys::GpuVertexState {
         if !state.constants.is_empty() {
             let obj = js_sys::Object::new();
             for (binding, constant) in &state.constants {
-                js_sys::Reflect::set(&obj, &JsValue::from(*binding), &JsValue::from(*constant)).unwrap_throw();
+                js_sys::Reflect::set(&obj, &JsValue::from(*binding), &JsValue::from(*constant))
+                    .unwrap_throw();
             }
             state_js.set_constants(&obj);
         }
@@ -73,7 +73,6 @@ impl From<VertexState<'_>> for web_sys::GpuVertexState {
 
 impl From<VertexBufferLayout> for web_sys::GpuVertexBufferLayout {
     fn from(buffer_layout: VertexBufferLayout) -> web_sys::GpuVertexBufferLayout {
-
         let attributes = js_sys::Array::new();
         if !buffer_layout.attributes.is_empty() {
             for attribute in &buffer_layout.attributes {
@@ -81,7 +80,8 @@ impl From<VertexBufferLayout> for web_sys::GpuVertexBufferLayout {
             }
         }
 
-        let buffer_layout_js = web_sys::GpuVertexBufferLayout::new(buffer_layout.array_stride, &attributes);
+        let buffer_layout_js =
+            web_sys::GpuVertexBufferLayout::new(buffer_layout.array_stride, &attributes);
 
         if let Some(step_mode) = buffer_layout.step_mode {
             buffer_layout_js.set_step_mode(step_mode);

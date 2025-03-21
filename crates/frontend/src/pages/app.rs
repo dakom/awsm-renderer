@@ -1,6 +1,6 @@
 mod content;
-mod sidebar;
 mod renderer;
+mod sidebar;
 
 use content::AppContent;
 use renderer::AppRenderer;
@@ -9,7 +9,7 @@ use sidebar::AppSidebar;
 use crate::prelude::*;
 
 pub struct AppUi {
-    renderer: AppRenderer
+    renderer: AppRenderer,
 }
 
 impl AppUi {

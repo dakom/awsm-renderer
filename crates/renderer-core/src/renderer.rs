@@ -1,8 +1,7 @@
-use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
 
 use crate::error::{AwsmError, Result};
-
 
 pub struct AwsmRenderer {
     pub gpu: web_sys::Gpu,
@@ -29,7 +28,10 @@ impl AwsmRendererBuilder {
     }
 
     pub async fn init_adapter(mut self) -> Result<Self> {
-        let adapter:web_sys::GpuAdapter = JsFuture::from(self.gpu.request_adapter()).await.map_err(AwsmError::gpu_adapter)?.unchecked_into();
+        let adapter: web_sys::GpuAdapter = JsFuture::from(self.gpu.request_adapter())
+            .await
+            .map_err(AwsmError::gpu_adapter)?
+            .unchecked_into();
 
         self.adapter = Some(adapter);
 
@@ -37,9 +39,15 @@ impl AwsmRendererBuilder {
     }
 
     pub async fn init_device(mut self) -> Result<Self> {
-        let adapter = self.adapter.as_ref().ok_or(AwsmError::GpuAdapter("Adapter not initialized".to_string()))?;
+        let adapter = self
+            .adapter
+            .as_ref()
+            .ok_or(AwsmError::GpuAdapter("Adapter not initialized".to_string()))?;
 
-        let device:web_sys::GpuDevice = JsFuture::from(adapter.request_device()).await.map_err(AwsmError::gpu_device)?.unchecked_into();
+        let device: web_sys::GpuDevice = JsFuture::from(adapter.request_device())
+            .await
+            .map_err(AwsmError::gpu_device)?
+            .unchecked_into();
 
         self.device = Some(device);
 
@@ -47,25 +55,25 @@ impl AwsmRendererBuilder {
     }
 
     pub fn init_context(mut self, canvas: web_sys::HtmlCanvasElement) -> Result<Self> {
-        let device = self.device.as_ref().ok_or(AwsmError::GpuDevice("Device not initialized".to_string()))?;
+        let device = self
+            .device
+            .as_ref()
+            .ok_or(AwsmError::GpuDevice("Device not initialized".to_string()))?;
 
-        let ctx:web_sys::GpuCanvasContext = match canvas.get_context("webgpu") {
+        let ctx: web_sys::GpuCanvasContext = match canvas.get_context("webgpu") {
             Ok(Some(ctx)) => Ok(ctx.unchecked_into()),
-            Err(err) => {
-                Err(AwsmError::canvas_context(err))
-            },
-            Ok(None) => {
-                Err(AwsmError::CanvasContext("No context found".to_string()))
-            }
+            Err(err) => Err(AwsmError::canvas_context(err)),
+            Ok(None) => Err(AwsmError::CanvasContext("No context found".to_string())),
         }?;
 
-        let presentation_format:web_sys::GpuTextureFormat = self.gpu.get_preferred_canvas_format();
+        let presentation_format: web_sys::GpuTextureFormat = self.gpu.get_preferred_canvas_format();
 
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUCanvasContext/configure
 
         let configuration = web_sys::GpuCanvasConfiguration::new(device, presentation_format);
 
-        ctx.configure(&configuration).map_err(AwsmError::context_configuration)?;
+        ctx.configure(&configuration)
+            .map_err(AwsmError::context_configuration)?;
 
         self.context = Some(ctx);
 
@@ -73,9 +81,15 @@ impl AwsmRendererBuilder {
     }
 
     pub fn build(self) -> Result<AwsmRenderer> {
-        let adapter = self.adapter.ok_or(AwsmError::GpuAdapter("Adapter not initialized".to_string()))?;
-        let device = self.device.ok_or(AwsmError::GpuDevice("Device not initialized".to_string()))?;
-        let context = self.context.ok_or(AwsmError::CanvasContext("Context not initialized".to_string()))?;
+        let adapter = self
+            .adapter
+            .ok_or(AwsmError::GpuAdapter("Adapter not initialized".to_string()))?;
+        let device = self
+            .device
+            .ok_or(AwsmError::GpuDevice("Device not initialized".to_string()))?;
+        let context = self.context.ok_or(AwsmError::CanvasContext(
+            "Context not initialized".to_string(),
+        ))?;
 
         Ok(AwsmRenderer {
             gpu: self.gpu,

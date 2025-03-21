@@ -1,14 +1,11 @@
-pub struct ShaderCode <'a> {
+pub struct ShaderCode<'a> {
     pub code: &'a str,
     pub label: Option<&'a str>,
 }
 
-impl <'a> ShaderCode <'a> {
+impl<'a> ShaderCode<'a> {
     pub fn new(code: &'a str, label: Option<&'a str>) -> Self {
-        Self {
-            code,
-            label,
-        }
+        Self { code, label }
     }
 }
 

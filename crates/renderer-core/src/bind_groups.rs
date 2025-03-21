@@ -1,7 +1,10 @@
-use crate::{buffer::BufferBinding, texture::{TextureFormat, TextureSampleType, TextureViewDimension}};
+use crate::{
+    buffer::BufferBinding,
+    texture::{TextureFormat, TextureSampleType, TextureViewDimension},
+};
 
 #[derive(Debug, Clone)]
-pub struct BindGroupLayoutDescriptor <'a> {
+pub struct BindGroupLayoutDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#descriptor
     pub label: Option<&'a str>,
     pub entries: Vec<BindGroupLayoutEntry>,
@@ -62,7 +65,6 @@ pub enum BindGroupLayoutResource {
     Texture(TextureBindingLayout),
 }
 
-
 #[derive(Debug, Clone, Default)]
 pub struct BufferBindingLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#hasdynamicoffset
@@ -104,7 +106,6 @@ impl StorageTextureBindingLayout {
 
 pub type StorageTextureAccess = web_sys::GpuStorageTextureAccess;
 
-
 #[derive(Debug, Clone)]
 pub struct TextureBindingLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#multisampled
@@ -114,7 +115,7 @@ pub struct TextureBindingLayout {
     pub sample_type: Option<TextureSampleType>,
 }
 
-impl <'a> BindGroupLayoutDescriptor <'a> {
+impl<'a> BindGroupLayoutDescriptor<'a> {
     pub fn new(label: Option<&'a str>) -> Self {
         Self {
             label,
@@ -124,7 +125,7 @@ impl <'a> BindGroupLayoutDescriptor <'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct BindGroupDescriptor <'a> {
+pub struct BindGroupDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroup#descriptor
     pub layout: &'a web_sys::GpuBindGroupLayout,
     pub label: Option<&'a str>,
@@ -146,8 +147,12 @@ pub enum BindGroupResource<'a> {
     TextureView(&'a web_sys::GpuTextureView),
 }
 
-impl <'a> BindGroupDescriptor <'a> {
-    pub fn new(layout: &'a web_sys::GpuBindGroupLayout, label: Option<&'a str>, entries: Vec<BindGroupEntry<'a>>) -> Self {
+impl<'a> BindGroupDescriptor<'a> {
+    pub fn new(
+        layout: &'a web_sys::GpuBindGroupLayout,
+        label: Option<&'a str>,
+        entries: Vec<BindGroupEntry<'a>>,
+    ) -> Self {
         Self {
             layout,
             label,
@@ -201,7 +206,9 @@ impl From<BindGroupLayoutEntry> for web_sys::GpuBindGroupLayoutEntry {
                 entry_js.set_sampler(&web_sys::GpuSamplerBindingLayout::from(sampler));
             }
             BindGroupLayoutResource::StorageTexture(storage_texture) => {
-                entry_js.set_storage_texture(&web_sys::GpuStorageTextureBindingLayout::from(storage_texture));
+                entry_js.set_storage_texture(&web_sys::GpuStorageTextureBindingLayout::from(
+                    storage_texture,
+                ));
             }
             BindGroupLayoutResource::Texture(texture) => {
                 entry_js.set_texture(&web_sys::GpuTextureBindingLayout::from(texture));
@@ -272,7 +279,7 @@ impl From<TextureBindingLayout> for web_sys::GpuTextureBindingLayout {
 
         if let Some(sample_type) = layout.sample_type {
             layout_js.set_sample_type(sample_type);
-        } 
+        }
 
         layout_js
     }
@@ -297,11 +304,14 @@ impl From<BindGroupDescriptor<'_>> for web_sys::GpuBindGroupDescriptor {
 
 impl From<BindGroupEntry<'_>> for web_sys::GpuBindGroupEntry {
     fn from(entry: BindGroupEntry) -> Self {
-        web_sys::GpuBindGroupEntry::new(entry.binding, &match entry.resource {
-            BindGroupResource::Buffer(buffer) => web_sys::GpuBufferBinding::from(buffer).into(),
-            BindGroupResource::ExternalTexture(external_texture) => external_texture.into(),
-            BindGroupResource::Sampler(sampler) => sampler.into(),
-            BindGroupResource::TextureView(texture_view) => texture_view.into(),
-        })
+        web_sys::GpuBindGroupEntry::new(
+            entry.binding,
+            &match entry.resource {
+                BindGroupResource::Buffer(buffer) => web_sys::GpuBufferBinding::from(buffer).into(),
+                BindGroupResource::ExternalTexture(external_texture) => external_texture.into(),
+                BindGroupResource::Sampler(sampler) => sampler.into(),
+                BindGroupResource::TextureView(texture_view) => texture_view.into(),
+            },
+        )
     }
 }

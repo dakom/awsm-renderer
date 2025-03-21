@@ -5,8 +5,8 @@ use awsm_renderer::renderer::{AwsmRenderer, AwsmRendererBuilder};
 use awsm_renderer::wip::AwsmRendererWipExt;
 use wasm_bindgen_futures::spawn_local;
 
-use crate::prelude::*;
 use crate::models::collections::GltfId;
+use crate::prelude::*;
 
 #[derive(Clone)]
 pub struct AppRenderer {
@@ -41,24 +41,32 @@ impl AppRenderer {
     pub fn set_canvas(&self, canvas: web_sys::HtmlCanvasElement) {
         let inner = self.inner.clone();
         spawn_local(async move {
-            let mut renderer = AwsmRendererBuilder::new(web_sys::window().unwrap().navigator().gpu())
-                .init_adapter().await.unwrap()
-                .init_device().await.unwrap()
-                .init_context(canvas.clone()).unwrap()
-                .build()
-                .unwrap();
+            let mut renderer =
+                AwsmRendererBuilder::new(web_sys::window().unwrap().navigator().gpu())
+                    .init_adapter()
+                    .await
+                    .unwrap()
+                    .init_device()
+                    .await
+                    .unwrap()
+                    .init_context(canvas.clone())
+                    .unwrap()
+                    .build()
+                    .unwrap();
 
             *inner.renderer.lock().unwrap() = Some(renderer);
 
             inner.render().await;
         });
     }
-
 }
 
 impl AppRendererInner {
     async fn render(&self) {
-        match (&mut *self.renderer.lock().unwrap(), *self.gltf_id.lock().unwrap()) {
+        match (
+            &mut *self.renderer.lock().unwrap(),
+            *self.gltf_id.lock().unwrap(),
+        ) {
             (Some(renderer), Some(gltf_id)) => {
                 tracing::info!("Rendering model with ID: {:?}", gltf_id);
                 renderer.temp_render().await.unwrap();

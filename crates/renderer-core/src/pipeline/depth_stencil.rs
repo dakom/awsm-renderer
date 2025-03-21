@@ -18,7 +18,6 @@ pub struct DepthStencilState {
     pub stencil_write_mask: Option<u32>,
 }
 
-
 #[derive(Debug, Clone, Default)]
 pub struct StencilFaceState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#stencilback

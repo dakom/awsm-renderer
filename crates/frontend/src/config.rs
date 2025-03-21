@@ -21,7 +21,11 @@ pub struct Config {
 
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
     let config = Config {
-        root_path: "",
+        root_path: if cfg!(debug_assertions) {
+            ""
+        } else {
+            "/awsm-renderer"
+        },
         debug: if cfg!(debug_assertions) {
             //ConfigDebug::release_mode()
             ConfigDebug::dev_mode(true)

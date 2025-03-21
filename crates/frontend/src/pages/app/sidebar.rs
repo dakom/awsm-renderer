@@ -11,7 +11,7 @@ pub struct AppSidebar {
 
 impl AppSidebar {
     pub fn new(renderer: AppRenderer) -> Arc<Self> {
-        Arc::new(Self {renderer})
+        Arc::new(Self { renderer })
     }
 
     pub fn render(self: &Arc<Self>) -> Dom {

@@ -1,13 +1,17 @@
 #[derive(Debug, Clone)]
-pub struct BufferBinding <'a> {
+pub struct BufferBinding<'a> {
     pub buffer: &'a web_sys::GpuBuffer,
     pub offset: Option<f64>,
     pub size: Option<f64>,
 }
 
-impl <'a> BufferBinding <'a> {
+impl<'a> BufferBinding<'a> {
     pub fn new(buffer: &'a web_sys::GpuBuffer) -> Self {
-        Self { buffer, offset: None, size: None }
+        Self {
+            buffer,
+            offset: None,
+            size: None,
+        }
     }
 }
 

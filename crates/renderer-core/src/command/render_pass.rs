@@ -2,7 +2,6 @@ use std::ops::Deref;
 
 use super::{color::Color, LoadOp, StoreOp};
 
-
 #[derive(Debug, Clone)]
 pub struct RenderPassEncoder {
     inner: web_sys::GpuRenderPassEncoder,
@@ -22,9 +21,8 @@ impl Deref for RenderPassEncoder {
     }
 }
 
-
 #[derive(Debug, Clone, Default)]
-pub struct RenderPassDescriptor <'a> {
+pub struct RenderPassDescriptor<'a> {
     pub color_attachments: Vec<ColorAttachment<'a>>,
     pub depth_stencil_attachment: Option<DepthStencilAttachment<'a>>,
     pub label: Option<&'a str>,
@@ -45,7 +43,7 @@ pub struct ColorAttachment<'a> {
     pub view: &'a web_sys::GpuTextureView,
 }
 
-impl <'a> ColorAttachment<'a> {
+impl<'a> ColorAttachment<'a> {
     pub fn new(view: &'a web_sys::GpuTextureView, load_op: LoadOp, store_op: StoreOp) -> Self {
         Self {
             view,
@@ -57,7 +55,6 @@ impl <'a> ColorAttachment<'a> {
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct DepthStencilAttachment<'a> {
@@ -74,9 +71,8 @@ pub struct DepthStencilAttachment<'a> {
     pub stencil_store_op: Option<StoreOp>,
 }
 
-
 #[derive(Debug, Clone)]
-pub struct RenderTimestampWrites <'a> {
+pub struct RenderTimestampWrites<'a> {
     pub query_set: &'a web_sys::GpuQuerySet,
     pub beginning_index: Option<u32>,
     pub end_index: Option<u32>,
@@ -98,7 +94,9 @@ impl From<RenderPassDescriptor<'_>> for web_sys::GpuRenderPassDescriptor {
         }
 
         if let Some(depth_stencil_attachment) = pass.depth_stencil_attachment {
-            pass_js.set_depth_stencil_attachment(&web_sys::GpuRenderPassDepthStencilAttachment::from(depth_stencil_attachment));
+            pass_js.set_depth_stencil_attachment(
+                &web_sys::GpuRenderPassDepthStencilAttachment::from(depth_stencil_attachment),
+            );
         }
 
         if let Some(max_draw_count) = pass.max_draw_count {
@@ -110,7 +108,9 @@ impl From<RenderPassDescriptor<'_>> for web_sys::GpuRenderPassDescriptor {
         }
 
         if let Some(timestamp_writes) = pass.timestamp_writes {
-            pass_js.set_timestamp_writes(&web_sys::GpuRenderPassTimestampWrites::from(timestamp_writes));
+            pass_js.set_timestamp_writes(&web_sys::GpuRenderPassTimestampWrites::from(
+                timestamp_writes,
+            ));
         }
 
         pass_js
@@ -119,7 +119,11 @@ impl From<RenderPassDescriptor<'_>> for web_sys::GpuRenderPassDescriptor {
 
 impl From<ColorAttachment<'_>> for web_sys::GpuRenderPassColorAttachment {
     fn from(attachment: ColorAttachment) -> web_sys::GpuRenderPassColorAttachment {
-        let attachment_js = web_sys::GpuRenderPassColorAttachment::new(attachment.load_op, attachment.store_op, attachment.view);
+        let attachment_js = web_sys::GpuRenderPassColorAttachment::new(
+            attachment.load_op,
+            attachment.store_op,
+            attachment.view,
+        );
 
         if let Some(clear_value) = attachment.clear_value {
             attachment_js.set_clear_value(&clear_value.as_js_value());
@@ -170,7 +174,8 @@ impl From<DepthStencilAttachment<'_>> for web_sys::GpuRenderPassDepthStencilAtta
 
 impl From<RenderTimestampWrites<'_>> for web_sys::GpuRenderPassTimestampWrites {
     fn from(timestamp_writes: RenderTimestampWrites) -> web_sys::GpuRenderPassTimestampWrites {
-        let timestamp_writes_js = web_sys::GpuRenderPassTimestampWrites::new(&timestamp_writes.query_set);
+        let timestamp_writes_js =
+            web_sys::GpuRenderPassTimestampWrites::new(&timestamp_writes.query_set);
 
         if let Some(beginning_index) = timestamp_writes.beginning_index {
             timestamp_writes_js.set_beginning_of_pass_write_index(beginning_index);

@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 #[derive(Debug, Clone)]
 pub enum PipelineLayoutKind {
     Auto,
-    Custom(web_sys::GpuPipelineLayout)
+    Custom(web_sys::GpuPipelineLayout),
 }
 
 impl Default for PipelineLayoutKind {
@@ -21,7 +21,6 @@ impl From<PipelineLayoutKind> for JsValue {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct PipelineLayoutDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createPipelineLayout
@@ -29,7 +28,7 @@ pub struct PipelineLayoutDescriptor<'a> {
     pub bind_group_layouts: Vec<web_sys::GpuBindGroupLayout>,
 }
 
-impl <'a> PipelineLayoutDescriptor <'a> {
+impl<'a> PipelineLayoutDescriptor<'a> {
     pub fn new(label: Option<&'a str>) -> Self {
         Self {
             label,

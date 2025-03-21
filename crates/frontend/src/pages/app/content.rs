@@ -6,14 +6,14 @@ use super::renderer::AppRenderer;
 
 pub struct AppContent {
     pub renderer: AppRenderer,
-    pub resize_observer: Arc<Mutex<Option<ResizeObserver>>> 
+    pub resize_observer: Arc<Mutex<Option<ResizeObserver>>>,
 }
 
 impl AppContent {
     pub fn new(renderer: AppRenderer) -> Arc<Self> {
         Arc::new(Self {
             renderer,
-            resize_observer: Arc::new(Mutex::new(None)), 
+            resize_observer: Arc::new(Mutex::new(None)),
         })
     }
 

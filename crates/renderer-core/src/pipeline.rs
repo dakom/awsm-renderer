@@ -1,11 +1,11 @@
-pub mod vertex;
+pub mod compare;
 pub mod constants;
-pub mod layout;
 pub mod depth_stencil;
 pub mod fragment;
+pub mod layout;
 pub mod multisample;
 pub mod primitive;
-pub mod compare;
+pub mod vertex;
 
 use depth_stencil::DepthStencilState;
 use fragment::FragmentState;
@@ -14,9 +14,8 @@ use multisample::MultisampleState;
 use primitive::PrimitiveState;
 use vertex::VertexState;
 
-
 #[derive(Debug, Clone)]
-pub struct PipelineDescriptor <'a> {
+pub struct PipelineDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#descriptor
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuRenderPipelineDescriptor.html
     // fill this out with a lot more detail
@@ -29,7 +28,7 @@ pub struct PipelineDescriptor <'a> {
     vertex: VertexState<'a>,
 }
 
-impl <'a> PipelineDescriptor <'a> {
+impl<'a> PipelineDescriptor<'a> {
     pub fn new(vertex: VertexState<'a>, label: Option<&'a str>) -> Self {
         Self {
             depth_stencil: None,
@@ -67,7 +66,6 @@ impl <'a> PipelineDescriptor <'a> {
 
 impl From<PipelineDescriptor<'_>> for web_sys::GpuRenderPipelineDescriptor {
     fn from(pipeline: PipelineDescriptor) -> web_sys::GpuRenderPipelineDescriptor {
-
         let PipelineDescriptor {
             depth_stencil,
             fragment,
@@ -78,7 +76,10 @@ impl From<PipelineDescriptor<'_>> for web_sys::GpuRenderPipelineDescriptor {
             vertex,
         } = pipeline;
 
-        let pipeline_js = web_sys::GpuRenderPipelineDescriptor::new(&layout.into(), &web_sys::GpuVertexState::from(vertex));
+        let pipeline_js = web_sys::GpuRenderPipelineDescriptor::new(
+            &layout.into(),
+            &web_sys::GpuVertexState::from(vertex),
+        );
 
         if let Some(depth_stencil) = depth_stencil {
             pipeline_js.set_depth_stencil(&web_sys::GpuDepthStencilState::from(depth_stencil));

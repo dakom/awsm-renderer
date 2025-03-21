@@ -1,9 +1,9 @@
+use super::constants::ConstantOverride;
 use crate::texture::TextureFormat;
 use wasm_bindgen::prelude::*;
-use super::constants::ConstantOverride;
 
 #[derive(Debug, Clone)]
-pub struct FragmentState <'a> {
+pub struct FragmentState<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#fragment_object_structure
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuFragmentState.html
     pub constants: Vec<(u16, ConstantOverride)>,
@@ -48,8 +48,12 @@ pub type BlendOperation = web_sys::GpuBlendOperation;
 
 // js conversions
 
-impl <'a> FragmentState <'a> {
-    pub fn new(module: &'a web_sys::GpuShaderModule, entry_point: Option<&'a str>, targets: Vec<ColorTargetState>) -> Self {
+impl<'a> FragmentState<'a> {
+    pub fn new(
+        module: &'a web_sys::GpuShaderModule,
+        entry_point: Option<&'a str>,
+        targets: Vec<ColorTargetState>,
+    ) -> Self {
         Self {
             constants: Vec::new(),
             entry_point,
@@ -57,7 +61,6 @@ impl <'a> FragmentState <'a> {
             targets,
         }
     }
-
 }
 
 impl From<FragmentState<'_>> for web_sys::GpuFragmentState {
@@ -76,7 +79,8 @@ impl From<FragmentState<'_>> for web_sys::GpuFragmentState {
         if !state.constants.is_empty() {
             let obj = js_sys::Object::new();
             for (binding, constant) in state.constants {
-                js_sys::Reflect::set(&obj, &JsValue::from(binding), &JsValue::from(constant)).unwrap_throw();
+                js_sys::Reflect::set(&obj, &JsValue::from(binding), &JsValue::from(constant))
+                    .unwrap_throw();
             }
             state_js.set_constants(&obj);
         }
@@ -93,7 +97,6 @@ impl ColorTargetState {
             write_mask: None,
         }
     }
-
 }
 
 impl From<ColorTargetState> for web_sys::GpuColorTargetState {
@@ -114,7 +117,10 @@ impl From<ColorTargetState> for web_sys::GpuColorTargetState {
 
 impl From<BlendState> for web_sys::GpuBlendState {
     fn from(state: BlendState) -> web_sys::GpuBlendState {
-        web_sys::GpuBlendState::new(&web_sys::GpuBlendComponent::from(state.alpha), &web_sys::GpuBlendComponent::from(state.color))
+        web_sys::GpuBlendState::new(
+            &web_sys::GpuBlendComponent::from(state.alpha),
+            &web_sys::GpuBlendComponent::from(state.color),
+        )
     }
 }
 
