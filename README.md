@@ -1,3 +1,5 @@
+# [live demo](https://dakom.github.io/awsm-renderer)
+
 # WHAT IT HOPES TO BE 
 
 A relatively pure Rust/WASM/WebGPU renderer, without using a full game engine framework like Bevy or a modular ECS like Shipyard (bring your own game engine!).
