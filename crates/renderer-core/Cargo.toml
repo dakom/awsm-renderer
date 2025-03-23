@@ -7,6 +7,10 @@ license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
 
+[features]
+default = ["exr"]
+exr = ["dep:exr"]
+
 [dependencies]
 anyhow = {workspace = true} 
 futures = {workspace = true} 
@@ -18,3 +22,6 @@ reqwest = {workspace = true}
 tracing = { workspace = true}
 web-sys = { workspace = true}
 thiserror = { workspace = true}
+awsm_web = { workspace = true}
+# optional deps
+exr = {workspace = true, optional = true}

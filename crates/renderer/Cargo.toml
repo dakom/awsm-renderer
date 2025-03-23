@@ -8,10 +8,13 @@ authors.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["core"]
-core = ["dep:awsm-renderer-core"]
+default = ["gltf"]
+gltf = ["awsm-renderer-scene/gltf"]
 
 [dependencies]
-awsm-renderer-core = {workspace = true, optional = true} 
+awsm-renderer-core = {workspace = true} 
+awsm-renderer-scene = {workspace = true} 
 web-sys = {workspace = true}
 tracing = {workspace = true}
+thiserror = {workspace = true}
+anyhow = {workspace = true}

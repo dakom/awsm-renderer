@@ -16,13 +16,19 @@ pub struct VertexState<'a> {
 pub struct VertexBufferLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#buffers
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuVertexBufferLayout.html
-    pub array_stride: f64,
+    pub array_stride: u64,
     pub attributes: Vec<VertexAttribute>,
     pub step_mode: Option<VertexStepMode>,
 }
 
-// https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#attributes
-pub type VertexAttribute = web_sys::GpuVertexAttribute;
+#[derive(Debug, Clone, Copy)]
+pub struct VertexAttribute {
+    // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#attributes
+    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuVertexAttribute.html
+    pub format: VertexFormat,
+    pub offset: u64,
+    pub shader_location: u32,
+}
 
 // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#stepmode
 pub type VertexStepMode = web_sys::GpuVertexStepMode;
@@ -76,17 +82,27 @@ impl From<VertexBufferLayout> for web_sys::GpuVertexBufferLayout {
         let attributes = js_sys::Array::new();
         if !buffer_layout.attributes.is_empty() {
             for attribute in &buffer_layout.attributes {
-                attributes.push(attribute);
+                attributes.push(&web_sys::GpuVertexAttribute::from(*attribute));
             }
         }
 
         let buffer_layout_js =
-            web_sys::GpuVertexBufferLayout::new(buffer_layout.array_stride, &attributes);
+            web_sys::GpuVertexBufferLayout::new(buffer_layout.array_stride as f64, &attributes);
 
         if let Some(step_mode) = buffer_layout.step_mode {
             buffer_layout_js.set_step_mode(step_mode);
         }
 
         buffer_layout_js
+    }
+}
+
+impl From<VertexAttribute> for web_sys::GpuVertexAttribute {
+    fn from(attribute: VertexAttribute) -> web_sys::GpuVertexAttribute {
+        web_sys::GpuVertexAttribute::new(
+            attribute.format,
+            attribute.offset as f64,
+            attribute.shader_location,
+        )
     }
 }

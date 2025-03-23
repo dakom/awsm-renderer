@@ -1,0 +1,59 @@
+use std::io::Cursor;
+
+// TODO - use reqwest, don't need awsm_web here
+use awsm_web::{data::ArrayBufferExt, loaders::fetch::fetch_url};
+use exr::prelude::{ReadChannels, ReadLayers, ChannelDescription};
+
+pub struct ExrImage {
+    pub data: Vec<f32>,
+    pub width: usize,
+    pub height: usize,
+    pub channel_info: (ChannelDescription, ChannelDescription, ChannelDescription, Option<ChannelDescription>),
+}
+
+impl ExrImage {
+    pub async fn load_url(url: &str) -> anyhow::Result<Self> {
+        // TODO: if getting raw bytes from url, regular request is fine
+        let bytes = fetch_url(url).await?.array_buffer().await?.to_vec_u8();
+
+        let cursor = Cursor::new(bytes);
+
+        // https://github.com/johannesvollmer/exrs/blob/master/GUIDE.md
+        let result = exr::image::read::read()
+            .no_deep_data()
+            .largest_resolution_level()
+            .rgba_channels(
+                |resolution, channel_info| {
+                    Self {
+                        data: vec![0.0; (resolution.0 * resolution.1 * 4) as usize],
+                        width: resolution.0 as usize,
+                        height: resolution.1 as usize,
+                        channel_info: channel_info.clone(),
+                    }
+                },
+                |img, pos, (r,g,b,a): (f32, f32, f32, exr::prelude::f16)| {
+                    //data: ImageData::new_with_sw(resolution.0 as u32, resolution.1 as u32).unwrap(),
+                    // let width = img.data.width() as usize;
+                    // let data = &mut img.data.data();
+
+                    let x = pos.0 as usize; 
+                    let y = pos.1 as usize; 
+                    let offset = (y * img.width + x) * 4;
+
+                    img.data[offset] = r; 
+                    img.data[offset + 1] = g; 
+                    img.data[offset + 2] = b; 
+                    img.data[offset + 3] = a.to_f32();
+                }
+            )
+            .first_valid_layer()
+            .all_attributes()
+            .on_progress(|progress| {
+                tracing::info!("progress: {:?}", progress);
+            })
+            .non_parallel()
+            .from_buffered(cursor)?;
+
+        Ok(result.layer_data.channel_data.pixels)
+    }
+}

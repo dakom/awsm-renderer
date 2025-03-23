@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use awsm_renderer::renderer::{AwsmRenderer, AwsmRendererBuilder};
 use awsm_renderer::wip::AwsmRendererWipExt;
+use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::models::collections::GltfId;
@@ -41,7 +41,7 @@ impl AppRenderer {
     pub fn set_canvas(&self, canvas: web_sys::HtmlCanvasElement) {
         let inner = self.inner.clone();
         spawn_local(async move {
-            let mut renderer =
+            let renderer =
                 AwsmRendererBuilder::new(web_sys::window().unwrap().navigator().gpu())
                     .init_adapter()
                     .await
@@ -68,8 +68,10 @@ impl AppRendererInner {
             *self.gltf_id.lock().unwrap(),
         ) {
             (Some(renderer), Some(gltf_id)) => {
-                tracing::info!("Rendering model with ID: {:?}", gltf_id);
-                renderer.temp_render().await.unwrap();
+                let url = format!("{}/{}", CONFIG.gltf_url, gltf_id.filepath());
+                tracing::info!("Rendering model at: {}", url);
+
+                renderer.temp_render(&url).await.unwrap();
 
                 // let pipeline = {
                 //     self.pipelines.lock().unwrap().get(&gltf_id).cloned()
