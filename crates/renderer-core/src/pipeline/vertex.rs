@@ -12,7 +12,7 @@ pub struct VertexState<'a> {
     pub buffers: Vec<VertexBufferLayout>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VertexBufferLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#buffers
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuVertexBufferLayout.html
@@ -21,13 +21,29 @@ pub struct VertexBufferLayout {
     pub step_mode: Option<VertexStepMode>,
 }
 
-#[derive(Debug, Clone, Copy)]
+impl std::hash::Hash for VertexBufferLayout {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.array_stride.hash(state);
+        self.step_mode.map(|x| x as u32).hash(state);
+        self.attributes.hash(state);
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VertexAttribute {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#attributes
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuVertexAttribute.html
     pub format: VertexFormat,
     pub offset: u64,
     pub shader_location: u32,
+}
+
+impl std::hash::Hash for VertexAttribute {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        (self.format as u32).hash(state);
+        self.offset.hash(state);
+        self.shader_location.hash(state);
+    }
 }
 
 // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#stepmode

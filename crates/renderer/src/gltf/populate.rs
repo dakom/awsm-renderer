@@ -1,29 +1,63 @@
-use crate::AwsmRenderer;
+use awsm_renderer_core::shaders::ShaderModuleExt;
+
+use crate::{
+    gltf::{pipelines::PipelineKey, shaders::ShaderKey},
+    AwsmRenderer,
+};
 
 use super::loader::GltfResource;
 
 impl AwsmRenderer {
     pub async fn populate_gltf(&mut self, _gltf_res: &GltfResource) -> anyhow::Result<()> {
         tracing::info!("Populating gltf resource...");
-        // TODO - populate the gltf resource with the data from the gltf file
-        // This will include loading textures, buffers, and other resources
-        // and creating the necessary GPU resources for rendering
 
-        // static INIT_SHADER_CODE: &str = include_str!("wip-shaders/init.wgsl");
-        // let shader = self.gpu.compile_shader(&ShaderModuleDescriptor::new(INIT_SHADER_CODE, None).into());
+        let shader_key = ShaderKey::default();
 
-        // let vertex = VertexState::new(&shader, None);
-        // let fragment = FragmentState::new(
-        //     &shader,
-        //     None,
-        //     vec![ColorTargetState::new(self.gpu.current_context_format())],
-        // );
+        let shader_module = match self.gltf_cache.shaders.get(&shader_key) {
+            None => {
+                tracing::info!("Compiling shader...");
+                let shader_module = self.gpu.compile_shader(&shader_key.into_descriptor());
+                shader_module.validate_shader().await?;
 
-        // let pipeline_descriptor = RenderPipelineDescriptor::new(vertex, None).with_fragment(fragment);
+                tracing::info!(
+                    "compiled shader: {:#?}",
+                    shader_module.get_compilation_info_ext().await?
+                );
+                tracing::info!("{}", shader_key.into_source());
 
-        // tracing::info!("Creating pipeline...");
+                self.gltf_cache
+                    .shaders
+                    .insert(shader_key.clone(), shader_module.clone());
 
-        // let pipeline = self.gpu.create_pipeline(&pipeline_descriptor.into()).await?;
+                shader_module
+            }
+            Some(shader_module) => shader_module.clone(),
+        };
+
+        let pipeline_key = PipelineKey::new(self, shader_key);
+
+        let _pipeline = match self.gltf_cache.pipelines.get(&pipeline_key) {
+            None => {
+                tracing::info!("Creating pipeline...");
+
+                let pipeline = self
+                    .gpu
+                    .create_render_pipeline(&pipeline_key.into_descriptor(&shader_module))
+                    .await?;
+
+                tracing::info!("created pipeline: {:#?}", pipeline);
+
+                self.gltf_cache
+                    .pipelines
+                    .insert(pipeline_key.clone(), pipeline.clone());
+
+                pipeline
+            }
+            Some(pipeline) => pipeline.clone(),
+        };
+
+        // TODO - transform nodes? lights? cameras? animations?
+
         Ok(())
     }
 }

@@ -12,7 +12,7 @@ pub struct FragmentState<'a> {
     pub targets: Vec<ColorTargetState>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColorTargetState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#targets
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuColorTargetState.html
@@ -21,7 +21,15 @@ pub struct ColorTargetState {
     pub write_mask: Option<u32>,
 }
 
-#[derive(Debug, Clone)]
+impl std::hash::Hash for ColorTargetState {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.blend.hash(state);
+        (self.format as u32).hash(state);
+        self.write_mask.hash(state);
+    }
+}
+
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct BlendState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#blend
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBlendState.html
@@ -35,12 +43,20 @@ impl BlendState {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct BlendComponent {
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBlendComponent.html
     pub operation: Option<BlendOperation>,
     pub src_factor: Option<BlendFactor>,
     pub dst_factor: Option<BlendFactor>,
+}
+
+impl std::hash::Hash for BlendComponent {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.operation.map(|x| x as u32).hash(state);
+        self.src_factor.map(|x| x as u32).hash(state);
+        self.dst_factor.map(|x| x as u32).hash(state);
+    }
 }
 
 pub type BlendFactor = web_sys::GpuBlendFactor;

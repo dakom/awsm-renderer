@@ -47,6 +47,7 @@ awsm-renderer-core = { version = "0.1.0-alpha.1", path = "./crates/renderer-core
 
 # Misc
 cfg-if = "1.0.0"
+ordered-float = "5.0.0"
 
 # Error handling
 anyhow = "1.0.95"
@@ -181,7 +182,6 @@ features = [
     "GpuTextureViewDescriptor",
     "GpuTextureDescriptor",
     "GpuTexture",
-    "gpu_shader_stage",
     "GpuTextureDimension",
     "GpuQueue",
     "GpuComputePassDescriptor",
@@ -201,6 +201,10 @@ features = [
     "GpuTexelCopyTextureInfo",
     "GpuTexelCopyBufferLayout",
     "GpuBufferDescriptor",
+    "GpuCompilationInfo",
+    "GpuCompilationMessage",
+    "GpuCompilationMessageType",
     "gpu_buffer_usage",
     "gpu_texture_usage",
+    "gpu_shader_stage",
 ]

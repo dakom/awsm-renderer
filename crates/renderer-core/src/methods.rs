@@ -42,8 +42,8 @@ impl AwsmRendererWebGpu {
 
     /// Example usage:
     /// let descriptor:RenderPipelineDescriptor = ...;
-    /// renderer.create_pipeline(&descriptor.into());
-    pub async fn create_pipeline(
+    /// renderer.create_render_pipeline(&descriptor.into());
+    pub async fn create_render_pipeline(
         &self,
         descriptor: &web_sys::GpuRenderPipelineDescriptor,
     ) -> Result<web_sys::GpuRenderPipeline> {
@@ -55,6 +55,8 @@ impl AwsmRendererWebGpu {
 
         Ok(pipeline)
     }
+
+    // TODO - create_compute_pipeline
 
     /// Example usage:
     /// let descriptor:PipelineLayoutDescriptor = ...;

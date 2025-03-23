@@ -67,7 +67,12 @@ impl AppRenderer {
 }
 
 impl AppRendererInner {
-    async fn render(&self) -> Result<()> {
+    async fn render(&self) {
+        if let Err(err) = self.inner_render().await {
+            tracing::error!("{:?}", err);
+        }
+    }
+    async fn inner_render(&self) -> Result<()> {
         match (
             &mut *self.renderer.lock().unwrap(),
             *self.gltf_id.lock().unwrap(),

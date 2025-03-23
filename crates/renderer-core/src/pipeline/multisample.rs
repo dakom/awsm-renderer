@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Default)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
 pub struct MultisampleState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#multisample
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuMultisampleState.html

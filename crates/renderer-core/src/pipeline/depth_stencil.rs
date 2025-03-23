@@ -1,8 +1,10 @@
+use ordered_float::OrderedFloat;
+
 use crate::texture::TextureFormat;
 
 use crate::compare::CompareFunction;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DepthStencilState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#depthstencil_object_structure
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuDepthStencilState.html
@@ -18,7 +20,22 @@ pub struct DepthStencilState {
     pub stencil_write_mask: Option<u32>,
 }
 
-#[derive(Debug, Clone, Default)]
+impl std::hash::Hash for DepthStencilState {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.depth_bias.hash(state);
+        self.depth_bias_clamp.map(OrderedFloat).hash(state);
+        self.depth_bias_slope_scale.map(OrderedFloat).hash(state);
+        self.depth_compare.map(|x| x as u32).hash(state);
+        self.depth_write_enabled.hash(state);
+        (self.format as u32).hash(state);
+        self.stencil_back.hash(state);
+        self.stencil_front.hash(state);
+        self.stencil_read_mask.hash(state);
+        self.stencil_write_mask.hash(state);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StencilFaceState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#stencilback
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuStencilFaceState.html
@@ -26,6 +43,15 @@ pub struct StencilFaceState {
     pub fail_op: Option<StencilOperation>,
     pub depth_fail_op: Option<StencilOperation>,
     pub pass_op: Option<StencilOperation>,
+}
+
+impl std::hash::Hash for StencilFaceState {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.compare.map(|x| x as u32).hash(state);
+        self.fail_op.map(|x| x as u32).hash(state);
+        self.depth_fail_op.map(|x| x as u32).hash(state);
+        self.pass_op.map(|x| x as u32).hash(state);
+    }
 }
 
 pub type StencilOperation = web_sys::GpuStencilOperation;
