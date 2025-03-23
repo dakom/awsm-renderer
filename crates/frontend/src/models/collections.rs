@@ -9,76 +9,68 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
     h.insert(
         "Todo",
         vec![
-            GltfId::EnvironmentTest,
-            GltfId::EnvironmentIblTest,
-            GltfId::MetalRoughSpheres,
-            GltfId::MetalRoughSpheresTextureless,
-            GltfId::MorphStressTest,
-            GltfId::NormalTangent,
-            GltfId::NormalTangentMirror,
-            GltfId::RecursiveSkeletons,
-            GltfId::NegativeScale,
-        ],
-    );
-
-    h.insert(
-        "Feature tests",
-        vec![
-            GltfId::AlphaBlendMode,
-            GltfId::BoomBoxAxes,
-            //GltfId::MetalRoughSpheres,
-            //GltfId::MetalRoughSpheresTextureless,
-            GltfId::MorphPrimitives,
-            //GltfId::MorphStressTest,
-            GltfId::MultiUv,
-            //GltfId::NegativeScale,
-            // GltfId::NormalTangent,
-            // GltfId::NormalTangentMirror,
-            GltfId::Orientation,
-            //GltfId::RecursiveSkeletons,
-            GltfId::TextureCoordinate,
-            GltfId::TextureLinearInterpolation,
-            GltfId::TextureSettings,
-            GltfId::VertexColor,
-        ],
-    );
-
-    h.insert(
-        "Minimal",
-        vec![
-            GltfId::TriangleWithoutIndices,
             GltfId::Triangle,
-            GltfId::SimpleSparseAccessor,
-            GltfId::SimpleMeshes,
-            GltfId::SimpleMorph,
-            GltfId::AnimatedTriangle,
-            GltfId::AnimatedMorphCube,
-            GltfId::AnimatedMorphSphere,
-            GltfId::SimpleSkin,
-            GltfId::InterpolationTest,
         ],
     );
 
-    h.insert(
-        "Standard",
-        vec![
-            GltfId::Box,
-            GltfId::BoxInterleaved,
-            GltfId::BoxTextured,
-            GltfId::BoxTexturedNpoT,
-            GltfId::BoxWithSpaces,
-            GltfId::BoxVertexColors,
-            GltfId::Cube,
-        ],
-    );
+    // h.insert(
+    //     "Feature tests",
+    //     vec![
+    //         GltfId::AlphaBlendMode,
+    //         GltfId::BoomBoxAxes,
+    //         //GltfId::MetalRoughSpheres,
+    //         //GltfId::MetalRoughSpheresTextureless,
+    //         GltfId::MorphPrimitives,
+    //         //GltfId::MorphStressTest,
+    //         GltfId::MultiUv,
+    //         //GltfId::NegativeScale,
+    //         // GltfId::NormalTangent,
+    //         // GltfId::NormalTangentMirror,
+    //         GltfId::Orientation,
+    //         //GltfId::RecursiveSkeletons,
+    //         GltfId::TextureCoordinate,
+    //         GltfId::TextureLinearInterpolation,
+    //         GltfId::TextureSettings,
+    //         GltfId::VertexColor,
+    //     ],
+    // );
 
-    h.insert(
-        "Extension Tests",
-        vec![
-            // GltfId::EnvironmentTest,
-            // GltfId::EnvironmentIblTest,
-        ],
-    );
+    // h.insert(
+    //     "Minimal",
+    //     vec![
+    //         GltfId::TriangleWithoutIndices,
+    //         GltfId::Triangle,
+    //         GltfId::SimpleSparseAccessor,
+    //         GltfId::SimpleMeshes,
+    //         GltfId::SimpleMorph,
+    //         GltfId::AnimatedTriangle,
+    //         GltfId::AnimatedMorphCube,
+    //         GltfId::AnimatedMorphSphere,
+    //         GltfId::SimpleSkin,
+    //         GltfId::InterpolationTest,
+    //     ],
+    // );
+
+    // h.insert(
+    //     "Standard",
+    //     vec![
+    //         GltfId::Box,
+    //         GltfId::BoxInterleaved,
+    //         GltfId::BoxTextured,
+    //         GltfId::BoxTexturedNpoT,
+    //         GltfId::BoxWithSpaces,
+    //         GltfId::BoxVertexColors,
+    //         GltfId::Cube,
+    //     ],
+    // );
+
+    // h.insert(
+    //     "Extension Tests",
+    //     vec![
+    //         // GltfId::EnvironmentTest,
+    //         // GltfId::EnvironmentIblTest,
+    //     ],
+    // );
 
     h
 });

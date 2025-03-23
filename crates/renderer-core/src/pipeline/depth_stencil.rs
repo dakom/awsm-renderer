@@ -1,6 +1,6 @@
 use crate::texture::TextureFormat;
 
-use super::compare::CompareFunction;
+use crate::compare::CompareFunction;
 
 #[derive(Debug, Clone)]
 pub struct DepthStencilState {

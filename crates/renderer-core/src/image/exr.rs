@@ -1,9 +1,8 @@
 use std::io::Cursor;
 
-// TODO - use reqwest, don't need awsm_web here
-use awsm_web::{data::ArrayBufferExt, loaders::fetch::fetch_url};
 use exr::prelude::{ReadChannels, ReadLayers, ChannelDescription};
 
+#[derive(Clone, Debug)]
 pub struct ExrImage {
     pub data: Vec<f32>,
     pub width: usize,
@@ -13,8 +12,11 @@ pub struct ExrImage {
 
 impl ExrImage {
     pub async fn load_url(url: &str) -> anyhow::Result<Self> {
-        // TODO: if getting raw bytes from url, regular request is fine
-        let bytes = fetch_url(url).await?.array_buffer().await?.to_vec_u8();
+        let bytes = gloo_net::http::Request::get(url)
+            .send()
+            .await?
+            .binary()
+            .await?;
 
         let cursor = Cursor::new(bytes);
 

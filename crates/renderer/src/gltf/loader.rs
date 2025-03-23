@@ -9,8 +9,6 @@ use awsm_renderer_core::image::ImageLoader;
 /// 3. Some error checking is removed since the web api does it inherently (e.g. mime type)
 /// 4. Adds awsm as a dependency
 ///
-use awsm_web::data::ArrayBufferExt;
-use awsm_web::loaders::{fetch::fetch_url, image::load_u8 as load_image_u8};
 use gltf::{Gltf, Document, buffer, image, Error as GltfError};
 use std::future::Future;
 use std::sync::{Arc, Mutex};
@@ -18,6 +16,7 @@ use futures::future::try_join_all;
 
 use super::error::AwsmGltfError;
 
+#[derive(Clone, Debug)]
 pub struct GltfResource {
     pub gltf: Document,
     pub buffers: Vec<Vec<u8>>,
@@ -45,12 +44,12 @@ impl GltfResource {
 
         let Gltf { document, blob } = match file_type {
             GltfFileType::Json => { 
-                let text = fetch_url(&url).await?.text().await?;
+                let text = gloo_net::http::Request::get(&url).send().await?.text().await?;
                 let bytes:&[u8] = text.as_bytes();
                 Gltf::from_slice(bytes)
             },
             GltfFileType::Glb => {
-                let bytes = fetch_url(&url).await?.array_buffer().await?.to_vec_u8();
+                let bytes = gloo_net::http::Request::get(&url).send().await?.binary().await?;
                 Gltf::from_slice(&bytes)
             },
             _ => return Err(AwsmGltfError::Load.into())
@@ -121,8 +120,8 @@ fn get_buffer_futures<'a>(document:&'a Document, base:&str, blob: Option<Vec<u8>
             match buffer.source() {
                 buffer::Source::Uri(uri) => {
                     let url = get_url(base.as_ref(), uri)?;
-                    let res = fetch_url(&url).await?.array_buffer().await?.to_vec_u8();
-                    Ok(res)
+                    let bytes = gloo_net::http::Request::get(&url).send().await?.binary().await?;
+                    Ok(bytes)
                 },
                 buffer::Source::Bin => {
                     // should this be cloned?
@@ -158,7 +157,7 @@ fn get_image_futures<'a>(document:&'a Document, base:&str, buffer_data:&'a [Vec<
                     let begin = view.offset();
                     let end = begin + view.length();
                     let encoded_image = &parent_buffer_data[begin..end];
-                    let image = load_image_u8(&encoded_image, &mime_type).await?;
+                    let image = crate::core::image::element::load_u8(&encoded_image, &mime_type).await?;
                     Ok(ImageLoader::HtmlImage(image))
                 },
             }

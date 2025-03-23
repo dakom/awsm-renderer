@@ -8,13 +8,24 @@ authors.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["gltf"]
-gltf = ["awsm-renderer-scene/gltf"]
+default = ["gltf", "exr"]
+gltf = [
+    "dep:gltf",
+    "dep:gloo-net",
+    "awsm-renderer-core/image",
+]
+exr = [
+    "awsm-renderer-core/exr",
+]
 
 [dependencies]
 awsm-renderer-core = {workspace = true} 
-awsm-renderer-scene = {workspace = true} 
 web-sys = {workspace = true}
 tracing = {workspace = true}
 thiserror = {workspace = true}
 anyhow = {workspace = true}
+futures = {workspace = true}
+
+# Optional deps
+gloo-net = {workspace = true, optional = true}
+gltf = {workspace = true, optional = true}

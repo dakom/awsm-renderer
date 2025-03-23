@@ -27,6 +27,9 @@ impl AwsmRendererWebGpu {
             .map_err(AwsmCoreError::current_context_texture_view)
     }
 
+    /// Example usage:
+    /// let descriptor:ShaderModuleDescriptor = ...;
+    /// renderer.compile_shader(&descriptor.into());
     pub fn compile_shader(
         &self,
         shader_code: &web_sys::GpuShaderModuleDescriptor,
@@ -34,6 +37,9 @@ impl AwsmRendererWebGpu {
         self.device.create_shader_module(shader_code)
     }
 
+    /// Example usage:
+    /// let descriptor:RenderPipelineDescriptor = ...;
+    /// renderer.create_pipeline(&descriptor.into());
     pub async fn create_pipeline(
         &self,
         descriptor: &web_sys::GpuRenderPipelineDescriptor,
@@ -47,6 +53,9 @@ impl AwsmRendererWebGpu {
         Ok(pipeline)
     }
 
+    /// Example usage:
+    /// let descriptor:PipelineLayoutDescriptor = ...;
+    /// renderer.create_pipeline_layout(&descriptor.into());
     pub fn create_pipeline_layout(
         &self,
         descriptor: &web_sys::GpuPipelineLayoutDescriptor,
@@ -54,6 +63,9 @@ impl AwsmRendererWebGpu {
         self.device.create_pipeline_layout(descriptor)
     }
 
+    /// Example usage:
+    /// let descriptor:BindGroupLayoutDescriptor = ...;
+    /// renderer.create_bind_group_layout(&descriptor.into());
     pub fn create_bind_group_layout(
         &self,
         descriptor: &web_sys::GpuBindGroupLayoutDescriptor,
@@ -63,6 +75,9 @@ impl AwsmRendererWebGpu {
             .map_err(AwsmCoreError::bind_group_layout)
     }
 
+    /// Example usage:
+    /// let descriptor:BindGroupDescriptor = ...;
+    /// renderer.create_bind_group(&descriptor.into());
     pub fn create_bind_group(
         &self,
         descriptor: &web_sys::GpuBindGroupDescriptor,
@@ -70,6 +85,9 @@ impl AwsmRendererWebGpu {
         self.device.create_bind_group(descriptor)
     }
 
+    /// Example usage:
+    /// let descriptor:SamplerDescriptor = ...;
+    /// renderer.create_sampler(Some(&descriptor.into()));
     pub fn create_sampler(
         &self,
         descriptor: Option<&web_sys::GpuSamplerDescriptor>,
@@ -80,6 +98,9 @@ impl AwsmRendererWebGpu {
         }
     }
 
+    /// Example usage:
+    /// let descriptor:TextureDescriptor = ...;
+    /// renderer.create_texture(&descriptor.into());
     pub fn create_texture(
         &self,
         descriptor: &web_sys::GpuTextureDescriptor,
@@ -89,6 +110,9 @@ impl AwsmRendererWebGpu {
             .map_err(AwsmCoreError::texture_creation)
     }
 
+    /// Example usage:
+    /// let descriptor:BufferDescriptor = ...;
+    /// renderer.create_buffer(&descriptor.into());
     pub fn create_buffer(
         &self,
         descriptor: &web_sys::GpuBufferDescriptor,
@@ -98,6 +122,24 @@ impl AwsmRendererWebGpu {
             .map_err(AwsmCoreError::buffer_creation)
     }
 
+    /// Example usage:
+    /// let encoder = renderer.create_command_encoder(Some("My Encoder"));
+    /// let render_pass = command_encoder.begin_render_pass(
+    ///     &RenderPassDescriptor {
+    ///         color_attachments: vec![ColorAttachment::new(
+    ///             &renderer.gpu.current_context_texture_view()?,
+    ///             LoadOp::Clear,
+    ///             StoreOp::Store,
+    ///         )],
+    ///         ..Default::default()
+    ///     }
+    ///     .into()
+    /// );
+    /// 
+    /// render_pass.set_pipeline(&pipeline);
+    /// render_pass.draw(3);
+    /// render_pass.end();
+    /// self.gpu.submit_commands(&command_encoder.finish());
     pub fn create_command_encoder(&self, label: Option<&str>) -> CommandEncoder {
         let encoder = match label {
             None => self.device.create_command_encoder(),
@@ -112,12 +154,14 @@ impl AwsmRendererWebGpu {
         CommandEncoder::new(encoder)
     }
 
+    /// See [create_command_encoder](create_command_encoder) for usage.
     pub fn submit_commands(&self, command_buffer: &web_sys::GpuCommandBuffer) {
         self.device
             .queue()
             .submit(&js_sys::Array::of1(command_buffer));
     }
 
+    /// See [create_command_encoder](create_command_encoder) for usage.
     pub fn submit_commands_batch(&self, command_buffers: &[&web_sys::GpuCommandBuffer]) {
         let command_buffers_js = js_sys::Array::new();
         for command_buffer in command_buffers {
@@ -126,6 +170,7 @@ impl AwsmRendererWebGpu {
         self.device.queue().submit(&command_buffers_js);
     }
 
+    // pretty much a direct pass-through, just a bit nicer
     pub fn create_query_set(
         &self,
         query_type: web_sys::GpuQueryType,
@@ -143,6 +188,9 @@ impl AwsmRendererWebGpu {
             .map_err(AwsmCoreError::query_set_creation)
     }
 
+    /// Example usage:
+    /// let descriptor:ExternalTextureDescriptor = ...;
+    /// renderer.import_external_texture(&descriptor.into());
     pub fn import_external_texture(
         &self,
         descriptor: &web_sys::GpuExternalTextureDescriptor,
@@ -152,6 +200,9 @@ impl AwsmRendererWebGpu {
             .map_err(AwsmCoreError::external_texture_creation)
     }
 
+    /// Example usage:
+    /// let data: &[u8] = ...;
+    /// renderer.write_buffer(buffer, None, data, None, None);
     #[allow(private_bounds)]
     pub fn write_buffer<'a>(&self, buffer: &web_sys::GpuBuffer, buffer_offset: Option<u64>, data: impl Into<JsData<'a>>, data_offset: Option<u64>, data_size: Option<u64>) -> Result<()> 
     {
@@ -161,7 +212,7 @@ impl AwsmRendererWebGpu {
         let data = data.into();
 
         match data {
-            JsData::Slice(data) => {
+            JsData::SliceU8(data) => {
                 match (data_offset, data_size) {
                     (None, None) => {
                         self.device
@@ -255,13 +306,19 @@ impl AwsmRendererWebGpu {
 
     }
 
+    /// Example usage:
+    /// let destination:TexelCopyTextureInfo = ...;
+    /// let layout: TexelCopyBufferLayout = ...;
+    /// let size: Extent3d = ...;
+    /// let data: &[u8] = ...;
+    /// renderer.write_texture(&destination.into(), data, &layout.into(), &size.into());
     #[allow(private_bounds)]
     pub fn write_texture<'a>(&self, destination: &web_sys::GpuTexelCopyTextureInfo, data: impl Into<JsData<'a>>, layout: &web_sys::GpuTexelCopyBufferLayout, size: &web_sys::GpuExtent3dDict) -> Result<()> {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/writeTexture
 
         let data = data.into();
         match data {
-            JsData::Slice(data) => {
+            JsData::SliceU8(data) => {
                 self.device
                     .queue()
                     .write_texture_with_u8_slice_and_gpu_extent_3d_dict(

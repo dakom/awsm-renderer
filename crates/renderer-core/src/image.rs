@@ -1,10 +1,10 @@
-use web_sys::HtmlImageElement;
-// TODO - use reqwest, don't need awsm_web here
-use awsm_web::loaders::image::load as fetch_image;
-
+pub mod element;
 #[cfg(feature = "exr")]
 pub mod exr;
 
+use web_sys::HtmlImageElement;
+
+#[derive(Clone, Debug)]
 pub enum ImageLoader {
     #[cfg(feature = "exr")]
     Exr(exr::ExrImage),
@@ -19,7 +19,7 @@ impl ImageLoader {
                     let exr_image = exr::ExrImage::load_url(url).await?;
                     Ok(Self::Exr(exr_image))
                 } else {
-                    let image = fetch_image(url.to_string()).await?;
+                    let image = element::load(url.to_string()).await?;
                     Ok(Self::HtmlImage(image))
                 }
             }
@@ -32,7 +32,7 @@ impl ImageLoader {
             }
         } else {
             pub async fn load_url(url:&str) -> Result<Self> {
-                let image = fetch_image(url.to_string()).await?;
+                let image = element::load(url.to_string()).await?;
                 Ok(Self::HtmlImage(image))
             }
 

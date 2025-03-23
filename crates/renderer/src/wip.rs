@@ -6,28 +6,21 @@ use awsm_renderer_core::{
     pipeline::{
         fragment::{ColorTargetState, FragmentState},
         vertex::VertexState,
-        PipelineDescriptor,
+        RenderPipelineDescriptor,
     },
-    shaders::ShaderCode,
+    shaders::ShaderModuleDescriptor,
 };
-use awsm_renderer_scene::gltf::loader::GltfResource;
+use crate::gltf::loader::GltfResource;
 use anyhow::Result;
 
 use crate::AwsmRenderer;
 
-pub trait AwsmRendererWipExt {
-    #[allow(async_fn_in_trait)]
-    async fn temp_render(&mut self, url: &str) -> Result<()>;
-    #[allow(async_fn_in_trait)]
-    async fn basic_render(&self) -> Result<()>;
-}
-
-impl AwsmRendererWipExt for AwsmRenderer {
+impl AwsmRenderer {
     async fn temp_render(&mut self, url: &str) -> Result<()> {
 
         let gltf_res = GltfResource::load(url, None).await?;
 
-        self.scene.init_gltf(&gltf_res).await?;
+        self.init_gltf(&gltf_res).await?;
 
 
         Ok(())
@@ -35,7 +28,7 @@ impl AwsmRendererWipExt for AwsmRenderer {
 
     async fn basic_render(&self) -> Result<()> {
         static INIT_SHADER_CODE: &str = include_str!("wip-shaders/init.wgsl");
-        let shader = self.gpu.compile_shader(&ShaderCode::new(INIT_SHADER_CODE, None).into());
+        let shader = self.gpu.compile_shader(&ShaderModuleDescriptor::new(INIT_SHADER_CODE, None).into());
 
         let vertex = VertexState::new(&shader, None);
         let fragment = FragmentState::new(
@@ -44,7 +37,7 @@ impl AwsmRendererWipExt for AwsmRenderer {
             vec![ColorTargetState::new(self.gpu.current_context_format())],
         );
 
-        let pipeline_descriptor = PipelineDescriptor::new(vertex, None).with_fragment(fragment);
+        let pipeline_descriptor = RenderPipelineDescriptor::new(vertex, None).with_fragment(fragment);
 
         tracing::info!("Creating pipeline...");
 

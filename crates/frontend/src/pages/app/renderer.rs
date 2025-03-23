@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use awsm_renderer::wip::AwsmRendererWipExt;
+use awsm_renderer::gltf::loader::GltfResource;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use wasm_bindgen_futures::spawn_local;
 
@@ -17,6 +17,7 @@ struct AppRendererInner {
     pub renderer: Mutex<Option<AwsmRenderer>>,
     pub gltf_id: Mutex<Option<GltfId>>,
     pub pipelines: Mutex<HashMap<GltfId, web_sys::GpuRenderPipeline>>,
+    pub gltf_res: Mutex<HashMap<GltfId, GltfResource>>,
 }
 
 impl AppRenderer {
@@ -26,6 +27,7 @@ impl AppRenderer {
                 renderer: Mutex::new(None),
                 gltf_id: Mutex::new(None),
                 pipelines: Mutex::new(HashMap::new()),
+                gltf_res: Mutex::new(HashMap::new()),
             }),
         }
     }
@@ -33,7 +35,9 @@ impl AppRenderer {
     pub fn set_model(&self, model_id: GltfId) {
         let inner = self.inner.clone();
         spawn_local(async move {
-            *inner.gltf_id.lock().unwrap() = Some(model_id);
+            {
+                *inner.gltf_id.lock().unwrap() = Some(model_id);
+            }
             inner.render().await;
         });
     }
@@ -54,7 +58,9 @@ impl AppRenderer {
                     .build()
                     .unwrap();
 
-            *inner.renderer.lock().unwrap() = Some(renderer);
+            {
+                *inner.renderer.lock().unwrap() = Some(renderer);
+            }
 
             inner.render().await;
         });
@@ -62,7 +68,7 @@ impl AppRenderer {
 }
 
 impl AppRendererInner {
-    async fn render(&self) {
+    async fn render(&self) -> Result<()> {
         match (
             &mut *self.renderer.lock().unwrap(),
             *self.gltf_id.lock().unwrap(),
@@ -71,26 +77,26 @@ impl AppRendererInner {
                 let url = format!("{}/{}", CONFIG.gltf_url, gltf_id.filepath());
                 tracing::info!("Rendering model at: {}", url);
 
-                renderer.temp_render(&url).await.unwrap();
+                let gltf_res = {
+                    self.gltf_res.lock().unwrap().get(&gltf_id).cloned()
+                };
 
-                // let pipeline = {
-                //     self.pipelines.lock().unwrap().get(&gltf_id).cloned()
-                // };
+                let gltf_res = match gltf_res {
+                    Some(gltf_res) => gltf_res,
+                    None => {
+                        let gltf_res = GltfResource::load(&url, None).await?;
+                        self.gltf_res.lock().unwrap().insert(gltf_id, gltf_res.clone());
+                        gltf_res
+                    }
+                };
 
-                // let pipeline = match pipeline {
-                //     Some(pipeline) => pipeline,
-                //     None => {
-                //         let pipeline = renderer.temp_pipeline().await.unwrap();
-                //         self.pipelines.lock().unwrap().insert(gltf_id, pipeline.clone());
-                //         pipeline
-                //     }
-                // };
+                renderer.populate_gltf(&gltf_res).await?;
 
-                // let mut commands = CommandBuilder::new(None);
-
-                // renderer.temp_render(commands.build(renderer).unwrap());
+                renderer.render()?;
             }
             _ => {}
         }
+
+        Ok(())
     }
 }

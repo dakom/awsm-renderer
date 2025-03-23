@@ -9,7 +9,8 @@ rust-version.workspace = true
 
 [features]
 default = ["exr"]
-exr = ["dep:exr"]
+exr = ["dep:exr", "image"]
+image = ["dep:gloo-net"]
 
 [dependencies]
 anyhow = {workspace = true} 
@@ -18,10 +19,9 @@ wasm-bindgen = {workspace = true}
 js-sys = {workspace = true}
 wasm-bindgen-futures = {workspace = true}
 cfg-if = {workspace = true}
-reqwest = {workspace = true}
 tracing = { workspace = true}
 web-sys = { workspace = true}
 thiserror = { workspace = true}
-awsm_web = { workspace = true}
 # optional deps
+gloo-net = {workspace = true, optional = true}
 exr = {workspace = true, optional = true}

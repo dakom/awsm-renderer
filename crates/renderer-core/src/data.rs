@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 // Internal-only wrapper so we can constrain the type of data used in
 // write_buffer() and write_texture()
 pub(crate) enum JsData <'a> {
-    Slice(&'a [u8]),
+    SliceU8(&'a [u8]),
     ArrayBuffer(&'a js_sys::ArrayBuffer),
     DataView(&'a js_sys::DataView),
     Int8Array(&'a js_sys::Int8Array),
@@ -22,7 +22,7 @@ pub(crate) enum JsData <'a> {
 impl <'a> JsData<'a> { 
     pub fn as_js_value_ref(&'a self) -> &'a JsValue {
         match self {
-            JsData::Slice(_) => {
+            JsData::SliceU8(_) => {
                 panic!("JsData::Slice should not be used as a JsValue")
             },
             JsData::ArrayBuffer(buffer) => buffer.unchecked_ref(),
@@ -44,7 +44,7 @@ impl <'a> JsData<'a> {
 
 impl <'a> From<&'a [u8]> for JsData<'a> {
     fn from(data: &'a [u8]) -> Self {
-        JsData::Slice(data)
+        JsData::SliceU8(data)
     }
 }
 

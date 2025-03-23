@@ -10,3 +10,4 @@ pub mod shaders;
 pub mod texture;
 pub mod image;
 pub mod data;
+pub mod compare;
