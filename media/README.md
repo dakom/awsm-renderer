@@ -1,0 +1,1 @@
+The models directory is gitignored. Expected to be cloned from https://github.com/KhronosGroup/glTF-Sample-Assets.git

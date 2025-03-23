@@ -17,6 +17,7 @@ pub struct Config {
     pub root_path: &'static str,
     pub debug: ConfigDebug,
     pub media_baseurl: String,
+    pub gltf_url: String,
 }
 
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
@@ -37,6 +38,11 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         } else {
             "/awsm-renderer/media".to_string()
             //format!("{}/media", web_sys::window().unwrap().origin())
+        },
+        gltf_url: if cfg!(debug_assertions) {
+            "http://localhost:9082/glTF-Sample-Assets/Models".to_string()
+        } else {
+            "https://raw.githubusercontent.com/glTF-Sample-Assets/Models".to_string()
         },
     };
 

@@ -26,7 +26,7 @@ pub struct RenderPassDescriptor<'a> {
     pub color_attachments: Vec<ColorAttachment<'a>>,
     pub depth_stencil_attachment: Option<DepthStencilAttachment<'a>>,
     pub label: Option<&'a str>,
-    pub max_draw_count: Option<f64>,
+    pub max_draw_count: Option<u64>,
     pub occlusion_query_set: Option<&'a web_sys::GpuQuerySet>,
     pub timestamp_writes: Option<RenderTimestampWrites<'a>>,
 }
@@ -100,7 +100,7 @@ impl From<RenderPassDescriptor<'_>> for web_sys::GpuRenderPassDescriptor {
         }
 
         if let Some(max_draw_count) = pass.max_draw_count {
-            pass_js.set_max_draw_count(max_draw_count);
+            pass_js.set_max_draw_count(max_draw_count as f64);
         }
 
         if let Some(occlusion_query_set) = pass.occlusion_query_set {

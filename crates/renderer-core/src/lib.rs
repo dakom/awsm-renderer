@@ -1,7 +1,10 @@
 pub mod bind_groups;
 pub mod buffer;
 pub mod command;
+pub mod compare;
+pub mod data;
 pub mod error;
+pub mod image;
 pub mod methods;
 pub mod pipeline;
 pub mod renderer;

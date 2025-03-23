@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use awsm_renderer::renderer::{AwsmRenderer, AwsmRendererBuilder};
-use awsm_renderer::wip::AwsmRendererWipExt;
+use awsm_renderer::gltf::loader::GltfResource;
+use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::models::collections::GltfId;
@@ -17,6 +17,7 @@ struct AppRendererInner {
     pub renderer: Mutex<Option<AwsmRenderer>>,
     pub gltf_id: Mutex<Option<GltfId>>,
     pub pipelines: Mutex<HashMap<GltfId, web_sys::GpuRenderPipeline>>,
+    pub gltf_res: Mutex<HashMap<GltfId, GltfResource>>,
 }
 
 impl AppRenderer {
@@ -26,6 +27,7 @@ impl AppRenderer {
                 renderer: Mutex::new(None),
                 gltf_id: Mutex::new(None),
                 pipelines: Mutex::new(HashMap::new()),
+                gltf_res: Mutex::new(HashMap::new()),
             }),
         }
     }
@@ -33,7 +35,9 @@ impl AppRenderer {
     pub fn set_model(&self, model_id: GltfId) {
         let inner = self.inner.clone();
         spawn_local(async move {
-            *inner.gltf_id.lock().unwrap() = Some(model_id);
+            {
+                *inner.gltf_id.lock().unwrap() = Some(model_id);
+            }
             inner.render().await;
         });
     }
@@ -41,20 +45,21 @@ impl AppRenderer {
     pub fn set_canvas(&self, canvas: web_sys::HtmlCanvasElement) {
         let inner = self.inner.clone();
         spawn_local(async move {
-            let mut renderer =
-                AwsmRendererBuilder::new(web_sys::window().unwrap().navigator().gpu())
-                    .init_adapter()
-                    .await
-                    .unwrap()
-                    .init_device()
-                    .await
-                    .unwrap()
-                    .init_context(canvas.clone())
-                    .unwrap()
-                    .build()
-                    .unwrap();
+            let renderer = AwsmRendererBuilder::new(web_sys::window().unwrap().navigator().gpu())
+                .init_adapter()
+                .await
+                .unwrap()
+                .init_device()
+                .await
+                .unwrap()
+                .init_context(canvas.clone())
+                .unwrap()
+                .build()
+                .unwrap();
 
-            *inner.renderer.lock().unwrap() = Some(renderer);
+            {
+                *inner.renderer.lock().unwrap() = Some(renderer);
+            }
 
             inner.render().await;
         });
@@ -62,33 +67,36 @@ impl AppRenderer {
 }
 
 impl AppRendererInner {
-    async fn render(&self) {
+    async fn render(&self) -> Result<()> {
         match (
             &mut *self.renderer.lock().unwrap(),
             *self.gltf_id.lock().unwrap(),
         ) {
             (Some(renderer), Some(gltf_id)) => {
-                tracing::info!("Rendering model with ID: {:?}", gltf_id);
-                renderer.temp_render().await.unwrap();
+                let url = format!("{}/{}", CONFIG.gltf_url, gltf_id.filepath());
+                tracing::info!("Rendering model at: {}", url);
 
-                // let pipeline = {
-                //     self.pipelines.lock().unwrap().get(&gltf_id).cloned()
-                // };
+                let gltf_res = { self.gltf_res.lock().unwrap().get(&gltf_id).cloned() };
 
-                // let pipeline = match pipeline {
-                //     Some(pipeline) => pipeline,
-                //     None => {
-                //         let pipeline = renderer.temp_pipeline().await.unwrap();
-                //         self.pipelines.lock().unwrap().insert(gltf_id, pipeline.clone());
-                //         pipeline
-                //     }
-                // };
+                let gltf_res = match gltf_res {
+                    Some(gltf_res) => gltf_res,
+                    None => {
+                        let gltf_res = GltfResource::load(&url, None).await?;
+                        self.gltf_res
+                            .lock()
+                            .unwrap()
+                            .insert(gltf_id, gltf_res.clone());
+                        gltf_res
+                    }
+                };
 
-                // let mut commands = CommandBuilder::new(None);
+                renderer.populate_gltf(&gltf_res).await?;
 
-                // renderer.temp_render(commands.build(renderer).unwrap());
+                renderer.render()?;
             }
             _ => {}
         }
+
+        Ok(())
     }
 }

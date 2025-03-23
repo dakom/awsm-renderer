@@ -1,5 +1,3 @@
-use wasm_bindgen::prelude::*;
-
 pub type TextureFormat = web_sys::GpuTextureFormat;
 pub type TextureAspect = web_sys::GpuTextureAspect;
 pub type TextureViewDimension = web_sys::GpuTextureViewDimension;
@@ -15,17 +13,13 @@ pub struct TextureDescriptor<'a> {
     pub label: Option<&'a str>,
     pub mip_level_count: Option<u32>,
     pub sample_count: Option<u32>,
-    pub size: TextureDescriptorSize,
-    pub usage: TextureDescriptorUsage,
+    pub size: Extent3d,
+    pub usage: TextureUsage,
     pub view_formats: Vec<TextureFormat>,
 }
 
 impl TextureDescriptor<'_> {
-    pub fn new(
-        format: TextureFormat,
-        size: TextureDescriptorSize,
-        usage: TextureDescriptorUsage,
-    ) -> Self {
+    pub fn new(format: TextureFormat, size: Extent3d, usage: TextureUsage) -> Self {
         Self {
             dimension: None,
             format,
@@ -40,21 +34,16 @@ impl TextureDescriptor<'_> {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct TextureDescriptorUsage {
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/gpu_buffer_usage/index.html
+pub struct TextureUsage {
+    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/gpu_texture_usage/index.html
     pub copy_dst: bool,
     pub copy_src: bool,
-    pub index: bool,
-    pub indirect: bool,
-    pub map_read: bool,
-    pub map_write: bool,
-    pub query_resolve: bool,
-    pub storage: bool,
-    pub uniform: bool,
-    pub vertex: bool,
+    pub render_attachment: bool,
+    pub storage_binding: bool,
+    pub texture_binding: bool,
 }
 
-impl TextureDescriptorUsage {
+impl TextureUsage {
     pub fn new() -> Self {
         Self::default()
     }
@@ -62,35 +51,21 @@ impl TextureDescriptorUsage {
     pub fn as_u32(&self) -> u32 {
         let mut usage = 0;
         if self.copy_dst {
-            usage |= web_sys::gpu_buffer_usage::COPY_DST;
+            usage |= web_sys::gpu_texture_usage::COPY_DST;
         }
         if self.copy_src {
-            usage |= web_sys::gpu_buffer_usage::COPY_SRC;
+            usage |= web_sys::gpu_texture_usage::COPY_SRC;
         }
-        if self.index {
-            usage |= web_sys::gpu_buffer_usage::INDEX;
+        if self.render_attachment {
+            usage |= web_sys::gpu_texture_usage::RENDER_ATTACHMENT;
         }
-        if self.indirect {
-            usage |= web_sys::gpu_buffer_usage::INDIRECT;
+        if self.storage_binding {
+            usage |= web_sys::gpu_texture_usage::STORAGE_BINDING;
         }
-        if self.map_read {
-            usage |= web_sys::gpu_buffer_usage::MAP_READ;
+        if self.texture_binding {
+            usage |= web_sys::gpu_texture_usage::TEXTURE_BINDING;
         }
-        if self.map_write {
-            usage |= web_sys::gpu_buffer_usage::MAP_WRITE;
-        }
-        if self.query_resolve {
-            usage |= web_sys::gpu_buffer_usage::QUERY_RESOLVE;
-        }
-        if self.storage {
-            usage |= web_sys::gpu_buffer_usage::STORAGE;
-        }
-        if self.uniform {
-            usage |= web_sys::gpu_buffer_usage::UNIFORM;
-        }
-        if self.vertex {
-            usage |= web_sys::gpu_buffer_usage::VERTEX;
-        }
+
         usage
     }
 
@@ -98,61 +73,32 @@ impl TextureDescriptorUsage {
         self.copy_dst = true;
         self
     }
-
     pub fn with_copy_src(mut self) -> Self {
         self.copy_src = true;
         self
     }
-
-    pub fn with_index(mut self) -> Self {
-        self.index = true;
+    pub fn with_render_attachment(mut self) -> Self {
+        self.render_attachment = true;
         self
     }
-
-    pub fn with_indirect(mut self) -> Self {
-        self.indirect = true;
+    pub fn with_storage_binding(mut self) -> Self {
+        self.storage_binding = true;
         self
     }
-
-    pub fn with_map_read(mut self) -> Self {
-        self.map_read = true;
-        self
-    }
-
-    pub fn with_map_write(mut self) -> Self {
-        self.map_write = true;
-        self
-    }
-
-    pub fn with_query_resolve(mut self) -> Self {
-        self.query_resolve = true;
-        self
-    }
-
-    pub fn with_storage(mut self) -> Self {
-        self.storage = true;
-        self
-    }
-
-    pub fn with_uniform(mut self) -> Self {
-        self.uniform = true;
-        self
-    }
-
-    pub fn with_vertex(mut self) -> Self {
-        self.vertex = true;
+    pub fn with_texture_binding(mut self) -> Self {
+        self.texture_binding = true;
         self
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct TextureDescriptorSize {
+pub struct Extent3d {
     pub width: u32,
     pub height: Option<u32>,
     pub depth_or_array_layers: Option<u32>,
 }
 
-impl TextureDescriptorSize {
+impl Extent3d {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createTexture#size
 
     pub fn new(width: u32, height: Option<u32>, depth_or_array_layers: Option<u32>) -> Self {
@@ -186,7 +132,7 @@ pub struct TextureViewDescriptor<'a> {
     pub format: Option<TextureFormat>,
     pub label: Option<&'a str>,
     pub mip_level_count: Option<u32>,
-    pub usage: Option<TextureDescriptorUsage>,
+    pub usage: Option<TextureUsage>,
 }
 
 impl<'a> TextureViewDescriptor<'a> {
@@ -220,7 +166,7 @@ impl From<TextureDescriptor<'_>> for web_sys::GpuTextureDescriptor {
     fn from(descriptor: TextureDescriptor) -> Self {
         let descriptor_js = web_sys::GpuTextureDescriptor::new(
             descriptor.format,
-            &js_sys::Object::from(descriptor.size),
+            &web_sys::GpuExtent3dDict::from(descriptor.size),
             descriptor.usage.as_u32(),
         );
 
@@ -301,36 +247,19 @@ impl From<ExternalTextureDescriptor<'_>> for web_sys::GpuExternalTextureDescript
     }
 }
 
-impl From<TextureDescriptorSize> for js_sys::Object {
-    fn from(size: TextureDescriptorSize) -> Self {
+impl From<Extent3d> for web_sys::GpuExtent3dDict {
+    fn from(size: Extent3d) -> Self {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createTexture#size
-        let obj = js_sys::Object::new();
-
-        js_sys::Reflect::set(
-            &obj,
-            &JsValue::from_str("width"),
-            &JsValue::from_f64(size.width as f64),
-        )
-        .unwrap();
+        // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuExtent3dDict.html
+        let size_js = web_sys::GpuExtent3dDict::new(size.width);
 
         if let Some(height) = size.height {
-            js_sys::Reflect::set(
-                &obj,
-                &JsValue::from_str("height"),
-                &JsValue::from_f64(height as f64),
-            )
-            .unwrap();
+            size_js.set_height(height);
         }
-
         if let Some(depth_or_array_layers) = size.depth_or_array_layers {
-            js_sys::Reflect::set(
-                &obj,
-                &JsValue::from_str("depthOrArrayLayers"),
-                &JsValue::from_f64(depth_or_array_layers as f64),
-            )
-            .unwrap();
+            size_js.set_depth_or_array_layers(depth_or_array_layers);
         }
 
-        obj
+        size_js
     }
 }

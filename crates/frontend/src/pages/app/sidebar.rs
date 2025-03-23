@@ -25,12 +25,12 @@ impl AppSidebar {
         });
 
         let ordered_keys = [
-            "Minimal",
-            "Standard",
-            "Extension Tests",
-            "Standard",
-            "Feature tests",
             "Todo",
+            // "Minimal",
+            // "Standard",
+            // "Extension Tests",
+            // "Standard",
+            // "Feature tests",
         ];
 
         for key in ordered_keys {

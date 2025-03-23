@@ -1,6 +1,7 @@
 ####### Frontend artifacts
 dist
 .build-artifacts
+glTF-Sample-Assets
 
 ####### Secrets
 .env

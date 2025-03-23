@@ -1,4 +1,3 @@
-pub mod compare;
 pub mod constants;
 pub mod depth_stencil;
 pub mod fragment;
@@ -15,7 +14,7 @@ use primitive::PrimitiveState;
 use vertex::VertexState;
 
 #[derive(Debug, Clone)]
-pub struct PipelineDescriptor<'a> {
+pub struct RenderPipelineDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#descriptor
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuRenderPipelineDescriptor.html
     // fill this out with a lot more detail
@@ -28,7 +27,7 @@ pub struct PipelineDescriptor<'a> {
     vertex: VertexState<'a>,
 }
 
-impl<'a> PipelineDescriptor<'a> {
+impl<'a> RenderPipelineDescriptor<'a> {
     pub fn new(vertex: VertexState<'a>, label: Option<&'a str>) -> Self {
         Self {
             depth_stencil: None,
@@ -64,9 +63,9 @@ impl<'a> PipelineDescriptor<'a> {
     }
 }
 
-impl From<PipelineDescriptor<'_>> for web_sys::GpuRenderPipelineDescriptor {
-    fn from(pipeline: PipelineDescriptor) -> web_sys::GpuRenderPipelineDescriptor {
-        let PipelineDescriptor {
+impl From<RenderPipelineDescriptor<'_>> for web_sys::GpuRenderPipelineDescriptor {
+    fn from(pipeline: RenderPipelineDescriptor) -> web_sys::GpuRenderPipelineDescriptor {
+        let RenderPipelineDescriptor {
             depth_stencil,
             fragment,
             label,
