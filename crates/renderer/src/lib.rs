@@ -9,6 +9,8 @@ pub mod core {
 
 pub struct AwsmRenderer {
     pub gpu: core::renderer::AwsmRendererWebGpu,
+    #[cfg(feature = "gltf")]
+    pub gltf_cache: gltf::cache::GltfCache,
 }
 
 pub struct AwsmRendererBuilder {
@@ -37,6 +39,16 @@ impl AwsmRendererBuilder {
         Ok(self)
     }
 
+    #[cfg(feature = "gltf")]
+    pub fn build(self) -> core::error::Result<AwsmRenderer> {
+        let gpu = self.gpu.build()?;
+        Ok(AwsmRenderer {
+            gpu,
+            gltf_cache: gltf::cache::GltfCache::default(),
+        })
+    }
+
+    #[cfg(not(feature = "gltf"))]
     pub fn build(self) -> core::error::Result<AwsmRenderer> {
         let gpu = self.gpu.build()?;
         Ok(AwsmRenderer { gpu })

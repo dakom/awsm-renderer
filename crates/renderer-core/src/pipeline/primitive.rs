@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct PrimitiveState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#primitive
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuPrimitiveState.html
@@ -7,6 +7,16 @@ pub struct PrimitiveState {
     pub strip_index_format: Option<IndexFormat>,
     pub topology: Option<PrimitiveTopology>,
     pub unclipped_depth: Option<bool>,
+}
+
+impl std::hash::Hash for PrimitiveState {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.cull_mode.map(|x| x as u32).hash(state);
+        self.front_face.map(|x| x as u32).hash(state);
+        self.strip_index_format.map(|x| x as u32).hash(state);
+        self.topology.map(|x| x as u32).hash(state);
+        self.unclipped_depth.hash(state);
+    }
 }
 
 pub type PrimitiveTopology = web_sys::GpuPrimitiveTopology;

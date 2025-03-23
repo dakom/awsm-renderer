@@ -3,6 +3,8 @@ use std::sync::LazyLock;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
+use crate::shaders::ShaderCompilationMessage;
+
 pub type Result<T> = std::result::Result<T, AwsmCoreError>;
 
 #[derive(Error, Debug)]
@@ -81,6 +83,12 @@ pub enum AwsmCoreError {
     #[cfg(feature = "image")]
     #[error("Failed to parse url: {0}")]
     UrlParse(String),
+
+    #[error("Failed to get WebGPU Shader compilation info: {0}")]
+    ShaderCompilationInfo(String),
+
+    #[error("Failed to validate WebGPU Shader: {0:#?}")]
+    ShaderValidation(Vec<ShaderCompilationMessage>),
 }
 
 static ERROR_UNKNOWN: LazyLock<String> = LazyLock::new(|| "Unknown error".to_string());
@@ -196,5 +204,9 @@ impl AwsmCoreError {
     #[cfg(feature = "image")]
     pub fn url_parse(err: JsValue) -> Self {
         Self::UrlParse(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
+    }
+
+    pub fn shader_compilation_info(err: JsValue) -> Self {
+        Self::ShaderCompilationInfo(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 }
