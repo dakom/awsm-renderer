@@ -42,7 +42,7 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         gltf_url: if cfg!(debug_assertions) {
             "http://localhost:9082/glTF-Sample-Assets/Models".to_string()
         } else {
-            "https://raw.githubusercontent.com/glTF-Sample-Assets/Models".to_string()
+            "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/refs/heads/main/Models".to_string()
         },
     };
 
