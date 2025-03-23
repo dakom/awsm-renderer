@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::AwsmRenderer;
+use anyhow::Result;
 
 use super::loader::GltfResource;
 

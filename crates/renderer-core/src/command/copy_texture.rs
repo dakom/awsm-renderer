@@ -4,7 +4,6 @@ use crate::texture::TextureAspect;
 pub struct TexelCopyBufferInfo<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/copyBufferToTexture#source
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuTexelCopyBufferInfo.html
-
     pub buffer: &'a web_sys::GpuBuffer,
     pub bytes_per_row: Option<u32>,
     pub offset: Option<u64>,
@@ -12,10 +11,9 @@ pub struct TexelCopyBufferInfo<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct TexelCopyTextureInfo <'a> {
+pub struct TexelCopyTextureInfo<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/copyBufferToTexture#destination
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuTexelCopyTextureInfo.html
-    
     pub texture: &'a web_sys::GpuTexture,
     pub aspect: Option<TextureAspect>,
     pub mip_level: Option<u32>,
@@ -59,7 +57,7 @@ impl Origin3d {
         self.z = Some(z);
         self
     }
-} 
+}
 
 // js conversion
 
@@ -83,7 +81,7 @@ impl From<TexelCopyBufferInfo<'_>> for web_sys::GpuTexelCopyBufferInfo {
 
 impl From<TexelCopyTextureInfo<'_>> for web_sys::GpuTexelCopyTextureInfo {
     fn from(info: TexelCopyTextureInfo) -> Self {
-        let info_js = web_sys::GpuTexelCopyTextureInfo::new(info.texture); 
+        let info_js = web_sys::GpuTexelCopyTextureInfo::new(info.texture);
 
         if let Some(aspect) = info.aspect {
             info_js.set_aspect(aspect);
@@ -94,7 +92,6 @@ impl From<TexelCopyTextureInfo<'_>> for web_sys::GpuTexelCopyTextureInfo {
         if let Some(origin) = info.origin {
             info_js.set_origin(&web_sys::GpuOrigin3dDict::from(origin));
         }
-
 
         info_js
     }

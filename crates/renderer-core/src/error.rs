@@ -48,7 +48,7 @@ pub enum AwsmCoreError {
 
     #[error("Failed to get WebGPU current context texture view: {0}")]
     CurrentContextTextureView(String),
-    
+
     #[error("WebGPU failed copy buffer to buffer command: {0}")]
     CommandCopyBufferToBuffer(String),
 
@@ -87,31 +87,19 @@ static ERROR_UNKNOWN: LazyLock<String> = LazyLock::new(|| "Unknown error".to_str
 
 impl AwsmCoreError {
     pub fn gpu_adapter(err: JsValue) -> Self {
-        Self::GpuAdapter(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone()),
-        )
+        Self::GpuAdapter(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn gpu_device(err: JsValue) -> Self {
-        Self::GpuDevice(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone()),
-        )
+        Self::GpuDevice(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn canvas_context(err: JsValue) -> Self {
-        Self::CanvasContext(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone()),
-        )
+        Self::CanvasContext(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn context_configuration(err: JsValue) -> Self {
-        Self::ContextConfiguration(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone()),
-        )
+        Self::ContextConfiguration(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn pipeline_creation(err: JsValue) -> Self {
@@ -129,139 +117,84 @@ impl AwsmCoreError {
                     err.message()
                 ))
             }
-            Err(err) => Self::PipelineCreation(
-                err.as_string()
-                    .unwrap_or_else(|| ERROR_UNKNOWN.clone()),
-            ),
+            Err(err) => {
+                Self::PipelineCreation(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
+            }
         }
     }
 
     pub fn pipeline_descriptor(err: JsValue) -> Self {
-        Self::PipelineDescriptor(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::PipelineDescriptor(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn query_set_creation(err: JsValue) -> Self {
-        Self::QuerySetCreation(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::QuerySetCreation(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn bind_group_layout(err: JsValue) -> Self {
-        Self::BindGroupLayout(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::BindGroupLayout(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn external_texture_creation(err: JsValue) -> Self {
-        Self::ExternalTextureCreation(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::ExternalTextureCreation(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn texture_creation(err: JsValue) -> Self {
-        Self::TextureCreation(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::TextureCreation(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn command_render_pass(err: JsValue) -> Self {
-        Self::CommandRenderPass(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::CommandRenderPass(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn current_context_texture(err: JsValue) -> Self {
-        Self::CurrentContextTexture(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::CurrentContextTexture(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn current_context_texture_view(err: JsValue) -> Self {
-        Self::CurrentContextTextureView(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::CurrentContextTextureView(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn command_copy_buffer_to_buffer(err: JsValue) -> Self {
-        Self::CommandCopyBufferToBuffer(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::CommandCopyBufferToBuffer(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn command_copy_buffer_to_texture(err: JsValue) -> Self {
-        Self::CommandCopyBufferToTexture(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::CommandCopyBufferToTexture(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn command_copy_texture_to_buffer(err: JsValue) -> Self {
-        Self::CommandCopyTextureToBuffer(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::CommandCopyTextureToBuffer(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
-    
+
     pub fn command_copy_texture_to_texture(err: JsValue) -> Self {
-        Self::CommandCopyTextureToTexture(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::CommandCopyTextureToTexture(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn buffer_creation(err: JsValue) -> Self {
-        Self::BufferCreation(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::BufferCreation(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn buffer_write(err: JsValue) -> Self {
-        Self::BufferWrite(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::BufferWrite(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     pub fn texture_write(err: JsValue) -> Self {
-        Self::TextureWrite(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::TextureWrite(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     #[cfg(feature = "image")]
     pub fn image_load(err: JsValue) -> Self {
-        Self::ImageLoad(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::ImageLoad(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     #[cfg(feature = "image")]
     pub fn location_origin(err: JsValue) -> Self {
-        Self::LocationOrigin(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::LocationOrigin(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 
     #[cfg(feature = "image")]
     pub fn url_parse(err: JsValue) -> Self {
-        Self::UrlParse(
-            err.as_string()
-                .unwrap_or_else(|| ERROR_UNKNOWN.clone())
-        )
+        Self::UrlParse(err.as_string().unwrap_or_else(|| ERROR_UNKNOWN.clone()))
     }
 }

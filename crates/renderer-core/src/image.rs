@@ -7,8 +7,8 @@ use web_sys::HtmlImageElement;
 #[derive(Clone, Debug)]
 pub enum ImageLoader {
     #[cfg(feature = "exr")]
-    Exr(exr::ExrImage),
-    HtmlImage(HtmlImageElement)
+    Exr(Box<exr::ExrImage>),
+    HtmlImage(HtmlImageElement),
 }
 
 impl ImageLoader {
@@ -17,7 +17,7 @@ impl ImageLoader {
             pub async fn load_url(url:&str) -> anyhow::Result<Self> {
                 if url.contains(".exr") {
                     let exr_image = exr::ExrImage::load_url(url).await?;
-                    Ok(Self::Exr(exr_image))
+                    Ok(Self::Exr(Box::new(exr_image)))
                 } else {
                     let image = element::load(url.to_string()).await?;
                     Ok(Self::HtmlImage(image))

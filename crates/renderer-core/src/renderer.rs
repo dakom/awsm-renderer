@@ -41,10 +41,9 @@ impl AwsmRendererWebGpuBuilder {
     }
 
     pub async fn init_device(mut self) -> Result<Self> {
-        let adapter = self
-            .adapter
-            .as_ref()
-            .ok_or(AwsmCoreError::GpuAdapter("Adapter not initialized".to_string()))?;
+        let adapter = self.adapter.as_ref().ok_or(AwsmCoreError::GpuAdapter(
+            "Adapter not initialized".to_string(),
+        ))?;
 
         let device: web_sys::GpuDevice = JsFuture::from(adapter.request_device())
             .await
@@ -57,10 +56,9 @@ impl AwsmRendererWebGpuBuilder {
     }
 
     pub fn init_context(mut self, canvas: web_sys::HtmlCanvasElement) -> Result<Self> {
-        let device = self
-            .device
-            .as_ref()
-            .ok_or(AwsmCoreError::GpuDevice("Device not initialized".to_string()))?;
+        let device = self.device.as_ref().ok_or(AwsmCoreError::GpuDevice(
+            "Device not initialized".to_string(),
+        ))?;
 
         let ctx: web_sys::GpuCanvasContext = match canvas.get_context("webgpu") {
             Ok(Some(ctx)) => Ok(ctx.unchecked_into()),
@@ -83,12 +81,12 @@ impl AwsmRendererWebGpuBuilder {
     }
 
     pub fn build(self) -> Result<AwsmRendererWebGpu> {
-        let adapter = self
-            .adapter
-            .ok_or(AwsmCoreError::GpuAdapter("Adapter not initialized".to_string()))?;
-        let device = self
-            .device
-            .ok_or(AwsmCoreError::GpuDevice("Device not initialized".to_string()))?;
+        let adapter = self.adapter.ok_or(AwsmCoreError::GpuAdapter(
+            "Adapter not initialized".to_string(),
+        ))?;
+        let device = self.device.ok_or(AwsmCoreError::GpuDevice(
+            "Device not initialized".to_string(),
+        ))?;
         let context = self.context.ok_or(AwsmCoreError::CanvasContext(
             "Context not initialized".to_string(),
         ))?;

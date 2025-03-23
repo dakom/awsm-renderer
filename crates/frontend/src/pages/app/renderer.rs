@@ -45,18 +45,17 @@ impl AppRenderer {
     pub fn set_canvas(&self, canvas: web_sys::HtmlCanvasElement) {
         let inner = self.inner.clone();
         spawn_local(async move {
-            let renderer =
-                AwsmRendererBuilder::new(web_sys::window().unwrap().navigator().gpu())
-                    .init_adapter()
-                    .await
-                    .unwrap()
-                    .init_device()
-                    .await
-                    .unwrap()
-                    .init_context(canvas.clone())
-                    .unwrap()
-                    .build()
-                    .unwrap();
+            let renderer = AwsmRendererBuilder::new(web_sys::window().unwrap().navigator().gpu())
+                .init_adapter()
+                .await
+                .unwrap()
+                .init_device()
+                .await
+                .unwrap()
+                .init_context(canvas.clone())
+                .unwrap()
+                .build()
+                .unwrap();
 
             {
                 *inner.renderer.lock().unwrap() = Some(renderer);
@@ -77,15 +76,16 @@ impl AppRendererInner {
                 let url = format!("{}/{}", CONFIG.gltf_url, gltf_id.filepath());
                 tracing::info!("Rendering model at: {}", url);
 
-                let gltf_res = {
-                    self.gltf_res.lock().unwrap().get(&gltf_id).cloned()
-                };
+                let gltf_res = { self.gltf_res.lock().unwrap().get(&gltf_id).cloned() };
 
                 let gltf_res = match gltf_res {
                     Some(gltf_res) => gltf_res,
                     None => {
                         let gltf_res = GltfResource::load(&url, None).await?;
-                        self.gltf_res.lock().unwrap().insert(gltf_id, gltf_res.clone());
+                        self.gltf_res
+                            .lock()
+                            .unwrap()
+                            .insert(gltf_id, gltf_res.clone());
                         gltf_res
                     }
                 };

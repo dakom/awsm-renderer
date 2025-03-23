@@ -25,7 +25,6 @@ impl<'a> BufferBinding<'a> {
     }
 }
 
-
 #[derive(Debug, Clone, Default)]
 pub struct BufferUsage {
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/gpu_buffer_usage/index.html
@@ -136,7 +135,8 @@ impl BufferUsage {
 
 impl From<BufferDescriptor<'_>> for web_sys::GpuBufferDescriptor {
     fn from(descriptor: BufferDescriptor) -> Self {
-        let descriptor_js = web_sys::GpuBufferDescriptor::new(descriptor.size as f64, descriptor.usage.as_u32());
+        let descriptor_js =
+            web_sys::GpuBufferDescriptor::new(descriptor.size as f64, descriptor.usage.as_u32());
 
         if let Some(label) = descriptor.label {
             descriptor_js.set_label(label);

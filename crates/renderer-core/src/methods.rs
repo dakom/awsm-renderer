@@ -1,9 +1,12 @@
+use crate::data::JsData;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
-use crate::data::JsData;
 
 use crate::{
-    command::CommandEncoder, error::{AwsmCoreError, Result}, renderer::AwsmRendererWebGpu, texture::TextureFormat
+    command::CommandEncoder,
+    error::{AwsmCoreError, Result},
+    renderer::AwsmRendererWebGpu,
+    texture::TextureFormat,
 };
 
 impl AwsmRendererWebGpu {
@@ -135,7 +138,7 @@ impl AwsmRendererWebGpu {
     ///     }
     ///     .into()
     /// );
-    /// 
+    ///
     /// render_pass.set_pipeline(&pipeline);
     /// render_pass.draw(3);
     /// render_pass.end();
@@ -204,106 +207,93 @@ impl AwsmRendererWebGpu {
     /// let data: &[u8] = ...;
     /// renderer.write_buffer(buffer, None, data, None, None);
     #[allow(private_bounds)]
-    pub fn write_buffer<'a>(&self, buffer: &web_sys::GpuBuffer, buffer_offset: Option<u64>, data: impl Into<JsData<'a>>, data_offset: Option<u64>, data_size: Option<u64>) -> Result<()> 
-    {
-
+    pub fn write_buffer<'a>(
+        &self,
+        buffer: &web_sys::GpuBuffer,
+        buffer_offset: Option<u64>,
+        data: impl Into<JsData<'a>>,
+        data_offset: Option<u64>,
+        data_size: Option<u64>,
+    ) -> Result<()> {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/writeBuffer
 
         let data = data.into();
 
         match data {
-            JsData::SliceU8(data) => {
-                match (data_offset, data_size) {
-                    (None, None) => {
-                        self.device
-                            .queue()
-                            .write_buffer_with_f64_and_u8_slice(
-                                buffer,
-                                buffer_offset.unwrap_or(0) as f64,
-                                data
-                            )
-                    },
-                    (Some(data_offset), Some(data_size)) => {
-                        self.device
-                            .queue()
-                            .write_buffer_with_f64_and_u8_slice_and_f64_and_f64(
-                                buffer,
-                                buffer_offset.unwrap_or(0) as f64,
-                                data,
-                                data_offset as f64,
-                                data_size as f64
-                            )
-                    },
-                    (Some(data_offset), None) => {
-                        self.device
-                            .queue()
-                            .write_buffer_with_f64_and_u8_slice_and_f64(
-                                buffer,
-                                buffer_offset.unwrap_or(0) as f64,
-                                data,
-                                data_offset as f64
-                            )
-                    },
-                    (None, Some(data_size)) => {
-                        self.device
-                            .queue()
-                            .write_buffer_with_f64_and_u8_slice_and_f64_and_f64(
-                                buffer,
-                                buffer_offset.unwrap_or(0) as f64,
-                                data,
-                                0.0,
-                                data_size as f64
-                            )
-                    }
-                }
+            JsData::SliceU8(data) => match (data_offset, data_size) {
+                (None, None) => self.device.queue().write_buffer_with_f64_and_u8_slice(
+                    buffer,
+                    buffer_offset.unwrap_or(0) as f64,
+                    data,
+                ),
+                (Some(data_offset), Some(data_size)) => self
+                    .device
+                    .queue()
+                    .write_buffer_with_f64_and_u8_slice_and_f64_and_f64(
+                        buffer,
+                        buffer_offset.unwrap_or(0) as f64,
+                        data,
+                        data_offset as f64,
+                        data_size as f64,
+                    ),
+                (Some(data_offset), None) => self
+                    .device
+                    .queue()
+                    .write_buffer_with_f64_and_u8_slice_and_f64(
+                        buffer,
+                        buffer_offset.unwrap_or(0) as f64,
+                        data,
+                        data_offset as f64,
+                    ),
+                (None, Some(data_size)) => self
+                    .device
+                    .queue()
+                    .write_buffer_with_f64_and_u8_slice_and_f64_and_f64(
+                        buffer,
+                        buffer_offset.unwrap_or(0) as f64,
+                        data,
+                        0.0,
+                        data_size as f64,
+                    ),
             },
-            _ => {
-                match (data_offset, data_size) {
-                    (None, None) => {
-                        self.device
-                            .queue()
-                            .write_buffer_with_f64_and_buffer_source(
-                                buffer,
-                                buffer_offset.unwrap_or(0) as f64,
-                                data.as_js_value_ref().unchecked_ref()
-                            )
-                    },
-                    (Some(data_offset), Some(data_size)) => {
-                        self.device
-                            .queue()
-                            .write_buffer_with_f64_and_buffer_source_and_f64_and_f64(
-                                buffer,
-                                buffer_offset.unwrap_or(0) as f64,
-                                data.as_js_value_ref().unchecked_ref(),
-                                data_offset as f64,
-                                data_size as f64
-                            )
-                    },
-                    (Some(data_offset), None) => {
-                        self.device
-                            .queue()
-                            .write_buffer_with_f64_and_buffer_source_and_f64(
-                                buffer,
-                                buffer_offset.unwrap_or(0) as f64,
-                                data.as_js_value_ref().unchecked_ref(),
-                                data_offset as f64
-                            )
-                    },
-                    (None, Some(data_size)) => {
-                        self.device
-                            .queue()
-                            .write_buffer_with_f64_and_buffer_source_and_f64_and_f64(
-                                buffer,
-                                buffer_offset.unwrap_or(0) as f64,
-                                data.as_js_value_ref().unchecked_ref(),
-                                0.0,
-                                data_size as f64
-                            )
-                    }
-                }
-            }
-        }.map_err(AwsmCoreError::buffer_write)
-
+            _ => match (data_offset, data_size) {
+                (None, None) => self.device.queue().write_buffer_with_f64_and_buffer_source(
+                    buffer,
+                    buffer_offset.unwrap_or(0) as f64,
+                    data.as_js_value_ref().unchecked_ref(),
+                ),
+                (Some(data_offset), Some(data_size)) => self
+                    .device
+                    .queue()
+                    .write_buffer_with_f64_and_buffer_source_and_f64_and_f64(
+                        buffer,
+                        buffer_offset.unwrap_or(0) as f64,
+                        data.as_js_value_ref().unchecked_ref(),
+                        data_offset as f64,
+                        data_size as f64,
+                    ),
+                (Some(data_offset), None) => self
+                    .device
+                    .queue()
+                    .write_buffer_with_f64_and_buffer_source_and_f64(
+                        buffer,
+                        buffer_offset.unwrap_or(0) as f64,
+                        data.as_js_value_ref().unchecked_ref(),
+                        data_offset as f64,
+                    ),
+                (None, Some(data_size)) => self
+                    .device
+                    .queue()
+                    .write_buffer_with_f64_and_buffer_source_and_f64_and_f64(
+                        buffer,
+                        buffer_offset.unwrap_or(0) as f64,
+                        data.as_js_value_ref().unchecked_ref(),
+                        0.0,
+                        data_size as f64,
+                    ),
+            },
+        }
+        .map_err(AwsmCoreError::buffer_write)
     }
 
     /// Example usage:
@@ -313,33 +303,36 @@ impl AwsmRendererWebGpu {
     /// let data: &[u8] = ...;
     /// renderer.write_texture(&destination.into(), data, &layout.into(), &size.into());
     #[allow(private_bounds)]
-    pub fn write_texture<'a>(&self, destination: &web_sys::GpuTexelCopyTextureInfo, data: impl Into<JsData<'a>>, layout: &web_sys::GpuTexelCopyBufferLayout, size: &web_sys::GpuExtent3dDict) -> Result<()> {
+    pub fn write_texture<'a>(
+        &self,
+        destination: &web_sys::GpuTexelCopyTextureInfo,
+        data: impl Into<JsData<'a>>,
+        layout: &web_sys::GpuTexelCopyBufferLayout,
+        size: &web_sys::GpuExtent3dDict,
+    ) -> Result<()> {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/writeTexture
 
         let data = data.into();
         match data {
-            JsData::SliceU8(data) => {
-                self.device
-                    .queue()
-                    .write_texture_with_u8_slice_and_gpu_extent_3d_dict(
-                        destination,
-                        data,
-                        layout,
-                        size
-                    )
-            },
-            _ => {
-                self.device
-                    .queue()
-                    .write_texture_with_buffer_source_and_gpu_extent_3d_dict(
-                        destination,
-                        data.as_js_value_ref().unchecked_ref(),
-                        layout,
-                        size
-                    )
-            }
-        }.map_err(AwsmCoreError::texture_write)
-
+            JsData::SliceU8(data) => self
+                .device
+                .queue()
+                .write_texture_with_u8_slice_and_gpu_extent_3d_dict(
+                    destination,
+                    data,
+                    layout,
+                    size,
+                ),
+            _ => self
+                .device
+                .queue()
+                .write_texture_with_buffer_source_and_gpu_extent_3d_dict(
+                    destination,
+                    data.as_js_value_ref().unchecked_ref(),
+                    layout,
+                    size,
+                ),
+        }
+        .map_err(AwsmCoreError::texture_write)
     }
-
 }

@@ -1,7 +1,7 @@
 pub mod color;
 pub mod compute_pass;
-pub mod render_pass;
 pub mod copy_texture;
+pub mod render_pass;
 
 use std::ops::Deref;
 
@@ -49,25 +49,39 @@ impl CommandEncoder {
         ))
     }
 
-    pub fn clear_buffer(&self, buffer: &web_sys::GpuBuffer, offset: Option<u32>, size: Option<u32>) {
+    pub fn clear_buffer(
+        &self,
+        buffer: &web_sys::GpuBuffer,
+        offset: Option<u32>,
+        size: Option<u32>,
+    ) {
         match (offset, size) {
-            (Some(offset), Some(size)) => self.inner.clear_buffer_with_u32_and_u32(buffer, offset, size),
+            (Some(offset), Some(size)) => self
+                .inner
+                .clear_buffer_with_u32_and_u32(buffer, offset, size),
             (Some(offset), None) => self.inner.clear_buffer_with_u32(buffer, offset),
             (None, Some(size)) => self.inner.clear_buffer_with_u32_and_u32(buffer, 0, size),
             (None, None) => self.inner.clear_buffer(buffer),
         }
     }
 
-    pub fn copy_buffer_to_buffer(&self, 
+    pub fn copy_buffer_to_buffer(
+        &self,
         source: &web_sys::GpuBuffer,
         source_offset: u32,
         destination: &web_sys::GpuBuffer,
         destination_offset: u32,
         size: u32,
     ) -> Result<()> {
-        self.inner.copy_buffer_to_buffer_with_u32_and_u32_and_u32(
-            source, source_offset, destination, destination_offset, size,
-        ).map_err(AwsmCoreError::command_copy_buffer_to_buffer)
+        self.inner
+            .copy_buffer_to_buffer_with_u32_and_u32_and_u32(
+                source,
+                source_offset,
+                destination,
+                destination_offset,
+                size,
+            )
+            .map_err(AwsmCoreError::command_copy_buffer_to_buffer)
     }
 
     pub fn copy_buffer_to_texture(
@@ -76,9 +90,9 @@ impl CommandEncoder {
         destination: &web_sys::GpuTexelCopyTextureInfo,
         copy_size: &web_sys::GpuExtent3dDict,
     ) -> Result<()> {
-        self.inner.copy_buffer_to_texture_with_gpu_extent_3d_dict(
-            source, destination, copy_size,
-        ).map_err(AwsmCoreError::command_copy_buffer_to_texture)
+        self.inner
+            .copy_buffer_to_texture_with_gpu_extent_3d_dict(source, destination, copy_size)
+            .map_err(AwsmCoreError::command_copy_buffer_to_texture)
     }
 
     pub fn copy_texture_to_buffer(
@@ -87,9 +101,9 @@ impl CommandEncoder {
         destination: &web_sys::GpuTexelCopyBufferInfo,
         copy_size: &web_sys::GpuExtent3dDict,
     ) -> Result<()> {
-        self.inner.copy_texture_to_buffer_with_gpu_extent_3d_dict(
-            source, destination, copy_size,
-        ).map_err(AwsmCoreError::command_copy_texture_to_buffer)
+        self.inner
+            .copy_texture_to_buffer_with_gpu_extent_3d_dict(source, destination, copy_size)
+            .map_err(AwsmCoreError::command_copy_texture_to_buffer)
     }
 
     pub fn copy_texture_to_texture(
@@ -98,9 +112,9 @@ impl CommandEncoder {
         destination: &web_sys::GpuTexelCopyTextureInfo,
         copy_size: &web_sys::GpuExtent3dDict,
     ) -> Result<()> {
-        self.inner.copy_texture_to_texture_with_gpu_extent_3d_dict(
-            source, destination, copy_size,
-        ).map_err(AwsmCoreError::command_copy_texture_to_texture)
+        self.inner
+            .copy_texture_to_texture_with_gpu_extent_3d_dict(source, destination, copy_size)
+            .map_err(AwsmCoreError::command_copy_texture_to_texture)
     }
 
     pub fn resolve_query_set(
@@ -112,7 +126,11 @@ impl CommandEncoder {
         destination_offset: u32,
     ) {
         self.inner.resolve_query_set_with_u32(
-            query_set, first_query, query_count, destination, destination_offset,
+            query_set,
+            first_query,
+            query_count,
+            destination,
+            destination_offset,
         );
     }
 

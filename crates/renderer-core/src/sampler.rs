@@ -4,7 +4,6 @@ use crate::compare::CompareFunction;
 pub struct SamplerDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createSampler#descriptor
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuSamplerDescriptor.html
-
     pub address_mode_u: Option<AddressMode>,
     pub address_mode_v: Option<AddressMode>,
     pub address_mode_w: Option<AddressMode>,

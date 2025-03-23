@@ -3,7 +3,7 @@ use crate::AwsmRenderer;
 use super::loader::GltfResource;
 
 impl AwsmRenderer {
-    pub async fn populate_gltf(&mut self, gltf_res: &GltfResource) -> anyhow::Result<()> {
+    pub async fn populate_gltf(&mut self, _gltf_res: &GltfResource) -> anyhow::Result<()> {
         tracing::info!("Populating gltf resource...");
         // TODO - populate the gltf resource with the data from the gltf file
         // This will include loading textures, buffers, and other resources

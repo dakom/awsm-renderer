@@ -19,11 +19,7 @@ pub struct TextureDescriptor<'a> {
 }
 
 impl TextureDescriptor<'_> {
-    pub fn new(
-        format: TextureFormat,
-        size: Extent3d,
-        usage: TextureUsage,
-    ) -> Self {
+    pub fn new(format: TextureFormat, size: Extent3d, usage: TextureUsage) -> Self {
         Self {
             dimension: None,
             format,
@@ -45,7 +41,6 @@ pub struct TextureUsage {
     pub render_attachment: bool,
     pub storage_binding: bool,
     pub texture_binding: bool,
-
 }
 
 impl TextureUsage {
@@ -94,8 +89,6 @@ impl TextureUsage {
         self.texture_binding = true;
         self
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -265,7 +258,7 @@ impl From<Extent3d> for web_sys::GpuExtent3dDict {
         }
         if let Some(depth_or_array_layers) = size.depth_or_array_layers {
             size_js.set_depth_or_array_layers(depth_or_array_layers);
-        } 
+        }
 
         size_js
     }

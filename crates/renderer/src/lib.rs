@@ -1,10 +1,8 @@
-
+pub mod camera;
 #[cfg(feature = "gltf")]
 pub mod gltf;
-pub mod wip;
-pub mod transform;
 pub mod render;
-pub mod camera;
+pub mod transform;
 pub mod core {
     pub use awsm_renderer_core::*;
 }
@@ -13,15 +11,14 @@ pub struct AwsmRenderer {
     pub gpu: core::renderer::AwsmRendererWebGpu,
 }
 
-
 pub struct AwsmRendererBuilder {
-    gpu : core::renderer::AwsmRendererWebGpuBuilder,
+    gpu: core::renderer::AwsmRendererWebGpuBuilder,
 }
 
 impl AwsmRendererBuilder {
     pub fn new(gpu: web_sys::Gpu) -> Self {
         Self {
-            gpu : core::renderer::AwsmRendererWebGpuBuilder::new(gpu),
+            gpu: core::renderer::AwsmRendererWebGpuBuilder::new(gpu),
         }
     }
 
