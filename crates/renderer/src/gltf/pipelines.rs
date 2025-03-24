@@ -1,6 +1,6 @@
 use awsm_renderer_core::pipeline::{
     fragment::{ColorTargetState, FragmentState},
-    vertex::VertexState,
+    vertex::{VertexBufferLayout, VertexState},
     RenderPipelineDescriptor,
 };
 
@@ -13,6 +13,7 @@ use super::shaders::ShaderKey;
 pub struct PipelineKey {
     pub shader_key: ShaderKey,
     pub fragment_targets: Vec<ColorTargetState>,
+    pub vertex_buffer_layouts: Vec<VertexBufferLayout>,
 }
 
 impl PipelineKey {
@@ -20,14 +21,17 @@ impl PipelineKey {
         Self {
             shader_key,
             fragment_targets: vec![ColorTargetState::new(renderer.gpu.current_context_format())],
+            vertex_buffer_layouts: Vec::new()
         }
     }
 
     pub fn into_descriptor(
-        &self,
+        self,
         shader_module: &web_sys::GpuShaderModule,
     ) -> web_sys::GpuRenderPipelineDescriptor {
-        let vertex = VertexState::new(shader_module, None);
+        let mut vertex = VertexState::new(shader_module, None);
+        vertex.buffers = self.vertex_buffer_layouts;
+
         let fragment = FragmentState::new(shader_module, None, self.fragment_targets.clone());
 
         RenderPipelineDescriptor::new(vertex, None)

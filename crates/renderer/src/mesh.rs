@@ -3,7 +3,6 @@ use awsm_renderer_core::command::{LoadOp, StoreOp};
 
 use crate::render::RenderContext;
 use crate::error::Result;
-use crate::AwsmRenderer;
 
 #[derive(Default)]
 pub struct Meshes {

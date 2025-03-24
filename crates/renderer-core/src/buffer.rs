@@ -8,6 +8,22 @@ pub struct BufferDescriptor<'a> {
     pub usage: BufferUsage,
 }
 
+impl <'a> BufferDescriptor<'a> {
+    pub fn new(label: Option<&'a str>, size: u64, usage: BufferUsage) -> Self {
+        Self {
+            label,
+            size,
+            usage,
+            mapped_at_creation: None
+        }
+    }
+
+    pub fn with_mapped_at_creation(mut self, mapped_at_creation: bool) -> Self {
+        self.mapped_at_creation = Some(mapped_at_creation);
+        self
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct BufferBinding<'a> {
     pub buffer: &'a web_sys::GpuBuffer,

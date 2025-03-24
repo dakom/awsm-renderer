@@ -5,3 +5,4 @@ pub mod loader;
 pub mod pipelines;
 pub mod populate;
 pub mod shaders;
+pub mod buffers;
