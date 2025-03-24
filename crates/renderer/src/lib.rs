@@ -2,15 +2,20 @@ pub mod camera;
 #[cfg(feature = "gltf")]
 pub mod gltf;
 pub mod render;
+pub mod error;
 pub mod transform;
+pub mod mesh;
 pub mod core {
     pub use awsm_renderer_core::*;
 }
 
 pub struct AwsmRenderer {
     pub gpu: core::renderer::AwsmRendererWebGpu,
+
     #[cfg(feature = "gltf")]
-    pub gltf_cache: gltf::cache::GltfCache,
+    pub gltf: gltf::cache::GltfCache,
+
+    pub meshes: mesh::Meshes    
 }
 
 pub struct AwsmRendererBuilder {
@@ -44,13 +49,17 @@ impl AwsmRendererBuilder {
         let gpu = self.gpu.build()?;
         Ok(AwsmRenderer {
             gpu,
-            gltf_cache: gltf::cache::GltfCache::default(),
+            gltf: gltf::cache::GltfCache::default(),
+            meshes: mesh::Meshes::default()
         })
     }
 
     #[cfg(not(feature = "gltf"))]
     pub fn build(self) -> core::error::Result<AwsmRenderer> {
         let gpu = self.gpu.build()?;
-        Ok(AwsmRenderer { gpu })
+        Ok(AwsmRenderer {
+            gpu,
+            meshes: mesh::Meshes::default()
+        })
     }
 }

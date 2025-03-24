@@ -1,8 +1,7 @@
 use awsm_renderer_core::shaders::ShaderModuleExt;
 
 use crate::{
-    gltf::{pipelines::PipelineKey, shaders::ShaderKey},
-    AwsmRenderer,
+    gltf::{pipelines::PipelineKey, shaders::ShaderKey}, mesh::Mesh, AwsmRenderer
 };
 
 use super::loader::GltfResource;
@@ -13,19 +12,18 @@ impl AwsmRenderer {
 
         let shader_key = ShaderKey::default();
 
-        let shader_module = match self.gltf_cache.shaders.get(&shader_key) {
+        let shader_module = match self.gltf.shaders.get(&shader_key) {
             None => {
-                tracing::info!("Compiling shader...");
                 let shader_module = self.gpu.compile_shader(&shader_key.into_descriptor());
                 shader_module.validate_shader().await?;
 
-                tracing::info!(
-                    "compiled shader: {:#?}",
-                    shader_module.get_compilation_info_ext().await?
-                );
-                tracing::info!("{}", shader_key.into_source());
+                // tracing::info!(
+                //     "compiled shader: {:#?}",
+                //     shader_module.get_compilation_info_ext().await?
+                // );
+                // tracing::info!("{}", shader_key.into_source());
 
-                self.gltf_cache
+                self.gltf
                     .shaders
                     .insert(shader_key.clone(), shader_module.clone());
 
@@ -36,18 +34,16 @@ impl AwsmRenderer {
 
         let pipeline_key = PipelineKey::new(self, shader_key);
 
-        let _pipeline = match self.gltf_cache.pipelines.get(&pipeline_key) {
+        let pipeline = match self.gltf.pipelines.get(&pipeline_key) {
             None => {
-                tracing::info!("Creating pipeline...");
 
                 let pipeline = self
                     .gpu
                     .create_render_pipeline(&pipeline_key.into_descriptor(&shader_module))
                     .await?;
 
-                tracing::info!("created pipeline: {:#?}", pipeline);
 
-                self.gltf_cache
+                self.gltf
                     .pipelines
                     .insert(pipeline_key.clone(), pipeline.clone());
 
@@ -57,6 +53,11 @@ impl AwsmRenderer {
         };
 
         // TODO - transform nodes? lights? cameras? animations?
+
+        let mesh = Mesh::new(pipeline);
+        let mesh_key = self.meshes.add(mesh);
+
+        tracing::info!("Created mesh {mesh_key} from gltf");
 
         Ok(())
     }
