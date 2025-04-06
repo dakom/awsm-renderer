@@ -5,13 +5,11 @@ use crate::{
 
 use super::renderer::AppRenderer;
 
-pub struct AppSidebar {
-    pub renderer: AppRenderer,
-}
+pub struct AppSidebar {}
 
 impl AppSidebar {
-    pub fn new(renderer: AppRenderer) -> Arc<Self> {
-        Arc::new(Self { renderer })
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {})
     }
 
     pub fn render(self: &Arc<Self>) -> Dom {
@@ -123,7 +121,7 @@ fn render_dropdown_label(label: &str, dropdown: Dom) -> Dom {
     })
 }
 
-fn current_model_signal() -> impl Signal<Item = Option<GltfId>> {
+pub fn current_model_signal() -> impl Signal<Item = Option<GltfId>> {
     Route::signal().map(|route| match route {
         Route::App(AppRoute::Model(model_id)) => Some(model_id),
         _ => None,
