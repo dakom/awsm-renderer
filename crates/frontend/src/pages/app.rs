@@ -1,22 +1,18 @@
-mod content;
+mod canvas;
 mod renderer;
 mod sidebar;
 
-use content::AppContent;
+use canvas::AppCanvas;
 use renderer::AppRenderer;
 use sidebar::AppSidebar;
 
-use crate::prelude::*;
+use crate::{models::collections::GltfId, prelude::*};
 
-pub struct AppUi {
-    renderer: AppRenderer,
-}
+pub struct AppUi {}
 
 impl AppUi {
     pub fn new() -> Arc<Self> {
-        Arc::new(Self {
-            renderer: AppRenderer::new(),
-        })
+        Arc::new(Self {})
     }
 
     pub fn render(self: &Arc<Self>) -> Dom {
@@ -40,14 +36,14 @@ impl AppUi {
                 .style("overflow-y", "auto")  // scroll if content overflows
                 .style("height", "100%")
                 .class(ColorBackground::Sidebar.class())
-                .child(AppSidebar::new(self.renderer.clone()).render())
+                .child(AppSidebar::new().render())
             }))
             .child(html!("div", {  // right column
                 .style("flex", "1")  // grow to fill remaining space
                 .style("overflow-y", "auto")  // scroll if content overflows
                 .style("height", "100%")
                 .class(ColorBackground::GltfContent.class())
-                .child(AppContent::new(self.renderer.clone()).render())
+                .child(AppCanvas::new().render())
             }))
         })
     }
