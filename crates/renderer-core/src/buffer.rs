@@ -8,6 +8,22 @@ pub struct BufferDescriptor<'a> {
     pub usage: BufferUsage,
 }
 
+impl<'a> BufferDescriptor<'a> {
+    pub fn new(label: Option<&'a str>, size: u64, usage: BufferUsage) -> Self {
+        Self {
+            label,
+            size,
+            usage,
+            mapped_at_creation: None,
+        }
+    }
+
+    pub fn with_mapped_at_creation(mut self, mapped_at_creation: bool) -> Self {
+        self.mapped_at_creation = Some(mapped_at_creation);
+        self
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct BufferBinding<'a> {
     pub buffer: &'a web_sys::GpuBuffer,
@@ -25,19 +41,19 @@ impl<'a> BufferBinding<'a> {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct BufferUsage {
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/gpu_buffer_usage/index.html
-    pub copy_dst: bool,
-    pub copy_src: bool,
-    pub index: bool,
-    pub indirect: bool,
-    pub map_read: bool,
-    pub map_write: bool,
-    pub query_resolve: bool,
-    pub storage: bool,
-    pub uniform: bool,
-    pub vertex: bool,
+#[derive(Hash, Debug, Clone, Default, Copy, PartialEq, Eq)]
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/gpu_buffer_usage/index.html
+pub struct BufferUsage(u32);
+
+impl From<u32> for BufferUsage {
+    fn from(usage: u32) -> Self {
+        Self(usage)
+    }
+}
+impl From<BufferUsage> for u32 {
+    fn from(usage: BufferUsage) -> Self {
+        usage.0
+    }
 }
 
 impl BufferUsage {
@@ -45,88 +61,53 @@ impl BufferUsage {
         Self::default()
     }
 
-    pub fn as_u32(&self) -> u32 {
-        let mut usage = 0;
-        if self.copy_dst {
-            usage |= web_sys::gpu_buffer_usage::COPY_DST;
-        }
-        if self.copy_src {
-            usage |= web_sys::gpu_buffer_usage::COPY_SRC;
-        }
-        if self.index {
-            usage |= web_sys::gpu_buffer_usage::INDEX;
-        }
-        if self.indirect {
-            usage |= web_sys::gpu_buffer_usage::INDIRECT;
-        }
-        if self.map_read {
-            usage |= web_sys::gpu_buffer_usage::MAP_READ;
-        }
-        if self.map_write {
-            usage |= web_sys::gpu_buffer_usage::MAP_WRITE;
-        }
-        if self.query_resolve {
-            usage |= web_sys::gpu_buffer_usage::QUERY_RESOLVE;
-        }
-        if self.storage {
-            usage |= web_sys::gpu_buffer_usage::STORAGE;
-        }
-        if self.uniform {
-            usage |= web_sys::gpu_buffer_usage::UNIFORM;
-        }
-        if self.vertex {
-            usage |= web_sys::gpu_buffer_usage::VERTEX;
-        }
-        usage
-    }
-
     pub fn with_copy_dst(mut self) -> Self {
-        self.copy_dst = true;
+        self.0 |= web_sys::gpu_buffer_usage::COPY_DST;
         self
     }
 
     pub fn with_copy_src(mut self) -> Self {
-        self.copy_src = true;
+        self.0 |= web_sys::gpu_buffer_usage::COPY_SRC;
         self
     }
 
     pub fn with_index(mut self) -> Self {
-        self.index = true;
+        self.0 |= web_sys::gpu_buffer_usage::INDEX;
         self
     }
 
     pub fn with_indirect(mut self) -> Self {
-        self.indirect = true;
+        self.0 |= web_sys::gpu_buffer_usage::INDIRECT;
         self
     }
 
     pub fn with_map_read(mut self) -> Self {
-        self.map_read = true;
+        self.0 |= web_sys::gpu_buffer_usage::MAP_READ;
         self
     }
 
     pub fn with_map_write(mut self) -> Self {
-        self.map_write = true;
+        self.0 |= web_sys::gpu_buffer_usage::MAP_WRITE;
         self
     }
 
     pub fn with_query_resolve(mut self) -> Self {
-        self.query_resolve = true;
+        self.0 |= web_sys::gpu_buffer_usage::QUERY_RESOLVE;
         self
     }
 
     pub fn with_storage(mut self) -> Self {
-        self.storage = true;
+        self.0 |= web_sys::gpu_buffer_usage::STORAGE;
         self
     }
 
     pub fn with_uniform(mut self) -> Self {
-        self.uniform = true;
+        self.0 |= web_sys::gpu_buffer_usage::UNIFORM;
         self
     }
 
     pub fn with_vertex(mut self) -> Self {
-        self.vertex = true;
+        self.0 |= web_sys::gpu_buffer_usage::VERTEX;
         self
     }
 }
@@ -136,7 +117,7 @@ impl BufferUsage {
 impl From<BufferDescriptor<'_>> for web_sys::GpuBufferDescriptor {
     fn from(descriptor: BufferDescriptor) -> Self {
         let descriptor_js =
-            web_sys::GpuBufferDescriptor::new(descriptor.size as f64, descriptor.usage.as_u32());
+            web_sys::GpuBufferDescriptor::new(descriptor.size as f64, descriptor.usage.into());
 
         if let Some(label) = descriptor.label {
             descriptor_js.set_label(label);

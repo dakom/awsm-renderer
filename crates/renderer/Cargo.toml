@@ -25,6 +25,8 @@ tracing = {workspace = true}
 thiserror = {workspace = true}
 anyhow = {workspace = true}
 futures = {workspace = true}
+slotmap = {workspace = true}
+glam = {workspace = true}
 
 # Optional deps
 gloo-net = {workspace = true, optional = true}

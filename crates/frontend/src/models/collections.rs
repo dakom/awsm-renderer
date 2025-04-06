@@ -6,7 +6,7 @@ use crate::prelude::*;
 pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::new(|| {
     let mut h = HashMap::new();
 
-    h.insert("Todo", vec![GltfId::Triangle]);
+    h.insert("Todo", vec![GltfId::SimpleSparseAccessor]);
 
     // h.insert(
     //     "Feature tests",
@@ -30,21 +30,21 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
     //     ],
     // );
 
-    // h.insert(
-    //     "Minimal",
-    //     vec![
-    //         GltfId::TriangleWithoutIndices,
-    //         GltfId::Triangle,
-    //         GltfId::SimpleSparseAccessor,
-    //         GltfId::SimpleMeshes,
-    //         GltfId::SimpleMorph,
-    //         GltfId::AnimatedTriangle,
-    //         GltfId::AnimatedMorphCube,
-    //         GltfId::AnimatedMorphSphere,
-    //         GltfId::SimpleSkin,
-    //         GltfId::InterpolationTest,
-    //     ],
-    // );
+    h.insert(
+        "Minimal",
+        vec![
+            GltfId::TriangleWithoutIndices,
+            GltfId::Triangle,
+            // GltfId::SimpleSparseAccessor,
+            // GltfId::SimpleMeshes,
+            // GltfId::SimpleMorph,
+            // GltfId::AnimatedTriangle,
+            // GltfId::AnimatedMorphCube,
+            // GltfId::AnimatedMorphSphere,
+            // GltfId::SimpleSkin,
+            // GltfId::InterpolationTest,
+        ],
+    );
 
     // h.insert(
     //     "Standard",

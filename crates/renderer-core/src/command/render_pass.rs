@@ -1,5 +1,7 @@
 use std::ops::Deref;
 
+use crate::pipeline::primitive::IndexFormat;
+
 use super::{color::Color, LoadOp, StoreOp};
 
 #[derive(Debug, Clone)]
@@ -10,6 +12,58 @@ pub struct RenderPassEncoder {
 impl RenderPassEncoder {
     pub fn new(inner: web_sys::GpuRenderPassEncoder) -> Self {
         Self { inner }
+    }
+
+    pub fn set_vertex_buffer(
+        &self,
+        slot: u32,
+        buffer: &web_sys::GpuBuffer,
+        offset: Option<u64>,
+        size: Option<u64>,
+    ) {
+        match (offset, size) {
+            (Some(offset), Some(size)) => self.inner.set_vertex_buffer_with_f64_and_f64(
+                slot,
+                Some(buffer),
+                offset as f64,
+                size as f64,
+            ),
+            (Some(offset), None) => {
+                self.inner
+                    .set_vertex_buffer_with_f64(slot, Some(buffer), offset as f64)
+            }
+            (None, Some(size)) => {
+                self.inner
+                    .set_vertex_buffer_with_f64_and_f64(slot, Some(buffer), 0.0, size as f64)
+            }
+            (None, None) => self.inner.set_vertex_buffer(slot, Some(buffer)),
+        }
+    }
+
+    pub fn set_index_buffer(
+        &self,
+        buffer: &web_sys::GpuBuffer,
+        format: IndexFormat,
+        offset: Option<u64>,
+        size: Option<u64>,
+    ) {
+        match (offset, size) {
+            (Some(offset), Some(size)) => self.inner.set_index_buffer_with_f64_and_f64(
+                buffer,
+                format,
+                offset as f64,
+                size as f64,
+            ),
+            (Some(offset), None) => {
+                self.inner
+                    .set_index_buffer_with_f64(buffer, format, offset as f64)
+            }
+            (None, Some(size)) => {
+                self.inner
+                    .set_index_buffer_with_f64_and_f64(buffer, format, 0.0, size as f64)
+            }
+            (None, None) => self.inner.set_index_buffer(buffer, format),
+        }
     }
 }
 

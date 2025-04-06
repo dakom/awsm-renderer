@@ -214,7 +214,9 @@ impl AwsmRendererWebGpu {
         buffer: &web_sys::GpuBuffer,
         buffer_offset: Option<u64>,
         data: impl Into<JsData<'a>>,
+        // This value is a number of elements if data is a TypedArray, and a number of bytes if not
         data_offset: Option<u64>,
+        // This value is a number of elements if data is a TypedArray, and a number of bytes if not
         data_size: Option<u64>,
     ) -> Result<()> {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/writeBuffer

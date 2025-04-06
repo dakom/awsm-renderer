@@ -95,6 +95,7 @@ features = [
     "FileList",
     "File",
     "Window",
+    "BlobPropertyBag",
     "Url",
     "UrlSearchParams",
     "MediaQueryList",
