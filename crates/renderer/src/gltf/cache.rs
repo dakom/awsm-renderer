@@ -1,15 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
-use super::{buffers::BufferKey, loader::GltfResource, pipelines::PipelineKey, shaders::ShaderKey};
+use super::{data::GltfData, pipelines::PipelineKey, shaders::ShaderKey};
 
 #[derive(Default)]
 pub struct GltfCache {
     pub shaders: HashMap<ShaderKey, web_sys::GpuShaderModule>,
     pub pipelines: HashMap<PipelineKey, web_sys::GpuRenderPipeline>,
-    // TODO - slotmap for gltf resources
-    pub resources: Vec<Arc<GltfResource>>,
-    pub buffers: HashMap<BufferKey, web_sys::GpuBuffer>,
+    pub raw_datas: Vec<Arc<GltfData>>,
 }
-
-// TODO - slotmap for gltf resources
-pub type GltfResourceKey = usize;

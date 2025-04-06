@@ -7,9 +7,9 @@ use awsm_renderer_core::shaders::ShaderModuleDescriptor;
 // is controlled via various components as-needed
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
 pub struct ShaderKey {
-    pub position_attribute_loc: Option<u32>,
-    pub normal_attribute_loc: Option<u32>,
-    pub tangent_attribute_loc: Option<u32>,
+    pub position_attribute: bool,
+    pub normal_attribute: bool,
+    pub tangent_attribute: bool,
     pub morph_targets: Vec<MorphTarget>,
     pub skin_targets: Vec<SkinTarget>,
     pub n_morph_target_weights: u8,
@@ -21,6 +21,40 @@ pub struct ShaderKey {
     pub base_color_texture_uv_index: Option<u32>,
     pub emissive_texture_uv_index: Option<u32>,
     pub alpha_mode: ShaderKeyAlphaMode,
+}
+
+impl ShaderKey {
+    pub fn new(primitive: &gltf::Primitive<'_>) -> Self {
+        let mut key = Self::default();
+
+        for (semantic, _accessor) in primitive.attributes() {
+            match semantic {
+                gltf::Semantic::Positions => {
+                    key.position_attribute = true;
+                },
+                gltf::Semantic::Normals => {
+                    tracing::warn!("TODO - primitive normals");
+                },
+                gltf::Semantic::Tangents => {
+                    tracing::warn!("TODO - primitive tangents");
+                },
+                gltf::Semantic::Colors(_color_index) => {
+                    tracing::warn!("TODO - primitive colors");
+                },
+                gltf::Semantic::TexCoords(_uvs) => {
+                    tracing::warn!("TODO - primitive uvs");
+                },
+                gltf::Semantic::Joints(_joint_index) => {
+                    tracing::warn!("TODO - primitive joins");
+                },
+                gltf::Semantic::Weights(_weight_index) => {
+                    tracing::warn!("TODO - primitive weights");
+                }
+            }
+        }
+
+        key
+    }
 }
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
@@ -78,5 +112,18 @@ impl ShaderKey {
         source.push_str(FRAGMENT_PBR);
 
         source
+    }
+}
+
+pub fn semantic_shader_location(semantic: gltf::Semantic) -> u32 {
+    match semantic {
+        gltf::Semantic::Positions => 0,
+        gltf::Semantic::Normals => 1,
+        gltf::Semantic::Tangents => 2,
+        // TODO - not sure if these are right
+        gltf::Semantic::Colors(index) => 3 + index as u32,
+        gltf::Semantic::TexCoords(index) => 4 + index as u32,
+        gltf::Semantic::Joints(index) => 8 + index as u32,
+        gltf::Semantic::Weights(index) => 12 + index as u32,
     }
 }

@@ -3,11 +3,20 @@ use crate::{
     texture::{TextureFormat, TextureSampleType, TextureViewDimension},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BindGroupLayoutDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#descriptor
     pub label: Option<&'a str>,
     pub entries: Vec<BindGroupLayoutEntry>,
+}
+
+impl<'a> BindGroupLayoutDescriptor<'a> {
+    pub fn new(label: Option<&'a str>) -> Self {
+        Self {
+            label,
+            entries: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +83,23 @@ pub struct BufferBindingLayout {
     pub binding_type: Option<BufferBindingType>,
 }
 
+impl BufferBindingLayout {
+    pub fn with_dynamic_offset(mut self, has_dynamic_offset: bool) -> Self {
+        self.has_dynamic_offset = Some(has_dynamic_offset);
+        self
+    }
+
+    pub fn with_min_binding_size(mut self, min_binding_size: f64) -> Self {
+        self.min_binding_size = Some(min_binding_size);
+        self
+    }
+    pub fn with_binding_type(mut self, binding_type: BufferBindingType) -> Self {
+        self.binding_type = Some(binding_type);
+        self
+    }
+}
+
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuBufferBindingType.html
 pub type BufferBindingType = web_sys::GpuBufferBindingType;
 
 #[derive(Debug, Clone, Default)]
@@ -115,14 +141,6 @@ pub struct TextureBindingLayout {
     pub sample_type: Option<TextureSampleType>,
 }
 
-impl<'a> BindGroupLayoutDescriptor<'a> {
-    pub fn new(label: Option<&'a str>) -> Self {
-        Self {
-            label,
-            entries: Vec::new(),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct BindGroupDescriptor<'a> {

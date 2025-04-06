@@ -18,8 +18,6 @@ impl AwsmRenderer {
 
         self.gpu.submit_commands(&ctx.command_encoder.finish());
 
-        tracing::info!("Submitted all commands to gpu");
-
         Ok(())
     }
 }

@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use awsm_renderer::gltf::loader::GltfResource;
+use awsm_renderer::gltf::data::GltfData;
+use awsm_renderer::gltf::loader::GltfLoader;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
-use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 
 use crate::models::collections::GltfId;
 use crate::prelude::*;
@@ -17,7 +18,7 @@ struct AppRendererInner {
     pub renderer: Mutex<Option<AwsmRenderer>>,
     pub gltf_id: Mutex<Option<GltfId>>,
     pub pipelines: Mutex<HashMap<GltfId, web_sys::GpuRenderPipeline>>,
-    pub gltf_res: Mutex<HashMap<GltfId, GltfResource>>,
+    pub gltf_data: Mutex<HashMap<GltfId, Arc<GltfData>>>,
 }
 
 impl AppRenderer {
@@ -27,7 +28,7 @@ impl AppRenderer {
                 renderer: Mutex::new(None),
                 gltf_id: Mutex::new(None),
                 pipelines: Mutex::new(HashMap::new()),
-                gltf_res: Mutex::new(HashMap::new()),
+                gltf_data: Mutex::new(HashMap::new()),
             }),
         }
     }
@@ -79,25 +80,33 @@ impl AppRendererInner {
         ) {
             (Some(renderer), Some(gltf_id)) => {
                 let url = format!("{}/{}", CONFIG.gltf_url, gltf_id.filepath());
-                tracing::info!("Rendering model at: {}", url);
 
-                let gltf_res = { self.gltf_res.lock().unwrap().get(&gltf_id).cloned() };
+                let gltf_data = { self.gltf_data.lock().unwrap().get(&gltf_id).cloned() };
 
-                let gltf_res = match gltf_res {
-                    Some(gltf_res) => gltf_res,
+                let gltf_data = match gltf_data {
+                    Some(gltf_data) => gltf_data,
                     None => {
-                        let gltf_res = GltfResource::load(&url, None).await?;
-                        self.gltf_res
+                        let gltf_loader = GltfLoader::load(&url, None).await?;
+                        let gltf_data = Arc::new(GltfData::new(renderer, gltf_loader).await?);
+
+                        self.gltf_data
                             .lock()
                             .unwrap()
-                            .insert(gltf_id, gltf_res.clone());
-                        gltf_res
+                            .insert(gltf_id, gltf_data.clone());
+
+                        gltf_data
                     }
                 };
 
-                renderer.populate_gltf(&gltf_res).await?;
+                renderer.populate_gltf(gltf_data, None).await?;
 
                 renderer.render()?;
+
+                loop {
+                    JsFuture::from(renderer.gpu.device.lost()).await;
+                    tracing::info!("GPU device lost, attempting re-render");
+                    renderer.render()?;
+                }
             }
             _ => {}
         }

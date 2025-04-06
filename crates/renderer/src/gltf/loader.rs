@@ -17,8 +17,8 @@ use std::sync::{Arc, Mutex};
 use super::error::AwsmGltfError;
 
 #[derive(Clone, Debug)]
-pub struct GltfResource {
-    pub gltf: Document,
+pub struct GltfLoader {
+    pub doc: Document,
     pub buffers: Vec<Vec<u8>>,
     pub images: Vec<ImageLoader>,
 }
@@ -34,7 +34,7 @@ pub fn get_type_from_filename(_url: &str) -> Option<GltfFileType> {
     Some(GltfFileType::Json)
 }
 
-impl GltfResource {
+impl GltfLoader {
     pub async fn load(url: &str, file_type: Option<GltfFileType>) -> anyhow::Result<Self> {
         let url = url.to_owned();
         let file_type = match file_type {
@@ -42,7 +42,7 @@ impl GltfResource {
             None => get_type_from_filename(&url).unwrap_or(GltfFileType::Json),
         };
 
-        let Gltf { document, blob } = match file_type {
+        let Gltf { document: doc, blob } = match file_type {
             GltfFileType::Json => {
                 let text = gloo_net::http::Request::get(&url)
                     .send()
@@ -64,16 +64,16 @@ impl GltfResource {
         }?;
 
         let base_path = get_base_path(&url);
-        let buffers = import_buffer_data(&document, base_path, blob).await?;
+        let buffers = import_buffer_data(&doc, base_path, blob).await?;
 
         //info!("loaded {} buffers", buffer_data.len());
 
-        let images = import_image_data(&document, base_path, &buffers).await?;
+        let images = import_image_data(&doc, base_path, &buffers).await?;
 
         //info!("loaded {} images", image_data.len());
 
         Ok(Self {
-            gltf: document,
+            doc,
             buffers,
             images,
         })

@@ -12,7 +12,7 @@ pub struct VertexState<'a> {
     pub buffers: Vec<VertexBufferLayout>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct VertexBufferLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#buffers
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuVertexBufferLayout.html
@@ -20,6 +20,7 @@ pub struct VertexBufferLayout {
     pub attributes: Vec<VertexAttribute>,
     pub step_mode: Option<VertexStepMode>,
 }
+
 
 impl std::hash::Hash for VertexBufferLayout {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -49,6 +50,7 @@ impl std::hash::Hash for VertexAttribute {
 // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#stepmode
 pub type VertexStepMode = web_sys::GpuVertexStepMode;
 
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuVertexFormat.html
 pub type VertexFormat = web_sys::GpuVertexFormat;
 
 // JS conversion
