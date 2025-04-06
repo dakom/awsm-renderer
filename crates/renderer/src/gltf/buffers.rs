@@ -4,7 +4,10 @@ use awsm_renderer_core::buffer::{BufferDescriptor, BufferUsage};
 
 use crate::AwsmRenderer;
 
-use super::{accessors::semantic_ordering, error::{AwsmGltfError, Result}};
+use super::{
+    accessors::semantic_ordering,
+    error::{AwsmGltfError, Result},
+};
 
 #[derive(Debug)]
 pub struct GltfBuffers {
@@ -23,7 +26,7 @@ pub struct GltfBuffers {
     pub vertex_buffer: web_sys::GpuBuffer,
 
     // first level is mesh, second level is primitive
-    pub meshes: Vec<Vec<MeshPrimitiveOffset>>
+    pub meshes: Vec<Vec<MeshPrimitiveOffset>>,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -32,7 +35,7 @@ pub struct MeshPrimitiveOffset {
     pub index_len: Option<usize>,
     pub vertex: usize,
     pub vertex_lens: Vec<usize>,
-    pub vertex_strides: Vec<usize>
+    pub vertex_strides: Vec<usize>,
 }
 
 impl MeshPrimitiveOffset {
@@ -46,15 +49,19 @@ impl MeshPrimitiveOffset {
 }
 
 impl GltfBuffers {
-    pub async fn new(renderer: &AwsmRenderer, doc: &gltf::Document, buffers: Vec<Vec<u8>>) -> Result<Self> {
+    pub async fn new(
+        renderer: &AwsmRenderer,
+        doc: &gltf::Document,
+        buffers: Vec<Vec<u8>>,
+    ) -> Result<Self> {
         // refactor original buffers into the format we want
         // namely, pack the data in a predictable order
         // arranged by primitive
         // with indices as a separate buffer
 
-        let mut index_bytes:Vec<u8> = Vec::new();
-        let mut vertex_bytes:Vec<u8> = Vec::new();
-        let mut meshes:Vec<Vec<MeshPrimitiveOffset>> = Vec::new();
+        let mut index_bytes: Vec<u8> = Vec::new();
+        let mut vertex_bytes: Vec<u8> = Vec::new();
+        let mut meshes: Vec<Vec<MeshPrimitiveOffset>> = Vec::new();
 
         for mesh in doc.meshes() {
             let mut primitive_offsets = Vec::new();
@@ -73,11 +80,11 @@ impl GltfBuffers {
 
                 // Write to vertex buffer
                 let vertex_offset = vertex_bytes.len();
-                let mut attributes:Vec<(gltf::Semantic, gltf::Accessor<'_>)> = primitive.attributes().collect();
+                let mut attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> =
+                    primitive.attributes().collect();
 
-                attributes.sort_by(|(a, _), (b, _)| {
-                    semantic_ordering(a).cmp(&semantic_ordering(b))
-                });
+                attributes
+                    .sort_by(|(a, _), (b, _)| semantic_ordering(a).cmp(&semantic_ordering(b)));
 
                 let mut vertex_strides = Vec::new();
                 let mut vertex_lens = Vec::new();
@@ -90,7 +97,7 @@ impl GltfBuffers {
                     match accessor.view() {
                         Some(view) => {
                             vertex_strides.push(view.stride().unwrap_or(accessor.size()));
-                        },
+                        }
                         None => {
                             vertex_strides.push(accessor.size());
                         }
@@ -113,27 +120,32 @@ impl GltfBuffers {
             meshes.push(primitive_offsets);
         }
 
-
         let index_buffer = match index_bytes.is_empty() {
             true => None,
-            false=> {
+            false => {
                 // pad to multiple of 4 to satisfy WebGPU
                 let pad = 4 - (index_bytes.len() % 4);
                 if pad != 4 {
                     index_bytes.extend(vec![0; pad]);
                 }
 
-                let index_buffer = renderer.gpu.create_buffer(&BufferDescriptor::new(
-                    Some("gltf index buffer"),
-                    index_bytes.len() as u64,
-                    BufferUsage::new()
-                        .with_copy_dst()
-                        .with_index()
-                ).into())
-                .map_err(AwsmGltfError::BufferCreate)?;
+                let index_buffer = renderer
+                    .gpu
+                    .create_buffer(
+                        &BufferDescriptor::new(
+                            Some("gltf index buffer"),
+                            index_bytes.len() as u64,
+                            BufferUsage::new().with_copy_dst().with_index(),
+                        )
+                        .into(),
+                    )
+                    .map_err(AwsmGltfError::BufferCreate)?;
 
-                renderer.gpu.write_buffer(&index_buffer, None, index_bytes.as_slice(), None, None).map_err(AwsmGltfError::BufferWrite)?;
-                
+                renderer
+                    .gpu
+                    .write_buffer(&index_buffer, None, index_bytes.as_slice(), None, None)
+                    .map_err(AwsmGltfError::BufferWrite)?;
+
                 Some(index_buffer)
             }
         };
@@ -144,16 +156,22 @@ impl GltfBuffers {
             vertex_bytes.extend(vec![0; pad]);
         }
 
-        let vertex_buffer = renderer.gpu.create_buffer(&BufferDescriptor::new(
-            Some("gltf vertex buffer"),
-            vertex_bytes.len() as u64,
-            BufferUsage::new()
-                .with_copy_dst()
-                .with_vertex()
-        ).into())
-        .map_err(AwsmGltfError::BufferCreate)?;
+        let vertex_buffer = renderer
+            .gpu
+            .create_buffer(
+                &BufferDescriptor::new(
+                    Some("gltf vertex buffer"),
+                    vertex_bytes.len() as u64,
+                    BufferUsage::new().with_copy_dst().with_vertex(),
+                )
+                .into(),
+            )
+            .map_err(AwsmGltfError::BufferCreate)?;
 
-        renderer.gpu.write_buffer(&vertex_buffer, None, vertex_bytes.as_slice(), None, None).map_err(AwsmGltfError::BufferWrite)?;
+        renderer
+            .gpu
+            .write_buffer(&vertex_buffer, None, vertex_bytes.as_slice(), None, None)
+            .map_err(AwsmGltfError::BufferWrite)?;
 
         Ok(Self {
             index_bytes: if index_bytes.is_empty() {
@@ -164,22 +182,24 @@ impl GltfBuffers {
             index_buffer,
             vertex_bytes,
             vertex_buffer,
-            meshes
+            meshes,
         })
     }
 }
 
-fn accessor_to_bytes<'a>(accessor: &gltf::Accessor<'_>, buffers: &'a Vec<Vec<u8>>) -> Result<Cow<'a, [u8]>> {
-
+fn accessor_to_bytes<'a>(
+    accessor: &gltf::Accessor<'_>,
+    buffers: &'a Vec<Vec<u8>>,
+) -> Result<Cow<'a, [u8]>> {
     let length = accessor.size() * accessor.count();
 
-    let mut buffer:Cow<[u8]> = match accessor.view() {
+    let mut buffer: Cow<[u8]> = match accessor.view() {
         Some(view) => {
             let buffer = &buffers[view.buffer().index()];
             let start = accessor.offset() + view.offset();
             let end = start + length;
             Cow::Borrowed(&buffer[start..end])
-        },
+        }
         None => {
             // gltf spec says if we have no view, fill it with zeroes
             // and these may or may not be overwritten with sparse bytes (and/or extensions)
@@ -201,13 +221,16 @@ fn accessor_to_bytes<'a>(accessor: &gltf::Accessor<'_>, buffers: &'a Vec<Vec<u8>
 
         for (value_index, target_index) in indices.into_iter().enumerate() {
             let value_slice_start = value_index * accessor.size();
-            let value_slice = &values_buffer_slice[value_slice_start..value_slice_start + accessor.size()];
+            let value_slice =
+                &values_buffer_slice[value_slice_start..value_slice_start + accessor.size()];
 
             let buffer_slice_start = target_index * accessor.size();
-            let buffer_slice = &mut buffer[buffer_slice_start..buffer_slice_start + accessor.size()];
+            let buffer_slice =
+                &mut buffer[buffer_slice_start..buffer_slice_start + accessor.size()];
 
             // interpret the value_slice as a f32 using rust std
-            tracing::info!("from values: {}, {}, {} to {}, {}, {}", 
+            tracing::info!(
+                "from values: {}, {}, {} to {}, {}, {}",
                 f32::from_le_bytes(buffer_slice[0..4].try_into().unwrap()),
                 f32::from_le_bytes(buffer_slice[4..8].try_into().unwrap()),
                 f32::from_le_bytes(buffer_slice[8..12].try_into().unwrap()),
@@ -221,10 +244,12 @@ fn accessor_to_bytes<'a>(accessor: &gltf::Accessor<'_>, buffers: &'a Vec<Vec<u8>
     }
 
     Ok(buffer)
+}
 
-} 
-
-fn sparse_to_indices(sparse: &gltf::accessor::sparse::Sparse<'_>, buffers: &Vec<Vec<u8>>) -> Vec<usize> {
+fn sparse_to_indices(
+    sparse: &gltf::accessor::sparse::Sparse<'_>,
+    buffers: &Vec<Vec<u8>>,
+) -> Vec<usize> {
     let indices_buffer_slice = &buffers[sparse.indices().view().buffer().index()];
     let indices_buffer_slice_start = sparse.indices().offset() + sparse.indices().view().offset();
     let indices_buffer_slice = &indices_buffer_slice[indices_buffer_slice_start..];
@@ -239,13 +264,17 @@ fn sparse_to_indices(sparse: &gltf::accessor::sparse::Sparse<'_>, buffers: &Vec<
             gltf::accessor::sparse::IndexType::U8 => {
                 let index = indices_buffer_slice[index_offset];
                 index as usize
-            }, 
+            }
             gltf::accessor::sparse::IndexType::U16 => {
-                let index = indices_buffer_slice[index_offset..index_offset + 2].try_into().unwrap();
+                let index = indices_buffer_slice[index_offset..index_offset + 2]
+                    .try_into()
+                    .unwrap();
                 u16::from_le_bytes(index) as usize
-            },
+            }
             gltf::accessor::sparse::IndexType::U32 => {
-                let index = indices_buffer_slice[index_offset..index_offset + 4].try_into().unwrap();
+                let index = indices_buffer_slice[index_offset..index_offset + 4]
+                    .try_into()
+                    .unwrap();
                 u32::from_le_bytes(index) as usize
             }
         };

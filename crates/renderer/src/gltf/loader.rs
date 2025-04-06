@@ -42,7 +42,10 @@ impl GltfLoader {
             None => get_type_from_filename(&url).unwrap_or(GltfFileType::Json),
         };
 
-        let Gltf { document: doc, blob } = match file_type {
+        let Gltf {
+            document: doc,
+            blob,
+        } = match file_type {
             GltfFileType::Json => {
                 let text = gloo_net::http::Request::get(&url)
                     .send()

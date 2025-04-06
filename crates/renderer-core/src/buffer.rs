@@ -8,13 +8,13 @@ pub struct BufferDescriptor<'a> {
     pub usage: BufferUsage,
 }
 
-impl <'a> BufferDescriptor<'a> {
+impl<'a> BufferDescriptor<'a> {
     pub fn new(label: Option<&'a str>, size: u64, usage: BufferUsage) -> Self {
         Self {
             label,
             size,
             usage,
-            mapped_at_creation: None
+            mapped_at_creation: None,
         }
     }
 

@@ -1,7 +1,7 @@
-use awsm_renderer_core::image::ImageLoader;
 use crate::AwsmRenderer;
+use awsm_renderer_core::image::ImageLoader;
 
-use super::{buffers::GltfBuffers, loader::GltfLoader, error::Result};
+use super::{buffers::GltfBuffers, error::Result, loader::GltfLoader};
 
 #[derive(Debug)]
 pub struct GltfData {

@@ -21,7 +21,6 @@ pub struct VertexBufferLayout {
     pub step_mode: Option<VertexStepMode>,
 }
 
-
 impl std::hash::Hash for VertexBufferLayout {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.array_stride.hash(state);

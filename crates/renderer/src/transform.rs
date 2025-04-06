@@ -31,5 +31,4 @@ impl Transform {
             origin: glam::Vec3::ZERO,
         }
     }
-
 }

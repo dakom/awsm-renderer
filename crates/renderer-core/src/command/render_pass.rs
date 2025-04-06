@@ -22,11 +22,20 @@ impl RenderPassEncoder {
         size: Option<u64>,
     ) {
         match (offset, size) {
-            (Some(offset), Some(size)) => self
-                .inner
-                .set_vertex_buffer_with_f64_and_f64(slot, Some(buffer), offset as f64, size as f64),
-            (Some(offset), None) => self.inner.set_vertex_buffer_with_f64(slot, Some(buffer), offset as f64),
-            (None, Some(size)) => self.inner.set_vertex_buffer_with_f64_and_f64(slot, Some(buffer), 0.0, size as f64),
+            (Some(offset), Some(size)) => self.inner.set_vertex_buffer_with_f64_and_f64(
+                slot,
+                Some(buffer),
+                offset as f64,
+                size as f64,
+            ),
+            (Some(offset), None) => {
+                self.inner
+                    .set_vertex_buffer_with_f64(slot, Some(buffer), offset as f64)
+            }
+            (None, Some(size)) => {
+                self.inner
+                    .set_vertex_buffer_with_f64_and_f64(slot, Some(buffer), 0.0, size as f64)
+            }
             (None, None) => self.inner.set_vertex_buffer(slot, Some(buffer)),
         }
     }
@@ -39,11 +48,20 @@ impl RenderPassEncoder {
         size: Option<u64>,
     ) {
         match (offset, size) {
-            (Some(offset), Some(size)) => self
-                .inner
-                .set_index_buffer_with_f64_and_f64(buffer, format, offset as f64, size as f64),
-            (Some(offset), None) => self.inner.set_index_buffer_with_f64(buffer, format, offset as f64),
-            (None, Some(size)) => self.inner.set_index_buffer_with_f64_and_f64(buffer, format, 0.0, size as f64),
+            (Some(offset), Some(size)) => self.inner.set_index_buffer_with_f64_and_f64(
+                buffer,
+                format,
+                offset as f64,
+                size as f64,
+            ),
+            (Some(offset), None) => {
+                self.inner
+                    .set_index_buffer_with_f64(buffer, format, offset as f64)
+            }
+            (None, Some(size)) => {
+                self.inner
+                    .set_index_buffer_with_f64_and_f64(buffer, format, 0.0, size as f64)
+            }
             (None, None) => self.inner.set_index_buffer(buffer, format),
         }
     }

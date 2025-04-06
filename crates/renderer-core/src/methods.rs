@@ -224,84 +224,78 @@ impl AwsmRendererWebGpu {
         let data = data.into();
 
         match data {
-            JsData::SliceU8(data) => {
-                match (data_offset, data_size) {
-                    (None, None) => self.device.queue().write_buffer_with_f64_and_u8_slice(
+            JsData::SliceU8(data) => match (data_offset, data_size) {
+                (None, None) => self.device.queue().write_buffer_with_f64_and_u8_slice(
+                    buffer,
+                    buffer_offset.unwrap_or(0) as f64,
+                    data,
+                ),
+                (Some(data_offset), Some(data_size)) => self
+                    .device
+                    .queue()
+                    .write_buffer_with_f64_and_u8_slice_and_f64_and_f64(
                         buffer,
                         buffer_offset.unwrap_or(0) as f64,
                         data,
+                        data_offset as f64,
+                        data_size as f64,
                     ),
-                    (Some(data_offset), Some(data_size)) => self
-                        .device
-                        .queue()
-                        .write_buffer_with_f64_and_u8_slice_and_f64_and_f64(
-                            buffer,
-                            buffer_offset.unwrap_or(0) as f64,
-                            data,
-                            data_offset as f64,
-                            data_size as f64,
-                        ),
-                    (Some(data_offset), None) => self
-                        .device
-                        .queue()
-                        .write_buffer_with_f64_and_u8_slice_and_f64(
-                            buffer,
-                            buffer_offset.unwrap_or(0) as f64,
-                            data,
-                            data_offset as f64,
-                        ),
-                    (None, Some(data_size)) => self
-                        .device
-                        .queue()
-                        .write_buffer_with_f64_and_u8_slice_and_f64_and_f64(
-                            buffer,
-                            buffer_offset.unwrap_or(0) as f64,
-                            data,
-                            0.0,
-                            data_size as f64,
-                        ),
-                }
+                (Some(data_offset), None) => self
+                    .device
+                    .queue()
+                    .write_buffer_with_f64_and_u8_slice_and_f64(
+                        buffer,
+                        buffer_offset.unwrap_or(0) as f64,
+                        data,
+                        data_offset as f64,
+                    ),
+                (None, Some(data_size)) => self
+                    .device
+                    .queue()
+                    .write_buffer_with_f64_and_u8_slice_and_f64_and_f64(
+                        buffer,
+                        buffer_offset.unwrap_or(0) as f64,
+                        data,
+                        0.0,
+                        data_size as f64,
+                    ),
             },
-            _ => {
-                match (data_offset, data_size) {
-                    (None, None) => self.device.queue().write_buffer_with_f64_and_buffer_source(
+            _ => match (data_offset, data_size) {
+                (None, None) => self.device.queue().write_buffer_with_f64_and_buffer_source(
+                    buffer,
+                    buffer_offset.unwrap_or(0) as f64,
+                    data.as_js_value_ref().unchecked_ref(),
+                ),
+                (Some(data_offset), Some(data_size)) => self
+                    .device
+                    .queue()
+                    .write_buffer_with_f64_and_buffer_source_and_f64_and_f64(
                         buffer,
                         buffer_offset.unwrap_or(0) as f64,
                         data.as_js_value_ref().unchecked_ref(),
+                        data_offset as f64,
+                        data_size as f64,
                     ),
-                    (Some(data_offset), Some(data_size)) => self
-                        .device
-                        .queue()
-                        .write_buffer_with_f64_and_buffer_source_and_f64_and_f64(
-                            buffer,
-                            buffer_offset.unwrap_or(0) as f64,
-                            data.as_js_value_ref().unchecked_ref(),
-                            data_offset as f64,
-                            data_size as f64,
-                        ),
-                    (Some(data_offset), None) => self
-                        .device
-                        .queue()
-                        .write_buffer_with_f64_and_buffer_source_and_f64(
-                            buffer,
-                            buffer_offset.unwrap_or(0) as f64,
-                            data.as_js_value_ref().unchecked_ref(),
-                            data_offset as f64,
-                        ),
-                    (None, Some(data_size)) => {
-                        self
-                            .device
-                            .queue()
-                            .write_buffer_with_f64_and_buffer_source_and_f64_and_f64(
-                                buffer,
-                                buffer_offset.unwrap_or(0) as f64,
-                                data.as_js_value_ref().unchecked_ref(),
-                                0.0,
-                                data_size as f64,
-                            )
-                    },
-                }
-            }
+                (Some(data_offset), None) => self
+                    .device
+                    .queue()
+                    .write_buffer_with_f64_and_buffer_source_and_f64(
+                        buffer,
+                        buffer_offset.unwrap_or(0) as f64,
+                        data.as_js_value_ref().unchecked_ref(),
+                        data_offset as f64,
+                    ),
+                (None, Some(data_size)) => self
+                    .device
+                    .queue()
+                    .write_buffer_with_f64_and_buffer_source_and_f64_and_f64(
+                        buffer,
+                        buffer_offset.unwrap_or(0) as f64,
+                        data.as_js_value_ref().unchecked_ref(),
+                        0.0,
+                        data_size as f64,
+                    ),
+            },
         }
         .map_err(AwsmCoreError::buffer_write)
     }

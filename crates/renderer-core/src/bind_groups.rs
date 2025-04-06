@@ -141,7 +141,6 @@ pub struct TextureBindingLayout {
     pub sample_type: Option<TextureSampleType>,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct BindGroupDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroup#descriptor

@@ -18,11 +18,15 @@ pub struct PipelineKey {
 }
 
 impl PipelineKey {
-    pub fn new(renderer: &AwsmRenderer, shader_key: ShaderKey, vertex_buffer_layouts: Vec<VertexBufferLayout>) -> Self {
+    pub fn new(
+        renderer: &AwsmRenderer,
+        shader_key: ShaderKey,
+        vertex_buffer_layouts: Vec<VertexBufferLayout>,
+    ) -> Self {
         Self {
             shader_key,
             fragment_targets: vec![ColorTargetState::new(renderer.gpu.current_context_format())],
-            vertex_buffer_layouts
+            vertex_buffer_layouts,
         }
     }
 
@@ -31,13 +35,11 @@ impl PipelineKey {
         _renderer: &AwsmRenderer,
         shader_module: &web_sys::GpuShaderModule,
     ) -> Result<web_sys::GpuRenderPipelineDescriptor> {
-
         let fragment = FragmentState::new(shader_module, None, self.fragment_targets.clone());
 
         let layout = if self.vertex_buffer_layouts.is_empty() {
             PipelineLayoutKind::Auto
         } else {
-
             PipelineLayoutKind::Auto
             // let mut pipeline_layout_descriptor = PipelineLayoutDescriptor::new(None);
 

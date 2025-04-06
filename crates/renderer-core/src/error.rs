@@ -89,7 +89,6 @@ pub enum AwsmCoreError {
     ShaderValidation(Vec<ShaderCompilationMessage>),
 }
 
-
 impl AwsmCoreError {
     pub fn gpu_adapter(err: JsValue) -> Self {
         Self::GpuAdapter(format_err(err))
@@ -122,9 +121,7 @@ impl AwsmCoreError {
                     err.message()
                 ))
             }
-            Err(err) => {
-                Self::PipelineCreation(format_err(err))
-            }
+            Err(err) => Self::PipelineCreation(format_err(err)),
         }
     }
 

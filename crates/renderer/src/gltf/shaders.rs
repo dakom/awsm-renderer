@@ -31,22 +31,22 @@ impl ShaderKey {
             match semantic {
                 gltf::Semantic::Positions => {
                     key.position_attribute = true;
-                },
+                }
                 gltf::Semantic::Normals => {
                     tracing::warn!("TODO - primitive normals");
-                },
+                }
                 gltf::Semantic::Tangents => {
                     tracing::warn!("TODO - primitive tangents");
-                },
+                }
                 gltf::Semantic::Colors(_color_index) => {
                     tracing::warn!("TODO - primitive colors");
-                },
+                }
                 gltf::Semantic::TexCoords(_uvs) => {
                     tracing::warn!("TODO - primitive uvs");
-                },
+                }
                 gltf::Semantic::Joints(_joint_index) => {
                     tracing::warn!("TODO - primitive joins");
-                },
+                }
                 gltf::Semantic::Weights(_weight_index) => {
                     tracing::warn!("TODO - primitive weights");
                 }

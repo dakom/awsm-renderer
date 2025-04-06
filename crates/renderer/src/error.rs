@@ -5,7 +5,6 @@ use thiserror::Error;
 pub enum AwsmError {
     #[error("{0}")]
     Core(#[from] AwsmCoreError),
-
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;

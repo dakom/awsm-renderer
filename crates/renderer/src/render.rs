@@ -1,6 +1,6 @@
+use crate::core::command::CommandEncoder;
 use crate::error::Result;
 use crate::AwsmRenderer;
-use crate::core::command::CommandEncoder;
 
 impl AwsmRenderer {
     pub fn render(&self) -> Result<()> {
@@ -9,7 +9,7 @@ impl AwsmRenderer {
         // and submitting the commands to the GPU for rendering
         let mut ctx = RenderContext {
             current_texture_view: self.gpu.current_context_texture_view()?,
-            command_encoder: self.gpu.create_command_encoder(Some("Meshes"))
+            command_encoder: self.gpu.create_command_encoder(Some("Meshes")),
         };
 
         for (mesh_key, mesh) in self.meshes.iter_with_key() {
@@ -24,5 +24,5 @@ impl AwsmRenderer {
 
 pub struct RenderContext {
     pub current_texture_view: web_sys::GpuTextureView,
-    pub command_encoder: CommandEncoder
+    pub command_encoder: CommandEncoder,
 }
