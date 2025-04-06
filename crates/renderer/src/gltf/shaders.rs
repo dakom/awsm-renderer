@@ -121,9 +121,9 @@ pub fn semantic_shader_location(semantic: gltf::Semantic) -> u32 {
         gltf::Semantic::Normals => 1,
         gltf::Semantic::Tangents => 2,
         // TODO - not sure if these are right
-        gltf::Semantic::Colors(index) => 3 + index as u32,
-        gltf::Semantic::TexCoords(index) => 4 + index as u32,
-        gltf::Semantic::Joints(index) => 8 + index as u32,
-        gltf::Semantic::Weights(index) => 12 + index as u32,
+        gltf::Semantic::Colors(index) => 3 + index,
+        gltf::Semantic::TexCoords(index) => 4 + index,
+        gltf::Semantic::Joints(index) => 8 + index,
+        gltf::Semantic::Weights(index) => 12 + index,
     }
 }

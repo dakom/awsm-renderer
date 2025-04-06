@@ -107,10 +107,7 @@ impl GltfBuffers {
                 // Done for this primitive
                 primitive_offsets.push(MeshPrimitiveOffset {
                     index: index_offset,
-                    index_len: match index_offset {
-                        None => None,
-                        Some(offset) => Some(index_bytes.len() - offset),
-                    },
+                    index_len: index_offset.map(|offset| index_bytes.len() - offset),
                     vertex: vertex_offset,
                     vertex_lens,
                     vertex_strides,
@@ -189,7 +186,7 @@ impl GltfBuffers {
 
 fn accessor_to_bytes<'a>(
     accessor: &gltf::Accessor<'_>,
-    buffers: &'a Vec<Vec<u8>>,
+    buffers: &'a [Vec<u8>],
 ) -> Result<Cow<'a, [u8]>> {
     let length = accessor.size() * accessor.count();
 
@@ -239,7 +236,7 @@ fn accessor_to_bytes<'a>(
                 f32::from_le_bytes(value_slice[8..12].try_into().unwrap())
             );
 
-            buffer_slice.copy_from_slice(&value_slice);
+            buffer_slice.copy_from_slice(value_slice);
         }
     }
 
@@ -248,7 +245,7 @@ fn accessor_to_bytes<'a>(
 
 fn sparse_to_indices(
     sparse: &gltf::accessor::sparse::Sparse<'_>,
-    buffers: &Vec<Vec<u8>>,
+    buffers: &[Vec<u8>],
 ) -> Vec<usize> {
     let indices_buffer_slice = &buffers[sparse.indices().view().buffer().index()];
     let indices_buffer_slice_start = sparse.indices().offset() + sparse.indices().view().offset();

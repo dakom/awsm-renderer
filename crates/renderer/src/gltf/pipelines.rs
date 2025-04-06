@@ -37,9 +37,11 @@ impl PipelineKey {
     ) -> Result<web_sys::GpuRenderPipelineDescriptor> {
         let fragment = FragmentState::new(shader_module, None, self.fragment_targets.clone());
 
+        #[allow(clippy::if_same_then_else)]
         let layout = if self.vertex_buffer_layouts.is_empty() {
             PipelineLayoutKind::Auto
         } else {
+            // TODO - re-use pipeline layouts (not just values, but, from a key lookup so we re-use the same objects)
             PipelineLayoutKind::Auto
             // let mut pipeline_layout_descriptor = PipelineLayoutDescriptor::new(None);
 

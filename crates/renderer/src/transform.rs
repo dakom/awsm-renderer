@@ -1,6 +1,7 @@
 use slotmap::{new_key_type, SlotMap};
 
 #[derive(Default)]
+#[allow(dead_code)]
 pub struct Transforms {
     // TODO - replace with slotmap
     local_lookup: SlotMap<TransformKey, Transform>,
@@ -20,6 +21,12 @@ pub struct Transform {
     pub rotation: glam::Quat,
     pub scale: glam::Vec3,
     pub origin: glam::Vec3,
+}
+
+impl Default for Transform {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Transform {

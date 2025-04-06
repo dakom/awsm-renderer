@@ -59,7 +59,7 @@ impl AwsmRenderer {
             }
 
             for child in gltf_node.children() {
-                self.populate_gltf_node(ctx, &child, Some(&gltf_node))
+                self.populate_gltf_node(ctx, &child, Some(gltf_node))
                     .await?;
             }
             Ok(())
@@ -102,9 +102,7 @@ impl AwsmRenderer {
                 let pipeline = self
                     .gpu
                     .create_render_pipeline(
-                        &pipeline_key
-                            .clone()
-                            .into_descriptor(&self, &shader_module)?,
+                        &pipeline_key.clone().into_descriptor(self, &shader_module)?,
                     )
                     .await?;
 

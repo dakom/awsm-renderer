@@ -91,7 +91,7 @@ impl Mesh {
         let render_pass = command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 color_attachments: vec![ColorAttachment::new(
-                    &current_texture_view,
+                    current_texture_view,
                     LoadOp::Clear,
                     StoreOp::Store,
                 )],
