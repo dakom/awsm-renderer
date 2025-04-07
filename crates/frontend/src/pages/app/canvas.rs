@@ -9,6 +9,7 @@ use super::renderer::AppRenderer;
 pub struct AppCanvas {
     pub resize_observer: Arc<Mutex<Option<ResizeObserver>>>,
     pub renderer: Mutable<Option<Arc<AppRenderer>>>,
+    pub display_text: Mutable<String>,
 }
 
 impl AppCanvas {
@@ -16,6 +17,7 @@ impl AppCanvas {
         Arc::new(Self {
             resize_observer: Arc::new(Mutex::new(None)),
             renderer: Mutable::new(None),
+            display_text: Mutable::new("<-- Select a model from the sidebar".to_string()),
         })
     }
 
@@ -91,25 +93,52 @@ impl AppCanvas {
                 .style("position", "absolute")
                 .style("padding", "1rem")
                 .class([FontSize::H3.class(), ColorText::GltfContent.class()])
-                .text_signal(Route::signal().map(clone!(state => move |route| {
-                    match route {
-                        Route::App(AppRoute::Model(model_id)) => {
-                            format!("Now showing: {}", model_id)
-                        }
-                        _ => {
-                            "<-- Select a model from the sidebar".to_string()
-                        }
-                    }
-                })))
+                .text_signal(state.display_text.signal_cloned())
             }))
             .future(sig.for_each(clone!(state => move |data| {
-                async move {
+                clone!(state => async move {
                     if let Some((gltf_id, renderer)) = data {
-                        if let Err(err) = renderer.render(gltf_id).await {
+                        state.display_text.set(format!("Loading: {}", gltf_id));
+
+                        renderer.clear().await;
+
+                        let loader = match renderer.load(gltf_id.clone()).await {
+                            Ok(loader) => loader,
+                            Err(err) => {
+                                tracing::error!("{:?}", err);
+                                state.display_text.set(format!("Error loading: {}", gltf_id));
+                                return;
+                            }
+                        };
+
+                        state.display_text.set(format!("Uploading data: {}", gltf_id));
+
+                        let data = match renderer.upload_data(gltf_id, loader).await {
+                            Ok(data) => data,
+                            Err(err) => {
+                                tracing::error!("{:?}", err);
+                                state.display_text.set(format!("Error uploading data: {}", gltf_id));
+                                return;
+                            }
+                        };
+
+                        state.display_text.set(format!("Preparing data: {}", gltf_id));
+
+                        if let Err(err) = renderer.populate(data).await {
                             tracing::error!("{:?}", err);
+                            state.display_text.set(format!("Error preparing data: {}", gltf_id));
+                            return;
                         }
+
+                        if let Err(err) = renderer.render().await {
+                            tracing::error!("{:?}", err);
+                            state.display_text.set(format!("Error rendering: {}", gltf_id));
+                            return;
+                        }
+
+                        state.display_text.set(format!("Now showing: {}", gltf_id));
                     }
-                }
+                })
             })))
         })
     }

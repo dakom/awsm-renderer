@@ -2,13 +2,13 @@ use crate::gltf::accessors::semantic_ordering;
 use awsm_renderer_core::pipeline::vertex::{VertexAttribute, VertexBufferLayout};
 
 use super::{
-    accessors::accessor_vertex_format, buffers::MeshPrimitiveOffset, error::Result,
+    accessors::accessor_vertex_format, buffers::PrimitiveBufferInfo, error::Result,
     shaders::semantic_shader_location,
 };
 
 pub(super) fn primitive_vertex_buffer_layout(
     primitive: &gltf::Primitive<'_>,
-    mesh_primitive_offset: &MeshPrimitiveOffset,
+    buffer_info: &PrimitiveBufferInfo,
 ) -> Result<VertexBufferLayout> {
     // not strictly necessary for the attributes array, which only needs the shader location
     // but this makes it quicker to lookup the individual array strides
@@ -20,22 +20,23 @@ pub(super) fn primitive_vertex_buffer_layout(
     let mut attributes = Vec::with_capacity(gltf_attributes.len());
 
     // this is the offset within the total vertex stride
-    let mut offset = 0;
+    let mut offset: u64 = 0;
 
     for (index, (semantic, accessor)) in gltf_attributes.into_iter().enumerate() {
         attributes.push(VertexAttribute {
             format: accessor_vertex_format(&accessor),
-            offset: offset as u64,
+            offset,
             shader_location: semantic_shader_location(semantic),
         });
 
         // because the vertex strides are in a specific order
         // we can just add the stride of the current attribute to the offset
-        offset += mesh_primitive_offset.vertex_strides[index];
+        offset += buffer_info.vertex_strides[index] as u64;
     }
 
     Ok(VertexBufferLayout {
-        array_stride: mesh_primitive_offset.total_vertex_stride() as u64,
+        // this is the stride across all of the attributes
+        array_stride: offset,
         step_mode: None, // TODO - instancing
         attributes,
     })

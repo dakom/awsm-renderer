@@ -1,6 +1,7 @@
 use awsm_renderer_core::command::render_pass::{ColorAttachment, RenderPassDescriptor};
 use awsm_renderer_core::command::{LoadOp, StoreOp};
 use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
+use glam::Vec3;
 
 use crate::error::Result;
 use crate::render::RenderContext;
@@ -21,6 +22,18 @@ impl Meshes {
         key
     }
 
+    pub fn clear(&mut self) {
+        self.lookup.clear();
+    }
+
+    pub fn remove(&mut self, key: MeshKey) -> Option<Mesh> {
+        if key < self.lookup.len() {
+            Some(self.lookup.remove(key))
+        } else {
+            None
+        }
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &Mesh> {
         self.lookup.iter()
     }
@@ -38,6 +51,7 @@ pub struct Mesh {
     pub vertex_buffers: Vec<MeshVertexBuffer>,
     pub index_buffer: Option<MeshIndexBuffer>,
     pub topology: PrimitiveTopology,
+    pub position_extents: Option<Vec3>,
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +78,7 @@ impl Mesh {
             vertex_buffers: Vec::new(),
             index_buffer: None,
             topology: PrimitiveTopology::TriangleList,
+            position_extents: None,
         }
     }
 
@@ -79,6 +94,11 @@ impl Mesh {
 
     pub fn with_topology(mut self, topology: PrimitiveTopology) -> Self {
         self.topology = topology;
+        self
+    }
+
+    pub fn with_position_extents(mut self, position_extents: Vec3) -> Self {
+        self.position_extents = Some(position_extents);
         self
     }
 

@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex};
 
 use super::error::AwsmGltfError;
 
+// this is a heavy clone
 #[derive(Clone, Debug)]
 pub struct GltfLoader {
     pub doc: Document,

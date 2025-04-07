@@ -26,11 +26,11 @@ pub struct GltfBuffers {
     pub vertex_buffer: web_sys::GpuBuffer,
 
     // first level is mesh, second level is primitive
-    pub meshes: Vec<Vec<MeshPrimitiveOffset>>,
+    pub meshes: Vec<Vec<PrimitiveBufferInfo>>,
 }
 
 #[derive(Default, Debug, Clone)]
-pub struct MeshPrimitiveOffset {
+pub struct PrimitiveBufferInfo {
     pub index: Option<usize>,
     pub index_len: Option<usize>,
     pub vertex: usize,
@@ -38,11 +38,7 @@ pub struct MeshPrimitiveOffset {
     pub vertex_strides: Vec<usize>,
 }
 
-impl MeshPrimitiveOffset {
-    pub fn total_vertex_stride(&self) -> usize {
-        self.vertex_strides.iter().sum()
-    }
-
+impl PrimitiveBufferInfo {
     pub fn total_vertex_len(&self) -> usize {
         self.vertex_lens.iter().sum()
     }
@@ -61,10 +57,10 @@ impl GltfBuffers {
 
         let mut index_bytes: Vec<u8> = Vec::new();
         let mut vertex_bytes: Vec<u8> = Vec::new();
-        let mut meshes: Vec<Vec<MeshPrimitiveOffset>> = Vec::new();
+        let mut meshes: Vec<Vec<PrimitiveBufferInfo>> = Vec::new();
 
         for mesh in doc.meshes() {
-            let mut primitive_offsets = Vec::new();
+            let mut primitive_buffer_infos = Vec::new();
 
             for primitive in mesh.primitives() {
                 // Write to index buffer
@@ -105,7 +101,7 @@ impl GltfBuffers {
                 }
 
                 // Done for this primitive
-                primitive_offsets.push(MeshPrimitiveOffset {
+                primitive_buffer_infos.push(PrimitiveBufferInfo {
                     index: index_offset,
                     index_len: index_offset.map(|offset| index_bytes.len() - offset),
                     vertex: vertex_offset,
@@ -114,7 +110,7 @@ impl GltfBuffers {
                 });
             }
 
-            meshes.push(primitive_offsets);
+            meshes.push(primitive_buffer_infos);
         }
 
         let index_buffer = match index_bytes.is_empty() {
@@ -181,6 +177,15 @@ impl GltfBuffers {
             vertex_buffer,
             meshes,
         })
+    }
+}
+
+impl Drop for GltfBuffers {
+    fn drop(&mut self) {
+        if let Some(index_buffer) = &self.index_buffer {
+            index_buffer.destroy();
+        }
+        self.vertex_buffer.destroy();
     }
 }
 
@@ -257,6 +262,8 @@ fn sparse_to_indices(
     let mut indices = Vec::with_capacity(sparse.count());
 
     for _ in 0..sparse.count() {
+        // "All buffer data defined in this specification [...] MUST use little endian byte order."
+        // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#buffers-and-buffer-views-overview
         let index = match sparse.indices().index_type() {
             gltf::accessor::sparse::IndexType::U8 => {
                 let index = indices_buffer_slice[index_offset];
