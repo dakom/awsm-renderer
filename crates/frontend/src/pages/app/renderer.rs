@@ -13,50 +13,66 @@ use crate::prelude::*;
 
 pub struct AppRenderer {
     pub renderer: futures::lock::Mutex<AwsmRenderer>,
-    pub gltf_data: Mutex<HashMap<GltfId, Arc<GltfData>>>,
+    pub gltf_loader: Mutex<HashMap<GltfId, GltfLoader>>,
 }
 
 impl AppRenderer {
     pub fn new(renderer: AwsmRenderer) -> Arc<Self> {
         Arc::new(Self {
             renderer: futures::lock::Mutex::new(renderer),
-            gltf_data: Mutex::new(HashMap::new()),
+            gltf_loader: Mutex::new(HashMap::new()),
         })
     }
 
-    pub async fn render(self: &Arc<Self>, gltf_id: GltfId) -> Result<()> {
-        tracing::info!("Rendering GLTF model: {:?}", gltf_id);
-
+    pub async fn clear(self: &Arc<Self>) {
         let state = self;
+
+        let mut lock = state.renderer.lock().await;
+
+        lock.meshes.clear();
+        lock.gltf.raw_datas.clear();
+    }
+
+    pub async fn load(self: &Arc<Self>, gltf_id: GltfId) -> Result<GltfLoader> {
+        let state = self;
+
+        if let Some(loader) = state.gltf_loader.lock().unwrap().get(&gltf_id).cloned() {
+            return Ok(loader);
+        }
 
         let url = format!("{}/{}", CONFIG.gltf_url, gltf_id.filepath());
 
-        let gltf_data = { state.gltf_data.lock().unwrap().get(&gltf_id).cloned() };
+        let loader = GltfLoader::load(&url, None).await?;
 
-        let gltf_data = match gltf_data {
-            Some(gltf_data) => gltf_data,
-            None => {
-                let gltf_loader = GltfLoader::load(&url, None).await?;
-                let lock = state.renderer.lock().await;
-                let gltf_data = Arc::new(GltfData::new(&lock, gltf_loader).await?);
-                {
-                    state
-                        .gltf_data
-                        .lock()
-                        .unwrap()
-                        .insert(gltf_id, gltf_data.clone());
-                }
+        state
+            .gltf_loader
+            .lock()
+            .unwrap()
+            .insert(gltf_id, loader.clone());
 
-                gltf_data
-            }
-        };
+        Ok(loader)
+    }
 
-        {
-            let mut lock = state.renderer.lock().await;
-            lock.populate_gltf(gltf_data, None).await?;
-            lock.render()?;
-        }
+    pub async fn upload_data(self: &Arc<Self>, gltf_id: GltfId, loader: GltfLoader) -> Result<GltfData> {
+        let state = self;
 
-        Ok(())
+        let lock = state.renderer.lock().await;
+        Ok(GltfData::new(&lock, loader).await?)
+    }
+
+
+    pub async fn populate(self: &Arc<Self>, data: GltfData) -> Result<()> {
+        self.renderer
+            .lock()
+            .await
+            .populate_gltf(data, None)
+            .await
+    }
+
+    pub async fn render(self: &Arc<Self>) -> Result<()> {
+        Ok(self.renderer
+            .lock()
+            .await
+            .render()?)
     }
 }

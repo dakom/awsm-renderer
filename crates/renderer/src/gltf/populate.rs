@@ -92,6 +92,9 @@ impl AwsmRenderer {
             Some(shader_module) => shader_module.clone(),
         };
 
+        // we only need one vertex buffer per-mesh, because we've already constructed our buffers
+        // to be one contiguous buffer of interleaved vertex data.
+        // the attributes of this one vertex buffer layout contain all the info needed for the shader locations
         let vertex_buffer_layout =
             primitive_vertex_buffer_layout(&gltf_primitive, mesh_primitive_offset)?;
 
@@ -157,6 +160,7 @@ impl AwsmRenderer {
                 return Err(AwsmGltfError::UnsupportedPrimitiveMode(gltf_primitive.mode()).into())
             }
         });
+        //.with_position_extents();
 
         if let Some(index) = mesh_primitive_offset.index {
             mesh = mesh.with_index_buffer(MeshIndexBuffer {
