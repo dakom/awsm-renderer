@@ -9,7 +9,7 @@ pub struct VertexState<'a> {
     pub constants: Vec<(u16, ConstantOverride)>,
     pub entry_point: Option<&'a str>,
     pub module: &'a web_sys::GpuShaderModule,
-    pub buffers: Vec<VertexBufferLayout>,
+    pub buffer_layouts: Vec<VertexBufferLayout>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -60,8 +60,13 @@ impl<'a> VertexState<'a> {
             constants: Vec::new(),
             entry_point,
             module,
-            buffers: Vec::new(),
+            buffer_layouts: Vec::new(),
         }
+    }
+
+    pub fn with_buffer_layouts(mut self, buffer_layouts: Vec<VertexBufferLayout>) -> Self {
+        self.buffer_layouts = buffer_layouts;
+        self
     }
 }
 
@@ -82,9 +87,9 @@ impl From<VertexState<'_>> for web_sys::GpuVertexState {
             state_js.set_constants(&obj);
         }
 
-        if !state.buffers.is_empty() {
+        if !state.buffer_layouts.is_empty() {
             let buffers = js_sys::Array::new();
-            for buffer in state.buffers {
+            for buffer in state.buffer_layouts {
                 buffers.push(&web_sys::GpuVertexBufferLayout::from(buffer));
             }
             state_js.set_buffers(&buffers);

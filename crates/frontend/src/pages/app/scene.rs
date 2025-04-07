@@ -9,6 +9,7 @@ use awsm_renderer::mesh::PositionExtents;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use awsm_web::dom::resize::ResizeObserver;
 use camera::Camera;
+use glam::Vec3;
 use serde::de;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 

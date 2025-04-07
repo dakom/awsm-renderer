@@ -33,7 +33,7 @@ impl ShaderKey {
                     key.position_attribute = true;
                 }
                 gltf::Semantic::Normals => {
-                    tracing::warn!("TODO - primitive normals");
+                    //key.normal_attribute = true;
                 }
                 gltf::Semantic::Tangents => {
                     tracing::warn!("TODO - primitive tangents");
@@ -108,8 +108,14 @@ impl ShaderKey {
 
         let mut source = String::new();
         source.push_str(CAMERA);
+        source.push_str("\n\n");
         source.push_str(VERTEX_MESH);
+        source.push_str("\n\n");
         source.push_str(FRAGMENT_PBR);
+
+        if !self.normal_attribute {
+            source = source.replace("@location(1) normal: vec3<f32>,", "");
+        }
 
         source
     }

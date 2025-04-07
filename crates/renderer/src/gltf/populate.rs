@@ -1,7 +1,7 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use crate::{
-    gltf::{error::AwsmGltfError, pipelines::PipelineKey, shaders::ShaderKey},
+    gltf::{error::AwsmGltfError, pipelines::RenderPipelineKey, shaders::ShaderKey},
     mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer, PositionExtents},
     AwsmRenderer,
 };
@@ -11,7 +11,7 @@ use awsm_renderer_core::{
 };
 use glam::Vec3;
 
-use super::{data::GltfData, layout::primitive_vertex_buffer_layout};
+use super::{data::GltfData, layout::primitive_vertex_buffer_layout, pipelines::PipelineLayoutKey};
 
 impl AwsmRenderer {
     pub async fn populate_gltf(
@@ -74,8 +74,11 @@ impl AwsmRenderer {
         gltf_mesh: &gltf::Mesh<'_>,
         gltf_primitive: gltf::Primitive<'_>,
     ) -> anyhow::Result<()> {
-        let mesh_primitive_offset =
+        let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
+
+        let pipeline_layout_key = PipelineLayoutKey::new()
+            .with_camera();
 
         let shader_key = ShaderKey::new(&gltf_primitive);
 
@@ -97,24 +100,30 @@ impl AwsmRenderer {
         // to be one contiguous buffer of interleaved vertex data.
         // the attributes of this one vertex buffer layout contain all the info needed for the shader locations
         let vertex_buffer_layout =
-            primitive_vertex_buffer_layout(&gltf_primitive, mesh_primitive_offset)?;
+            primitive_vertex_buffer_layout(&gltf_primitive, primitive_buffer_info)?;
 
-        let pipeline_key = PipelineKey::new(self, shader_key, vec![vertex_buffer_layout]);
+        // tracing::info!("indices: {:?}", debug_slice_to_u16(ctx.data.buffers.index_bytes.as_ref().unwrap()));
+        // tracing::info!("positions: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[0].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
+        //tracing::info!("normals: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[1].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
 
-        let pipeline = match self.gltf.pipelines.get(&pipeline_key) {
+        let pipeline_key = RenderPipelineKey::new(self, shader_key, pipeline_layout_key, vec![vertex_buffer_layout]);
+
+        let render_pipeline = match self.gltf.render_pipelines.get(&pipeline_key).cloned() {
             None => {
-                let pipeline = self
+                let descriptor = pipeline_key.clone().into_descriptor(self, &shader_module)?;
+
+                web_sys::console::log_1(&descriptor);
+
+                let render_pipeline = self
                     .gpu
-                    .create_render_pipeline(
-                        &pipeline_key.clone().into_descriptor(self, &shader_module)?,
-                    )
+                    .create_render_pipeline(&descriptor)
                     .await?;
 
-                self.gltf.pipelines.insert(pipeline_key, pipeline.clone());
+                self.gltf.render_pipelines.insert(pipeline_key, render_pipeline.clone());
 
-                pipeline
+                render_pipeline
             }
-            Some(pipeline) => pipeline.clone(),
+            Some(pipeline) => pipeline,
         };
 
         // TODO - transform nodes? lights? cameras? animations?
@@ -131,7 +140,7 @@ impl AwsmRenderer {
             .ok_or(AwsmGltfError::MissingPositionAttribute)?;
 
         let mut mesh = Mesh::new(
-            pipeline,
+            render_pipeline,
             match gltf_primitive.indices() {
                 Some(indices) => indices.count(),
                 None => positions_attribute.count(),
@@ -146,8 +155,8 @@ impl AwsmRenderer {
                 // slot here points to the first one
                 slot: 0,
                 // but we need to point to this primitive's slice within the larger buffer
-                offset: Some(mesh_primitive_offset.vertex as u64),
-                size: Some(mesh_primitive_offset.total_vertex_len() as u64),
+                offset: Some(primitive_buffer_info.vertex_offset as u64),
+                size: Some((primitive_buffer_info.vertex_count * primitive_buffer_info.vertex_strides.iter().sum::<usize>()) as u64),
             }],
         )
         .with_topology(match gltf_primitive.mode() {
@@ -182,8 +191,8 @@ impl AwsmRenderer {
                         )
                     }
                 },
-                offset: mesh_primitive_offset.index.map(|x| x as u64),
-                size: mesh_primitive_offset.index_len.map(|x| x as u64),
+                offset: primitive_buffer_info.index_offset.map(|x| x as u64),
+                size: primitive_buffer_info.index_len.map(|x| x as u64),
             });
         }
 

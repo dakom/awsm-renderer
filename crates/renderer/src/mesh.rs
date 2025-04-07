@@ -43,6 +43,7 @@ impl Meshes {
 
 // this is most like a "primitive" in gltf, not the containing "mesh"
 // because for non-gltf naming, "mesh" makes more sense
+#[derive(Debug)]
 pub struct Mesh {
     pub pipeline: web_sys::GpuRenderPipeline,
     pub draw_count: usize, // indices or vertices
