@@ -1,8 +1,10 @@
 use std::ops::Deref;
 
-use crate::pipeline::primitive::IndexFormat;
+use crate::{error::AwsmCoreError, pipeline::primitive::IndexFormat};
 
 use super::{color::Color, LoadOp, StoreOp};
+
+use crate::error::Result;
 
 #[derive(Debug, Clone)]
 pub struct RenderPassEncoder {
@@ -64,6 +66,29 @@ impl RenderPassEncoder {
             }
             (None, None) => self.inner.set_index_buffer(buffer, format),
         }
+    }
+
+    pub fn set_bind_group(
+        &self,
+        index: u32,
+        bind_group: &web_sys::GpuBindGroup,
+        dynamic_offsets: Option<&[u32]>,
+    ) -> Result<()> {
+        match dynamic_offsets {
+            Some(offsets) => self
+                .inner
+                .set_bind_group_with_u32_slice_and_f64_and_dynamic_offsets_data_length(
+                    index,
+                    Some(bind_group),
+                    offsets,
+                    0 as f64,
+                    offsets.len() as u32,
+                )
+                .map_err(AwsmCoreError::set_bind_group)?,
+            None => self.inner.set_bind_group(index, Some(bind_group)),
+        }
+
+        Ok(())
     }
 }
 

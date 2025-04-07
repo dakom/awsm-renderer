@@ -1,5 +1,5 @@
 use awsm_renderer_core::pipeline::fragment::{ColorTargetState, FragmentState};
-use awsm_renderer_core::pipeline::layout::PipelineLayoutKind;
+use awsm_renderer_core::pipeline::layout::{PipelineLayoutDescriptor, PipelineLayoutKind};
 use awsm_renderer_core::pipeline::vertex::{VertexBufferLayout, VertexState};
 use awsm_renderer_core::pipeline::RenderPipelineDescriptor;
 
@@ -32,36 +32,22 @@ impl PipelineKey {
 
     pub fn into_descriptor(
         self,
-        _renderer: &AwsmRenderer,
+        renderer: &AwsmRenderer,
         shader_module: &web_sys::GpuShaderModule,
     ) -> Result<web_sys::GpuRenderPipelineDescriptor> {
         let fragment = FragmentState::new(shader_module, None, self.fragment_targets.clone());
 
-        #[allow(clippy::if_same_then_else)]
-        let layout = if self.vertex_buffer_layouts.is_empty() {
-            PipelineLayoutKind::Auto
-        } else {
-            // TODO - re-use pipeline layouts (not just values, but, from a key lookup so we re-use the same objects)
-            PipelineLayoutKind::Auto
-            // let mut pipeline_layout_descriptor = PipelineLayoutDescriptor::new(None);
+        // TODO - re-use pipeline layouts (not just values, but, from a key lookup so we re-use the same objects)
 
-            // for binding in 0..self.vertex_buffer_layouts.len() {
-            //     let buffer_layout = BufferBindingLayout::default().with_binding_type(BufferBindingType::ReadOnlyStorage);
-            //     let bind_group_layout_descriptor = BindGroupLayoutDescriptor{
-            //         entries: vec![
-            //             BindGroupLayoutEntry::new(binding as u32, BindGroupLayoutResource::Buffer(buffer_layout))
-            //             .with_visibility_vertex()
-            //         ],
-            //         ..Default::default()
-            //     };
-            //     let bind_group_layout = renderer.gpu.create_bind_group_layout(&bind_group_layout_descriptor.into()).map_err(AwsmGltfError::BindGroupLayout)?;
-            //     pipeline_layout_descriptor.bind_group_layouts.push(bind_group_layout);
-            // }
+        let layout = renderer.gpu.create_pipeline_layout(
+            &PipelineLayoutDescriptor::new(
+                Some("Mesh"),
+                vec![renderer.camera.bind_group_layout.clone()],
+            )
+            .into(),
+        );
 
-            // let pipeline_layout = renderer.gpu.create_pipeline_layout(&pipeline_layout_descriptor.into());
-
-            // PipelineLayoutKind::Custom(pipeline_layout)
-        };
+        let layout = PipelineLayoutKind::Custom(layout);
 
         let mut vertex = VertexState::new(shader_module, None);
         vertex.buffers = self.vertex_buffer_layouts;

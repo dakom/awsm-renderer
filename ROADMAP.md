@@ -3,20 +3,18 @@ starting with minimal and feature-tests
 
 # Next up
 
-## Sparse accessors
+## Gltf models
 
-Might actually be working fine, values are logging correctly, but without camera it's hard to see
+#### Simple meshes
+normals are a warning, but fragment shader is hardcoded anyway. Need to dig-in! 
+maybe a camera issue?
 
-## Camera
-
-finish up camera stuff (is currently updating buffer, need to propogate to shader, bind groups, etc.)
-semi-related to scene graph stuff, but not really, can have minimal "transform" multiplication without a real model matrix
-
-## non-auto pipeline
-
-need to do this... also, use a key and lookup so we get the real object, not just same values
 
 ## Scene graph
 
 * hierarchy with slotmap stuff
 * transforms everywhere
+
+## Camera
+
+* Arc ball controls

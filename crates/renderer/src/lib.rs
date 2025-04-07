@@ -4,6 +4,7 @@ pub mod error;
 pub mod gltf;
 pub mod mesh;
 pub mod render;
+pub mod shaders;
 pub mod transform;
 pub mod core {
     pub use awsm_renderer_core::*;
@@ -17,7 +18,7 @@ pub struct AwsmRenderer {
 
     pub meshes: mesh::Meshes,
 
-    pub camera_buffer: camera::CameraBuffer,
+    pub camera: camera::CameraBuffer,
 }
 
 pub struct AwsmRendererBuilder {
@@ -49,20 +50,20 @@ impl AwsmRendererBuilder {
     #[cfg(feature = "gltf")]
     pub fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
         let gpu = self.gpu.build()?;
-        let camera_buffer = camera::CameraBuffer::new(gpu.clone())?;
+        let camera = camera::CameraBuffer::new(&gpu)?;
 
         Ok(AwsmRenderer {
             gpu,
             gltf: gltf::cache::GltfCache::default(),
             meshes: mesh::Meshes::default(),
-            camera_buffer,
+            camera,
         })
     }
 
     #[cfg(not(feature = "gltf"))]
     pub fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
         let gpu = self.gpu.build()?;
-        let camera_buffer = camera::CameraBuffer::new(gpu.clone())?;
+        let camera_buffer = camera::CameraBuffer::new(&gpu)?;
 
         Ok(AwsmRenderer {
             gpu,

@@ -17,6 +17,11 @@ impl<'a> BindGroupLayoutDescriptor<'a> {
             entries: Vec::new(),
         }
     }
+
+    pub fn with_entries(mut self, entries: Vec<BindGroupLayoutEntry>) -> Self {
+        self.entries = entries;
+        self
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -84,6 +89,10 @@ pub struct BufferBindingLayout {
 }
 
 impl BufferBindingLayout {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn with_dynamic_offset(mut self, has_dynamic_offset: bool) -> Self {
         self.has_dynamic_offset = Some(has_dynamic_offset);
         self
@@ -154,6 +163,12 @@ pub struct BindGroupEntry<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroup#entries
     pub binding: u32,
     pub resource: BindGroupResource<'a>,
+}
+
+impl<'a> BindGroupEntry<'a> {
+    pub fn new(binding: u32, resource: BindGroupResource<'a>) -> Self {
+        Self { binding, resource }
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -20,6 +20,13 @@ impl Camera {
             Camera::Perspective(camera) => camera.set_extents(extents.min, extents.max),
         }
     }
+
+    pub fn set_canvas(&mut self, canvas: &web_sys::HtmlCanvasElement) {
+        match self {
+            Camera::Orthographic(camera) => camera.set_canvas(canvas),
+            Camera::Perspective(camera) => camera.set_canvas(canvas),
+        }
+    }
 }
 
 impl CameraExt for Camera {
@@ -79,29 +86,50 @@ impl OrthographicCamera {
         // Calculate the left, right, bottom, and top extents based on the provided min and max
         let width = max.x - min.x;
         let height = max.y - min.y;
+
         let aspect_ratio = width / height;
-        let half_width = width / 2.0;
-        let half_height = height / 2.0;
-        self.left = min.x - half_width;
-        self.right = max.x + half_width;
-        self.bottom = min.y - half_height;
-        self.top = max.y + half_height;
-        self.near = min.z;
-        self.far = max.z;
 
-        self.position = Vec3::new(
-            (self.left + self.right) / 2.0,
-            (self.bottom + self.top) / 2.0,
-            self.position.z,
-        );
+        self.left = -min.x;
+        self.right = max.x;
+        self.bottom = -min.y;
+        self.top = max.y;
 
-        self.target = Vec3::new(
-            (self.left + self.right) / 2.0,
-            (self.bottom + self.top) / 2.0,
-            self.target.z,
-        );
+        self.position = Vec3::new(0.0, 0.0, self.position.z);
+
+        self.target = Vec3::new(self.position.x, self.position.y, self.target.z);
 
         self.up = Vec3::Y;
+
+        let zoom_factor = 2.0;
+
+        // Update the left, right, bottom, and top extents based on the zoom factor
+        self.left *= zoom_factor;
+        self.right *= zoom_factor;
+        self.bottom *= zoom_factor;
+        self.top *= zoom_factor;
+
+        // but we need to keep the camera centered
+        // erm, not sure if this is really right, but it seems to work so far...
+        self.position.x = -(self.left + self.right) / 4.0;
+        self.position.y = -(self.bottom + self.top) / 4.0;
+        self.target.x = self.position.x;
+        self.target.y = self.position.y;
+    }
+
+    pub fn set_canvas(&mut self, canvas: &web_sys::HtmlCanvasElement) {
+        // TODO - should we even do this?
+        // Set the camera's position based on the canvas size
+        let width = canvas.client_width() as f32;
+        let height = canvas.client_height() as f32;
+
+        // Update the left, right, bottom, and top extents based on the canvas size
+        self.left = -width / 2.0;
+        self.right = width / 2.0;
+        self.bottom = -height / 2.0;
+        self.top = height / 2.0;
+
+        // Update the projection matrix
+        self.projection_matrix();
     }
 }
 
@@ -145,6 +173,8 @@ impl PerspectiveCamera {
     pub fn set_extents(&mut self, min: Vec3, max: Vec3) {
         tracing::warn!("Perspective camera extents are not implemented yet");
     }
+
+    pub fn set_canvas(&mut self, canvas: &web_sys::HtmlCanvasElement) {}
 }
 
 impl Default for PerspectiveCamera {

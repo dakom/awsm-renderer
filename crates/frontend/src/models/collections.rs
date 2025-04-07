@@ -6,7 +6,7 @@ use crate::prelude::*;
 pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::new(|| {
     let mut h = HashMap::new();
 
-    h.insert("Todo", vec![GltfId::SimpleSparseAccessor]);
+    h.insert("Todo", vec![GltfId::SimpleMeshes]);
 
     // h.insert(
     //     "Feature tests",
@@ -35,7 +35,7 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
         vec![
             GltfId::TriangleWithoutIndices,
             GltfId::Triangle,
-            // GltfId::SimpleSparseAccessor,
+            GltfId::SimpleSparseAccessor,
             // GltfId::SimpleMeshes,
             // GltfId::SimpleMorph,
             // GltfId::AnimatedTriangle,
