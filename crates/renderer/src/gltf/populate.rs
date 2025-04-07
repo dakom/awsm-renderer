@@ -2,13 +2,14 @@ use std::{future::Future, pin::Pin, sync::Arc};
 
 use crate::{
     gltf::{error::AwsmGltfError, pipelines::PipelineKey, shaders::ShaderKey},
-    mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer},
+    mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer, PositionExtents},
     AwsmRenderer,
 };
 use awsm_renderer_core::{
     pipeline::primitive::{IndexFormat, PrimitiveTopology},
     shaders::ShaderModuleExt,
 };
+use glam::Vec3;
 
 use super::{data::GltfData, layout::primitive_vertex_buffer_layout};
 
@@ -118,20 +119,22 @@ impl AwsmRenderer {
 
         // TODO - transform nodes? lights? cameras? animations?
 
+        let positions_attribute = gltf_primitive
+            .attributes()
+            .find_map(|(semantic, attribute)| {
+                if semantic == gltf::Semantic::Positions {
+                    Some(attribute)
+                } else {
+                    None
+                }
+            })
+            .ok_or(AwsmGltfError::MissingPositionAttribute)?;
+
         let mut mesh = Mesh::new(
             pipeline,
             match gltf_primitive.indices() {
                 Some(indices) => indices.count(),
-                None => gltf_primitive
-                    .attributes()
-                    .find_map(|(semantic, attribute)| {
-                        if semantic == gltf::Semantic::Positions {
-                            Some(attribute.count())
-                        } else {
-                            None
-                        }
-                    })
-                    .ok_or(AwsmGltfError::MissingPositionAttribute)?,
+                None => positions_attribute.count(),
             },
         )
         .with_vertex_buffers(
@@ -160,24 +163,26 @@ impl AwsmRenderer {
                 return Err(AwsmGltfError::UnsupportedPrimitiveMode(gltf_primitive.mode()).into())
             }
         });
-        //.with_position_extents();
 
-        if let Some(index) = mesh_primitive_offset.index {
+        if let Some(position_extents) = try_position_extents(&positions_attribute) {
+            mesh = mesh.with_position_extents(position_extents);
+        }
+
+        if let Some(indices) = gltf_primitive.indices() {
             mesh = mesh.with_index_buffer(MeshIndexBuffer {
                 // safe, only exists if we have an index
                 buffer: ctx.data.buffers.index_buffer.clone().unwrap(),
-                format: match gltf_primitive.indices().unwrap().data_type() {
+                format: match indices.data_type() {
                     gltf::accessor::DataType::I16 => IndexFormat::Uint16,
                     gltf::accessor::DataType::U16 => IndexFormat::Uint16,
                     gltf::accessor::DataType::U32 => IndexFormat::Uint32,
                     _ => {
-                        return Err(AwsmGltfError::UnsupportedIndexDataType(
-                            gltf_primitive.indices().unwrap().data_type(),
+                        return Err(
+                            AwsmGltfError::UnsupportedIndexDataType(indices.data_type()).into()
                         )
-                        .into())
                     }
                 },
-                offset: Some(index as u64),
+                offset: mesh_primitive_offset.index.map(|x| x as u64),
                 size: mesh_primitive_offset.index_len.map(|x| x as u64),
             });
         }
@@ -186,6 +191,29 @@ impl AwsmRenderer {
 
         Ok(())
     }
+}
+
+fn try_position_extents(positions_attribute: &gltf::Accessor<'_>) -> Option<PositionExtents> {
+    let min = positions_attribute.min()?;
+    let min = min.as_array()?;
+    let max = positions_attribute.max()?;
+    let max = max.as_array()?;
+
+    if min.len() != 3 || max.len() != 3 {
+        return None;
+    }
+
+    let min_x = min[0].as_f64()?;
+    let min_y = min[1].as_f64()?;
+    let min_z = min[2].as_f64()?;
+    let max_x = max[0].as_f64()?;
+    let max_y = max[1].as_f64()?;
+    let max_z = max[2].as_f64()?;
+
+    Some(PositionExtents {
+        min: Vec3::new(min_x as f32, min_y as f32, min_z as f32),
+        max: Vec3::new(max_x as f32, max_y as f32, max_z as f32),
+    })
 }
 
 pub(super) struct GltfPopulateContext {

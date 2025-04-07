@@ -1,5 +1,3 @@
-use awsm_renderer_core::command::render_pass::{ColorAttachment, RenderPassDescriptor};
-use awsm_renderer_core::command::{LoadOp, StoreOp};
 use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
 use glam::Vec3;
 
@@ -51,7 +49,24 @@ pub struct Mesh {
     pub vertex_buffers: Vec<MeshVertexBuffer>,
     pub index_buffer: Option<MeshIndexBuffer>,
     pub topology: PrimitiveTopology,
-    pub position_extents: Option<Vec3>,
+    pub position_extents: Option<PositionExtents>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PositionExtents {
+    pub min: Vec3,
+    pub max: Vec3,
+}
+
+impl PositionExtents {
+    pub fn new(min: Vec3, max: Vec3) -> Self {
+        Self { min, max }
+    }
+
+    pub fn extend(&mut self, other: &Self) {
+        self.min = self.min.min(other.min);
+        self.max = self.max.max(other.max);
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -97,33 +112,16 @@ impl Mesh {
         self
     }
 
-    pub fn with_position_extents(mut self, position_extents: Vec3) -> Self {
-        self.position_extents = Some(position_extents);
+    pub fn with_position_extents(mut self, extents: PositionExtents) -> Self {
+        self.position_extents = Some(extents);
         self
     }
 
     pub fn push_commands(&self, _key: MeshKey, ctx: &mut RenderContext) -> Result<()> {
-        let RenderContext {
-            current_texture_view,
-            command_encoder,
-        } = ctx;
-
-        let render_pass = command_encoder.begin_render_pass(
-            &RenderPassDescriptor {
-                color_attachments: vec![ColorAttachment::new(
-                    current_texture_view,
-                    LoadOp::Clear,
-                    StoreOp::Store,
-                )],
-                ..Default::default()
-            }
-            .into(),
-        )?;
-
-        render_pass.set_pipeline(&self.pipeline);
+        ctx.render_pass.set_pipeline(&self.pipeline);
 
         for vertex_buffer in &self.vertex_buffers {
-            render_pass.set_vertex_buffer(
+            ctx.render_pass.set_vertex_buffer(
                 vertex_buffer.slot,
                 &vertex_buffer.buffer,
                 vertex_buffer.offset,
@@ -133,20 +131,18 @@ impl Mesh {
 
         match &self.index_buffer {
             Some(index_buffer) => {
-                render_pass.set_index_buffer(
+                ctx.render_pass.set_index_buffer(
                     &index_buffer.buffer,
                     index_buffer.format,
                     index_buffer.offset,
                     index_buffer.size,
                 );
-                render_pass.draw_indexed(self.draw_count as u32);
+                ctx.render_pass.draw_indexed(self.draw_count as u32);
             }
             None => {
-                render_pass.draw(self.draw_count as u32);
+                ctx.render_pass.draw(self.draw_count as u32);
             }
         }
-
-        render_pass.end();
 
         Ok(())
     }

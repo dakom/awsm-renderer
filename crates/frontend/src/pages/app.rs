@@ -1,9 +1,8 @@
 mod canvas;
-mod renderer;
+mod scene;
 mod sidebar;
 
 use canvas::AppCanvas;
-use renderer::AppRenderer;
 use sidebar::AppSidebar;
 
 use crate::{models::collections::GltfId, prelude::*};
