@@ -17,7 +17,7 @@ impl AppCanvas {
         Arc::new(Self {
             resize_observer: Arc::new(Mutex::new(None)),
             renderer: Mutable::new(None),
-            display_text: Mutable::new("<-- Select a model from the sidebar".to_string())
+            display_text: Mutable::new("<-- Select a model from the sidebar".to_string()),
         })
     }
 

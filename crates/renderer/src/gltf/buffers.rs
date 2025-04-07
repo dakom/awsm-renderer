@@ -101,7 +101,7 @@ impl GltfBuffers {
                 }
 
                 // Done for this primitive
-                primitive_buffer_infos.push(PrimitiveBufferInfo{
+                primitive_buffer_infos.push(PrimitiveBufferInfo {
                     index: index_offset,
                     index_len: index_offset.map(|offset| index_bytes.len() - offset),
                     vertex: vertex_offset,

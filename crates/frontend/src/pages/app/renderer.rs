@@ -53,26 +53,22 @@ impl AppRenderer {
         Ok(loader)
     }
 
-    pub async fn upload_data(self: &Arc<Self>, gltf_id: GltfId, loader: GltfLoader) -> Result<GltfData> {
+    pub async fn upload_data(
+        self: &Arc<Self>,
+        gltf_id: GltfId,
+        loader: GltfLoader,
+    ) -> Result<GltfData> {
         let state = self;
 
         let lock = state.renderer.lock().await;
         Ok(GltfData::new(&lock, loader).await?)
     }
 
-
     pub async fn populate(self: &Arc<Self>, data: GltfData) -> Result<()> {
-        self.renderer
-            .lock()
-            .await
-            .populate_gltf(data, None)
-            .await
+        self.renderer.lock().await.populate_gltf(data, None).await
     }
 
     pub async fn render(self: &Arc<Self>) -> Result<()> {
-        Ok(self.renderer
-            .lock()
-            .await
-            .render()?)
+        Ok(self.renderer.lock().await.render()?)
     }
 }
