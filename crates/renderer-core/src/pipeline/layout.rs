@@ -24,10 +24,13 @@ pub struct PipelineLayoutDescriptor<'a> {
 }
 
 impl<'a> PipelineLayoutDescriptor<'a> {
-    pub fn new(label: Option<&'a str>) -> Self {
+    pub fn new(
+        label: Option<&'a str>,
+        bind_group_layouts: Vec<web_sys::GpuBindGroupLayout>,
+    ) -> Self {
         Self {
             label,
-            bind_group_layouts: Vec::new(),
+            bind_group_layouts,
         }
     }
 }

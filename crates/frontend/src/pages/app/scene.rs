@@ -7,6 +7,7 @@ use awsm_renderer::gltf::data::GltfData;
 use awsm_renderer::gltf::loader::GltfLoader;
 use awsm_renderer::mesh::PositionExtents;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
+use awsm_web::dom::resize::ResizeObserver;
 use camera::Camera;
 use serde::de;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
@@ -19,15 +20,45 @@ pub struct AppScene {
     pub renderer: futures::lock::Mutex<AwsmRenderer>,
     pub gltf_loader: Mutex<HashMap<GltfId, GltfLoader>>,
     pub camera: Mutex<Camera>,
+    pub resize_observer: Mutex<Option<ResizeObserver>>,
 }
 
 impl AppScene {
-    pub fn new(renderer: AwsmRenderer) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn new(renderer: AwsmRenderer, canvas: web_sys::HtmlCanvasElement) -> Arc<Self> {
+        let state = Arc::new(Self {
             renderer: futures::lock::Mutex::new(renderer),
             gltf_loader: Mutex::new(HashMap::new()),
             camera: Mutex::new(Camera::default()),
-        })
+            resize_observer: Mutex::new(None),
+        });
+
+        let resize_observer = ResizeObserver::new(
+            clone!(canvas, state => move |entries| {
+                if let Some(entry) = entries.get(0) {
+                    let width = entry.content_box_sizes[0].inline_size;
+                    let height = entry.content_box_sizes[0].block_size;
+                    canvas.set_width(width);
+                    canvas.set_height(height);
+
+                    spawn_local(clone!(state => async move {
+                        if let Err(err) = state.setup().await {
+                            tracing::error!("Failed to setup scene after canvas resize: {:?}", err);
+                        }
+
+                        if let Err(err) = state.render().await {
+                            tracing::error!("Failed to render after canvas resize: {:?}", err);
+                        }
+                    }));
+                }
+            }),
+            None,
+        );
+
+        resize_observer.observe(&canvas);
+
+        *state.resize_observer.lock().unwrap() = Some(resize_observer);
+
+        state
     }
 
     pub async fn clear(self: &Arc<Self>) {
@@ -79,11 +110,11 @@ impl AppScene {
         Ok(self.renderer.lock().await.render()?)
     }
 
-    pub async fn reset_camera(self: &Arc<Self>) -> Result<()> {
-        let lock = self.renderer.lock().await;
+    pub async fn setup(self: &Arc<Self>) -> Result<()> {
+        let mut renderer = self.renderer.lock().await;
         let mut extents: Option<PositionExtents> = None;
 
-        for mesh in lock.meshes.iter() {
+        for mesh in renderer.meshes.iter() {
             if let Some(mesh_extents) = &mesh.position_extents {
                 if let Some(mut current_extents) = extents {
                     current_extents.extend(mesh_extents);
@@ -99,7 +130,9 @@ impl AppScene {
             camera.set_extents(extents);
         }
 
-        lock.camera_buffer.write(&*camera)?;
+        //camera.set_canvas(renderer.gpu.context.canvas().unchecked_ref());
+
+        renderer.camera.update(&*camera)?;
 
         Ok(())
     }

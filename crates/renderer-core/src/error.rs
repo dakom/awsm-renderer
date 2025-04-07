@@ -87,6 +87,9 @@ pub enum AwsmCoreError {
 
     #[error("[gpu] Failed to validate Shader: {0:#?}")]
     ShaderValidation(Vec<ShaderCompilationMessage>),
+
+    #[error("[gpu] Failed to set bind group: {0}")]
+    SetBindGroup(String),
 }
 
 impl AwsmCoreError {
@@ -202,6 +205,10 @@ impl AwsmCoreError {
 
     pub fn shader_compilation_info(err: JsValue) -> Self {
         Self::ShaderCompilationInfo(format_err(err))
+    }
+
+    pub fn set_bind_group(err: JsValue) -> Self {
+        Self::SetBindGroup(format_err(err))
     }
 }
 

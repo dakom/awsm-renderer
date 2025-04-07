@@ -7,7 +7,6 @@ use crate::{models::collections::GltfId, pages::app::sidebar::current_model_sign
 use super::scene::AppScene;
 
 pub struct AppCanvas {
-    pub resize_observer: Arc<Mutex<Option<ResizeObserver>>>,
     pub scene: Mutable<Option<Arc<AppScene>>>,
     pub display_text: Mutable<String>,
 }
@@ -15,7 +14,6 @@ pub struct AppCanvas {
 impl AppCanvas {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
-            resize_observer: Arc::new(Mutex::new(None)),
             scene: Mutable::new(None),
             display_text: Mutable::new("<-- Select a model from the sidebar".to_string()),
         })
@@ -53,22 +51,6 @@ impl AppCanvas {
             .style("position", "relative")
             .child(html!("canvas" => web_sys::HtmlCanvasElement, {
                 .after_inserted(clone!(state => move |canvas| {
-                    let resize_observer = ResizeObserver::new(
-                        clone!(canvas => move |entries| {
-                            if let Some(entry) = entries.get(0) {
-                                let width = entry.content_box_sizes[0].inline_size;
-                                let height = entry.content_box_sizes[0].block_size;
-                                canvas.set_width(width);
-                                canvas.set_height(height);
-                            }
-                        }),
-                        None
-                    );
-
-                    resize_observer.observe(&canvas);
-
-                    *state.resize_observer.lock().unwrap() = Some(resize_observer);
-
                     spawn_local(clone!(state => async move {
                         let renderer = AwsmRendererBuilder::new(web_sys::window().unwrap().navigator().gpu())
                             .init_adapter()
@@ -82,7 +64,7 @@ impl AppCanvas {
                             .build()
                             .unwrap();
 
-                        state.scene.set(Some(AppScene::new(renderer)));
+                        state.scene.set(Some(AppScene::new(renderer, canvas)));
                     }));
                 }))
                 .class(&*FULL_AREA)
@@ -132,7 +114,7 @@ impl AppCanvas {
 
                         state.display_text.set(format!("Setting up scene: {}", gltf_id));
 
-                        scene.reset_camera().await;
+                        scene.setup().await;
 
                         if let Err(err) = scene.render().await {
                             tracing::error!("{:?}", err);

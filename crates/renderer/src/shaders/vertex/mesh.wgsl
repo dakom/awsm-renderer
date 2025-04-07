@@ -11,7 +11,10 @@ struct VertexOutput {
 
 @vertex
 fn vert_main(input: VertexInput) -> VertexOutput {
-    let clip_pos = camera.view_proj * vec4<f32>(input.position, 1.0);
-    output.position = clip_pos; 
+    var output: VertexOutput;
+
+    output.position = camera.view_proj * vec4<f32>(input.position, 1.0);
+    //output.position = vec4<f32>(input.position, 1.0);
+
     return output;
 }
