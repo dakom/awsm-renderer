@@ -1,3 +1,5 @@
+mod camera;
+
 use std::collections::HashMap;
 use std::ops::Deref;
 
@@ -5,6 +7,7 @@ use awsm_renderer::gltf::data::GltfData;
 use awsm_renderer::gltf::loader::GltfLoader;
 use awsm_renderer::mesh::PositionExtents;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
+use camera::Camera;
 use serde::de;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 
@@ -15,6 +18,7 @@ use crate::prelude::*;
 pub struct AppScene {
     pub renderer: futures::lock::Mutex<AwsmRenderer>,
     pub gltf_loader: Mutex<HashMap<GltfId, GltfLoader>>,
+    pub camera: Mutex<Camera>,
 }
 
 impl AppScene {
@@ -22,6 +26,7 @@ impl AppScene {
         Arc::new(Self {
             renderer: futures::lock::Mutex::new(renderer),
             gltf_loader: Mutex::new(HashMap::new()),
+            camera: Mutex::new(Camera::default()),
         })
     }
 
@@ -74,7 +79,7 @@ impl AppScene {
         Ok(self.renderer.lock().await.render()?)
     }
 
-    pub async fn reset_camera(self: &Arc<Self>) {
+    pub async fn reset_camera(self: &Arc<Self>) -> Result<()> {
         let lock = self.renderer.lock().await;
         let mut extents: Option<PositionExtents> = None;
 
@@ -89,8 +94,13 @@ impl AppScene {
             }
         }
 
+        let mut camera = self.camera.lock().unwrap();
         if let Some(extents) = extents {
-            tracing::info!("Extents: {:?}", extents);
+            camera.set_extents(extents);
         }
+
+        lock.camera_buffer.write(&*camera)?;
+
+        Ok(())
     }
 }

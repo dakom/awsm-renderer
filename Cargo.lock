@@ -286,6 +286,7 @@ dependencies = [
  "dominator_helpers",
  "futures",
  "futures-signals",
+ "glam",
  "gloo-events 0.2.0",
  "gloo-net",
  "gloo-timers",
