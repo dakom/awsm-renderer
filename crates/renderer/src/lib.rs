@@ -55,7 +55,7 @@ impl AwsmRendererBuilder {
             gpu,
             gltf: gltf::cache::GltfCache::default(),
             meshes: mesh::Meshes::default(),
-            camera_buffer
+            camera_buffer,
         })
     }
 
@@ -67,7 +67,7 @@ impl AwsmRendererBuilder {
         Ok(AwsmRenderer {
             gpu,
             meshes: mesh::Meshes::default(),
-            camera_buffer
+            camera_buffer,
         })
     }
 }

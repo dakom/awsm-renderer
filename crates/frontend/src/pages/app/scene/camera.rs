@@ -45,7 +45,6 @@ impl CameraExt for Camera {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct OrthographicCamera {
     pub left: f32,
@@ -103,7 +102,6 @@ impl OrthographicCamera {
         );
 
         self.up = Vec3::Y;
-
     }
 }
 
@@ -137,12 +135,7 @@ pub struct PerspectiveCamera {
 impl PerspectiveCamera {
     pub fn projection_matrix(&self) -> Mat4 {
         // For WebGPU, use perspective_rh or perspective_lh (NOT perspective_rh_gl).
-        Mat4::perspective_rh(
-            self.fovy_radians,
-            self.aspect_ratio,
-            self.near,
-            self.far,
-        )
+        Mat4::perspective_rh(self.fovy_radians, self.aspect_ratio, self.near, self.far)
     }
 
     pub fn view_matrix(&self) -> Mat4 {

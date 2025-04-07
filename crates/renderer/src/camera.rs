@@ -1,6 +1,6 @@
 use awsm_renderer_core::buffer::{BufferDescriptor, BufferUsage};
-use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use awsm_renderer_core::error::AwsmCoreError;
+use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::{Mat4, Vec3};
 use thiserror::Error;
 
@@ -19,19 +19,18 @@ pub trait CameraExt {
 
 impl CameraBuffer {
     pub fn new(gpu: AwsmRendererWebGpu) -> Result<Self> {
+        let buffer = gpu
+            .create_buffer(
+                &BufferDescriptor::new(
+                    Some("Camera"),
+                    16 * 4,
+                    BufferUsage::new().with_uniform().with_copy_dst(),
+                )
+                .into(),
+            )
+            .map_err(AwsmCameraError::CreateBuffer)?;
 
-        let buffer = gpu.create_buffer(&BufferDescriptor::new(
-            Some("Camera"), 
-            16 * 4, 
-            BufferUsage::new()
-                .with_uniform()
-                .with_copy_dst()
-        ).into()).map_err(AwsmCameraError::CreateBuffer)?;
-
-        Ok(Self {
-            gpu,
-            buffer,
-        })
+        Ok(Self { gpu, buffer })
     }
 
     pub fn write(&self, camera: &impl CameraExt) -> Result<()> {
@@ -46,7 +45,7 @@ impl CameraBuffer {
 }
 
 // combine all the camera data into a single u8 array of bytes
-fn get_buffer_array(camera: &impl CameraExt) -> [u8;336] {
+fn get_buffer_array(camera: &impl CameraExt) -> [u8; 336] {
     let view = camera.view_matrix(); // 16 floats
     let proj = camera.projection_matrix(); // 16 floats
 
