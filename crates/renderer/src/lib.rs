@@ -16,6 +16,8 @@ pub struct AwsmRenderer {
     pub gltf: gltf::cache::GltfCache,
 
     pub meshes: mesh::Meshes,
+
+    pub camera_buffer: camera::CameraBuffer,
 }
 
 pub struct AwsmRendererBuilder {
@@ -45,21 +47,27 @@ impl AwsmRendererBuilder {
     }
 
     #[cfg(feature = "gltf")]
-    pub fn build(self) -> core::error::Result<AwsmRenderer> {
+    pub fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
         let gpu = self.gpu.build()?;
+        let camera_buffer = camera::CameraBuffer::new(gpu.clone())?;
+
         Ok(AwsmRenderer {
             gpu,
             gltf: gltf::cache::GltfCache::default(),
             meshes: mesh::Meshes::default(),
+            camera_buffer,
         })
     }
 
     #[cfg(not(feature = "gltf"))]
-    pub fn build(self) -> core::error::Result<AwsmRenderer> {
+    pub fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
         let gpu = self.gpu.build()?;
+        let camera_buffer = camera::CameraBuffer::new(gpu.clone())?;
+
         Ok(AwsmRenderer {
             gpu,
             meshes: mesh::Meshes::default(),
+            camera_buffer,
         })
     }
 }
