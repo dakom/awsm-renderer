@@ -3,6 +3,7 @@ use std::ops::Deref;
 
 use awsm_renderer::gltf::data::GltfData;
 use awsm_renderer::gltf::loader::GltfLoader;
+use awsm_renderer::mesh::PositionExtents;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use serde::de;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
@@ -11,12 +12,12 @@ use crate::models::collections::GltfId;
 use crate::pages::app::sidebar::current_model_signal;
 use crate::prelude::*;
 
-pub struct AppRenderer {
+pub struct AppScene {
     pub renderer: futures::lock::Mutex<AwsmRenderer>,
     pub gltf_loader: Mutex<HashMap<GltfId, GltfLoader>>,
 }
 
-impl AppRenderer {
+impl AppScene {
     pub fn new(renderer: AwsmRenderer) -> Arc<Self> {
         Arc::new(Self {
             renderer: futures::lock::Mutex::new(renderer),
@@ -31,6 +32,7 @@ impl AppRenderer {
 
         lock.meshes.clear();
         lock.gltf.raw_datas.clear();
+        lock.render();
     }
 
     pub async fn load(self: &Arc<Self>, gltf_id: GltfId) -> Result<GltfLoader> {
@@ -70,5 +72,25 @@ impl AppRenderer {
 
     pub async fn render(self: &Arc<Self>) -> Result<()> {
         Ok(self.renderer.lock().await.render()?)
+    }
+
+    pub async fn reset_camera(self: &Arc<Self>) {
+        let lock = self.renderer.lock().await;
+        let mut extents: Option<PositionExtents> = None;
+
+        for mesh in lock.meshes.iter() {
+            if let Some(mesh_extents) = &mesh.position_extents {
+                if let Some(mut current_extents) = extents {
+                    current_extents.extend(mesh_extents);
+                    extents = Some(current_extents);
+                } else {
+                    extents = Some(mesh_extents.clone());
+                }
+            }
+        }
+
+        if let Some(extents) = extents {
+            tracing::info!("Extents: {:?}", extents);
+        }
     }
 }

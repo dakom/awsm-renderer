@@ -1,14 +1,14 @@
-use awsm_renderer::AwsmRendererBuilder;
+use awsm_renderer::{mesh::PositionExtents, AwsmRendererBuilder};
 use awsm_web::dom::resize::{self, ResizeObserver};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{models::collections::GltfId, pages::app::sidebar::current_model_signal, prelude::*};
 
-use super::renderer::AppRenderer;
+use super::scene::AppScene;
 
 pub struct AppCanvas {
     pub resize_observer: Arc<Mutex<Option<ResizeObserver>>>,
-    pub renderer: Mutable<Option<Arc<AppRenderer>>>,
+    pub scene: Mutable<Option<Arc<AppScene>>>,
     pub display_text: Mutable<String>,
 }
 
@@ -16,7 +16,7 @@ impl AppCanvas {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
             resize_observer: Arc::new(Mutex::new(None)),
-            renderer: Mutable::new(None),
+            scene: Mutable::new(None),
             display_text: Mutable::new("<-- Select a model from the sidebar".to_string()),
         })
     }
@@ -35,11 +35,11 @@ impl AppCanvas {
 
         let sig = map_ref! {
             let model_id = current_model_signal(),
-            let renderer = state.renderer.signal_cloned()
+            let scene = state.scene.signal_cloned()
             => {
-                match (model_id, renderer) {
-                    (Some(model_id), Some(renderer)) => {
-                        Some((model_id.clone(), renderer.clone()))
+                match (model_id, scene) {
+                    (Some(model_id), Some(scene)) => {
+                        Some((model_id.clone(), scene.clone()))
                     }
                     _ => {
                         None
@@ -82,7 +82,7 @@ impl AppCanvas {
                             .build()
                             .unwrap();
 
-                        state.renderer.set(Some(AppRenderer::new(renderer)));
+                        state.scene.set(Some(AppScene::new(renderer)));
                     }));
                 }))
                 .class(&*FULL_AREA)
@@ -97,12 +97,12 @@ impl AppCanvas {
             }))
             .future(sig.for_each(clone!(state => move |data| {
                 clone!(state => async move {
-                    if let Some((gltf_id, renderer)) = data {
+                    if let Some((gltf_id, scene)) = data {
                         state.display_text.set(format!("Loading: {}", gltf_id));
 
-                        renderer.clear().await;
+                        scene.clear().await;
 
-                        let loader = match renderer.load(gltf_id.clone()).await {
+                        let loader = match scene.load(gltf_id.clone()).await {
                             Ok(loader) => loader,
                             Err(err) => {
                                 tracing::error!("{:?}", err);
@@ -113,7 +113,7 @@ impl AppCanvas {
 
                         state.display_text.set(format!("Uploading data: {}", gltf_id));
 
-                        let data = match renderer.upload_data(gltf_id, loader).await {
+                        let data = match scene.upload_data(gltf_id, loader).await {
                             Ok(data) => data,
                             Err(err) => {
                                 tracing::error!("{:?}", err);
@@ -122,15 +122,19 @@ impl AppCanvas {
                             }
                         };
 
-                        state.display_text.set(format!("Preparing data: {}", gltf_id));
+                        state.display_text.set(format!("Populating data: {}", gltf_id));
 
-                        if let Err(err) = renderer.populate(data).await {
+                        if let Err(err) = scene.populate(data).await {
                             tracing::error!("{:?}", err);
-                            state.display_text.set(format!("Error preparing data: {}", gltf_id));
+                            state.display_text.set(format!("Error populating data: {}", gltf_id));
                             return;
                         }
 
-                        if let Err(err) = renderer.render().await {
+                        state.display_text.set(format!("Setting up scene: {}", gltf_id));
+
+                        scene.reset_camera().await;
+
+                        if let Err(err) = scene.render().await {
                             tracing::error!("{:?}", err);
                             state.display_text.set(format!("Error rendering: {}", gltf_id));
                             return;

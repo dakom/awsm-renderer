@@ -3,8 +3,6 @@ use crate::{
     prelude::*,
 };
 
-use super::renderer::AppRenderer;
-
 pub struct AppSidebar {}
 
 impl AppSidebar {
