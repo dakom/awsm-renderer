@@ -1,8 +1,11 @@
 struct CameraUniforms {
     view: mat4x4<f32>,
-    projection: mat4x4<f32>,
-    view_projection_inverse: mat4x4<f32>,
+    proj: mat4x4<f32>,
+    view_proj: mat4x4<f32>,
+    inv_view_proj: mat4x4<f32>,
+    inv_view: mat4x4<f32>,
     position: vec3<f32>,
+    _padding: f32,
 };
 
 @group(0) @binding(0)
