@@ -117,8 +117,6 @@ impl AwsmRenderer {
             None => {
                 let descriptor = pipeline_key.clone().into_descriptor(self, &shader_module)?;
 
-                web_sys::console::log_1(&descriptor);
-
                 let render_pipeline = self.gpu.create_render_pipeline(&descriptor).await?;
 
                 self.gltf
