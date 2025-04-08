@@ -1,13 +1,13 @@
 /// Processes WGSL-like shader code by removing lines or sections
 /// based on custom `// #IF <id>` or `// #SECTIONIF <id>` directives.
 /// and a provided `retain` function.
-/// 
-/// If `#SECTIONIF <id>` is encountered (and retain(id, code) evaluates to false), 
+///
+/// If `#SECTIONIF <id>` is encountered (and retain(id, code) evaluates to false),
 /// it will remove the entire section until the matching `#ENDIF` directive
 ///
 /// * `retain(id, full_source)` is a function/closure that determines if `id` is active.
 ///   If `false`, the line or section is removed from the final output.
-/// 
+///
 /// The second parameter passed to `retain` is the full source code, in case that context is needed.
 pub fn preprocess_shader<F>(code: &str, retain: F) -> String
 where
@@ -69,7 +69,7 @@ where
         // might affect nesting. That means "skip in output" but still "process directive."
         if skip_next_line {
             skip_next_line = false; // reset
-            // We do not add it to output, but we do still parse to handle nested sections
+                                    // We do not add it to output, but we do still parse to handle nested sections
             if let Some(id) = parse_section_if(line) {
                 // Even though the parent said skip, we must push a new section.
                 let is_parent_active = *section_stack.last().unwrap();
@@ -197,7 +197,6 @@ mod test {
             }
         "#;
 
-
         let retain = |id: &str, _code: &str| -> bool {
             match id {
                 "myId" => false,
@@ -207,7 +206,7 @@ mod test {
                 _ => true,
             }
         };
-        let processed_code = super::preprocess_shader(shader_code, retain); 
+        let processed_code = super::preprocess_shader(shader_code, retain);
 
         assert_eq!(processed_code, expected_code);
     }

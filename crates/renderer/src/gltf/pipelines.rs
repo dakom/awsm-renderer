@@ -18,18 +18,13 @@ pub struct RenderPipelineKey {
     pub vertex_buffer_layouts: Vec<VertexBufferLayout>,
 }
 
-
 // merely a key to hash ad-hoc pipeline generation
-#[derive(Hash, Debug, Clone, PartialEq, Eq)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
 pub struct PipelineLayoutKey {
-    pub camera: bool
+    pub camera: bool,
 }
 
 impl PipelineLayoutKey {
-    pub fn new() -> Self {
-        Self { camera: false }
-    }
-
     pub fn with_camera(mut self) -> Self {
         self.camera = true;
         self
@@ -40,12 +35,11 @@ impl PipelineLayoutKey {
             None,
             match self.camera {
                 true => vec![renderer.camera.bind_group_layout.clone()],
-                false => Vec::new()
-            }
+                false => Vec::new(),
+            },
         )
     }
 }
-
 
 impl RenderPipelineKey {
     pub fn new(
@@ -67,24 +61,28 @@ impl RenderPipelineKey {
         renderer: &mut AwsmRenderer,
         shader_module: &web_sys::GpuShaderModule,
     ) -> Result<web_sys::GpuRenderPipelineDescriptor> {
-        let vertex = VertexState::new(shader_module, None)
-            .with_buffer_layouts(self.vertex_buffer_layouts);
+        let vertex =
+            VertexState::new(shader_module, None).with_buffer_layouts(self.vertex_buffer_layouts);
 
         let fragment = FragmentState::new(shader_module, None, self.fragment_targets.clone());
 
         let layout = match renderer.gltf.pipeline_layouts.get(&self.layout_key) {
             None => {
-                let layout = renderer.gpu.create_pipeline_layout(&self.layout_key.clone().into_descriptor(renderer).into());
+                let layout = renderer.gpu.create_pipeline_layout(
+                    &self.layout_key.clone().into_descriptor(renderer).into(),
+                );
 
-                renderer.gltf.pipeline_layouts.insert(self.layout_key, layout.clone());
+                renderer
+                    .gltf
+                    .pipeline_layouts
+                    .insert(self.layout_key, layout.clone());
 
-                layout 
+                layout
             }
             Some(layout) => layout.clone(),
         };
 
         let layout = PipelineLayoutKind::Custom(layout);
-
 
         Ok(RenderPipelineDescriptor::new(vertex, None)
             .with_layout(layout)

@@ -29,15 +29,14 @@ pub(super) fn primitive_vertex_buffer_layout(
             shader_location: semantic_shader_location(semantic),
         });
 
-
         // because the vertex strides are in a specific order
         // we can just add the stride of the current attribute to the offset
-        stride_offset += buffer_info.vertex_strides[index] as u64;
+        stride_offset += buffer_info.vertex_attribute_strides[index] as u64;
     }
 
     Ok(VertexBufferLayout {
         // this is the stride across all of the attributes
-        array_stride: stride_offset as u64, 
+        array_stride: stride_offset,
         step_mode: None, // TODO - instancing
         attributes,
     })

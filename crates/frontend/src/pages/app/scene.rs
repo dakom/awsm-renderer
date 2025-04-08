@@ -115,7 +115,7 @@ impl AppScene {
         let mut renderer = self.renderer.lock().await;
         let mut extents: Option<PositionExtents> = None;
 
-        for mesh in renderer.meshes.iter() {
+        for (_, mesh) in renderer.meshes.iter() {
             if let Some(mesh_extents) = &mesh.position_extents {
                 if let Some(mut current_extents) = extents {
                     current_extents.extend(mesh_extents);

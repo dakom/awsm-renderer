@@ -1,41 +1,188 @@
-use slotmap::{new_key_type, SlotMap};
+use std::collections::HashSet;
+use thiserror::Error;
 
-#[derive(Default)]
-#[allow(dead_code)]
+use slotmap::{new_key_type, SecondaryMap, SlotMap};
+
 pub struct Transforms {
-    // TODO - replace with slotmap
-    local_lookup: SlotMap<TransformKey, Transform>,
-    world_lookup: SlotMap<TransformKey, glam::Mat4>,
-    child_lookup: Vec<TransformKey>,
-    parent_lookup: Vec<TransformKey>,
+    locals: SlotMap<TransformKey, Transform>,
+    world_matrices: SecondaryMap<TransformKey, glam::Mat4>,
+    children: SecondaryMap<TransformKey, Vec<TransformKey>>,
+    parents: SecondaryMap<TransformKey, TransformKey>,
+    dirties: HashSet<TransformKey>,
+    root_node: TransformKey,
 }
 
-// TODO - replace with slotmap
 new_key_type! {
     pub struct TransformKey;
 }
 
-// TODO - translation, rotation, scale, origin?
+impl Default for Transforms {
+    fn default() -> Self {
+        let mut locals = SlotMap::with_key();
+        let mut world_matrices = SecondaryMap::new();
+        let mut children = SecondaryMap::new();
+
+        let root_node = locals.insert(Transform::default());
+        world_matrices.insert(root_node, glam::Mat4::IDENTITY);
+        children.insert(root_node, Vec::new());
+
+        Self {
+            locals,
+            world_matrices,
+            children,
+            parents: SecondaryMap::new(),
+            dirties: HashSet::new(),
+            root_node,
+        }
+    }
+}
+
+impl Transforms {
+    pub fn insert(&mut self, transform: Transform) -> TransformKey {
+        let key = self.locals.insert(transform);
+        self.world_matrices.insert(key, glam::Mat4::IDENTITY);
+        self.children.insert(key, Vec::new());
+        self.dirties.insert(key);
+        self.parents.insert(key, self.root_node);
+
+        key
+    }
+
+    pub fn remove(&mut self, key: TransformKey) {
+        if key == self.root_node {
+            return;
+        }
+
+        // happens separately so that we can remove the node from the parent's children list
+        self.unset_parent(key);
+
+        self.locals.remove(key);
+        self.world_matrices.remove(key);
+        self.children.remove(key);
+        self.dirties.remove(&key);
+    }
+
+    // This is the only way to update the matrices
+    // world transforms are updated by walking the hierarchy
+    pub fn update_local(&mut self, key: TransformKey, transform: Transform) -> Result<()> {
+        match self.locals.get_mut(key) {
+            Some(existing) => {
+                *existing = transform;
+                self.dirties.insert(key);
+                Ok(())
+            }
+            None => Err(AwsmTransformError::LocalNotFound(key)),
+        }
+    }
+
+    pub fn set_parent(&mut self, child: TransformKey, parent: Option<TransformKey>) {
+        if child == self.root_node {
+            return;
+        }
+
+        let parent = parent.unwrap_or(self.root_node);
+
+        if let Some(existing_parent) = self.parents.get(child) {
+            if *existing_parent == parent {
+                return;
+            } else {
+                self.unset_parent(child);
+            }
+        }
+
+        // safe because all transforms have children vec when created
+        self.children.get_mut(parent).unwrap().push(child);
+
+        self.parents.insert(child, parent);
+    }
+
+    pub fn get_local(&self, key: TransformKey) -> Result<&Transform> {
+        self.locals
+            .get(key)
+            .ok_or(AwsmTransformError::LocalNotFound(key))
+    }
+
+    pub fn get_world(&self, key: TransformKey) -> Result<&glam::Mat4> {
+        self.world_matrices
+            .get(key)
+            .ok_or(AwsmTransformError::WorldNotFound(key))
+    }
+
+    pub fn update_hierarchy(
+        &mut self,
+        _key: TransformKey,
+        _world_matrix: glam::Mat4,
+    ) -> Result<()> {
+        // TODO - walk the hierarchy starting from the root node
+        // and update all dirty nodes
+
+        Ok(())
+    }
+
+    // internal-only function - leaves the node dangling
+    // after this call, the node should either be immediately removed or reparented
+    fn unset_parent(&mut self, child: TransformKey) {
+        if let Some(parent) = self.parents.remove(child) {
+            if let Some(children) = self.children.get_mut(parent) {
+                children.retain(|&c| c != child);
+            }
+        }
+    }
+}
+
 pub struct Transform {
     pub translation: glam::Vec3,
     pub rotation: glam::Quat,
     pub scale: glam::Vec3,
-    pub origin: glam::Vec3,
 }
 
 impl Default for Transform {
     fn default() -> Self {
-        Self::new()
+        Self::IDENTITY
     }
 }
 
 impl Transform {
-    pub fn new() -> Self {
+    const IDENTITY: Self = Self {
+        translation: glam::Vec3::ZERO,
+        rotation: glam::Quat::IDENTITY,
+        scale: glam::Vec3::ONE,
+    };
+
+    pub fn with_translation(mut self, translation: glam::Vec3) -> Self {
+        self.translation = translation;
+        self
+    }
+    pub fn with_rotation(mut self, rotation: glam::Quat) -> Self {
+        self.rotation = rotation;
+        self
+    }
+    pub fn with_scale(mut self, scale: glam::Vec3) -> Self {
+        self.scale = scale;
+        self
+    }
+
+    pub fn from_matrix(matrix: glam::Mat4) -> Self {
+        let (scale, rotation, translation) = matrix.to_scale_rotation_translation();
         Self {
-            translation: glam::Vec3::ZERO,
-            rotation: glam::Quat::IDENTITY,
-            scale: glam::Vec3::ONE,
-            origin: glam::Vec3::ZERO,
+            translation,
+            rotation,
+            scale,
         }
     }
+
+    pub fn to_matrix(&self) -> glam::Mat4 {
+        glam::Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
+    }
+}
+
+pub type Result<T> = std::result::Result<T, AwsmTransformError>;
+
+#[derive(Error, Debug)]
+pub enum AwsmTransformError {
+    #[error("[transform] local transform does not exist {0:?}")]
+    LocalNotFound(TransformKey),
+
+    #[error("[transform] world transform does not exist {0:?}")]
+    WorldNotFound(TransformKey),
 }

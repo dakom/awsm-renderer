@@ -225,13 +225,11 @@ impl AwsmRendererWebGpu {
 
         match data {
             JsData::SliceU8(data) => match (data_offset, data_size) {
-                (None, None) => {
-                    self.device.queue().write_buffer_with_f64_and_u8_slice(
-                        buffer,
-                        buffer_offset.unwrap_or(0) as f64,
-                        data,
-                    )
-                },
+                (None, None) => self.device.queue().write_buffer_with_f64_and_u8_slice(
+                    buffer,
+                    buffer_offset.unwrap_or(0) as f64,
+                    data,
+                ),
                 (Some(data_offset), Some(data_size)) => self
                     .device
                     .queue()

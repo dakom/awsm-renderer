@@ -1,3 +1,7 @@
+use camera::CameraBuffer;
+use slotmap::SlotMap;
+use transform::Transforms;
+
 pub mod camera;
 pub mod error;
 #[cfg(feature = "gltf")]
@@ -16,9 +20,11 @@ pub struct AwsmRenderer {
     #[cfg(feature = "gltf")]
     pub gltf: gltf::cache::GltfCache,
 
-    pub meshes: mesh::Meshes,
+    pub meshes: SlotMap<mesh::MeshKey, mesh::Mesh>,
 
-    pub camera: camera::CameraBuffer,
+    pub camera: CameraBuffer,
+
+    pub transforms: Transforms,
 }
 
 pub struct AwsmRendererBuilder {
@@ -55,8 +61,9 @@ impl AwsmRendererBuilder {
         Ok(AwsmRenderer {
             gpu,
             gltf: gltf::cache::GltfCache::default(),
-            meshes: mesh::Meshes::default(),
+            meshes: SlotMap::with_key(),
             camera,
+            transforms: Transforms::default(),
         })
     }
 
@@ -67,8 +74,9 @@ impl AwsmRendererBuilder {
 
         Ok(AwsmRenderer {
             gpu,
-            meshes: mesh::Meshes::default(),
+            meshes: SlotMap::with_key(),
             camera_buffer,
+            transforms: Transforms::default(),
         })
     }
 }
