@@ -1,3 +1,4 @@
+pub mod preprocess;
 use crate::error::{AwsmCoreError, Result};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;

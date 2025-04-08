@@ -1,4 +1,4 @@
-use awsm_renderer_core::shaders::ShaderModuleDescriptor;
+use awsm_renderer_core::shaders::{preprocess::preprocess_shader, ShaderModuleDescriptor};
 
 // merely a key to hash ad-hoc shader generation
 // is not stored on the mesh itself
@@ -113,11 +113,14 @@ impl ShaderKey {
         source.push_str("\n\n");
         source.push_str(FRAGMENT_PBR);
 
-        if !self.normal_attribute {
-            source = source.replace("@location(1) normal: vec3<f32>,", "");
-        }
+        let retain = |id: &str, _code: &str| -> bool {
+            match id {
+                "normals" => self.normal_attribute,
+                _ => true,
+            }
+        };
 
-        source
+        preprocess_shader(&source, retain)
     }
 }
 
