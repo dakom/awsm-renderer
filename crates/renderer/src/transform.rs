@@ -39,11 +39,15 @@ impl Default for Transforms {
 
 impl Transforms {
     pub fn insert(&mut self, transform: Transform) -> TransformKey {
+        let world_matrix = transform.to_matrix();
+
         let key = self.locals.insert(transform);
-        self.world_matrices.insert(key, glam::Mat4::IDENTITY);
+
+        self.world_matrices.insert(key, world_matrix);
         self.children.insert(key, Vec::new());
         self.dirties.insert(key);
-        self.parents.insert(key, self.root_node);
+
+        self.set_parent(key, None);
 
         key
     }
@@ -75,6 +79,7 @@ impl Transforms {
         }
     }
 
+    // if parent is None then the parent is actually the root node
     pub fn set_parent(&mut self, child: TransformKey, parent: Option<TransformKey>) {
         if child == self.root_node {
             return;
@@ -108,13 +113,20 @@ impl Transforms {
             .ok_or(AwsmTransformError::WorldNotFound(key))
     }
 
-    pub fn update_hierarchy(
+    // This is the only way to update the world matrices
+    // See: https://gameprogrammingpatterns.com/dirty-flag.html
+    // the overall idea is we walk the tree and skip over nodes that are not dirty
+    // whenever we encounter a dirty node, we must also mark all of its children dirty
+    // finally, for each dirty node, its world transform is its parent's world transform
+    // multiplied by its local transform
+    // or in other words, it's the local transform, offset by its parent in world space
+    pub fn propogate(
         &mut self,
-        _key: TransformKey,
-        _world_matrix: glam::Mat4,
+        // if None then will start from the root node
+        _key: Option<TransformKey>,
     ) -> Result<()> {
-        // TODO - walk the hierarchy starting from the root node
-        // and update all dirty nodes
+        // TODO - implement!
+        // see example at https://github.com/dakom/shipyard-scenegraph/blob/babc8de4af51408ec36a575eeb28f3fdb7d0ca57/crate/src/systems.rs#L94
 
         Ok(())
     }

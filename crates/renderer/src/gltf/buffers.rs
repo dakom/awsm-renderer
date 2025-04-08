@@ -264,8 +264,6 @@ fn accessor_to_bytes<'a>(
 
         let indices = sparse_to_indices(&sparse, buffers);
 
-        tracing::info!("indices: {:?}", indices);
-
         let values_buffer_slice = &buffers[sparse.values().view().buffer().index()];
         let values_buffer_slice_start = sparse.values().offset() + sparse.values().view().offset();
         let values_buffer_slice = &values_buffer_slice[values_buffer_slice_start..];
@@ -278,17 +276,6 @@ fn accessor_to_bytes<'a>(
             let buffer_slice_start = target_index * accessor.size();
             let buffer_slice =
                 &mut buffer[buffer_slice_start..buffer_slice_start + accessor.size()];
-
-            // interpret the value_slice as a f32 using rust std
-            tracing::info!(
-                "from values: {}, {}, {} to {}, {}, {}",
-                f32::from_le_bytes(buffer_slice[0..4].try_into().unwrap()),
-                f32::from_le_bytes(buffer_slice[4..8].try_into().unwrap()),
-                f32::from_le_bytes(buffer_slice[8..12].try_into().unwrap()),
-                f32::from_le_bytes(value_slice[0..4].try_into().unwrap()),
-                f32::from_le_bytes(value_slice[4..8].try_into().unwrap()),
-                f32::from_le_bytes(value_slice[8..12].try_into().unwrap())
-            );
 
             buffer_slice.copy_from_slice(value_slice);
         }
