@@ -1,48 +1,18 @@
 use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
 use glam::Vec3;
+use slotmap::new_key_type;
 
 use crate::error::Result;
 use crate::render::RenderContext;
+use crate::transform::TransformKey;
 
-#[derive(Default)]
-pub struct Meshes {
-    // TODO - replace with slotmap
-    lookup: Vec<Mesh>,
-}
-
-// TODO - replace with slotmap
-pub type MeshKey = usize;
-
-impl Meshes {
-    pub fn add(&mut self, mesh: Mesh) -> MeshKey {
-        let key = self.lookup.len();
-        self.lookup.push(mesh);
-        key
-    }
-
-    pub fn clear(&mut self) {
-        self.lookup.clear();
-    }
-
-    pub fn remove(&mut self, key: MeshKey) -> Option<Mesh> {
-        if key < self.lookup.len() {
-            Some(self.lookup.remove(key))
-        } else {
-            None
-        }
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &Mesh> {
-        self.lookup.iter()
-    }
-
-    pub fn iter_with_key(&self) -> impl Iterator<Item = (MeshKey, &Mesh)> {
-        self.lookup.iter().enumerate()
-    }
+new_key_type! {
+    pub struct MeshKey;
 }
 
 // this is most like a "primitive" in gltf, not the containing "mesh"
 // because for non-gltf naming, "mesh" makes more sense
+#[derive(Debug)]
 pub struct Mesh {
     pub pipeline: web_sys::GpuRenderPipeline,
     pub draw_count: usize, // indices or vertices
@@ -50,6 +20,7 @@ pub struct Mesh {
     pub index_buffer: Option<MeshIndexBuffer>,
     pub topology: PrimitiveTopology,
     pub position_extents: Option<PositionExtents>,
+    pub transform_key: TransformKey,
 }
 
 #[derive(Debug, Clone)]
@@ -86,7 +57,11 @@ pub struct MeshIndexBuffer {
 }
 
 impl Mesh {
-    pub fn new(pipeline: web_sys::GpuRenderPipeline, draw_count: usize) -> Self {
+    pub fn new(
+        pipeline: web_sys::GpuRenderPipeline,
+        draw_count: usize,
+        transform_key: TransformKey,
+    ) -> Self {
         Self {
             pipeline,
             draw_count,
@@ -94,6 +69,7 @@ impl Mesh {
             index_buffer: None,
             topology: PrimitiveTopology::TriangleList,
             position_extents: None,
+            transform_key,
         }
     }
 

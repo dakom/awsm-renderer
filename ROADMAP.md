@@ -6,9 +6,7 @@ starting with minimal and feature-tests
 ## Gltf models
 
 #### Simple meshes
-normals are a warning, but fragment shader is hardcoded anyway. Need to dig-in! 
-maybe a camera issue?
-
+* node transforms
 
 ## Scene graph
 

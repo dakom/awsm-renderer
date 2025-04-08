@@ -114,6 +114,10 @@ impl OrthographicCamera {
         self.position.y = -(self.bottom + self.top) / 4.0;
         self.target.x = self.position.x;
         self.target.y = self.position.y;
+
+        if self.position.z == self.target.z {
+            self.position.z = self.target.z + 1.0;
+        }
     }
 
     pub fn set_canvas(&mut self, canvas: &web_sys::HtmlCanvasElement) {
@@ -142,7 +146,7 @@ impl Default for OrthographicCamera {
             top: 10.0,
             near: 0.1,
             far: 100.0,
-            position: Vec3::new(0.0, 0.0, 10.0),
+            position: Vec3::new(0.0, 0.0, 0.0),
             target: Vec3::ZERO,
             up: Vec3::Y,
         }

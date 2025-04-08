@@ -9,6 +9,7 @@ use awsm_renderer::mesh::PositionExtents;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use awsm_web::dom::resize::ResizeObserver;
 use camera::Camera;
+use glam::Vec3;
 use serde::de;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 
@@ -114,7 +115,7 @@ impl AppScene {
         let mut renderer = self.renderer.lock().await;
         let mut extents: Option<PositionExtents> = None;
 
-        for mesh in renderer.meshes.iter() {
+        for (_, mesh) in renderer.meshes.iter() {
             if let Some(mesh_extents) = &mesh.position_extents {
                 if let Some(mut current_extents) = extents {
                     current_extents.extend(mesh_extents);

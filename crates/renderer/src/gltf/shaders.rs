@@ -1,4 +1,4 @@
-use awsm_renderer_core::shaders::ShaderModuleDescriptor;
+use awsm_renderer_core::shaders::{preprocess::preprocess_shader, ShaderModuleDescriptor};
 
 // merely a key to hash ad-hoc shader generation
 // is not stored on the mesh itself
@@ -33,7 +33,7 @@ impl ShaderKey {
                     key.position_attribute = true;
                 }
                 gltf::Semantic::Normals => {
-                    tracing::warn!("TODO - primitive normals");
+                    //key.normal_attribute = true;
                 }
                 gltf::Semantic::Tangents => {
                     tracing::warn!("TODO - primitive tangents");
@@ -108,10 +108,19 @@ impl ShaderKey {
 
         let mut source = String::new();
         source.push_str(CAMERA);
+        source.push_str("\n\n");
         source.push_str(VERTEX_MESH);
+        source.push_str("\n\n");
         source.push_str(FRAGMENT_PBR);
 
-        source
+        let retain = |id: &str, _code: &str| -> bool {
+            match id {
+                "normals" => self.normal_attribute,
+                _ => true,
+            }
+        };
+
+        preprocess_shader(&source, retain)
     }
 }
 

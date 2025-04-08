@@ -31,16 +31,38 @@ pub struct GltfBuffers {
 
 #[derive(Default, Debug, Clone)]
 pub struct PrimitiveBufferInfo {
-    pub index: Option<usize>,
-    pub index_len: Option<usize>,
-    pub vertex: usize,
-    pub vertex_lens: Vec<usize>,
-    pub vertex_strides: Vec<usize>,
+    // offset in index_bytes where this primitive starts
+    pub index_offset: Option<usize>,
+    // number of index elements for this primitive
+    pub index_count: Option<usize>,
+    // number of bytes per index (e.g. 2 for u16, 4 for u32)
+    pub index_stride: Option<usize>,
+    // offset in vertex_bytes where this primitive starts
+    pub vertex_offset: usize,
+    // number of vertices for this primitive
+    pub vertex_count: usize,
+    // number of bytes per vertex attribute
+    pub vertex_attribute_strides: Vec<usize>,
 }
 
 impl PrimitiveBufferInfo {
-    pub fn total_vertex_len(&self) -> usize {
-        self.vertex_lens.iter().sum()
+    pub fn draw_count(&self) -> usize {
+        // if we have indices, we use that count
+        // otherwise, we use the vertex count
+        self.index_count.unwrap_or(self.vertex_count)
+    }
+
+    // the size in bytes of the vertex buffer for this primitive
+    pub fn vertex_len(&self) -> usize {
+        self.vertex_count * self.vertex_attribute_strides.iter().sum::<usize>()
+    }
+
+    // the size in bytes of the index buffer for this primitive, if it exists
+    pub fn index_len(&self) -> Option<usize> {
+        match (self.index_count, self.index_stride) {
+            (Some(count), Some(stride)) => Some(count * stride),
+            _ => None,
+        }
     }
 }
 
@@ -64,13 +86,13 @@ impl GltfBuffers {
 
             for primitive in mesh.primitives() {
                 // Write to index buffer
-                let index_offset = match primitive.indices() {
-                    None => None,
+                let (index_offset, index_count, index_stride) = match primitive.indices() {
+                    None => (None, None, None),
                     Some(accessor) => {
                         let index = index_bytes.len();
                         let other = accessor_to_bytes(&accessor, &buffers)?;
                         index_bytes.extend_from_slice(&other);
-                        Some(index)
+                        (Some(index), Some(accessor.count()), Some(accessor.size()))
                     }
                 };
 
@@ -82,31 +104,58 @@ impl GltfBuffers {
                 attributes
                     .sort_by(|(a, _), (b, _)| semantic_ordering(a).cmp(&semantic_ordering(b)));
 
-                let mut vertex_strides = Vec::new();
-                let mut vertex_lens = Vec::new();
+                let mut vertex_attribute_strides = Vec::new();
+                let mut attributes_bytes = Vec::new();
 
+                // this should never be empty, but let's be safe
+                let vertex_count = attributes
+                    .first()
+                    .map(|(_, accessor)| accessor.count())
+                    .unwrap_or(0);
+
+                // first we need to read the whole accessor. This will be zero-copy unless one of these is true:
+                // 1. they're sparse and we need to replace values
+                // 2. there's no view, and we need to fill it with zeroes
+                //
+                // otherwise, it's just a slice of the original buffer
                 for (_, accessor) in attributes {
-                    let other = accessor_to_bytes(&accessor, &buffers)?;
-                    vertex_bytes.extend_from_slice(&other);
-                    vertex_lens.push(other.len());
+                    let attribute_bytes = accessor_to_bytes(&accessor, &buffers)?;
 
+                    // while we're at it, we can stash the stride sizes
                     match accessor.view() {
                         Some(view) => {
-                            vertex_strides.push(view.stride().unwrap_or(accessor.size()));
+                            vertex_attribute_strides.push(view.stride().unwrap_or(accessor.size()));
                         }
                         None => {
-                            vertex_strides.push(accessor.size());
+                            vertex_attribute_strides.push(accessor.size());
                         }
+                    }
+
+                    attributes_bytes.push(attribute_bytes);
+                }
+
+                // now let's predictably interleave the attributes into our final vertex buffer
+                // this does extend/copy the data, but it saves us additional calls at render time
+                for vertex in 0..vertex_count {
+                    for attribute_index in 0..attributes_bytes.len() {
+                        let vertex_stride = vertex_attribute_strides[attribute_index];
+                        let attribute_byte_offset = vertex * vertex_stride;
+                        let attribute_bytes = &attributes_bytes[attribute_index];
+                        let attribute_bytes = &attribute_bytes
+                            [attribute_byte_offset..attribute_byte_offset + vertex_stride];
+
+                        vertex_bytes.extend_from_slice(attribute_bytes);
                     }
                 }
 
                 // Done for this primitive
                 primitive_buffer_infos.push(PrimitiveBufferInfo {
-                    index: index_offset,
-                    index_len: index_offset.map(|offset| index_bytes.len() - offset),
-                    vertex: vertex_offset,
-                    vertex_lens,
-                    vertex_strides,
+                    index_offset,
+                    index_count,
+                    index_stride,
+                    vertex_offset,
+                    vertex_count,
+                    vertex_attribute_strides,
                 });
             }
 
@@ -287,4 +336,45 @@ fn sparse_to_indices(
     }
 
     indices
+}
+
+#[allow(dead_code)]
+pub(crate) fn debug_chunks_to_f32(slice: &[u8], chunk_size: usize) -> Vec<Vec<f32>> {
+    debug_slice_to_f32(slice)
+        .chunks(chunk_size)
+        .map(|chunk| chunk.to_vec())
+        .collect()
+}
+
+#[allow(dead_code)]
+pub(crate) fn debug_slice_to_f32(slice: &[u8]) -> Vec<f32> {
+    let mut f32s = Vec::new();
+    for i in (0..slice.len()).step_by(4) {
+        let bytes = &slice[i..i + 4];
+        let f32_value = f32::from_le_bytes(bytes.try_into().unwrap());
+        f32s.push(f32_value);
+    }
+    f32s
+}
+
+#[allow(dead_code)]
+pub(crate) fn debug_slice_to_u16(slice: &[u8]) -> Vec<u16> {
+    let mut u16s = Vec::new();
+    for i in (0..slice.len()).step_by(2) {
+        let bytes = &slice[i..i + 2];
+        let u16_value = u16::from_le_bytes(bytes.try_into().unwrap());
+        u16s.push(u16_value);
+    }
+    u16s
+}
+
+#[allow(dead_code)]
+pub(crate) fn debug_slice_to_u32(slice: &[u8]) -> Vec<u32> {
+    let mut u32s = Vec::new();
+    for i in (0..slice.len()).step_by(4) {
+        let bytes = &slice[i..i + 4];
+        let u32_value = u32::from_le_bytes(bytes.try_into().unwrap());
+        u32s.push(u32_value);
+    }
+    u32s
 }
