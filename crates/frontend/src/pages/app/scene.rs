@@ -108,7 +108,12 @@ impl AppScene {
     }
 
     pub async fn render(self: &Arc<Self>) -> Result<()> {
-        Ok(self.renderer.lock().await.render()?)
+        let mut lock = self.renderer.lock().await;
+
+        lock.transforms.update()?;
+        lock.render()?;
+
+        Ok(())
     }
 
     pub async fn setup(self: &Arc<Self>) -> Result<()> {

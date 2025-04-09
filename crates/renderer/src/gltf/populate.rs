@@ -3,7 +3,7 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use crate::{
     gltf::{error::AwsmGltfError, pipelines::RenderPipelineKey, shaders::ShaderKey},
     mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer, PositionExtents},
-    transform::Transform,
+    transform::TransformKey,
     AwsmRenderer,
 };
 use awsm_renderer_core::{
@@ -12,7 +12,7 @@ use awsm_renderer_core::{
 };
 use glam::Vec3;
 
-use super::{data::GltfData, layout::primitive_vertex_buffer_layout, pipelines::PipelineLayoutKey};
+use super::{data::GltfData, layout::primitive_vertex_buffer_layout, pipelines::PipelineLayoutKey, transform::transform_gltf_node};
 
 impl AwsmRenderer {
     pub async fn populate_gltf(
@@ -40,7 +40,7 @@ impl AwsmRenderer {
         };
 
         for node in scene.nodes() {
-            self.populate_gltf_node(&ctx, &node, None).await?;
+            self.populate_gltf_node(&ctx, &node, None, None).await?;
         }
 
         Ok(())
@@ -51,17 +51,28 @@ impl AwsmRenderer {
         ctx: &'c GltfPopulateContext,
         gltf_node: &'b gltf::Node<'b>,
         _gltf_parent_node: Option<&'b gltf::Node<'b>>,
+        parent_transform_key: Option<TransformKey>,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>> {
         Box::pin(async move {
+
+            // We use one transform per-node, even though we are creating distinct meshes per gltf-primitive 
+            // conceptually, this means meshes (in the renderer) are more like components than individual nodes
+            //
+            // the reason is two-fold:
+            // 1. that's technically how the gltf spec is defined
+            // 2. we aren't forced into a strict component system, so it's absolutely fine to share the transform - giving us a performance benefit
+            let transform = transform_gltf_node(gltf_node);
+            let transform_key = self.transforms.insert(transform, parent_transform_key);
+
             if let Some(gltf_mesh) = gltf_node.mesh() {
                 for gltf_primitive in gltf_mesh.primitives() {
-                    self.populate_gltf_primitive(ctx, gltf_node, &gltf_mesh, gltf_primitive)
+                    self.populate_gltf_primitive(ctx, gltf_node, &gltf_mesh, gltf_primitive, transform_key)
                         .await?;
                 }
             }
 
             for child in gltf_node.children() {
-                self.populate_gltf_node(ctx, &child, Some(gltf_node))
+                self.populate_gltf_node(ctx, &child, Some(gltf_node), Some(transform_key))
                     .await?;
             }
             Ok(())
@@ -74,6 +85,7 @@ impl AwsmRenderer {
         _gltf_node: &gltf::Node<'_>,
         gltf_mesh: &gltf::Mesh<'_>,
         gltf_primitive: gltf::Primitive<'_>,
+        transform_key: TransformKey,
     ) -> anyhow::Result<()> {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
@@ -128,14 +140,10 @@ impl AwsmRenderer {
             Some(pipeline) => pipeline,
         };
 
-        // TODO - get transform from node
-
-        let transform = Transform::default();
-
         let mut mesh = Mesh::new(
             render_pipeline,
             primitive_buffer_info.draw_count(),
-            self.transforms.insert(transform),
+            transform_key,
         )
         .with_vertex_buffers(
             // We only need one vertex buffer per-mesh, because we've already constructed our buffers

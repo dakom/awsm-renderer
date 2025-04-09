@@ -38,7 +38,7 @@ impl Default for Transforms {
 }
 
 impl Transforms {
-    pub fn insert(&mut self, transform: Transform) -> TransformKey {
+    pub fn insert(&mut self, transform: Transform, parent: Option<TransformKey>) -> TransformKey {
         let world_matrix = transform.to_matrix();
 
         let key = self.locals.insert(transform);
@@ -47,7 +47,7 @@ impl Transforms {
         self.children.insert(key, Vec::new());
         self.dirties.insert(key);
 
-        self.set_parent(key, None);
+        self.set_parent(key, parent);
 
         key
     }
@@ -66,9 +66,12 @@ impl Transforms {
         self.dirties.remove(&key);
     }
 
-    // This is the only way to update the matrices
-    // world transforms are updated by walking the hierarchy
-    pub fn update_local(&mut self, key: TransformKey, transform: Transform) -> Result<()> {
+    // This is the only way to modify the matrices (since it must manage the dirty flags)
+    // world transforms are updated by calling update() 
+    pub fn set_local(&mut self, key: TransformKey, transform: Transform) -> Result<()> {
+        if key == self.root_node {
+            return Err(AwsmTransformError::CannotModifyRootNode);
+        }
         match self.locals.get_mut(key) {
             Some(existing) => {
                 *existing = transform;
@@ -79,7 +82,7 @@ impl Transforms {
         }
     }
 
-    // if parent is None then the parent is actually the root node
+    // if parent is None then the parent is the root node
     pub fn set_parent(&mut self, child: TransformKey, parent: Option<TransformKey>) {
         if child == self.root_node {
             return;
@@ -114,21 +117,45 @@ impl Transforms {
     }
 
     // This is the only way to update the world matrices
+    pub fn update(&mut self) -> Result<()> {
+        self.update_inner(self.root_node, false);
+
+        self.dirties.clear();
+
+        Ok(())
+    }
+
+    // internal-only function
     // See: https://gameprogrammingpatterns.com/dirty-flag.html
     // the overall idea is we walk the tree and skip over nodes that are not dirty
     // whenever we encounter a dirty node, we must also mark all of its children dirty
     // finally, for each dirty node, its world transform is its parent's world transform
     // multiplied by its local transform
     // or in other words, it's the local transform, offset by its parent in world space
-    pub fn propogate(
-        &mut self,
-        // if None then will start from the root node
-        _key: Option<TransformKey>,
-    ) -> Result<()> {
-        // TODO - implement!
-        // see example at https://github.com/dakom/shipyard-scenegraph/blob/babc8de4af51408ec36a575eeb28f3fdb7d0ca57/crate/src/systems.rs#L94
+    fn update_inner(&mut self, key: TransformKey, dirty_tracker: bool) -> bool {
+        let dirty = self.dirties.contains(&key) | dirty_tracker;
 
-        Ok(())
+        if dirty {
+            let local_matrix = self.locals[key].to_matrix();
+
+            let world_matrix = match self.parents.get(key) {
+                Some(parent) => {
+                    let parent_matrix = self.world_matrices[*parent];
+                    parent_matrix.mul_mat4(&local_matrix)
+                }
+                None => local_matrix,
+            };
+
+            self.world_matrices[key] = world_matrix;
+        }
+
+        // safety: can't keep a mutable reference to self while it has a borrow of the iterator
+        let children = self.children[key].clone();
+        for child in children {
+            self.update_inner(child, dirty);
+        }
+
+        dirty
     }
 
     // internal-only function - leaves the node dangling
@@ -197,4 +224,7 @@ pub enum AwsmTransformError {
 
     #[error("[transform] world transform does not exist {0:?}")]
     WorldNotFound(TransformKey),
+
+    #[error("[transform] cannot modify root node")]
+    CannotModifyRootNode,
 }
