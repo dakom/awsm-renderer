@@ -33,7 +33,7 @@ impl CameraBuffer {
             .create_buffer(
                 &BufferDescriptor::new(
                     Some("Camera"),
-                    BUFFER_SIZE as u64,
+                    BUFFER_SIZE,
                     BufferUsage::new().with_uniform().with_copy_dst(),
                 )
                 .into(),
@@ -113,6 +113,15 @@ impl CameraBuffer {
         write_to_data(&inv_view_proj.to_cols_array());
         write_to_data(&inv_view.to_cols_array());
         write_to_data(&position.to_array());
+
+        Ok(())
+    }
+
+    pub fn write_buffers(&self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+        gpu.write_buffer(&self.gpu_buffer, None, self.raw_data.as_slice(), None, None)
+            .map_err(AwsmCameraError::WriteBuffer)?;
+
+        // TODO - transforms, etc.
 
         Ok(())
     }

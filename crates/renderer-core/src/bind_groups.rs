@@ -84,7 +84,7 @@ pub struct BufferBindingLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#hasdynamicoffset
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBufferBindingLayout.html
     pub has_dynamic_offset: Option<bool>,
-    pub min_binding_size: Option<f64>,
+    pub min_binding_size: Option<usize>,
     pub binding_type: Option<BufferBindingType>,
 }
 
@@ -98,7 +98,7 @@ impl BufferBindingLayout {
         self
     }
 
-    pub fn with_min_binding_size(mut self, min_binding_size: f64) -> Self {
+    pub fn with_min_binding_size(mut self, min_binding_size: usize) -> Self {
         self.min_binding_size = Some(min_binding_size);
         self
     }
@@ -260,7 +260,7 @@ impl From<BufferBindingLayout> for web_sys::GpuBufferBindingLayout {
         }
 
         if let Some(min_binding_size) = layout.min_binding_size {
-            layout_js.set_min_binding_size(min_binding_size);
+            layout_js.set_min_binding_size(min_binding_size as f64);
         }
 
         if let Some(binding_type) = layout.binding_type {

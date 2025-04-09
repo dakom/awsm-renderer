@@ -176,7 +176,7 @@ impl GltfBuffers {
                     .create_buffer(
                         &BufferDescriptor::new(
                             Some("gltf index buffer"),
-                            index_bytes.len() as u64,
+                            index_bytes.len(),
                             BufferUsage::new().with_copy_dst().with_index(),
                         )
                         .into(),
@@ -203,7 +203,7 @@ impl GltfBuffers {
             .create_buffer(
                 &BufferDescriptor::new(
                     Some("gltf vertex buffer"),
-                    vertex_bytes.len() as u64,
+                    vertex_bytes.len(),
                     BufferUsage::new().with_copy_dst().with_vertex(),
                 )
                 .into(),

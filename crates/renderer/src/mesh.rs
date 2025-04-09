@@ -1,10 +1,42 @@
+use awsm_renderer_core::error::AwsmCoreError;
 use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
-use glam::Vec3;
-use slotmap::new_key_type;
+use glam::{Mat4, Vec3};
+use slotmap::{new_key_type, DenseSlotMap};
+use thiserror::Error;
 
-use crate::error::Result;
 use crate::render::RenderContext;
-use crate::transform::TransformKey;
+use crate::shaders::BindGroup;
+use crate::transform::{AwsmTransformError, TransformKey};
+
+pub struct Meshes {
+    list: DenseSlotMap<MeshKey, Mesh>,
+}
+
+impl Default for Meshes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Meshes {
+    pub fn new() -> Self {
+        Self {
+            list: DenseSlotMap::with_key(),
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Mesh> {
+        self.list.values()
+    }
+
+    pub fn insert(&mut self, mesh: Mesh) -> MeshKey {
+        self.list.insert(mesh)
+    }
+
+    pub fn clear(&mut self) {
+        self.list.clear();
+    }
+}
 
 new_key_type! {
     pub struct MeshKey;
@@ -37,6 +69,11 @@ impl PositionExtents {
     pub fn extend(&mut self, other: &Self) {
         self.min = self.min.min(other.min);
         self.max = self.max.max(other.max);
+    }
+
+    pub fn apply_matrix(&mut self, mat: &Mat4) {
+        self.min = mat.transform_point3(self.min);
+        self.max = mat.transform_point3(self.max);
     }
 }
 
@@ -93,8 +130,14 @@ impl Mesh {
         self
     }
 
-    pub fn push_commands(&self, _key: MeshKey, ctx: &mut RenderContext) -> Result<()> {
+    pub fn push_commands(&self, ctx: &mut RenderContext) -> Result<()> {
         ctx.render_pass.set_pipeline(&self.pipeline);
+
+        ctx.render_pass.set_bind_group(
+            BindGroup::Transform as u32,
+            ctx.transforms.bind_group(),
+            Some(&[ctx.transforms.buffer_offset(self.transform_key)? as u32]),
+        )?;
 
         for vertex_buffer in &self.vertex_buffers {
             ctx.render_pass.set_vertex_buffer(
@@ -122,4 +165,18 @@ impl Mesh {
 
         Ok(())
     }
+}
+
+type Result<T> = std::result::Result<T, AwsmMeshError>;
+
+#[derive(Error, Debug)]
+pub enum AwsmMeshError {
+    #[error("[mesh] not found: {0:?}")]
+    MeshNotFound(MeshKey),
+
+    #[error("[mesh] {0:?}")]
+    Core(#[from] AwsmCoreError),
+
+    #[error("[mesh] {0:?}")]
+    Transform(#[from] AwsmTransformError),
 }

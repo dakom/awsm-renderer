@@ -3,15 +3,16 @@ use awsm_renderer_core::command::render_pass::{
 };
 use awsm_renderer_core::command::{LoadOp, StoreOp};
 
-use crate::camera::AwsmCameraError;
 use crate::core::command::CommandEncoder;
 use crate::error::Result;
 use crate::shaders::BindGroup;
+use crate::transform::Transforms;
 use crate::AwsmRenderer;
 
 impl AwsmRenderer {
-    pub fn render(&self) -> Result<()> {
-        self.pre_render()?;
+    pub fn render(&mut self) -> Result<()> {
+        self.transforms.write_buffers(&self.gpu)?;
+        self.camera.write_buffers(&self.gpu)?;
 
         let current_texture_view = self.gpu.current_context_texture_view()?;
         let command_encoder = self.gpu.create_command_encoder(Some("Render pass"));
@@ -29,16 +30,17 @@ impl AwsmRenderer {
         )?;
 
         let mut ctx = RenderContext {
-            current_texture_view,
+            current_texture_view: &current_texture_view,
             command_encoder,
             render_pass,
+            transforms: &self.transforms,
         };
 
         ctx.render_pass
             .set_bind_group(BindGroup::Camera as u32, &self.camera.bind_group, None)?;
 
-        for (mesh_key, mesh) in self.meshes.iter() {
-            mesh.push_commands(mesh_key, &mut ctx)?;
+        for mesh in self.meshes.iter() {
+            mesh.push_commands(&mut ctx)?;
         }
 
         ctx.render_pass.end();
@@ -47,26 +49,11 @@ impl AwsmRenderer {
 
         Ok(())
     }
-
-    fn pre_render(&self) -> Result<()> {
-        self.gpu
-            .write_buffer(
-                &self.camera.gpu_buffer,
-                None,
-                self.camera.raw_data.as_slice(),
-                None,
-                None,
-            )
-            .map_err(AwsmCameraError::WriteBuffer)?;
-
-        // TODO - transforms, etc.
-
-        Ok(())
-    }
 }
 
-pub struct RenderContext {
-    pub current_texture_view: web_sys::GpuTextureView,
+pub struct RenderContext<'a> {
+    pub current_texture_view: &'a web_sys::GpuTextureView,
     pub command_encoder: CommandEncoder,
     pub render_pass: RenderPassEncoder,
+    pub transforms: &'a Transforms,
 }

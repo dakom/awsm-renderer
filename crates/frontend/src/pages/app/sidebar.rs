@@ -22,7 +22,8 @@ impl AppSidebar {
 
         let ordered_keys = [
             "Todo",
-            "Minimal",
+            "Simple",
+            // "Animation",
             // "Standard",
             // "Extension Tests",
             // "Standard",
