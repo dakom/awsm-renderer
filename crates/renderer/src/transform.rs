@@ -1,14 +1,18 @@
-use std::collections::HashSet;
-use awsm_renderer_core::{bind_groups::{BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindGroupLayoutResource, BindGroupResource, BufferBindingLayout, BufferBindingType}, buffer::{BufferBinding, BufferDescriptor, BufferUsage}, error::AwsmCoreError, renderer::AwsmRendererWebGpu};
+use awsm_renderer_core::{
+    bind_groups::{
+        BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
+        BindGroupLayoutResource, BindGroupResource, BufferBindingLayout, BufferBindingType,
+    },
+    buffer::{BufferBinding, BufferDescriptor, BufferUsage},
+    error::AwsmCoreError,
+    renderer::AwsmRendererWebGpu,
+};
 use glam::Mat4;
+use slotmap::{new_key_type, SecondaryMap, SlotMap};
+use std::collections::HashSet;
 use thiserror::Error;
 
-use slotmap::{new_key_type, SecondaryMap, SlotMap};
-
-use crate::gltf::buffers::debug_slice_to_f32;
-
 pub struct Transforms {
-    gpu: AwsmRendererWebGpu,
     locals: SlotMap<TransformKey, Transform>,
     world_matrices: SecondaryMap<TransformKey, glam::Mat4>,
     children: SecondaryMap<TransformKey, Vec<TransformKey>>,
@@ -19,14 +23,13 @@ pub struct Transforms {
     buffer: TransformsBuffer,
 }
 
-
 new_key_type! {
     pub struct TransformKey;
 }
 
 impl Transforms {
-    pub fn new(gpu: AwsmRendererWebGpu) -> Result<Self> {
-        let buffer = TransformsBuffer::new(&gpu)?;
+    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
+        let buffer = TransformsBuffer::new(gpu)?;
         let mut locals = SlotMap::with_key();
         let mut world_matrices = SecondaryMap::new();
         let mut children = SecondaryMap::new();
@@ -36,7 +39,6 @@ impl Transforms {
         children.insert(root_node, Vec::new());
 
         Ok(Self {
-            gpu,
             locals,
             world_matrices,
             children,
@@ -44,7 +46,7 @@ impl Transforms {
             dirties: HashSet::new(),
             uniforms_to_write: HashSet::new(),
             root_node,
-            buffer
+            buffer,
         })
     }
 
@@ -80,7 +82,7 @@ impl Transforms {
     }
 
     // This is the only way to modify the matrices (since it must manage the dirty flags)
-    // world transforms are updated by calling update() 
+    // world transforms are updated by calling update()
     pub fn set_local(&mut self, key: TransformKey, transform: Transform) -> Result<()> {
         if key == self.root_node {
             return Err(AwsmTransformError::CannotModifyRootNode);
@@ -139,10 +141,10 @@ impl Transforms {
         Ok(())
     }
 
-    pub fn write_world(&mut self) -> Result<()> {
+    pub fn write_buffers(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
         for key in self.uniforms_to_write.drain() {
             let transform = self.world_matrices[key];
-            self.buffer.write(key, transform, &self.gpu)?;
+            self.buffer.write(key, transform, gpu)?;
         }
 
         Ok(())
@@ -157,7 +159,11 @@ impl Transforms {
     }
 
     pub fn buffer_offset(&self, key: TransformKey) -> Result<usize> {
-        let slot = self.buffer.slot_indices.get(key).ok_or(AwsmTransformError::TransformBufferSlotMissing(key))?;
+        let slot = self
+            .buffer
+            .slot_indices
+            .get(key)
+            .ok_or(AwsmTransformError::TransformBufferSlotMissing(key))?;
         Ok(slot * TransformsBuffer::SLOT_SIZE_ALIGNED)
     }
 
@@ -206,7 +212,6 @@ impl Transforms {
     }
 }
 
-
 /// TransformsBuffer manages a dynamic uniform buffer.
 ///
 /// Each transform is 64 bytes (a glam::Mat4). Internally, we manage free slots for re‑use,
@@ -237,44 +242,53 @@ impl TransformsBuffer {
     const RESIZE_MAX_CAPACITY: usize = 16;
     const TRANSFORM_BYTE_SIZE: usize = 64; // 4x4 matrix of f32 is 64 bytes
     const SLOT_SIZE_ALIGNED: usize = 256; // 4x4 matrix of f32 is just 64 bytes but we need to align to 256
-    const INITIAL_SIZE_BYTES:usize = Self::INITIAL_CAPACITY * Self::SLOT_SIZE_ALIGNED;
+    const INITIAL_SIZE_BYTES: usize = Self::INITIAL_CAPACITY * Self::SLOT_SIZE_ALIGNED;
 
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-
         // Allocate CPU data – initially filled with zeros.
         let raw_data = vec![0u8; Self::INITIAL_SIZE_BYTES];
 
         // Create the GPU buffer.
-        let gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
-            Some("Transforms"),
-            Self::INITIAL_SIZE_BYTES,
-            BufferUsage::new()
-                .with_copy_dst()
-                .with_uniform()
-        ).into())?;
+        let gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Transforms"),
+                Self::INITIAL_SIZE_BYTES,
+                BufferUsage::new().with_copy_dst().with_uniform(),
+            )
+            .into(),
+        )?;
 
         // Create the bind group layout (one binding, marked as dynamic).
-        let bind_group_layout = gpu.create_bind_group_layout(&BindGroupLayoutDescriptor::new(Some("Transforms"))
-            .with_entries(vec![
-                BindGroupLayoutEntry::new(0, BindGroupLayoutResource::Buffer(
-                    BufferBindingLayout::new()
-                        .with_binding_type(BufferBindingType::Uniform)
-                        .with_dynamic_offset(true)
-                        .with_min_binding_size(Self::SLOT_SIZE_ALIGNED)
-                ))
-                .with_visibility_vertex()
-            ])
-        .into())?;
+        let bind_group_layout = gpu.create_bind_group_layout(
+            &BindGroupLayoutDescriptor::new(Some("Transforms"))
+                .with_entries(vec![BindGroupLayoutEntry::new(
+                    0,
+                    BindGroupLayoutResource::Buffer(
+                        BufferBindingLayout::new()
+                            .with_binding_type(BufferBindingType::Uniform)
+                            .with_dynamic_offset(true)
+                            .with_min_binding_size(Self::SLOT_SIZE_ALIGNED),
+                    ),
+                )
+                .with_visibility_vertex()])
+                .into(),
+        )?;
 
-        let bind_group = gpu.create_bind_group(&BindGroupDescriptor::new(
-            &bind_group_layout,
-            Some("Transforms"),
-            vec![BindGroupEntry::new(0, BindGroupResource::Buffer(
-                BufferBinding::new(&gpu_buffer)
-                    .with_offset(0)
-                    .with_size(Self::SLOT_SIZE_ALIGNED)
-            ))]
-        ).into());
+        let bind_group = gpu.create_bind_group(
+            &BindGroupDescriptor::new(
+                &bind_group_layout,
+                Some("Transforms"),
+                vec![BindGroupEntry::new(
+                    0,
+                    BindGroupResource::Buffer(
+                        BufferBinding::new(&gpu_buffer)
+                            .with_offset(0)
+                            .with_size(Self::SLOT_SIZE_ALIGNED),
+                    ),
+                )],
+            )
+            .into(),
+        );
 
         Ok(Self {
             raw_data,
@@ -292,7 +306,12 @@ impl TransformsBuffer {
     /// * write into the transform's slot if it already has one
     /// * use a free slot if available
     /// * grow the buffer if needed
-    pub fn write(&mut self, key: TransformKey, transform: Mat4, gpu: &AwsmRendererWebGpu) -> Result<()> {
+    pub fn write(
+        &mut self,
+        key: TransformKey,
+        transform: Mat4,
+        gpu: &AwsmRendererWebGpu,
+    ) -> Result<()> {
         // If we don't have a slot, set one
         if !self.slot_indices.contains_key(key) {
             // Choose a slot: either reuse a free slot or use the next available slot.
@@ -314,7 +333,6 @@ impl TransformsBuffer {
 
         self.inner_write_to_slot(key, transform, gpu)?;
 
-
         Ok(())
     }
 
@@ -332,36 +350,44 @@ impl TransformsBuffer {
     /// This method grows the raw_data and creates a new GPU buffer (and updates the bind group).
     fn resize(&mut self, required_slots: usize, gpu: &AwsmRendererWebGpu) -> Result<()> {
         // We grow by doubling the capacity (or ensuring it meets required_slots).
-        let new_capacity = (self.capacity_slots.max(required_slots) * 2).max(Self::RESIZE_MAX_CAPACITY);
+        let new_capacity =
+            (self.capacity_slots.max(required_slots) * 2).max(Self::RESIZE_MAX_CAPACITY);
         let new_size_bytes = new_capacity * Self::SLOT_SIZE_ALIGNED;
 
         // Resize the CPU-side data; new bytes are filled with zero.
         self.raw_data.resize(new_size_bytes, 0);
 
         // Create a new GPU buffer with the new size.
-        let gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
-            Some("Transforms"),
-            new_size_bytes,
-            BufferUsage::new()
-                .with_copy_dst()
-                .with_uniform()
-        ).into())?;
+        let gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Transforms"),
+                new_size_bytes,
+                BufferUsage::new().with_copy_dst().with_uniform(),
+            )
+            .into(),
+        )?;
 
         // Write the entire raw_data into the new GPU buffer.
         gpu.write_buffer(&gpu_buffer, None, self.raw_data.as_slice(), None, None)?;
 
         // Replace the bind group to point at the new buffer
-        self.bind_group = gpu.create_bind_group(&BindGroupDescriptor::new(
-            &self.bind_group_layout,
-            Some("Transforms"),
-            vec![BindGroupEntry::new(0, BindGroupResource::Buffer(
-                BufferBinding::new(&gpu_buffer)
-                    .with_offset(0)
-                    .with_size(Self::SLOT_SIZE_ALIGNED)
-            ))]
-        ).into());
+        self.bind_group = gpu.create_bind_group(
+            &BindGroupDescriptor::new(
+                &self.bind_group_layout,
+                Some("Transforms"),
+                vec![BindGroupEntry::new(
+                    0,
+                    BindGroupResource::Buffer(
+                        BufferBinding::new(&gpu_buffer)
+                            .with_offset(0)
+                            .with_size(Self::SLOT_SIZE_ALIGNED),
+                    ),
+                )],
+            )
+            .into(),
+        );
 
-        // Replace the old GPU buffer with the new one. 
+        // Replace the old GPU buffer with the new one.
         self.gpu_buffer = gpu_buffer;
 
         // Update our capacity.
@@ -371,18 +397,28 @@ impl TransformsBuffer {
     }
 
     /// Updates an existing transform with the given key.
-    fn inner_write_to_slot(&mut self, key: TransformKey, transform: Mat4, gpu: &AwsmRendererWebGpu) -> Result<()> {
-        let slot = self.slot_indices.get(key).ok_or(AwsmTransformError::TransformBufferSlotMissing(key))?;
+    fn inner_write_to_slot(
+        &mut self,
+        key: TransformKey,
+        transform: Mat4,
+        gpu: &AwsmRendererWebGpu,
+    ) -> Result<()> {
+        let slot = self
+            .slot_indices
+            .get(key)
+            .ok_or(AwsmTransformError::TransformBufferSlotMissing(key))?;
         // Calculate byte offset.
         let offset_bytes = slot * Self::SLOT_SIZE_ALIGNED;
 
         // get the transform as a slice of bytes
         let values = transform.to_cols_array();
-        let values_u8 =
-            unsafe { std::slice::from_raw_parts(values.as_ptr() as *const u8, Self::TRANSFORM_BYTE_SIZE) };
+        let values_u8 = unsafe {
+            std::slice::from_raw_parts(values.as_ptr() as *const u8, Self::TRANSFORM_BYTE_SIZE)
+        };
 
         // Write transform data into raw_data.
-        self.raw_data[offset_bytes..offset_bytes + Self::TRANSFORM_BYTE_SIZE].copy_from_slice(&values_u8);
+        self.raw_data[offset_bytes..offset_bytes + Self::TRANSFORM_BYTE_SIZE]
+            .copy_from_slice(values_u8);
 
         // Update the corresponding part of the GPU buffer.
         gpu.write_buffer(
@@ -390,16 +426,14 @@ impl TransformsBuffer {
             Some(offset_bytes),
             &self.raw_data[offset_bytes..offset_bytes + Self::SLOT_SIZE_ALIGNED],
             None,
-            Some(Self::SLOT_SIZE_ALIGNED)
+            Some(Self::SLOT_SIZE_ALIGNED),
         )?;
 
         Ok(())
     }
-
 }
 
-impl TransformsBuffer {
-}
+impl TransformsBuffer {}
 
 pub struct Transform {
     pub translation: glam::Vec3,

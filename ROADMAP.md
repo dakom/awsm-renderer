@@ -5,9 +5,6 @@ starting with minimal and feature-tests
 
 ## Gltf models
 
-#### Simple meshes
-* Set camera extents based on model extents *after* transform is applied
-
 ## Camera
 
 * Arc ball controls

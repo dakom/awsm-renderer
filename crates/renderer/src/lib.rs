@@ -13,7 +13,6 @@ pub mod transform;
 pub mod core {
     pub use awsm_renderer_core::*;
 }
-
 pub struct AwsmRenderer {
     pub gpu: core::renderer::AwsmRendererWebGpu,
 
@@ -58,7 +57,7 @@ impl AwsmRendererBuilder {
         let gpu = self.gpu.build()?;
         let camera = camera::CameraBuffer::new(&gpu)?;
         let meshes = Meshes::new();
-        let transforms = Transforms::new(gpu.clone())?;
+        let transforms = Transforms::new(&gpu)?;
 
         Ok(AwsmRenderer {
             gpu,
@@ -74,7 +73,7 @@ impl AwsmRendererBuilder {
         let gpu = self.gpu.build()?;
         let camera_buffer = camera::CameraBuffer::new(&gpu)?;
         let meshes = Meshes::new();
-        let transforms = Transforms::new(gpu.clone())?;
+        let transforms = Transforms::new(&gpu)?;
 
         Ok(AwsmRenderer {
             gpu,

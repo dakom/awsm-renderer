@@ -1,6 +1,6 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 use slotmap::{new_key_type, DenseSlotMap};
 use thiserror::Error;
 
@@ -10,6 +10,12 @@ use crate::transform::{AwsmTransformError, TransformKey};
 
 pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
+}
+
+impl Default for Meshes {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Meshes {
@@ -63,6 +69,11 @@ impl PositionExtents {
     pub fn extend(&mut self, other: &Self) {
         self.min = self.min.min(other.min);
         self.max = self.max.max(other.max);
+    }
+
+    pub fn apply_matrix(&mut self, mat: &Mat4) {
+        self.min = mat.transform_point3(self.min);
+        self.max = mat.transform_point3(self.max);
     }
 }
 
@@ -123,8 +134,8 @@ impl Mesh {
         ctx.render_pass.set_pipeline(&self.pipeline);
 
         ctx.render_pass.set_bind_group(
-            BindGroup::Transform as u32, 
-            ctx.transforms.bind_group(), 
+            BindGroup::Transform as u32,
+            ctx.transforms.bind_group(),
             Some(&[ctx.transforms.buffer_offset(self.transform_key)? as u32]),
         )?;
 

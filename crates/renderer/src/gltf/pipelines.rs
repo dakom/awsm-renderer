@@ -20,8 +20,7 @@ pub struct RenderPipelineKey {
 
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
-pub struct PipelineLayoutKey {
-}
+pub struct PipelineLayoutKey {}
 
 impl PipelineLayoutKey {
     pub fn into_descriptor(self, renderer: &AwsmRenderer) -> PipelineLayoutDescriptor {
@@ -29,8 +28,8 @@ impl PipelineLayoutKey {
             None,
             vec![
                 renderer.camera.bind_group_layout.clone(),
-                renderer.transforms.bind_group_layout().clone()
-            ]
+                renderer.transforms.bind_group_layout().clone(),
+            ],
         )
     }
 }

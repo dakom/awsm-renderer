@@ -116,6 +116,15 @@ impl CameraBuffer {
 
         Ok(())
     }
+
+    pub fn write_buffers(&self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+        gpu.write_buffer(&self.gpu_buffer, None, self.raw_data.as_slice(), None, None)
+            .map_err(AwsmCameraError::WriteBuffer)?;
+
+        // TODO - transforms, etc.
+
+        Ok(())
+    }
 }
 
 type Result<T> = std::result::Result<T, AwsmCameraError>;

@@ -3,7 +3,6 @@ use awsm_renderer_core::command::render_pass::{
 };
 use awsm_renderer_core::command::{LoadOp, StoreOp};
 
-use crate::camera::AwsmCameraError;
 use crate::core::command::CommandEncoder;
 use crate::error::Result;
 use crate::shaders::BindGroup;
@@ -11,8 +10,9 @@ use crate::transform::Transforms;
 use crate::AwsmRenderer;
 
 impl AwsmRenderer {
-    pub fn render(&self) -> Result<()> {
-        self.write_global_uniforms()?;
+    pub fn render(&mut self) -> Result<()> {
+        self.transforms.write_buffers(&self.gpu)?;
+        self.camera.write_buffers(&self.gpu)?;
 
         let current_texture_view = self.gpu.current_context_texture_view()?;
         let command_encoder = self.gpu.create_command_encoder(Some("Render pass"));
@@ -49,27 +49,9 @@ impl AwsmRenderer {
 
         Ok(())
     }
-
-    fn write_global_uniforms(&self) -> Result<()> {
-        // theoretically we could skip this call if camera has not changed
-        // but it's so minimal and only once per frame, so we just do it
-        self.gpu
-            .write_buffer(
-                &self.camera.gpu_buffer,
-                None,
-                self.camera.raw_data.as_slice(),
-                None,
-                None,
-            )
-            .map_err(AwsmCameraError::WriteBuffer)?;
-
-        // TODO - transforms, etc.
-
-        Ok(())
-    }
 }
 
-pub struct RenderContext <'a> {
+pub struct RenderContext<'a> {
     pub current_texture_view: &'a web_sys::GpuTextureView,
     pub command_encoder: CommandEncoder,
     pub render_pass: RenderPassEncoder,

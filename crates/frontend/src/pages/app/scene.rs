@@ -110,8 +110,6 @@ impl AppScene {
     pub async fn render(self: &Arc<Self>) -> Result<()> {
         let mut renderer = self.renderer.lock().await;
 
-        renderer.transforms.update_world()?;
-        renderer.transforms.write_world()?;
         renderer.render()?;
 
         Ok(())
@@ -119,15 +117,20 @@ impl AppScene {
 
     pub async fn setup(self: &Arc<Self>) -> Result<()> {
         let mut renderer = self.renderer.lock().await;
+
+        renderer.transforms.update_world()?;
         let mut extents: Option<PositionExtents> = None;
 
         for mesh in renderer.meshes.iter() {
-            if let Some(mesh_extents) = &mesh.position_extents {
+            if let Some(mut mesh_extents) = mesh.position_extents.clone() {
+                if let Ok(world_tranform) = renderer.transforms.get_world(mesh.transform_key) {
+                    mesh_extents.apply_matrix(&*world_tranform);
+                }
                 if let Some(mut current_extents) = extents {
-                    current_extents.extend(mesh_extents);
+                    current_extents.extend(&mesh_extents);
                     extents = Some(current_extents);
                 } else {
-                    extents = Some(mesh_extents.clone());
+                    extents = Some(mesh_extents);
                 }
             }
         }

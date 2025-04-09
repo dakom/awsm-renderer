@@ -12,7 +12,10 @@ use awsm_renderer_core::{
 };
 use glam::Vec3;
 
-use super::{data::GltfData, layout::primitive_vertex_buffer_layout, pipelines::PipelineLayoutKey, transform::transform_gltf_node};
+use super::{
+    data::GltfData, layout::primitive_vertex_buffer_layout, pipelines::PipelineLayoutKey,
+    transform::transform_gltf_node,
+};
 
 impl AwsmRenderer {
     pub async fn populate_gltf(
@@ -54,8 +57,7 @@ impl AwsmRenderer {
         parent_transform_key: Option<TransformKey>,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>> {
         Box::pin(async move {
-
-            // We use one transform per-node, even though we are creating distinct meshes per gltf-primitive 
+            // We use one transform per-node, even though we are creating distinct meshes per gltf-primitive
             // conceptually, this means meshes (in the renderer) are more like components than individual nodes
             //
             // the reason is two-fold:
@@ -66,8 +68,14 @@ impl AwsmRenderer {
 
             if let Some(gltf_mesh) = gltf_node.mesh() {
                 for gltf_primitive in gltf_mesh.primitives() {
-                    self.populate_gltf_primitive(ctx, gltf_node, &gltf_mesh, gltf_primitive, transform_key)
-                        .await?;
+                    self.populate_gltf_primitive(
+                        ctx,
+                        gltf_node,
+                        &gltf_mesh,
+                        gltf_primitive,
+                        transform_key,
+                    )
+                    .await?;
                 }
             }
 
