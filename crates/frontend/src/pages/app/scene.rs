@@ -108,10 +108,11 @@ impl AppScene {
     }
 
     pub async fn render(self: &Arc<Self>) -> Result<()> {
-        let mut lock = self.renderer.lock().await;
+        let mut renderer = self.renderer.lock().await;
 
-        lock.transforms.update()?;
-        lock.render()?;
+        renderer.transforms.update_world()?;
+        renderer.transforms.write_world()?;
+        renderer.render()?;
 
         Ok(())
     }
@@ -120,7 +121,7 @@ impl AppScene {
         let mut renderer = self.renderer.lock().await;
         let mut extents: Option<PositionExtents> = None;
 
-        for (_, mesh) in renderer.meshes.iter() {
+        for mesh in renderer.meshes.iter() {
             if let Some(mesh_extents) = &mesh.position_extents {
                 if let Some(mut current_extents) = extents {
                     current_extents.extend(mesh_extents);

@@ -1,7 +1,7 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::camera::AwsmCameraError;
+use crate::{camera::AwsmCameraError, mesh::AwsmMeshError, transform::AwsmTransformError};
 
 #[derive(Error, Debug)]
 pub enum AwsmError {
@@ -10,6 +10,12 @@ pub enum AwsmError {
 
     #[error("{0}")]
     Camera(#[from] AwsmCameraError),
+
+    #[error("{0}")]
+    Mesh(#[from] AwsmMeshError),
+
+    #[error("{0}")]
+    Transform(#[from] AwsmTransformError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;

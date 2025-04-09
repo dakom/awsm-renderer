@@ -1,5 +1,5 @@
 use camera::CameraBuffer;
-use slotmap::SlotMap;
+use mesh::Meshes;
 use transform::Transforms;
 
 pub mod camera;
@@ -20,7 +20,7 @@ pub struct AwsmRenderer {
     #[cfg(feature = "gltf")]
     pub gltf: gltf::cache::GltfCache,
 
-    pub meshes: SlotMap<mesh::MeshKey, mesh::Mesh>,
+    pub meshes: Meshes,
 
     pub camera: CameraBuffer,
 
@@ -57,13 +57,15 @@ impl AwsmRendererBuilder {
     pub fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
         let gpu = self.gpu.build()?;
         let camera = camera::CameraBuffer::new(&gpu)?;
+        let meshes = Meshes::new();
+        let transforms = Transforms::new(gpu.clone())?;
 
         Ok(AwsmRenderer {
             gpu,
             gltf: gltf::cache::GltfCache::default(),
-            meshes: SlotMap::with_key(),
+            meshes,
             camera,
-            transforms: Transforms::default(),
+            transforms,
         })
     }
 
@@ -71,12 +73,14 @@ impl AwsmRendererBuilder {
     pub fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
         let gpu = self.gpu.build()?;
         let camera_buffer = camera::CameraBuffer::new(&gpu)?;
+        let meshes = Meshes::new();
+        let transforms = Transforms::new(gpu.clone())?;
 
         Ok(AwsmRenderer {
             gpu,
-            meshes: SlotMap::with_key(),
+            meshes,
             camera_buffer,
-            transforms: Transforms::default(),
+            transforms,
         })
     }
 }

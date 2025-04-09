@@ -90,7 +90,7 @@ impl AwsmRenderer {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
-        let pipeline_layout_key = PipelineLayoutKey::default().with_camera();
+        let pipeline_layout_key = PipelineLayoutKey::default();
 
         let shader_key = ShaderKey::new(&gltf_primitive);
 

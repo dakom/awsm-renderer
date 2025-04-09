@@ -6,12 +6,7 @@ starting with minimal and feature-tests
 ## Gltf models
 
 #### Simple meshes
-* node transforms
-
-## Scene graph
-
-* hierarchy with slotmap stuff
-* transforms everywhere
+* Set camera extents based on model extents *after* transform is applied
 
 ## Camera
 

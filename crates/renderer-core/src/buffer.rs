@@ -4,12 +4,12 @@ pub struct BufferDescriptor<'a> {
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBufferDescriptor.html
     pub label: Option<&'a str>,
     pub mapped_at_creation: Option<bool>,
-    pub size: u64,
+    pub size: usize,
     pub usage: BufferUsage,
 }
 
 impl<'a> BufferDescriptor<'a> {
-    pub fn new(label: Option<&'a str>, size: u64, usage: BufferUsage) -> Self {
+    pub fn new(label: Option<&'a str>, size: usize, usage: BufferUsage) -> Self {
         Self {
             label,
             size,
@@ -27,8 +27,8 @@ impl<'a> BufferDescriptor<'a> {
 #[derive(Debug, Clone)]
 pub struct BufferBinding<'a> {
     pub buffer: &'a web_sys::GpuBuffer,
-    pub offset: Option<f64>,
-    pub size: Option<f64>,
+    pub offset: Option<usize>,
+    pub size: Option<usize>,
 }
 
 impl<'a> BufferBinding<'a> {
@@ -38,6 +38,16 @@ impl<'a> BufferBinding<'a> {
             offset: None,
             size: None,
         }
+    }
+
+    pub fn with_offset(mut self, offset: usize) -> Self {
+        self.offset = Some(offset);
+        self
+    }
+
+    pub fn with_size(mut self, size: usize) -> Self {
+        self.size = Some(size);
+        self
     }
 }
 
@@ -136,11 +146,11 @@ impl From<BufferBinding<'_>> for web_sys::GpuBufferBinding {
         let binding_js = web_sys::GpuBufferBinding::new(binding.buffer);
 
         if let Some(offset) = binding.offset {
-            binding_js.set_offset(offset);
+            binding_js.set_offset(offset as f64);
         }
 
         if let Some(size) = binding.size {
-            binding_js.set_size(size);
+            binding_js.set_size(size as f64);
         }
 
         binding_js

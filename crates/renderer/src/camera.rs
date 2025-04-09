@@ -33,7 +33,7 @@ impl CameraBuffer {
             .create_buffer(
                 &BufferDescriptor::new(
                     Some("Camera"),
-                    BUFFER_SIZE as u64,
+                    BUFFER_SIZE,
                     BufferUsage::new().with_uniform().with_copy_dst(),
                 )
                 .into(),
