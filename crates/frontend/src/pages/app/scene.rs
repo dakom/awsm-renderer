@@ -123,8 +123,8 @@ impl AppScene {
 
         for mesh in renderer.meshes.iter() {
             if let Some(mut mesh_extents) = mesh.position_extents.clone() {
-                if let Ok(world_tranform) = renderer.transforms.get_world(mesh.transform_key) {
-                    mesh_extents.apply_matrix(&*world_tranform);
+                if let Ok(world_transform) = renderer.transforms.get_world(mesh.transform_key) {
+                    mesh_extents.apply_matrix(&*world_transform);
                 }
                 if let Some(mut current_extents) = extents {
                     current_extents.extend(&mesh_extents);
