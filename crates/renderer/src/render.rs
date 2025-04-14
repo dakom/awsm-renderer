@@ -11,8 +11,8 @@ use crate::AwsmRenderer;
 
 impl AwsmRenderer {
     pub fn render(&mut self) -> Result<()> {
-        self.transforms.write_buffers(&self.gpu)?;
-        self.camera.write_buffers(&self.gpu)?;
+        self.transforms.write_buffer(&self.gpu)?;
+        self.camera.write_buffer(&self.gpu)?;
 
         let current_texture_view = self.gpu.current_context_texture_view()?;
         let command_encoder = self.gpu.create_command_encoder(Some("Render pass"));
