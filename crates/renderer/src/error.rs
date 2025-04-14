@@ -16,6 +16,10 @@ pub enum AwsmError {
 
     #[error("{0}")]
     Transform(#[from] AwsmTransformError),
+
+    #[cfg(feature = "animation")]
+    #[error("{0}")]
+    Animation(#[from] crate::animation::AwsmAnimationError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;

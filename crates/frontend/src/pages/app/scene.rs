@@ -22,6 +22,7 @@ pub struct AppScene {
     pub gltf_loader: Mutex<HashMap<GltfId, GltfLoader>>,
     pub camera: Mutex<Camera>,
     pub resize_observer: Mutex<Option<ResizeObserver>>,
+    pub request_animation_frame: Mutex<Option<gloo_render::AnimationFrame>>,
 }
 
 impl AppScene {
@@ -31,6 +32,7 @@ impl AppScene {
             gltf_loader: Mutex::new(HashMap::new()),
             camera: Mutex::new(Camera::default()),
             resize_observer: Mutex::new(None),
+            request_animation_frame: Mutex::new(None),
         });
 
         let resize_observer = ResizeObserver::new(
@@ -58,6 +60,20 @@ impl AppScene {
         resize_observer.observe(&canvas);
 
         *state.resize_observer.lock().unwrap() = Some(resize_observer);
+
+        let request_animation_frame = gloo_render::request_animation_frame(clone!(state => move |timestamp| {
+            spawn_local(clone!(state => async move {
+                if let Err(err) = state.update_animation(timestamp).await {
+                    tracing::error!("Failed to animate: {:?}", err);
+                }
+
+                if let Err(err) = state.render().await {
+                    tracing::error!("Failed to render after animation: {:?}", err);
+                }
+            }));
+        }));
+
+        *state.request_animation_frame.lock().unwrap() = Some(request_animation_frame);
 
         state
     }
@@ -118,7 +134,10 @@ impl AppScene {
     pub async fn setup(self: &Arc<Self>) -> Result<()> {
         let mut renderer = self.renderer.lock().await;
 
+        // call these first so we can get the extents
+        renderer.animations.update(0.0)?;
         renderer.transforms.update_world()?;
+
         let mut extents: Option<PositionExtents> = None;
 
         for mesh in renderer.meshes.iter() {
@@ -143,6 +162,16 @@ impl AppScene {
         //camera.set_canvas(renderer.gpu.context.canvas().unchecked_ref());
 
         renderer.camera.update(&*camera)?;
+
+        Ok(())
+    }
+
+    pub async fn update_animation(self: &Arc<Self>, time: f64) -> Result<()> {
+        let state = self;
+
+        let camera = self.camera.lock().unwrap();
+
+        self.renderer.lock().await.update_all(time, &*camera)?;
 
         Ok(())
     }

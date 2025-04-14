@@ -136,7 +136,7 @@ impl Transforms {
     }
 
     // This *does* write to the gpu, should be called only once per frame
-    pub fn write_buffer(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+    pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
         self.buffer.write_to_gpu(gpu)
     }
 

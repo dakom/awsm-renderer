@@ -289,6 +289,7 @@ dependencies = [
  "glam",
  "gloo-events 0.2.0",
  "gloo-net",
+ "gloo-render",
  "gloo-timers",
  "js-sys",
  "serde",
@@ -479,6 +480,16 @@ dependencies = [
  "thiserror 1.0.69",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "gloo-render"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56008b6744713a8e8d98ac3dcb7d06543d5662358c9c805b4ce2167ad4649833"
+dependencies = [
+ "wasm-bindgen",
  "web-sys",
 ]
 

@@ -117,7 +117,8 @@ impl CameraBuffer {
         Ok(())
     }
 
-    pub fn write_buffer(&self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+    // writes to the GPU
+    pub fn write_gpu(&self, gpu: &AwsmRendererWebGpu) -> Result<()> {
         gpu.write_buffer(&self.gpu_buffer, None, self.raw_data.as_slice(), None, None)
             .map_err(AwsmCameraError::WriteBuffer)?;
 
