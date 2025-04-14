@@ -6,6 +6,7 @@ pub use error::AwsmTransformError;
 use glam::{Mat4, Quat, Vec3};
 pub use transforms::{TransformKey, Transforms};
 
+#[derive(Clone, Debug)]
 pub struct Transform {
     pub translation: Vec3,
     pub rotation: Quat,

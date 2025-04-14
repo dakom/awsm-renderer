@@ -62,9 +62,13 @@ impl AwsmRenderer {
             //
             // the reason is two-fold:
             // 1. that's technically how the gltf spec is defined
-            // 2. we aren't forced into a strict component system, so it's absolutely fine to share the transform - giving us a performance benefit
+            // 2. we get a performance boost since we can use the same transform for all primitives in a mesh (instead of forcing a tree of some kind)
             let transform = transform_gltf_node(gltf_node);
             let transform_key = self.transforms.insert(transform, parent_transform_key);
+
+            for gltf_animation in ctx.data.doc.animations() {
+                tracing::warn!("TODO - if animation applies to transform, create and set it");
+            }
 
             if let Some(gltf_mesh) = gltf_node.mesh() {
                 for gltf_primitive in gltf_mesh.primitives() {
@@ -204,6 +208,11 @@ impl AwsmRenderer {
         }
 
         let _mesh_key = self.meshes.insert(mesh);
+
+
+        for gltf_animation in ctx.data.doc.animations() {
+            tracing::warn!("TODO - if animation applies to mesh, create and set it");
+        }
 
         Ok(())
     }

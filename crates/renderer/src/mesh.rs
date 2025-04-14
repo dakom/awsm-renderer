@@ -36,6 +36,12 @@ impl Meshes {
     pub fn clear(&mut self) {
         self.list.clear();
     }
+
+    pub fn get_mut(&mut self, mesh_key: MeshKey) -> Result<&mut Mesh> {
+        self.list
+            .get_mut(mesh_key)
+            .ok_or(AwsmMeshError::MeshNotFound(mesh_key))
+    }
 }
 
 new_key_type! {
@@ -53,6 +59,7 @@ pub struct Mesh {
     pub topology: PrimitiveTopology,
     pub position_extents: Option<PositionExtents>,
     pub transform_key: TransformKey,
+    pub morph_weights: Vec<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -107,6 +114,7 @@ impl Mesh {
             topology: PrimitiveTopology::TriangleList,
             position_extents: None,
             transform_key,
+            morph_weights: Vec::new(),
         }
     }
 

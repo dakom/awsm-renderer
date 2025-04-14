@@ -9,3 +9,4 @@ pub mod pipelines;
 pub mod populate;
 pub mod shaders;
 pub mod transform;
+pub mod animation;

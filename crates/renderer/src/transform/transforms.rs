@@ -3,6 +3,8 @@ use std::collections::HashSet;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
+use crate::AwsmRenderer;
+
 use super::{
     buffer::TransformsBuffer,
     error::{AwsmTransformError, Result},
@@ -11,6 +13,12 @@ use super::{
 
 new_key_type! {
     pub struct TransformKey;
+}
+
+impl AwsmRenderer {
+    pub fn update_transforms(&mut self) -> Result<()> {
+        self.transforms.update_world()
+    }
 }
 
 pub struct Transforms {
@@ -127,7 +135,7 @@ impl Transforms {
 
     // This is the only way to update the world matrices
     // it does *not* write to the GPU, so it can be called relatively frequently for physics etc.
-    pub fn update_world(&mut self) -> Result<()> {
+    pub(crate) fn update_world(&mut self) -> Result<()> {
         self.update_inner(self.root_node, false);
 
         self.dirties.clear();

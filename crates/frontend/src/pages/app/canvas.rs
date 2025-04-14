@@ -123,6 +123,9 @@ impl AppCanvas {
                         }
 
                         state.display_text.set(format!("Now showing: {}", gltf_id));
+
+
+                        scene.start_animation_loop();
                     }
                 })
             })))

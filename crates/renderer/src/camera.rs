@@ -9,6 +9,13 @@ use glam::{Mat4, Vec3};
 use thiserror::Error;
 
 use crate::shaders::BindGroupBinding;
+use crate::AwsmRenderer;
+
+impl AwsmRenderer {
+    pub fn update_camera(&mut self, camera: &impl CameraExt) -> Result<()> {
+        self.camera.update(camera)
+    }
+}
 
 pub struct CameraBuffer {
     pub(crate) gpu_buffer: web_sys::GpuBuffer,
@@ -78,7 +85,7 @@ impl CameraBuffer {
 
     // this is fast/cheap to call, so we can call it multiple times a frame
     // it will only update the data in the buffer once per frame, at render time
-    pub fn update(&mut self, camera: &impl CameraExt) -> Result<()> {
+    pub(crate) fn update(&mut self, camera: &impl CameraExt) -> Result<()> {
         let view = camera.view_matrix(); // 16 floats
         let proj = camera.projection_matrix(); // 16 floats
 
