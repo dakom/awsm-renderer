@@ -135,6 +135,7 @@ impl Transforms {
         Ok(())
     }
 
+    // This *does* write to the gpu, should be called only once per frame
     pub fn write_buffer(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
         self.buffer.write_to_gpu(gpu)
     }
@@ -163,6 +164,8 @@ impl Transforms {
     // finally, for each dirty node, its world transform is its parent's world transform
     // multiplied by its local transform
     // or in other words, it's the local transform, offset by its parent in world space
+    //
+    // we also update the CPU-side buffer as needed so it will be ready for the GPU
     fn update_inner(&mut self, key: TransformKey, dirty_tracker: bool) -> bool {
         let dirty = self.dirties.contains(&key) | dirty_tracker;
 
