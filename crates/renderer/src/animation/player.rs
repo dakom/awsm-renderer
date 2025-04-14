@@ -9,14 +9,13 @@ pub struct AnimationPlayer<T> {
     clip: AnimationClip<T>,
     state: AnimationState,
     local_time: f64,
-
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnimationState {
     Playing,
     Paused,
-    Ended
+    Ended,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,7 +30,7 @@ pub enum AnimationPlayDirection {
     Backward,
 }
 
-impl <T> AnimationPlayer<T> {
+impl<T> AnimationPlayer<T> {
     pub fn new(clip: AnimationClip<T>) -> Self {
         Self {
             speed: 1.0,
@@ -47,9 +46,9 @@ impl <T> AnimationPlayer<T> {
         if self.state != AnimationState::Playing {
             return;
         }
-    
+
         let local_time_delta = global_time_delta * self.speed;
-    
+
         match self.play_direction {
             AnimationPlayDirection::Forward => {
                 self.local_time += local_time_delta;
@@ -69,13 +68,14 @@ impl <T> AnimationPlayer<T> {
                     }
                 }
             }
-    
+
             AnimationPlayDirection::Backward => {
                 self.local_time -= local_time_delta;
                 if self.local_time <= 0.0 {
                     match self.loop_style {
                         Some(AnimationLoopStyle::Loop) => {
-                            self.local_time = self.clip.duration - self.local_time.rem_euclid(self.clip.duration);
+                            self.local_time =
+                                self.clip.duration - self.local_time.rem_euclid(self.clip.duration);
                         }
                         Some(AnimationLoopStyle::PingPong) => {
                             self.play_direction = AnimationPlayDirection::Forward;

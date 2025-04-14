@@ -2,7 +2,12 @@ use slotmap::{new_key_type, DenseSlotMap};
 
 use crate::{mesh::MeshKey, transform::TransformKey, AwsmRenderer};
 
-use super::{data::{AnimationData, AppliedAnimation}, error::Result, player::AnimationPlayer, AwsmAnimationError};
+use super::{
+    data::{AnimationData, AppliedAnimation},
+    error::Result,
+    player::AnimationPlayer,
+    AwsmAnimationError,
+};
 
 new_key_type! {
     pub struct AnimationKey;
@@ -22,13 +27,18 @@ impl AwsmRenderer {
         }
 
         for (animation_key, transform_key) in self.animations.transforms.iter() {
-            let player = self.animations.players.get(animation_key).ok_or_else(|| AwsmAnimationError::MissingKey(animation_key))?;
+            let player = self
+                .animations
+                .players
+                .get(animation_key)
+                .ok_or(AwsmAnimationError::MissingKey(animation_key))?;
             let transform = self.transforms.get_local(*transform_key)?;
             match player.sample() {
                 AnimationData::Transform(transform_animation) => {
                     let updated_transform = transform_animation.apply(transform.clone());
-                    self.transforms.set_local(*transform_key, updated_transform)?;
-                },
+                    self.transforms
+                        .set_local(*transform_key, updated_transform)?;
+                }
                 _ => {
                     return Err(AwsmAnimationError::WrongKind("weird, animation player has a transform key but the animation data is not a transform".to_string()));
                 }
@@ -36,14 +46,18 @@ impl AwsmRenderer {
         }
 
         for (animation_key, mesh_key) in self.animations.meshes.iter() {
-            let player = self.animations.players.get(animation_key).ok_or_else(|| AwsmAnimationError::MissingKey(animation_key))?;
+            let player = self
+                .animations
+                .players
+                .get(animation_key)
+                .ok_or(AwsmAnimationError::MissingKey(animation_key))?;
             let mesh = self.meshes.get_mut(*mesh_key)?;
 
             match player.sample() {
                 AnimationData::Vertex(vertex_animation) => {
                     vertex_animation.apply(mesh.morph_weights.clone());
                     vertex_animation.apply_mut(&mut mesh.morph_weights);
-                },
+                }
                 _ => {
                     return Err(AwsmAnimationError::WrongKind("weird, animation player has a mesh key but the animation data is not for a mesh".to_string()));
                 }

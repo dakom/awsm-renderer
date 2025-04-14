@@ -3,14 +3,14 @@ use std::cmp::Ordering;
 use super::data::Animatable;
 
 #[derive(Debug, Clone)]
-pub struct AnimationClip <T> {
+pub struct AnimationClip<T> {
     pub name: Option<String>,
     pub duration: f64,
-    pub sampler: AnimationSampler<T>, 
+    pub sampler: AnimationSampler<T>,
 }
 
 #[derive(Debug, Clone)]
-pub enum AnimationSampler <T> {
+pub enum AnimationSampler<T> {
     Linear {
         times: Vec<f64>,
         values: Vec<T>,
@@ -27,32 +27,31 @@ pub enum AnimationSampler <T> {
     },
 }
 
-impl <T> AnimationClip<T> {
+impl<T> AnimationClip<T> {
     pub fn new(name: Option<String>, duration: f64, sampler: AnimationSampler<T>) -> Self {
         Self {
             name,
             duration,
-            sampler
+            sampler,
         }
     }
 }
 
-impl <T: Animatable> AnimationSampler<T> {
+impl<T: Animatable> AnimationSampler<T> {
     pub fn new_linear(times: Vec<f64>, values: Vec<T>) -> Self {
-        Self::Linear {
-            times,
-            values,
-        }
+        Self::Linear { times, values }
     }
 
     pub fn new_step(times: Vec<f64>, values: Vec<T>) -> Self {
-        Self::Step {
-            times,
-            values,
-        }
+        Self::Step { times, values }
     }
 
-    pub fn new_cubic_spline(times: Vec<f64>, values: Vec<T>, in_tangents: Vec<T>, out_tangents: Vec<T>) -> Self {
+    pub fn new_cubic_spline(
+        times: Vec<f64>,
+        values: Vec<T>,
+        in_tangents: Vec<T>,
+        out_tangents: Vec<T>,
+    ) -> Self {
         Self::CubicSpline {
             times,
             values,
@@ -73,12 +72,10 @@ impl <T: Animatable> AnimationSampler<T> {
         let bounds = self.binary_search_bounds(time);
 
         match bounds {
-            BinaryBounds::ExactHit(index) => {
-                match self {
-                    AnimationSampler::Linear { values, .. } => values[index].clone(),
-                    AnimationSampler::Step { values, .. } => values[index].clone(),
-                    AnimationSampler::CubicSpline { values, .. } => values[index].clone(),
-                }
+            BinaryBounds::ExactHit(index) => match self {
+                AnimationSampler::Linear { values, .. } => values[index].clone(),
+                AnimationSampler::Step { values, .. } => values[index].clone(),
+                AnimationSampler::CubicSpline { values, .. } => values[index].clone(),
             },
             BinaryBounds::Between(left_index, right_index) => {
                 let times = self.times();
@@ -93,11 +90,14 @@ impl <T: Animatable> AnimationSampler<T> {
                         let interpolation_time = (time - left_time) / (right_time - left_time);
 
                         T::interpolate_linear(left_value, right_value, interpolation_time)
-                    },
-                    AnimationSampler::Step { values, .. } => {
-                        values[left_index].clone()
-                    },
-                    AnimationSampler::CubicSpline { values, in_tangents, out_tangents, .. } => {
+                    }
+                    AnimationSampler::Step { values, .. } => values[left_index].clone(),
+                    AnimationSampler::CubicSpline {
+                        values,
+                        in_tangents,
+                        out_tangents,
+                        ..
+                    } => {
                         let interpolation_time = (time - left_time) / (right_time - left_time);
                         let delta_time = right_time - left_time;
                         let left_value = &values[left_index];
@@ -105,12 +105,18 @@ impl <T: Animatable> AnimationSampler<T> {
                         let left_tangent = &out_tangents[left_index];
                         let right_tangent = &in_tangents[right_index];
 
-                        T::interpolate_cubic_spline(left_value, left_tangent, right_value, right_tangent, delta_time, interpolation_time)
+                        T::interpolate_cubic_spline(
+                            left_value,
+                            left_tangent,
+                            right_value,
+                            right_tangent,
+                            delta_time,
+                            interpolation_time,
+                        )
                     }
                 }
-            },
+            }
         }
-
     }
 
     // Returns the index of the keyframe that is closest to the given time

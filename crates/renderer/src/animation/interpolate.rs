@@ -35,7 +35,10 @@ pub fn interpolate_cubic_spline_vec3(
     let h01 = -2.0 * t3 + 3.0 * t2;
     let h11 = t3 - t2;
 
-    (h00 * first_value) + (h10 * first_tangent * delta_time) + (h01 * second_value) + (h11 * second_tangent * delta_time)
+    (h00 * first_value)
+        + (h10 * first_tangent * delta_time)
+        + (h01 * second_value)
+        + (h11 * second_tangent * delta_time)
 }
 
 pub fn interpolate_cubic_spline_quat(
@@ -77,7 +80,6 @@ pub fn interpolate_cubic_spline_quat(
     blended.normalize()
 }
 
-
 pub fn interpolate_cubic_spline_f32(
     first_value: f32,
     first_tangent: f32,
@@ -96,9 +98,11 @@ pub fn interpolate_cubic_spline_f32(
     let h01 = -2.0 * t3 + 3.0 * t2;
     let h11 = t3 - t2;
 
-    (h00 * first_value) + (h10 * first_tangent * delta_time) + (h01 * second_value) + (h11 * second_tangent * delta_time)
+    (h00 * first_value)
+        + (h10 * first_tangent * delta_time)
+        + (h01 * second_value)
+        + (h11 * second_tangent * delta_time)
 }
-
 
 pub fn interpolate_cubic_spline_f64(
     first_value: f64,
@@ -115,5 +119,8 @@ pub fn interpolate_cubic_spline_f64(
     let h01 = -2.0 * t3 + 3.0 * t2;
     let h11 = t3 - t2;
 
-    (h00 * first_value) + (h10 * first_tangent * delta_time as f64) + (h01 * second_value) + (h11 * second_tangent * delta_time as f64)
+    (h00 * first_value)
+        + (h10 * first_tangent * delta_time)
+        + (h01 * second_value)
+        + (h11 * second_tangent * delta_time)
 }

@@ -1,11 +1,11 @@
 mod animations;
 mod clip;
+mod data;
 mod error;
 mod interpolate;
 mod player;
-mod data;
 
-pub use animations::{Animations, AnimationKey};
-pub use player::{AnimationPlayer, AnimationState};
+pub use animations::{AnimationKey, Animations};
 pub use clip::AnimationClip;
 pub use error::AwsmAnimationError;
+pub use player::{AnimationPlayer, AnimationState};

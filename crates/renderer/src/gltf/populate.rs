@@ -209,7 +209,6 @@ impl AwsmRenderer {
 
         let _mesh_key = self.meshes.insert(mesh);
 
-
         for gltf_animation in ctx.data.doc.animations() {
             tracing::warn!("TODO - if animation applies to mesh, create and set it");
         }

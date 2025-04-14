@@ -24,7 +24,7 @@ pub struct AppScene {
     pub camera: Mutex<Camera>,
     pub resize_observer: Mutex<Option<ResizeObserver>>,
     pub request_animation_frame: Mutex<Option<gloo_render::AnimationFrame>>,
-    pub last_request_animation_frame: Cell<Option<f64>>
+    pub last_request_animation_frame: Cell<Option<f64>>,
 }
 
 impl AppScene {
@@ -63,7 +63,6 @@ impl AppScene {
         resize_observer.observe(&canvas);
 
         *state.resize_observer.lock().unwrap() = Some(resize_observer);
-
 
         state
     }
@@ -158,7 +157,10 @@ impl AppScene {
 
         let camera = self.camera.lock().unwrap();
 
-        self.renderer.lock().await.update_all(global_time_delta, &*camera)?;
+        self.renderer
+            .lock()
+            .await
+            .update_all(global_time_delta, &*camera)?;
 
         Ok(())
     }
@@ -167,9 +169,11 @@ impl AppScene {
         let state = self;
 
         state.stop_animation_loop();
-        *state.request_animation_frame.lock().unwrap() = Some(gloo_render::request_animation_frame(clone!(state => move |timestamp| {
-            state.fire_raf(timestamp);
-        })));
+        *state.request_animation_frame.lock().unwrap() = Some(
+            gloo_render::request_animation_frame(clone!(state => move |timestamp| {
+                state.fire_raf(timestamp);
+            })),
+        );
     }
 
     pub fn stop_animation_loop(self: &Arc<Self>) {
@@ -202,5 +206,4 @@ impl AppScene {
             }
         }));
     }
-
 }
