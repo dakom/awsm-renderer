@@ -5,9 +5,11 @@ use awsm_renderer_core::pipeline::RenderPipelineDescriptor;
 
 use crate::gltf::error::Result;
 
+use crate::mesh::MorphBufferValuesKey;
+use crate::shaders::ShaderKey;
 use crate::AwsmRenderer;
 
-use super::shaders::ShaderKey;
+use super::populate::GltfPopulateContext;
 
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
@@ -20,16 +22,40 @@ pub struct RenderPipelineKey {
 
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
-pub struct PipelineLayoutKey {}
+pub struct PipelineLayoutKey {
+    pub morph_values_key: Option<MorphBufferValuesKey>,
+}
+
+impl PipelineLayoutKey {
+    pub fn new(ctx: &GltfPopulateContext, shader_key: &ShaderKey) -> Self {
+        let mut key = Self::default();
+
+        match (ctx.morph_values_key, shader_key.morphs) {
+            (Some(morph_values_key), true) => {
+                key.morph_values_key = Some(morph_values_key);
+            }
+            (None, false) => {}
+            _ => panic!("morph key mismatch"),
+        }
+
+        key
+    }
+}
 
 impl PipelineLayoutKey {
     pub fn into_descriptor(self, renderer: &AwsmRenderer) -> PipelineLayoutDescriptor {
+        let mut bind_group_layouts = vec![
+            renderer.camera.bind_group_layout.clone(),
+            renderer.transforms.bind_group_layout().clone(),
+        ];
+
+        if let Some(morph_values_key) = self.morph_values_key {
+            bind_group_layouts.push(renderer.meshes.morphs.weights_bind_group_layout().clone());
+            bind_group_layouts.push(renderer.meshes.morphs.values_bind_group_layout(morph_values_key).clone());
+        }
         PipelineLayoutDescriptor::new(
-            None,
-            vec![
-                renderer.camera.bind_group_layout.clone(),
-                renderer.transforms.bind_group_layout().clone(),
-            ],
+            Some("Mesh (from gltf primitive)"),
+            bind_group_layouts
         )
     }
 }
@@ -77,7 +103,7 @@ impl RenderPipelineKey {
 
         let layout = PipelineLayoutKind::Custom(layout);
 
-        Ok(RenderPipelineDescriptor::new(vertex, None)
+        Ok(RenderPipelineDescriptor::new(vertex,Some("Mesh (from gltf primitive)"))
             .with_layout(layout)
             .with_fragment(fragment)
             .into())

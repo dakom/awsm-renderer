@@ -51,12 +51,12 @@ impl AwsmRenderer {
                 .players
                 .get(animation_key)
                 .ok_or(AwsmAnimationError::MissingKey(animation_key))?;
-            let mesh = self.meshes.get_mut(*mesh_key)?;
 
             match player.sample() {
                 AnimationData::Vertex(vertex_animation) => {
-                    vertex_animation.apply(mesh.morph_weights.clone());
-                    vertex_animation.apply_mut(&mut mesh.morph_weights);
+                    self.meshes.morphs.update_morph_weights_with(*mesh_key, vertex_animation.weights.len(), |target| {
+                        target.copy_from_slice(&vertex_animation.weights);
+                    });
                 }
                 _ => {
                     return Err(AwsmAnimationError::WrongKind("weird, animation player has a mesh key but the animation data is not for a mesh".to_string()));

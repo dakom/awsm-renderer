@@ -1,15 +1,17 @@
 mod error;
 mod meshes;
+mod morphs;
 
 use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
 use glam::{Mat4, Vec3};
 
-use crate::render::RenderContext;
-use crate::shaders::BindGroup;
+use crate::uniforms::bind_group::{BIND_GROUP_MORPH_TARGET_VALUES, BIND_GROUP_MORPH_TARGET_WEIGHTS};
+use crate::{render::RenderContext, uniforms::bind_group::BIND_GROUP_TRANSFORM};
 use crate::transform::TransformKey;
 
 pub use error::AwsmMeshError;
 pub use meshes::{MeshKey, Meshes};
+pub use morphs::MorphBufferValuesKey;
 
 use super::error::Result;
 
@@ -24,7 +26,6 @@ pub struct Mesh {
     pub topology: PrimitiveTopology,
     pub position_extents: Option<PositionExtents>,
     pub transform_key: TransformKey,
-    pub morph_weights: Vec<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -79,7 +80,6 @@ impl Mesh {
             topology: PrimitiveTopology::TriangleList,
             position_extents: None,
             transform_key,
-            morph_weights: Vec::new(),
         }
     }
 
@@ -103,14 +103,35 @@ impl Mesh {
         self
     }
 
-    pub fn push_commands(&self, ctx: &mut RenderContext) -> Result<()> {
+    pub fn push_commands(&self, ctx: &mut RenderContext, mesh_key: MeshKey) -> Result<()> {
         ctx.render_pass.set_pipeline(&self.pipeline);
 
         ctx.render_pass.set_bind_group(
-            BindGroup::Transform as u32,
+            BIND_GROUP_TRANSFORM,
             ctx.transforms.bind_group(),
             Some(&[ctx.transforms.buffer_offset(self.transform_key)? as u32]),
         )?;
+
+        if let Some((morph_values_key, morph_value_offset)) = ctx.meshes.morphs.try_get_morph_value_offset(mesh_key) {
+            ctx.render_pass.set_bind_group(
+                BIND_GROUP_MORPH_TARGET_WEIGHTS,
+                ctx.meshes.morphs.weights_bind_group(),
+                Some(&[
+                    ctx.meshes.morphs.weights_buffer_offset(mesh_key)? as u32
+                ]),
+            )?;
+
+            ctx.render_pass.set_bind_group(
+                BIND_GROUP_MORPH_TARGET_VALUES,
+                ctx.meshes.morphs.values_bind_group(morph_values_key),
+                Some(&[
+                    morph_value_offset as u32
+                ]),
+            )?;
+        }
+
+
+
 
         for vertex_buffer in &self.vertex_buffers {
             ctx.render_pass.set_vertex_buffer(

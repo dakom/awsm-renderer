@@ -35,6 +35,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] Invalid sparse index size: {0:?}")]
     InvalidSparseIndexSize(gltf::accessor::DataType),
+
+    #[error("[gltf] unsupported morph semantic: {0:?}")]
+    UnsupportedMorphSemantic(gltf::mesh::Semantic),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

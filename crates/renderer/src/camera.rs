@@ -8,7 +8,7 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::{Mat4, Vec3};
 use thiserror::Error;
 
-use crate::shaders::BindGroupBinding;
+use crate::uniforms::bind_group::BIND_GROUP_CAMERA_BINDING;
 use crate::AwsmRenderer;
 
 impl AwsmRenderer {
@@ -51,7 +51,7 @@ impl CameraBuffer {
             .create_bind_group_layout(
                 &BindGroupLayoutDescriptor::new(Some("Camera"))
                     .with_entries(vec![BindGroupLayoutEntry::new(
-                        BindGroupBinding::Camera as u32,
+                        BIND_GROUP_CAMERA_BINDING,
                         BindGroupLayoutResource::Buffer(
                             BufferBindingLayout::new()
                                 .with_binding_type(BufferBindingType::Uniform),
@@ -68,7 +68,7 @@ impl CameraBuffer {
                 &bind_group_layout,
                 Some("Camera"),
                 vec![BindGroupEntry::new(
-                    BindGroupBinding::Camera as u32,
+                    BIND_GROUP_CAMERA_BINDING,
                     BindGroupResource::Buffer(BufferBinding::new(&gpu_buffer)),
                 )],
             )
@@ -128,8 +128,6 @@ impl CameraBuffer {
     pub fn write_gpu(&self, gpu: &AwsmRendererWebGpu) -> Result<()> {
         gpu.write_buffer(&self.gpu_buffer, None, self.raw_data.as_slice(), None, None)
             .map_err(AwsmCameraError::WriteBuffer)?;
-
-        // TODO - transforms, etc.
 
         Ok(())
     }

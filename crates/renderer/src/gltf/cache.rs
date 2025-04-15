@@ -1,9 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
+use crate::shaders::ShaderKey;
+
 use super::{
     data::GltfData,
     pipelines::{PipelineLayoutKey, RenderPipelineKey},
-    shaders::ShaderKey,
 };
 
 #[derive(Default)]

@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
-use crate::{dynamic_uniform_buffer::DynamicUniformBuffer, AwsmRenderer};
+use crate::{dynamic_buffer::DynamicBuffer, uniforms::bind_group::BIND_GROUP_TRANSFORM_BINDING, AwsmRenderer};
 
 use super::{
     error::{AwsmTransformError, Result},
@@ -29,12 +29,12 @@ pub struct Transforms {
     parents: SecondaryMap<TransformKey, TransformKey>,
     dirties: HashSet<TransformKey>,
     root_node: TransformKey,
-    buffer: DynamicUniformBuffer<TransformKey, TRANSFORM_BYTE_SIZE>,
+    buffer: DynamicBuffer<TransformKey>,
 }
 
 impl Transforms {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let buffer = DynamicUniformBuffer::new(gpu, Some("Transforms".to_string()))?;
+        let buffer = DynamicBuffer::new_uniform(TRANSFORM_BYTE_SIZE, BIND_GROUP_TRANSFORM_BINDING, gpu, Some("Transforms".to_string()))?;
         let mut locals = SlotMap::with_key();
         let mut world_matrices = SecondaryMap::new();
         let mut children = SecondaryMap::new();
@@ -145,6 +145,7 @@ impl Transforms {
     }
 
     // This *does* write to the gpu, should be called only once per frame
+    // just write the entire buffer in one fell swoop
     pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
         Ok(self.buffer.write_to_gpu(gpu)?)
     }

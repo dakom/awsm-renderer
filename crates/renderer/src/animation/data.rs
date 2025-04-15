@@ -302,7 +302,7 @@ impl AppliedAnimation for VertexAnimation {
         let mut result = input;
         for (i, weight) in self.weights.iter().enumerate() {
             if i < result.len() {
-                result[i] *= *weight;
+                result[i] = *weight;
             }
         }
         result

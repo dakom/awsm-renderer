@@ -1,10 +1,7 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use crate::{
-    gltf::{error::AwsmGltfError, pipelines::RenderPipelineKey, shaders::ShaderKey},
-    mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer, PositionExtents},
-    transform::TransformKey,
-    AwsmRenderer,
+    gltf::{error::AwsmGltfError, pipelines::RenderPipelineKey}, mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer, MorphBufferValuesKey, PositionExtents}, shaders::ShaderKey, transform::TransformKey, AwsmRenderer
 };
 use awsm_renderer_core::{
     pipeline::primitive::{IndexFormat, PrimitiveTopology},
@@ -26,7 +23,15 @@ impl AwsmRenderer {
         let gltf_data = gltf_data.into();
         self.gltf.raw_datas.push(gltf_data.clone());
 
-        let ctx = GltfPopulateContext { data: gltf_data };
+        let morph_values_key = if let Some(morph_buffer) = &gltf_data.buffers.morph_buffer {
+            let len = gltf_data.buffers.morph_bytes.as_ref().map(|b| b.len()).unwrap_or(0);
+            let morph_values_key = self.meshes.morphs.insert_values_buffer(&self.gpu, morph_buffer.clone(), len)?;
+            Some(morph_values_key)
+        } else {
+            None
+        };
+
+        let ctx = GltfPopulateContext { data: gltf_data, morph_values_key };
 
         let scene = match scene {
             Some(index) => ctx
@@ -102,9 +107,10 @@ impl AwsmRenderer {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
-        let pipeline_layout_key = PipelineLayoutKey::default();
+        let shader_key = ShaderKey::gltf_primitive_new(&gltf_primitive);
 
-        let shader_key = ShaderKey::new(&gltf_primitive);
+        let pipeline_layout_key = PipelineLayoutKey::new(ctx, &shader_key);
+
 
         let shader_module = match self.gltf.shaders.get(&shader_key) {
             None => {
@@ -188,6 +194,7 @@ impl AwsmRenderer {
             mesh = mesh.with_position_extents(position_extents);
         }
 
+
         if let Some(indices) = gltf_primitive.indices() {
             mesh = mesh.with_index_buffer(MeshIndexBuffer {
                 // safe, only exists if we have an index
@@ -207,7 +214,15 @@ impl AwsmRenderer {
             });
         }
 
-        let _mesh_key = self.meshes.insert(mesh);
+        let _mesh_key = match (ctx.morph_values_key, primitive_buffer_info.morph_offset) {
+            (Some(morph_values_key), Some(morph_value_offset)) => {
+                self.meshes.insert_with_morph(mesh, morph_values_key, morph_value_offset)
+            }
+            (None, None) => {
+                self.meshes.insert(mesh)
+            }
+            _ => panic!("morph key mismatch"),
+        };
 
         for gltf_animation in ctx.data.doc.animations() {
             tracing::warn!("TODO - if animation applies to mesh, create and set it");
@@ -252,5 +267,7 @@ fn try_position_extents(gltf_primitive: &gltf::Primitive<'_>) -> Option<Position
 
 pub(super) struct GltfPopulateContext {
     pub data: Arc<GltfData>,
+
+    pub morph_values_key: Option<MorphBufferValuesKey>
     // we may need more stuff here
 }

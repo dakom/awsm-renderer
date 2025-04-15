@@ -131,7 +131,7 @@ impl AppScene {
 
         let mut extents: Option<PositionExtents> = None;
 
-        for mesh in renderer.meshes.iter() {
+        for (_, mesh) in renderer.meshes.iter() {
             if let Some(mut mesh_extents) = mesh.position_extents.clone() {
                 if let Ok(world_transform) = renderer.transforms.get_world(mesh.transform_key) {
                     mesh_extents.apply_matrix(&*world_transform);

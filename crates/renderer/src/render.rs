@@ -5,16 +5,18 @@ use awsm_renderer_core::command::{LoadOp, StoreOp};
 
 use crate::core::command::CommandEncoder;
 use crate::error::Result;
-use crate::shaders::BindGroup;
+use crate::mesh::Meshes;
 use crate::transform::Transforms;
+use crate::uniforms::bind_group::BIND_GROUP_CAMERA;
 use crate::AwsmRenderer;
 
 impl AwsmRenderer {
     // this should only be called once per frame
-    // the various subsystems can be updated on their own cadence
+    // the various underlying raw data can be updated on their own cadence
     // or just call .update_all() right before .render() for convenience
     pub fn render(&mut self) -> Result<()> {
         self.transforms.write_gpu(&self.gpu)?;
+        self.meshes.write_gpu(&self.gpu)?;
         self.camera.write_gpu(&self.gpu)?;
 
         let current_texture_view = self.gpu.current_context_texture_view()?;
@@ -37,13 +39,14 @@ impl AwsmRenderer {
             command_encoder,
             render_pass,
             transforms: &self.transforms,
+            meshes: &self.meshes,
         };
 
         ctx.render_pass
-            .set_bind_group(BindGroup::Camera as u32, &self.camera.bind_group, None)?;
+            .set_bind_group(BIND_GROUP_CAMERA, &self.camera.bind_group, None)?;
 
-        for mesh in self.meshes.iter() {
-            mesh.push_commands(&mut ctx)?;
+        for (mesh_key, mesh) in self.meshes.iter() {
+            mesh.push_commands(&mut ctx, mesh_key)?;
         }
 
         ctx.render_pass.end();
@@ -59,4 +62,5 @@ pub struct RenderContext<'a> {
     pub command_encoder: CommandEncoder,
     pub render_pass: RenderPassEncoder,
     pub transforms: &'a Transforms,
+    pub meshes: &'a Meshes,
 }

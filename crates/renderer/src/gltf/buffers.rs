@@ -25,6 +25,11 @@ pub struct GltfBuffers {
     pub vertex_bytes: Vec<u8>,
     pub vertex_buffer: web_sys::GpuBuffer,
 
+    // these also always follow the same interleaving pattern
+    // and we track where each primitive starts
+    pub morph_bytes: Option<Vec<u8>>,
+    pub morph_buffer: Option<web_sys::GpuBuffer>,
+
     // first level is mesh, second level is primitive
     pub meshes: Vec<Vec<PrimitiveBufferInfo>>,
 }
@@ -43,6 +48,10 @@ pub struct PrimitiveBufferInfo {
     pub vertex_count: usize,
     // number of bytes per vertex attribute
     pub vertex_attribute_strides: Vec<usize>,
+
+    // offset and length in morph_bytes where this primitive starts
+    pub morph_offset: Option<usize>,
+    pub morph_len: Option<usize>,
 }
 
 impl PrimitiveBufferInfo {
@@ -79,6 +88,7 @@ impl GltfBuffers {
 
         let mut index_bytes: Vec<u8> = Vec::new();
         let mut vertex_bytes: Vec<u8> = Vec::new();
+        let mut morph_bytes: Vec<u8> = Vec::new();
         let mut meshes: Vec<Vec<PrimitiveBufferInfo>> = Vec::new();
 
         for mesh in doc.meshes() {
@@ -148,6 +158,70 @@ impl GltfBuffers {
                     }
                 }
 
+                // Done with vertex attributes, now the morph data
+                let mut morph_targets = Vec::new();
+
+                let morph_offset = morph_bytes.len();
+
+                let has_normals = primitive
+                    .attributes()
+                    .any(|(semantic, _)| semantic == gltf::Semantic::Normals);
+
+                let has_tangents = primitive 
+                    .attributes()
+                    .any(|(semantic, _)| semantic == gltf::Semantic::Tangents);
+
+                for morph_target in primitive.morph_targets() {
+                    if let Some(accessor) = morph_target.positions() {
+                        morph_targets.push((gltf::Semantic::Positions, Some(accessor_to_bytes(&accessor, &buffers)?)));
+                    } else {
+                        morph_targets.push((gltf::Semantic::Positions, None));
+                    }
+
+                    if let Some(accessor) = morph_target.normals() {
+                        morph_targets.push((gltf::Semantic::Normals, Some(accessor_to_bytes(&accessor, &buffers)?)));
+                    } else if has_normals {
+                        morph_targets.push((gltf::Semantic::Normals, None)); 
+                    }
+
+                    if let Some(accessor) = morph_target.tangents() {
+                        morph_targets.push((gltf::Semantic::Tangents, Some(accessor_to_bytes(&accessor, &buffers)?)));
+                    } else if has_tangents {
+                        morph_targets.push((gltf::Semantic::Tangents, None)); 
+                    }
+                }
+
+                // same idea as what we did with the vertex attributes
+                for vertex in 0..vertex_count {
+                    for morph_index in 0..morph_targets.len() {
+                        let (semantic, morph_target) = &morph_targets[morph_index];
+                        let vertex_stride = match semantic {
+                            gltf::Semantic::Positions => vertex_attribute_strides[0],
+                            gltf::Semantic::Normals => vertex_attribute_strides[1],
+                            gltf::Semantic::Tangents => vertex_attribute_strides[2],
+                            _ => return Err(AwsmGltfError::UnsupportedMorphSemantic(semantic.clone()).into()),
+                        }; 
+                        match morph_target {
+                            Some(morph_target) => {
+                                let target_byte_offset = vertex * vertex_stride;
+                                let target_bytes = &morph_target[target_byte_offset..target_byte_offset + vertex_stride];
+
+                                morph_bytes.extend_from_slice(target_bytes);
+                            }
+                            None => {
+                                // if we don't have a morph target, we need to fill it with zeroes
+                                morph_bytes.extend(vec![0; vertex_stride]);
+                            }
+                        }
+                    }
+                }
+
+                let morph_offset = if morph_bytes.len() != morph_offset {
+                    Some(morph_offset)
+                } else {
+                    None
+                };
+
                 // Done for this primitive
                 primitive_buffer_infos.push(PrimitiveBufferInfo {
                     index_offset,
@@ -156,6 +230,10 @@ impl GltfBuffers {
                     vertex_offset,
                     vertex_count,
                     vertex_attribute_strides,
+                    morph_offset,
+                    morph_len: morph_offset.map(|offset| {
+                        morph_bytes.len() - offset
+                    }),
                 });
             }
 
@@ -192,6 +270,37 @@ impl GltfBuffers {
             }
         };
 
+        let morph_buffer = match morph_bytes.is_empty() {
+            true => None,
+            false => {
+                // pad to multiple of 4 to satisfy WebGPU
+                let pad = 4 - (morph_bytes.len() % 4);
+                if pad != 4 {
+                    morph_bytes.extend(vec![0; pad]);
+                }
+
+                let morph_buffer = renderer
+                    .gpu
+                    .create_buffer(
+                        &BufferDescriptor::new(
+                            Some("gltf morph buffer"),
+                            morph_bytes.len(),
+                            BufferUsage::new().with_copy_dst().with_storage()
+                        )
+                        .into(),
+                    )
+                    .map_err(AwsmGltfError::BufferCreate)?;
+
+                renderer
+                    .gpu
+                    .write_buffer(&morph_buffer, None, morph_bytes.as_slice(), None, None)
+                    .map_err(AwsmGltfError::BufferWrite)?;
+
+                Some(morph_buffer)
+            }
+        };
+
+
         // pad to multiple of 4 to satisfy WebGPU
         let pad = 4 - (vertex_bytes.len() % 4);
         if pad != 4 {
@@ -224,6 +333,12 @@ impl GltfBuffers {
             index_buffer,
             vertex_bytes,
             vertex_buffer,
+            morph_bytes: if morph_bytes.is_empty() {
+                None
+            } else {
+                Some(morph_bytes)
+            },
+            morph_buffer,
             meshes,
         })
     }

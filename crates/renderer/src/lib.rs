@@ -3,12 +3,13 @@ use mesh::Meshes;
 use transform::Transforms;
 
 pub mod camera;
-pub mod dynamic_uniform_buffer;
 pub mod error;
 pub mod mesh;
 pub mod render;
-pub mod shaders;
+pub mod uniforms;
 pub mod transform;
+pub mod shaders;
+pub mod dynamic_buffer;
 pub mod core {
     pub use awsm_renderer_core::*;
 }

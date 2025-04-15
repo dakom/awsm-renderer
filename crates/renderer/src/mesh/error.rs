@@ -17,4 +17,10 @@ pub enum AwsmMeshError {
 
     #[error("[mesh] {0:?}")]
     Transform(#[from] AwsmTransformError),
+
+    #[error("[mesh] morph weight not found: {0:?}")]
+    MorphWeightSlotMissing(MeshKey),
+
+    #[error("[mesh] morph value not found: {0:?}")]
+    MorphValueSlotMissing(MeshKey),
 }
