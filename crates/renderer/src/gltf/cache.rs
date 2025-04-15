@@ -13,3 +13,9 @@ pub struct GltfCache {
     pub pipeline_layouts: HashMap<PipelineLayoutKey, web_sys::GpuPipelineLayout>,
     pub raw_datas: Vec<Arc<GltfData>>,
 }
+
+impl GltfCache {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}

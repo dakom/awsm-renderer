@@ -3,10 +3,9 @@ use std::collections::HashSet;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
-use crate::AwsmRenderer;
+use crate::{dynamic_uniform_buffer::DynamicUniformBuffer, AwsmRenderer};
 
 use super::{
-    buffer::TransformsBuffer,
     error::{AwsmTransformError, Result},
     Transform,
 };
@@ -21,6 +20,8 @@ impl AwsmRenderer {
     }
 }
 
+const TRANSFORM_BYTE_SIZE: usize = 64; // 4x4 matrix of f32 is 64 bytes
+
 pub struct Transforms {
     locals: SlotMap<TransformKey, Transform>,
     world_matrices: SecondaryMap<TransformKey, glam::Mat4>,
@@ -28,12 +29,12 @@ pub struct Transforms {
     parents: SecondaryMap<TransformKey, TransformKey>,
     dirties: HashSet<TransformKey>,
     root_node: TransformKey,
-    buffer: TransformsBuffer,
+    buffer: DynamicUniformBuffer<TransformKey, TRANSFORM_BYTE_SIZE>,
 }
 
 impl Transforms {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let buffer = TransformsBuffer::new(gpu)?;
+        let buffer = DynamicUniformBuffer::new(gpu, Some("Transforms".to_string()))?;
         let mut locals = SlotMap::with_key();
         let mut world_matrices = SecondaryMap::new();
         let mut children = SecondaryMap::new();
@@ -145,7 +146,7 @@ impl Transforms {
 
     // This *does* write to the gpu, should be called only once per frame
     pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
-        self.buffer.write_to_gpu(gpu)
+        Ok(self.buffer.write_to_gpu(gpu)?)
     }
 
     pub fn bind_group(&self) -> &web_sys::GpuBindGroup {
@@ -157,12 +158,9 @@ impl Transforms {
     }
 
     pub fn buffer_offset(&self, key: TransformKey) -> Result<usize> {
-        let slot = self
-            .buffer
-            .slot_indices
-            .get(key)
-            .ok_or(AwsmTransformError::TransformBufferSlotMissing(key))?;
-        Ok(slot * TransformsBuffer::SLOT_SIZE_ALIGNED)
+        self.buffer
+            .offset(key)
+            .ok_or(AwsmTransformError::TransformBufferSlotMissing(key))
     }
 
     // internal-only function
@@ -189,7 +187,12 @@ impl Transforms {
             };
 
             self.world_matrices[key] = world_matrix;
-            self.buffer.update(key, world_matrix);
+
+            let values = world_matrix.to_cols_array();
+            let values_u8 = unsafe {
+                std::slice::from_raw_parts(values.as_ptr() as *const u8, TRANSFORM_BYTE_SIZE)
+            };
+            self.buffer.update(key, values_u8);
         }
 
         // safety: can't keep a mutable reference to self while it has a borrow of the iterator

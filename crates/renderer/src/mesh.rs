@@ -1,52 +1,17 @@
-use awsm_renderer_core::error::AwsmCoreError;
+mod error;
+mod meshes;
+
 use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
 use glam::{Mat4, Vec3};
-use slotmap::{new_key_type, DenseSlotMap};
-use thiserror::Error;
 
 use crate::render::RenderContext;
 use crate::shaders::BindGroup;
-use crate::transform::{AwsmTransformError, TransformKey};
+use crate::transform::TransformKey;
 
-pub struct Meshes {
-    list: DenseSlotMap<MeshKey, Mesh>,
-}
+pub use error::AwsmMeshError;
+pub use meshes::{MeshKey, Meshes};
 
-impl Default for Meshes {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Meshes {
-    pub fn new() -> Self {
-        Self {
-            list: DenseSlotMap::with_key(),
-        }
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &Mesh> {
-        self.list.values()
-    }
-
-    pub fn insert(&mut self, mesh: Mesh) -> MeshKey {
-        self.list.insert(mesh)
-    }
-
-    pub fn clear(&mut self) {
-        self.list.clear();
-    }
-
-    pub fn get_mut(&mut self, mesh_key: MeshKey) -> Result<&mut Mesh> {
-        self.list
-            .get_mut(mesh_key)
-            .ok_or(AwsmMeshError::MeshNotFound(mesh_key))
-    }
-}
-
-new_key_type! {
-    pub struct MeshKey;
-}
+use super::error::Result;
 
 // this is most like a "primitive" in gltf, not the containing "mesh"
 // because for non-gltf naming, "mesh" makes more sense
@@ -173,18 +138,4 @@ impl Mesh {
 
         Ok(())
     }
-}
-
-type Result<T> = std::result::Result<T, AwsmMeshError>;
-
-#[derive(Error, Debug)]
-pub enum AwsmMeshError {
-    #[error("[mesh] not found: {0:?}")]
-    MeshNotFound(MeshKey),
-
-    #[error("[mesh] {0:?}")]
-    Core(#[from] AwsmCoreError),
-
-    #[error("[mesh] {0:?}")]
-    Transform(#[from] AwsmTransformError),
 }

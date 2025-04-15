@@ -3,6 +3,7 @@ use mesh::Meshes;
 use transform::Transforms;
 
 pub mod camera;
+pub mod dynamic_uniform_buffer;
 pub mod error;
 pub mod mesh;
 pub mod render;
@@ -48,6 +49,24 @@ impl AwsmRenderer {
 
         Ok(())
     }
+
+    pub fn remove_all(&mut self) -> crate::error::Result<()> {
+        self.camera = camera::CameraBuffer::new(&self.gpu)?;
+        self.meshes = Meshes::new(&self.gpu)?;
+        self.transforms = Transforms::new(&self.gpu)?;
+
+        #[cfg(feature = "gltf")]
+        {
+            self.gltf = gltf::cache::GltfCache::default();
+        }
+
+        #[cfg(feature = "animation")]
+        {
+            self.animations = animation::Animations::default();
+        }
+
+        Ok(())
+    }
 }
 
 pub struct AwsmRendererBuilder {
@@ -79,7 +98,7 @@ impl AwsmRendererBuilder {
     pub fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
         let gpu = self.gpu.build()?;
         let camera = camera::CameraBuffer::new(&gpu)?;
-        let meshes = Meshes::new();
+        let meshes = Meshes::new(&gpu)?;
         let transforms = Transforms::new(&gpu)?;
 
         Ok(AwsmRenderer {

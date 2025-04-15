@@ -1,4 +1,3 @@
-mod buffer;
 mod error;
 mod transforms;
 

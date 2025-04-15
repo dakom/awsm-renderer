@@ -70,12 +70,13 @@ impl AppScene {
     pub async fn clear(self: &Arc<Self>) {
         let state = self;
 
-        let mut lock = state.renderer.lock().await;
+        let mut renderer = state.renderer.lock().await;
 
-        lock.meshes.clear();
-        lock.gltf.raw_datas.clear();
         state.stop_animation_loop();
-        lock.render();
+        if let Err(err) = renderer.remove_all() {
+            tracing::error!("Failed to clear renderer: {:?}", err);
+        }
+        renderer.render();
     }
 
     pub async fn load(self: &Arc<Self>, gltf_id: GltfId) -> Result<GltfLoader> {
