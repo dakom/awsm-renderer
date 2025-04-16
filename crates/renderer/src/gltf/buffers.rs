@@ -1,8 +1,9 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 use awsm_renderer_core::buffer::{BufferDescriptor, BufferUsage};
+use glam::Vec3;
 
-use crate::AwsmRenderer;
+use crate::{buffers::helpers::{debug_chunks_to_f32, debug_slice_to_f32, slice_zeroes}, mesh::{MeshAttributeSemantic, MeshBufferIndexInfo, MeshBufferInfo, MeshBufferMorphInfo, MeshBufferVertexInfo}, AwsmRenderer};
 
 use super::{
     accessors::semantic_ordering,
@@ -31,49 +32,9 @@ pub struct GltfBuffers {
     pub morph_buffer: Option<web_sys::GpuBuffer>,
 
     // first level is mesh, second level is primitive
-    pub meshes: Vec<Vec<PrimitiveBufferInfo>>,
+    pub meshes: Vec<Vec<MeshBufferInfo>>,
 }
 
-#[derive(Default, Debug, Clone)]
-pub struct PrimitiveBufferInfo {
-    // offset in index_bytes where this primitive starts
-    pub index_offset: Option<usize>,
-    // number of index elements for this primitive
-    pub index_count: Option<usize>,
-    // number of bytes per index (e.g. 2 for u16, 4 for u32)
-    pub index_stride: Option<usize>,
-    // offset in vertex_bytes where this primitive starts
-    pub vertex_offset: usize,
-    // number of vertices for this primitive
-    pub vertex_count: usize,
-    // number of bytes per vertex attribute
-    pub vertex_attribute_strides: Vec<usize>,
-
-    // offset and length in morph_bytes where this primitive starts
-    pub morph_offset: Option<usize>,
-    pub morph_len: Option<usize>,
-}
-
-impl PrimitiveBufferInfo {
-    pub fn draw_count(&self) -> usize {
-        // if we have indices, we use that count
-        // otherwise, we use the vertex count
-        self.index_count.unwrap_or(self.vertex_count)
-    }
-
-    // the size in bytes of the vertex buffer for this primitive
-    pub fn vertex_len(&self) -> usize {
-        self.vertex_count * self.vertex_attribute_strides.iter().sum::<usize>()
-    }
-
-    // the size in bytes of the index buffer for this primitive, if it exists
-    pub fn index_len(&self) -> Option<usize> {
-        match (self.index_count, self.index_stride) {
-            (Some(count), Some(stride)) => Some(count * stride),
-            _ => None,
-        }
-    }
-}
 
 impl GltfBuffers {
     pub async fn new(
@@ -89,151 +50,198 @@ impl GltfBuffers {
         let mut index_bytes: Vec<u8> = Vec::new();
         let mut vertex_bytes: Vec<u8> = Vec::new();
         let mut morph_bytes: Vec<u8> = Vec::new();
-        let mut meshes: Vec<Vec<PrimitiveBufferInfo>> = Vec::new();
+        let mut meshes: Vec<Vec<MeshBufferInfo>> = Vec::new();
 
         for mesh in doc.meshes() {
             let mut primitive_buffer_infos = Vec::new();
 
             for primitive in mesh.primitives() {
-                // Write to index buffer
-                let (index_offset, index_count, index_stride) = match primitive.indices() {
-                    None => (None, None, None),
+                // Index buffer 
+                let index = match primitive.indices() {
+                    None => None,
                     Some(accessor) => {
-                        let index = index_bytes.len();
-                        let other = accessor_to_bytes(&accessor, &buffers)?;
-                        index_bytes.extend_from_slice(&other);
-                        (Some(index), Some(accessor.count()), Some(accessor.size()))
+                        let offset = index_bytes.len();
+                        let accessor_bytes = accessor_to_bytes(&accessor, &buffers)?;
+                        index_bytes.extend_from_slice(&accessor_bytes);
+
+                        Some(MeshBufferIndexInfo {
+                            offset,
+                            count: accessor.count(),
+                            stride: accessor.size(),
+                        })
                     }
                 };
 
-                // Write to vertex buffer
-                let vertex_offset = vertex_bytes.len();
-                let mut attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> =
-                    primitive.attributes().collect();
+                // Vertex buffer 
+                let vertex = {
+                    let offset = vertex_bytes.len();
 
-                attributes
-                    .sort_by(|(a, _), (b, _)| semantic_ordering(a).cmp(&semantic_ordering(b)));
+                    let mut attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> =
+                        primitive.attributes().collect();
 
-                let mut vertex_attribute_strides = Vec::new();
-                let mut attributes_bytes = Vec::new();
+                    attributes
+                        .sort_by(|(a, _), (b, _)| semantic_ordering(a).cmp(&semantic_ordering(b)));
 
-                // this should never be empty, but let's be safe
-                let vertex_count = attributes
-                    .first()
-                    .map(|(_, accessor)| accessor.count())
-                    .unwrap_or(0);
+                    let mut attribute_stride_sizes = HashMap::new();
+                    let mut attributes_bytes = Vec::new();
 
-                // first we need to read the whole accessor. This will be zero-copy unless one of these is true:
-                // 1. they're sparse and we need to replace values
-                // 2. there's no view, and we need to fill it with zeroes
-                //
-                // otherwise, it's just a slice of the original buffer
-                for (_, accessor) in attributes {
-                    let attribute_bytes = accessor_to_bytes(&accessor, &buffers)?;
+                    // this should never be empty, but let's be safe
+                    let vertex_count = attributes
+                        .first()
+                        .map(|(_, accessor)| accessor.count())
+                        .unwrap_or(0);
 
-                    // while we're at it, we can stash the stride sizes
-                    match accessor.view() {
-                        Some(view) => {
-                            vertex_attribute_strides.push(view.stride().unwrap_or(accessor.size()));
-                        }
-                        None => {
-                            vertex_attribute_strides.push(accessor.size());
+                    // first we need to read the whole accessor. This will be zero-copy unless one of these is true:
+                    // 1. they're sparse and we need to replace values
+                    // 2. there's no view, and we need to fill it with zeroes
+                    //
+                    // otherwise, it's just a slice of the original buffer
+                    for (semantic, accessor) in attributes {
+                        let semantic:MeshAttributeSemantic = semantic.into();
+                        let attribute_bytes = accessor_to_bytes(&accessor, &buffers)?;
+
+                        // while we're at it, we can stash the stride sizes
+                        let attribute_stride_size = accessor.view().and_then(|view| view.stride()).unwrap_or(accessor.size());
+                        attribute_stride_sizes.insert(semantic.clone(), attribute_stride_size);
+
+                        attributes_bytes.push((attribute_bytes, attribute_stride_size));
+                    }
+
+                    // now let's predictably interleave the attributes into our final vertex buffer
+                    // this does extend/copy the data, but it saves us additional calls at render time
+                    for vertex in 0..vertex_count {
+                        for (attribute_bytes, attribute_stride_size) in attributes_bytes.iter() {
+                            let attribute_byte_offset = vertex * attribute_stride_size;
+                            let attribute_bytes = &attribute_bytes
+                                [attribute_byte_offset..attribute_byte_offset + attribute_stride_size];
+
+                            vertex_bytes.extend_from_slice(attribute_bytes);
                         }
                     }
 
-                    attributes_bytes.push(attribute_bytes);
-                }
-
-                // now let's predictably interleave the attributes into our final vertex buffer
-                // this does extend/copy the data, but it saves us additional calls at render time
-                for vertex in 0..vertex_count {
-                    for attribute_index in 0..attributes_bytes.len() {
-                        let vertex_stride = vertex_attribute_strides[attribute_index];
-                        let attribute_byte_offset = vertex * vertex_stride;
-                        let attribute_bytes = &attributes_bytes[attribute_index];
-                        let attribute_bytes = &attribute_bytes
-                            [attribute_byte_offset..attribute_byte_offset + vertex_stride];
-
-                        vertex_bytes.extend_from_slice(attribute_bytes);
+                    MeshBufferVertexInfo { 
+                        offset, 
+                        count: vertex_count,
+                        size: vertex_bytes.len() - offset,
+                        attribute_stride_sizes
                     }
-                }
+                };
 
-                // Done with vertex attributes, now the morph data
-                let mut morph_targets = Vec::new();
+                // Morph buffer 
+                let morph = {
+                    let morph_has_position = primitive.morph_targets().any(|morph_target| morph_target.positions().is_some());
+                    let morph_has_normal = primitive.morph_targets().any(|morph_target| morph_target.normals().is_some());
+                    let morph_has_tangent = primitive.morph_targets().any(|morph_target| morph_target.tangents().is_some());
 
-                let morph_offset = morph_bytes.len();
-
-                let has_normals = primitive
-                    .attributes()
-                    .any(|(semantic, _)| semantic == gltf::Semantic::Normals);
-
-                let has_tangents = primitive 
-                    .attributes()
-                    .any(|(semantic, _)| semantic == gltf::Semantic::Tangents);
-
-                for morph_target in primitive.morph_targets() {
-                    if let Some(accessor) = morph_target.positions() {
-                        morph_targets.push((gltf::Semantic::Positions, Some(accessor_to_bytes(&accessor, &buffers)?)));
+                    if !morph_has_position && !morph_has_normal && !morph_has_tangent {
+                        None
                     } else {
-                        morph_targets.push((gltf::Semantic::Positions, None));
-                    }
+                        let mut morph_targets_buffer_data = Vec::new();
 
-                    if let Some(accessor) = morph_target.normals() {
-                        morph_targets.push((gltf::Semantic::Normals, Some(accessor_to_bytes(&accessor, &buffers)?)));
-                    } else if has_normals {
-                        morph_targets.push((gltf::Semantic::Normals, None)); 
-                    }
-
-                    if let Some(accessor) = morph_target.tangents() {
-                        morph_targets.push((gltf::Semantic::Tangents, Some(accessor_to_bytes(&accessor, &buffers)?)));
-                    } else if has_tangents {
-                        morph_targets.push((gltf::Semantic::Tangents, None)); 
-                    }
-                }
-
-                // same idea as what we did with the vertex attributes
-                for vertex in 0..vertex_count {
-                    for morph_index in 0..morph_targets.len() {
-                        let (semantic, morph_target) = &morph_targets[morph_index];
-                        let vertex_stride = match semantic {
-                            gltf::Semantic::Positions => vertex_attribute_strides[0],
-                            gltf::Semantic::Normals => vertex_attribute_strides[1],
-                            gltf::Semantic::Tangents => vertex_attribute_strides[2],
-                            _ => return Err(AwsmGltfError::UnsupportedMorphSemantic(semantic.clone()).into()),
-                        }; 
-                        match morph_target {
-                            Some(morph_target) => {
-                                let target_byte_offset = vertex * vertex_stride;
-                                let target_bytes = &morph_target[target_byte_offset..target_byte_offset + vertex_stride];
-
-                                morph_bytes.extend_from_slice(target_bytes);
-                            }
-                            None => {
-                                // if we don't have a morph target, we need to fill it with zeroes
-                                morph_bytes.extend(vec![0; vertex_stride]);
-                            }
+                        #[derive(Default)]
+                        struct MorphTargetBufferData <'a> {
+                            positions: Option<Cow<'a, [u8]>>,
+                            normals: Option<Cow<'a, [u8]>>,
+                            tangents: Option<Cow<'a, [u8]>>,
                         }
-                    }
-                }
+                        for morph_target in primitive.morph_targets() {
+                            let mut morph_target_buffer_data = MorphTargetBufferData::default();
 
-                let morph_offset = if morph_bytes.len() != morph_offset {
-                    Some(morph_offset)
-                } else {
-                    None
+                            if let Some(accessor) = morph_target.positions() {
+                                morph_target_buffer_data.positions = Some(accessor_to_bytes(&accessor, &buffers)?);
+                            }
+
+                            if let Some(accessor) = morph_target.normals() {
+                                morph_target_buffer_data.normals = Some(accessor_to_bytes(&accessor, &buffers)?);
+                            }
+                            if let Some(accessor) = morph_target.tangents() {
+                                morph_target_buffer_data.tangents = Some(accessor_to_bytes(&accessor, &buffers)?);
+                            }
+
+                            morph_targets_buffer_data.push(morph_target_buffer_data);
+                        }
+
+                        // same idea as what we did with the vertex attributes
+                        // but here we lay them out interleaved by morph target
+                        // for example, the sequence would be:
+                        // vertex 1, target 1: position, normal, tangent
+                        // vertex 1, target 2: position, normal, tangent
+                        // vertex 2, target 1: position, normal, tangent
+                        // vertex 2, target 2: position, normal, tangent
+                        //
+                        // and then in the shader, for each vertex,
+                        // it can read all the morph targets for that vertex
+                        // essentially by just reading from its offset start to finish
+                        //
+                        // if a semantic is not used, we skip it instead of
+                        // filling with 0's, since the shader will be different anyway
+
+
+                        let offset = morph_bytes.len();
+
+                        let mut vertex_morph_stride_size = 0;
+
+                        for vertex_index in 0..vertex.count {
+                            // eh, we could only set this once, but this is slightly nicer to read
+                            // when the loop breaks we return the latest-and-greatest value
+                            vertex_morph_stride_size = 0;
+
+                            for morph_target_buffer_data in &morph_targets_buffer_data {
+                                let mut push_bytes = |data: Option<&Cow<'_, [u8]>>, stride_size: usize| {
+                                    match data {
+                                        Some(data) => {
+                                            let data_byte_offset = vertex_index * stride_size;
+                                            let data_bytes = &data[data_byte_offset..data_byte_offset + stride_size];
+                                            morph_bytes.extend_from_slice(data_bytes);
+                                        }
+                                        None => {
+                                            morph_bytes.extend_from_slice(slice_zeroes(stride_size));
+                                        }
+                                    }
+
+                                    vertex_morph_stride_size += stride_size;
+                                };
+
+                                if morph_has_position {
+                                    let attribute_stride_size = *vertex.attribute_stride_sizes.get(&MeshAttributeSemantic::Position).unwrap();
+                                    push_bytes(morph_target_buffer_data.positions.as_ref(), attribute_stride_size);
+                                }
+
+                                if morph_has_normal {
+                                    let attribute_stride_size = *vertex.attribute_stride_sizes.get(&MeshAttributeSemantic::Normal).unwrap();
+                                    push_bytes(morph_target_buffer_data.normals.as_ref(), attribute_stride_size);
+                                }
+
+                                if morph_has_tangent {
+                                    let attribute_stride_size = *vertex.attribute_stride_sizes.get(&MeshAttributeSemantic::Tangent).unwrap();
+                                    push_bytes(morph_target_buffer_data.tangents.as_ref(), attribute_stride_size);
+                                }
+                            }
+
+                        }
+
+                        let size = morph_bytes.len() - offset;
+                        // pad to satisfy WebGPU
+                        let padding = 4 - (size % 4);
+                        if padding != 4 {
+                            morph_bytes.extend_from_slice(slice_zeroes(padding));
+                        }
+                        Some(MeshBufferMorphInfo {
+                            size: morph_bytes.len() - offset,
+                            offset,
+                            targets_len: primitive.morph_targets().len(),
+                            vertex_stride_size: vertex_morph_stride_size,
+                        })
+                    }
                 };
+
+
 
                 // Done for this primitive
-                primitive_buffer_infos.push(PrimitiveBufferInfo {
-                    index_offset,
-                    index_count,
-                    index_stride,
-                    vertex_offset,
-                    vertex_count,
-                    vertex_attribute_strides,
-                    morph_offset,
-                    morph_len: morph_offset.map(|offset| {
-                        morph_bytes.len() - offset
-                    }),
+                primitive_buffer_infos.push(MeshBufferInfo {
+                    index,
+                    vertex,
+                    morph,
                 });
             }
 
@@ -246,7 +254,7 @@ impl GltfBuffers {
                 // pad to multiple of 4 to satisfy WebGPU
                 let pad = 4 - (index_bytes.len() % 4);
                 if pad != 4 {
-                    index_bytes.extend(vec![0; pad]);
+                    index_bytes.extend_from_slice(slice_zeroes(pad));
                 }
 
                 let index_buffer = renderer
@@ -273,12 +281,6 @@ impl GltfBuffers {
         let morph_buffer = match morph_bytes.is_empty() {
             true => None,
             false => {
-                // pad to multiple of 4 to satisfy WebGPU
-                let pad = 4 - (morph_bytes.len() % 4);
-                if pad != 4 {
-                    morph_bytes.extend(vec![0; pad]);
-                }
-
                 let morph_buffer = renderer
                     .gpu
                     .create_buffer(
@@ -304,7 +306,7 @@ impl GltfBuffers {
         // pad to multiple of 4 to satisfy WebGPU
         let pad = 4 - (vertex_bytes.len() % 4);
         if pad != 4 {
-            vertex_bytes.extend(vec![0; pad]);
+            vertex_bytes.extend_from_slice(slice_zeroes(pad));
         }
 
         let vertex_buffer = renderer
@@ -438,45 +440,4 @@ fn sparse_to_indices(
     }
 
     indices
-}
-
-#[allow(dead_code)]
-pub(crate) fn debug_chunks_to_f32(slice: &[u8], chunk_size: usize) -> Vec<Vec<f32>> {
-    debug_slice_to_f32(slice)
-        .chunks(chunk_size)
-        .map(|chunk| chunk.to_vec())
-        .collect()
-}
-
-#[allow(dead_code)]
-pub(crate) fn debug_slice_to_f32(slice: &[u8]) -> Vec<f32> {
-    let mut f32s = Vec::new();
-    for i in (0..slice.len()).step_by(4) {
-        let bytes = &slice[i..i + 4];
-        let f32_value = f32::from_le_bytes(bytes.try_into().unwrap());
-        f32s.push(f32_value);
-    }
-    f32s
-}
-
-#[allow(dead_code)]
-pub(crate) fn debug_slice_to_u16(slice: &[u8]) -> Vec<u16> {
-    let mut u16s = Vec::new();
-    for i in (0..slice.len()).step_by(2) {
-        let bytes = &slice[i..i + 2];
-        let u16_value = u16::from_le_bytes(bytes.try_into().unwrap());
-        u16s.push(u16_value);
-    }
-    u16s
-}
-
-#[allow(dead_code)]
-pub(crate) fn debug_slice_to_u32(slice: &[u8]) -> Vec<u32> {
-    let mut u32s = Vec::new();
-    for i in (0..slice.len()).step_by(4) {
-        let bytes = &slice[i..i + 4];
-        let u32_value = u32::from_le_bytes(bytes.try_into().unwrap());
-        u32s.push(u32_value);
-    }
-    u32s
 }

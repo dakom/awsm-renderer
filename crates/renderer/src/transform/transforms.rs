@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
-use crate::{dynamic_buffer::DynamicBuffer, uniforms::bind_group::BIND_GROUP_TRANSFORM_BINDING, AwsmRenderer};
+use crate::{buffers::{dynamic::DynamicBuffer, bind_group::BIND_GROUP_TRANSFORM_BINDING}, AwsmRenderer};
 
 use super::{
     error::{AwsmTransformError, Result},
@@ -21,6 +21,7 @@ impl AwsmRenderer {
 }
 
 const TRANSFORM_BYTE_SIZE: usize = 64; // 4x4 matrix of f32 is 64 bytes
+const TRANSFORM_BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment 
 
 pub struct Transforms {
     locals: SlotMap<TransformKey, Transform>,
@@ -34,7 +35,7 @@ pub struct Transforms {
 
 impl Transforms {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let buffer = DynamicBuffer::new_uniform(TRANSFORM_BYTE_SIZE, BIND_GROUP_TRANSFORM_BINDING, gpu, Some("Transforms".to_string()))?;
+        let buffer = DynamicBuffer::new_uniform(TRANSFORM_BYTE_SIZE, TRANSFORM_BYTE_ALIGNMENT, BIND_GROUP_TRANSFORM_BINDING, gpu, Some("Transforms".to_string()))?;
         let mut locals = SlotMap::with_key();
         let mut world_matrices = SecondaryMap::new();
         let mut children = SecondaryMap::new();

@@ -1,9 +1,8 @@
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, DenseSlotMap};
 
-
 use super::error::{AwsmMeshError, Result};
-use super::{Mesh, MorphBufferValuesKey};
+use super::Mesh;
 use super::morphs::Morphs;
 
 
@@ -28,25 +27,21 @@ impl Meshes {
         self.list.insert(mesh)
     }
 
-    pub fn insert_with_morph(&mut self, mesh: Mesh, morph_values_buffer_key: MorphBufferValuesKey, morph_values_offset: usize) -> MeshKey {
-        let key = Self::insert(self, mesh);
-
-        self.morphs.insert_mesh(key, morph_values_buffer_key, morph_values_offset);
-
-        key
-    }
-
     pub fn get_mut(&mut self, mesh_key: MeshKey) -> Result<&mut Mesh> {
         self.list
             .get_mut(mesh_key)
             .ok_or(AwsmMeshError::MeshNotFound(mesh_key))
     }
 
-    pub fn remove(&mut self, mesh_key: MeshKey) -> Result<Mesh> {
-        self.morphs.remove_mesh(mesh_key);
-        self.list
-            .remove(mesh_key)
-            .ok_or(AwsmMeshError::MeshNotFound(mesh_key))
+    pub fn remove(&mut self, mesh_key: MeshKey) -> Option<Mesh> {
+        if let Some(mesh) = self.list.remove(mesh_key) {
+            if let Some(morph_key) = mesh.morph_key {
+                self.morphs.remove(morph_key);
+            }
+            Some(mesh)
+        } else {
+            None
+        }
     }
 
 

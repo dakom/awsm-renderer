@@ -1,6 +1,8 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
+use crate::mesh::AwsmMeshError;
+
 #[derive(Error, Debug)]
 pub enum AwsmGltfError {
     #[error("[gltf] Error loading file")]
@@ -27,8 +29,8 @@ pub enum AwsmGltfError {
     #[error("[gltf] Unsupported primitive mode: {0:?}")]
     UnsupportedPrimitiveMode(gltf::mesh::Mode),
 
-    #[error("[gltf] missing positions attribute")]
-    MissingPositionAttribute,
+    #[error("[gltf] missing positions attribute: {0:?}")]
+    MissingPositionAttribute(gltf::mesh::Semantic),
 
     #[error("[gltf] Unsupported index data type: {0:?}")]
     UnsupportedIndexDataType(gltf::accessor::DataType),
@@ -38,6 +40,15 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] unsupported morph semantic: {0:?}")]
     UnsupportedMorphSemantic(gltf::mesh::Semantic),
+
+    #[error("[gltf] morph storage key missing")] 
+    MorphStorageKeyMissing,
+
+    #[error("[gltf] invalid morph buffer size: {0}")] 
+    InvalidMorphBufferSize(String),
+
+    #[error("[gltf] {0:?}")]
+    Mesh(#[from] AwsmMeshError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

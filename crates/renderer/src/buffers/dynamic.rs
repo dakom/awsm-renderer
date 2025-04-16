@@ -34,7 +34,7 @@ pub struct DynamicBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
     pub label: Option<String>,
     pub byte_size: usize,
     pub bind_group_binding: u32,
-    pub alignment_size: usize,
+    pub aligned_slice_size: usize,
     pub binding_type: BufferBindingType,
     pub usage: BufferUsage,
 }
@@ -44,13 +44,14 @@ impl<K: Key, const ZERO_VALUE: u8>
 {
     pub fn new_uniform(
         byte_size: usize,
+        aligned_slice_size: usize,
         bind_group_binding: u32,
         gpu: &AwsmRendererWebGpu,
         label: Option<String>,
     ) -> std::result::Result<Self, AwsmCoreError> {
         Self::new(
             byte_size,
-            256, // minUniformBufferOffsetAlignment
+            aligned_slice_size,
             bind_group_binding,
             32, // just some reasonable default
             BufferBindingType::Uniform,
@@ -65,13 +66,14 @@ impl<K: Key, const ZERO_VALUE: u8>
 
     pub fn new_storage(
         byte_size: usize,
+        aligned_slice_size: usize,
         bind_group_binding: u32,
         gpu: &AwsmRendererWebGpu,
         label: Option<String>,
     ) -> std::result::Result<Self, AwsmCoreError> {
         Self::new(
             byte_size,
-            256, // not sure why this has to be like this, but okay! 
+            aligned_slice_size,
             bind_group_binding,
             32, // just some reasonable default
             BufferBindingType::ReadOnlyStorage,
@@ -86,7 +88,7 @@ impl<K: Key, const ZERO_VALUE: u8>
 
     pub fn new(
         byte_size: usize,
-        alignment_size: usize,
+        aligned_slice_size: usize,
         bind_group_binding: u32,
         initial_capacity: usize,
         binding_type: BufferBindingType,
@@ -97,7 +99,7 @@ impl<K: Key, const ZERO_VALUE: u8>
         gpu: &AwsmRendererWebGpu,
         label: Option<String>,
     ) -> std::result::Result<Self, AwsmCoreError> {
-        let initial_size_bytes: usize = initial_capacity * alignment_size;
+        let initial_size_bytes: usize = initial_capacity * aligned_slice_size;
         // Allocate CPU data – initially filled with zeros.
         let raw_data = vec![ZERO_VALUE; initial_size_bytes];
 
@@ -119,7 +121,6 @@ impl<K: Key, const ZERO_VALUE: u8>
                 BufferBindingLayout::new()
                     .with_binding_type(binding_type)
                     .with_dynamic_offset(true)
-                    .with_min_binding_size(alignment_size),
             ),
         );
 
@@ -148,7 +149,7 @@ impl<K: Key, const ZERO_VALUE: u8>
                     BindGroupResource::Buffer(
                         BufferBinding::new(&gpu_buffer)
                             .with_offset(0)
-                            .with_size(alignment_size),
+                            .with_size(aligned_slice_size),
                     ),
                 )],
             )
@@ -167,7 +168,7 @@ impl<K: Key, const ZERO_VALUE: u8>
             label,
             byte_size,
             bind_group_binding,
-            alignment_size,
+            aligned_slice_size,
             binding_type,
             usage,
         })
@@ -192,7 +193,7 @@ impl<K: Key, const ZERO_VALUE: u8>
                 } else {
                     let new_slot = self.capacity_slots;
                     // Check if we need to grow the raw_data and GPU buffer.
-                    if (new_slot + 1) * self.alignment_size > self.raw_data.len() {
+                    if (new_slot + 1) * self.aligned_slice_size > self.raw_data.len() {
                         self.resize(new_slot + 1);
                     }
                     // Increase our logical capacity count.
@@ -207,7 +208,7 @@ impl<K: Key, const ZERO_VALUE: u8>
         };
 
         // Calculate byte offset.
-        let offset_bytes = slot * self.alignment_size;
+        let offset_bytes = slot * self.aligned_slice_size;
 
         // we can mutate the slice directly
         f(&mut self.raw_data[offset_bytes..offset_bytes + self.byte_size]);
@@ -244,7 +245,7 @@ impl<K: Key, const ZERO_VALUE: u8>
                         BindGroupResource::Buffer(
                             BufferBinding::new(&self.gpu_buffer)
                                 .with_offset(0)
-                                .with_size(self.alignment_size),
+                                .with_size(self.aligned_slice_size),
                         ),
                     )],
                 )
@@ -266,15 +267,19 @@ impl<K: Key, const ZERO_VALUE: u8>
             self.free_slots.push(slot);
 
             // Zero out the data in the slot.
-            let offset_bytes = slot * self.alignment_size;
-            self.raw_data[offset_bytes..offset_bytes + self.alignment_size].fill(ZERO_VALUE);
+            let offset_bytes = slot * self.aligned_slice_size;
+            self.raw_data[offset_bytes..offset_bytes + self.aligned_slice_size].fill(ZERO_VALUE);
         }
     }
 
     pub fn offset(&self, key: K) -> Option<usize> {
         let slot = self.slot_indices.get(key)?;
 
-        Some(slot * self.alignment_size)
+        Some(slot * self.aligned_slice_size)
+    }
+
+    pub fn keys(&self) -> slotmap::secondary::Keys<K, usize> {
+        self.slot_indices.keys()
     }
 
     /// Resizes the buffer so that it can store at least `required_slots`.
@@ -287,7 +292,7 @@ impl<K: Key, const ZERO_VALUE: u8>
 
         // Resize the CPU-side data; new bytes are zeroed out.
         self.raw_data
-            .resize(self.capacity_slots * self.alignment_size, ZERO_VALUE);
+            .resize(self.capacity_slots * self.aligned_slice_size, ZERO_VALUE);
 
         // mark this so it will resize before the next gpu write
         self.gpu_buffer_needs_resize = true;

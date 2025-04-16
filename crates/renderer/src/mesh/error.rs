@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use crate::transform::AwsmTransformError;
 
-use super::MeshKey;
+use super::{morphs::MorphKey, MeshKey};
 
 pub type Result<T> = std::result::Result<T, AwsmMeshError>;
 
@@ -18,9 +18,6 @@ pub enum AwsmMeshError {
     #[error("[mesh] {0:?}")]
     Transform(#[from] AwsmTransformError),
 
-    #[error("[mesh] morph weight not found: {0:?}")]
-    MorphWeightSlotMissing(MeshKey),
-
-    #[error("[mesh] morph value not found: {0:?}")]
-    MorphValueSlotMissing(MeshKey),
+    #[error("[mesh] morph not found: {0:?}")]
+    MorphNotFound(MorphKey),
 }

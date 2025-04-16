@@ -8,7 +8,7 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::{Mat4, Vec3};
 use thiserror::Error;
 
-use crate::uniforms::bind_group::BIND_GROUP_CAMERA_BINDING;
+use crate::buffers::bind_group::BIND_GROUP_CAMERA_BINDING;
 use crate::AwsmRenderer;
 
 impl AwsmRenderer {

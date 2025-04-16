@@ -7,7 +7,7 @@ use crate::core::command::CommandEncoder;
 use crate::error::Result;
 use crate::mesh::Meshes;
 use crate::transform::Transforms;
-use crate::uniforms::bind_group::BIND_GROUP_CAMERA;
+use crate::buffers::bind_group::BIND_GROUP_CAMERA;
 use crate::AwsmRenderer;
 
 impl AwsmRenderer {
@@ -45,8 +45,8 @@ impl AwsmRenderer {
         ctx.render_pass
             .set_bind_group(BIND_GROUP_CAMERA, &self.camera.bind_group, None)?;
 
-        for (mesh_key, mesh) in self.meshes.iter() {
-            mesh.push_commands(&mut ctx, mesh_key)?;
+        for (_, mesh) in self.meshes.iter() {
+            mesh.push_commands(&mut ctx)?;
         }
 
         ctx.render_pass.end();

@@ -1,6 +1,6 @@
 use slotmap::{new_key_type, DenseSlotMap};
 
-use crate::{mesh::MeshKey, transform::TransformKey, AwsmRenderer};
+use crate::{mesh::MorphKey, transform::TransformKey, AwsmRenderer};
 
 use super::{
     data::{AnimationData, AppliedAnimation},
@@ -17,7 +17,7 @@ new_key_type! {
 pub struct Animations {
     pub players: DenseSlotMap<AnimationKey, AnimationPlayer<AnimationData>>,
     pub transforms: DenseSlotMap<AnimationKey, TransformKey>,
-    pub meshes: DenseSlotMap<AnimationKey, MeshKey>,
+    pub morphs: DenseSlotMap<AnimationKey, MorphKey>,
 }
 
 impl AwsmRenderer {
@@ -45,7 +45,7 @@ impl AwsmRenderer {
             }
         }
 
-        for (animation_key, mesh_key) in self.animations.meshes.iter() {
+        for (animation_key, morph_key) in self.animations.morphs.iter() {
             let player = self
                 .animations
                 .players
@@ -54,9 +54,9 @@ impl AwsmRenderer {
 
             match player.sample() {
                 AnimationData::Vertex(vertex_animation) => {
-                    self.meshes.morphs.update_morph_weights_with(*mesh_key, vertex_animation.weights.len(), |target| {
+                    self.meshes.morphs.update_morph_weights_with(*morph_key, |target| {
                         target.copy_from_slice(&vertex_animation.weights);
-                    });
+                    })?;
                 }
                 _ => {
                     return Err(AwsmAnimationError::WrongKind("weird, animation player has a mesh key but the animation data is not for a mesh".to_string()));

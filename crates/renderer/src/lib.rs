@@ -1,3 +1,4 @@
+use buffers::storage::StorageBuffers;
 use camera::{CameraBuffer, CameraExt};
 use mesh::Meshes;
 use transform::Transforms;
@@ -6,10 +7,9 @@ pub mod camera;
 pub mod error;
 pub mod mesh;
 pub mod render;
-pub mod uniforms;
+pub mod buffers;
 pub mod transform;
 pub mod shaders;
-pub mod dynamic_buffer;
 pub mod core {
     pub use awsm_renderer_core::*;
 }
@@ -27,6 +27,8 @@ pub struct AwsmRenderer {
     pub camera: CameraBuffer,
 
     pub transforms: Transforms,
+
+    pub storage: StorageBuffers,
 
     #[cfg(feature = "gltf")]
     pub gltf: gltf::cache::GltfCache,
@@ -107,6 +109,7 @@ impl AwsmRendererBuilder {
             meshes,
             camera,
             transforms,
+            storage: StorageBuffers::new(),
 
             #[cfg(feature = "gltf")]
             gltf: gltf::cache::GltfCache::default(),

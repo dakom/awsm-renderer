@@ -1,17 +1,20 @@
 mod error;
 mod meshes;
 mod morphs;
+mod buffer_info;
 
 use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
 use glam::{Mat4, Vec3};
 
-use crate::uniforms::bind_group::{BIND_GROUP_MORPH_TARGET_VALUES, BIND_GROUP_MORPH_TARGET_WEIGHTS};
-use crate::{render::RenderContext, uniforms::bind_group::BIND_GROUP_TRANSFORM};
+use crate::buffers::bind_group::{BIND_GROUP_TRANSFORM, BIND_GROUP_MORPH_TARGET_VALUES, BIND_GROUP_MORPH_TARGET_WEIGHTS};
+use crate::render::RenderContext;
 use crate::transform::TransformKey;
+
 
 pub use error::AwsmMeshError;
 pub use meshes::{MeshKey, Meshes};
-pub use morphs::MorphBufferValuesKey;
+pub use buffer_info::*;
+pub use morphs::MorphKey;
 
 use super::error::Result;
 
@@ -26,6 +29,7 @@ pub struct Mesh {
     pub topology: PrimitiveTopology,
     pub position_extents: Option<PositionExtents>,
     pub transform_key: TransformKey,
+    pub morph_key: Option<MorphKey>,
 }
 
 #[derive(Debug, Clone)]
@@ -62,8 +66,8 @@ pub struct MeshVertexBuffer {
 pub struct MeshIndexBuffer {
     pub buffer: web_sys::GpuBuffer,
     pub format: IndexFormat,
-    pub offset: Option<u64>,
-    pub size: Option<u64>,
+    pub offset: u64,
+    pub size: u64,
 }
 
 impl Mesh {
@@ -79,6 +83,7 @@ impl Mesh {
             index_buffer: None,
             topology: PrimitiveTopology::TriangleList,
             position_extents: None,
+            morph_key: None,
             transform_key,
         }
     }
@@ -103,7 +108,12 @@ impl Mesh {
         self
     }
 
-    pub fn push_commands(&self, ctx: &mut RenderContext, mesh_key: MeshKey) -> Result<()> {
+    pub fn with_morph_key(mut self, morph_key: MorphKey) -> Self {
+        self.morph_key = Some(morph_key);
+        self
+    }
+
+    pub fn push_commands(&self, ctx: &mut RenderContext) -> Result<()> {
         ctx.render_pass.set_pipeline(&self.pipeline);
 
         ctx.render_pass.set_bind_group(
@@ -112,26 +122,23 @@ impl Mesh {
             Some(&[ctx.transforms.buffer_offset(self.transform_key)? as u32]),
         )?;
 
-        if let Some((morph_values_key, morph_value_offset)) = ctx.meshes.morphs.try_get_morph_value_offset(mesh_key) {
+        if let Some(morph_key) = self.morph_key {
             ctx.render_pass.set_bind_group(
                 BIND_GROUP_MORPH_TARGET_WEIGHTS,
                 ctx.meshes.morphs.weights_bind_group(),
                 Some(&[
-                    ctx.meshes.morphs.weights_buffer_offset(mesh_key)? as u32
+                    ctx.meshes.morphs.weights_buffer_offset(morph_key)? as u32
                 ]),
             )?;
 
             ctx.render_pass.set_bind_group(
                 BIND_GROUP_MORPH_TARGET_VALUES,
-                ctx.meshes.morphs.values_bind_group(morph_values_key),
+                ctx.meshes.morphs.values_bind_group(morph_key)?,
                 Some(&[
-                    morph_value_offset as u32
+                    ctx.meshes.morphs.values_buffer_offset(morph_key)? as u32
                 ]),
             )?;
         }
-
-
-
 
         for vertex_buffer in &self.vertex_buffers {
             ctx.render_pass.set_vertex_buffer(
@@ -147,8 +154,8 @@ impl Mesh {
                 ctx.render_pass.set_index_buffer(
                     &index_buffer.buffer,
                     index_buffer.format,
-                    index_buffer.offset,
-                    index_buffer.size,
+                    Some(index_buffer.offset),
+                    Some(index_buffer.size),
                 );
                 ctx.render_pass.draw_indexed(self.draw_count as u32);
             }

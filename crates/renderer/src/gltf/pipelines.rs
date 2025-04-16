@@ -3,9 +3,10 @@ use awsm_renderer_core::pipeline::layout::{PipelineLayoutDescriptor, PipelineLay
 use awsm_renderer_core::pipeline::vertex::{VertexBufferLayout, VertexState};
 use awsm_renderer_core::pipeline::RenderPipelineDescriptor;
 
+use crate::buffers::storage::StorageBufferKey;
 use crate::gltf::error::Result;
 
-use crate::mesh::MorphBufferValuesKey;
+use crate::mesh::{MeshBufferInfo, MorphKey};
 use crate::shaders::ShaderKey;
 use crate::AwsmRenderer;
 
@@ -23,19 +24,17 @@ pub struct RenderPipelineKey {
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
 pub struct PipelineLayoutKey {
-    pub morph_values_key: Option<MorphBufferValuesKey>,
+    pub morph_buffer_storage_key: Option<StorageBufferKey>,
+    pub morph_targets_len: Option<usize>, // TODO - override constant in shader
 }
 
 impl PipelineLayoutKey {
-    pub fn new(ctx: &GltfPopulateContext, shader_key: &ShaderKey) -> Self {
+    pub fn new(ctx: &GltfPopulateContext, buffer_info: &MeshBufferInfo) -> Self {
         let mut key = Self::default();
 
-        match (ctx.morph_values_key, shader_key.morphs) {
-            (Some(morph_values_key), true) => {
-                key.morph_values_key = Some(morph_values_key);
-            }
-            (None, false) => {}
-            _ => panic!("morph key mismatch"),
+        if let Some(morph) = buffer_info.morph.as_ref() {
+            key.morph_targets_len = Some(morph.targets_len);
+            key.morph_buffer_storage_key = Some(ctx.morph_buffer_storage_key.unwrap());
         }
 
         key
@@ -43,20 +42,20 @@ impl PipelineLayoutKey {
 }
 
 impl PipelineLayoutKey {
-    pub fn into_descriptor(self, renderer: &AwsmRenderer) -> PipelineLayoutDescriptor {
+    pub fn into_descriptor(self, renderer: &AwsmRenderer, morph_key: Option<MorphKey>) -> Result<PipelineLayoutDescriptor> {
         let mut bind_group_layouts = vec![
             renderer.camera.bind_group_layout.clone(),
             renderer.transforms.bind_group_layout().clone(),
         ];
 
-        if let Some(morph_values_key) = self.morph_values_key {
+        if let Some(morph_key) = morph_key {
             bind_group_layouts.push(renderer.meshes.morphs.weights_bind_group_layout().clone());
-            bind_group_layouts.push(renderer.meshes.morphs.values_bind_group_layout(morph_values_key).clone());
+            bind_group_layouts.push(renderer.meshes.morphs.values_bind_group_layout(morph_key)?.clone());
         }
-        PipelineLayoutDescriptor::new(
+        Ok(PipelineLayoutDescriptor::new(
             Some("Mesh (from gltf primitive)"),
             bind_group_layouts
-        )
+        ))
     }
 }
 
@@ -79,6 +78,7 @@ impl RenderPipelineKey {
         self,
         renderer: &mut AwsmRenderer,
         shader_module: &web_sys::GpuShaderModule,
+        morph_key: Option<MorphKey>
     ) -> Result<web_sys::GpuRenderPipelineDescriptor> {
         let vertex =
             VertexState::new(shader_module, None).with_buffer_layouts(self.vertex_buffer_layouts);
@@ -88,7 +88,7 @@ impl RenderPipelineKey {
         let layout = match renderer.gltf.pipeline_layouts.get(&self.layout_key) {
             None => {
                 let layout = renderer.gpu.create_pipeline_layout(
-                    &self.layout_key.clone().into_descriptor(renderer).into(),
+                    &self.layout_key.clone().into_descriptor(renderer, morph_key)?.into(),
                 );
 
                 renderer
