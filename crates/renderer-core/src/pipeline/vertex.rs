@@ -1,12 +1,14 @@
+use std::collections::BTreeMap;
+
 use wasm_bindgen::prelude::*;
 
-use super::constants::ConstantOverride;
+use super::constants::{ConstantOverrideKey, ConstantOverrideValue};
 
 #[derive(Debug, Clone)]
 pub struct VertexState<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#vertex_object_structure
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuVertexState.html
-    pub constants: Vec<(u16, ConstantOverride)>,
+    pub constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
     pub entry_point: Option<&'a str>,
     pub module: &'a web_sys::GpuShaderModule,
     pub buffer_layouts: Vec<VertexBufferLayout>,
@@ -57,15 +59,20 @@ pub type VertexFormat = web_sys::GpuVertexFormat;
 impl<'a> VertexState<'a> {
     pub fn new(module: &'a web_sys::GpuShaderModule, entry_point: Option<&'a str>) -> Self {
         Self {
-            constants: Vec::new(),
+            constants: BTreeMap::new(),
             entry_point,
             module,
             buffer_layouts: Vec::new(),
         }
     }
 
-    pub fn with_buffer_layouts(mut self, buffer_layouts: Vec<VertexBufferLayout>) -> Self {
-        self.buffer_layouts = buffer_layouts;
+    pub fn with_buffer_layout(mut self, buffer_layout: VertexBufferLayout) -> Self {
+        self.buffer_layouts.push(buffer_layout);
+        self
+    }
+
+    pub fn with_constant(mut self, key: ConstantOverrideKey, value: ConstantOverrideValue) -> Self {
+        self.constants.insert(key, value);
         self
     }
 }
@@ -80,8 +87,8 @@ impl From<VertexState<'_>> for web_sys::GpuVertexState {
 
         if !state.constants.is_empty() {
             let obj = js_sys::Object::new();
-            for (binding, constant) in &state.constants {
-                js_sys::Reflect::set(&obj, &JsValue::from(*binding), &JsValue::from(*constant))
+            for (key, value) in state.constants.into_iter() {
+                js_sys::Reflect::set(&obj, &JsValue::from(key), &JsValue::from(value))
                     .unwrap_throw();
             }
             state_js.set_constants(&obj);

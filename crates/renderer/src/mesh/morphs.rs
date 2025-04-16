@@ -138,13 +138,10 @@ impl Morphs {
     // This *does* write to the gpu, should be called only once per frame
     // just write the entire buffer in one fell swoop
     pub fn write_weights_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
-        // let keys = self.weights.keys().collect::<Vec<_>>();
-        // for key in keys {
-        //     self.update_morph_weights_with(key, |weights| {
-        //         weights[0] = 0.0;
-        //         weights[1] = 1.0;
+        // if let Some(key) = self.weights.keys().next() {
+        //     self.update_morph_weights_with(key, |slice| {
+        //         slice[0] = 1.0;
         //     })?;
-
         // }
         self.weights.write_to_gpu(gpu)?;
 

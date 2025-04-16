@@ -1,7 +1,7 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use crate::{
-    buffers::storage::StorageBufferKey, gltf::{error::AwsmGltfError, pipelines::RenderPipelineKey}, mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer, PositionExtents}, shaders::ShaderKey, transform::TransformKey, AwsmRenderer
+    buffers::storage::StorageBufferKey, gltf::{error::AwsmGltfError, pipelines::RenderPipelineKey}, mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer, PositionExtents}, shaders::{ShaderConstantIds, ShaderKey}, transform::TransformKey, AwsmRenderer
 };
 use awsm_renderer_core::{
     pipeline::primitive::{IndexFormat, PrimitiveTopology},
@@ -146,12 +146,16 @@ impl AwsmRenderer {
         // tracing::info!("positions: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[0].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
         //tracing::info!("normals: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[1].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
 
-        let pipeline_key = RenderPipelineKey::new(
+        let mut pipeline_key = RenderPipelineKey::new(
             self,
             shader_key,
             pipeline_layout_key,
             vec![vertex_buffer_layout],
         );
+
+        if let Some(morph) = &primitive_buffer_info.morph {
+            pipeline_key = pipeline_key.with_vertex_constant((ShaderConstantIds::MaxMorphTargets as u16).into(), (morph.targets_len as u32).into());
+        }
 
         let render_pipeline = match self.gltf.render_pipelines.get(&pipeline_key).cloned() {
             None => {

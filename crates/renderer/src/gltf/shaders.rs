@@ -19,23 +19,23 @@ impl ShaderKey {
 
         primitive.morph_targets().for_each(|morph_target| {
             if morph_target.positions().is_some() {
-                key.morphs = true;
+                key.has_morphs = true;
             }
             if morph_target.normals().is_some() {
-                key.morphs = true;
+                key.has_morphs = true;
             }
             if morph_target.tangents().is_some() {
-                key.morphs = true;
+                key.has_morphs = true;
             }
         });
 
         for (semantic, _accessor) in primitive.attributes() {
             match semantic {
                 gltf::Semantic::Positions => {
-                    key.position_attribute = true;
+                    key.has_attribute_position = true;
                 }
                 gltf::Semantic::Normals => {
-                    key.normal_attribute = true;
+                    key.has_attribute_normal = true;
                 }
                 gltf::Semantic::Tangents => {
                     tracing::warn!("TODO - primitive tangents");

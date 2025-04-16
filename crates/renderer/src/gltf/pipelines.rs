@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+
+use awsm_renderer_core::pipeline::constants::{ConstantOverrideKey, ConstantOverrideValue};
 use awsm_renderer_core::pipeline::fragment::{ColorTargetState, FragmentState};
 use awsm_renderer_core::pipeline::layout::{PipelineLayoutDescriptor, PipelineLayoutKind};
 use awsm_renderer_core::pipeline::vertex::{VertexBufferLayout, VertexState};
@@ -14,16 +17,17 @@ use super::populate::GltfPopulateContext;
 
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
-pub struct RenderPipelineKey {
+pub(super) struct RenderPipelineKey {
     pub shader_key: ShaderKey,
     pub layout_key: PipelineLayoutKey,
     pub fragment_targets: Vec<ColorTargetState>,
     pub vertex_buffer_layouts: Vec<VertexBufferLayout>,
+    pub vertex_constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>
 }
 
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
-pub struct PipelineLayoutKey {
+pub(super) struct PipelineLayoutKey {
     pub morph_buffer_storage_key: Option<StorageBufferKey>,
     pub morph_targets_len: Option<usize>, // TODO - override constant in shader
 }
@@ -71,7 +75,18 @@ impl RenderPipelineKey {
             layout_key,
             fragment_targets: vec![ColorTargetState::new(renderer.gpu.current_context_format())],
             vertex_buffer_layouts,
+            vertex_constants: BTreeMap::new(),
         }
+    }
+
+    pub fn with_fragment_target(mut self, target: ColorTargetState) -> Self {
+        self.fragment_targets.push(target);
+        self
+    }
+
+    pub fn with_vertex_constant(mut self, key: ConstantOverrideKey, value: ConstantOverrideValue) -> Self {
+        self.vertex_constants.insert(key, value);
+        self
     }
 
     pub fn into_descriptor(
@@ -80,8 +95,10 @@ impl RenderPipelineKey {
         shader_module: &web_sys::GpuShaderModule,
         morph_key: Option<MorphKey>
     ) -> Result<web_sys::GpuRenderPipelineDescriptor> {
-        let vertex =
-            VertexState::new(shader_module, None).with_buffer_layouts(self.vertex_buffer_layouts);
+        let mut vertex = VertexState::new(shader_module, None);
+        vertex.buffer_layouts = self.vertex_buffer_layouts;
+        vertex.constants = self.vertex_constants;
+
 
         let fragment = FragmentState::new(shader_module, None, self.fragment_targets.clone());
 

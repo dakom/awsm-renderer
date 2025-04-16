@@ -1,12 +1,15 @@
-use super::constants::ConstantOverride;
+use std::collections::BTreeMap;
+
 use crate::texture::TextureFormat;
 use wasm_bindgen::prelude::*;
+
+use super::constants::{ConstantOverrideKey, ConstantOverrideValue};
 
 #[derive(Debug, Clone)]
 pub struct FragmentState<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#fragment_object_structure
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuFragmentState.html
-    pub constants: Vec<(u16, ConstantOverride)>,
+    pub constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
     pub entry_point: Option<&'a str>,
     pub module: &'a web_sys::GpuShaderModule,
     pub targets: Vec<ColorTargetState>,
@@ -71,11 +74,20 @@ impl<'a> FragmentState<'a> {
         targets: Vec<ColorTargetState>,
     ) -> Self {
         Self {
-            constants: Vec::new(),
+            constants: BTreeMap::new(),
             entry_point,
             module,
             targets,
         }
+    }
+
+    pub fn with_constant(mut self, binding: ConstantOverrideKey, constant: ConstantOverrideValue) -> Self {
+        self.constants.insert(binding, constant);
+        self
+    }
+    pub fn with_target(mut self, target: ColorTargetState) -> Self {
+        self.targets.push(target);
+        self
     }
 }
 

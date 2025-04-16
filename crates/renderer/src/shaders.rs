@@ -1,5 +1,9 @@
 use awsm_renderer_core::shaders::{preprocess::preprocess_shader, ShaderModuleDescriptor};
 
+#[repr(u16)]
+pub enum ShaderConstantIds {
+    MaxMorphTargets = 1,
+}
 // merely a key to hash ad-hoc shader generation
 // is not stored on the mesh itself
 //
@@ -7,20 +11,19 @@ use awsm_renderer_core::shaders::{preprocess::preprocess_shader, ShaderModuleDes
 // is controlled via various components as-needed
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
 pub struct ShaderKey {
-    pub position_attribute: bool,
-    pub normal_attribute: bool,
-    pub tangent_attribute: bool,
-    pub morphs: bool,
-    pub skin_targets: Vec<SkinTarget>,
-    pub n_morph_target_weights: u8,
-    pub n_skin_joints: u8,
-    pub tex_coords: Option<Vec<u32>>,
-    pub vertex_colors: Option<Vec<VertexColor>>,
-    pub normal_texture_uv_index: Option<u32>,
-    pub metallic_roughness_texture_uv_index: Option<u32>,
-    pub base_color_texture_uv_index: Option<u32>,
-    pub emissive_texture_uv_index: Option<u32>,
-    pub alpha_mode: ShaderKeyAlphaMode,
+    pub has_attribute_position: bool,
+    pub has_attribute_normal: bool,
+    pub has_attribute_tangent: bool,
+    pub has_morphs: bool,
+    // pub skin_targets: Vec<SkinTarget>,
+    // pub n_skin_joints: u8,
+    // pub tex_coords: Option<Vec<u32>>,
+    // pub vertex_colors: Option<Vec<VertexColor>>,
+    // pub normal_texture_uv_index: Option<u32>,
+    // pub metallic_roughness_texture_uv_index: Option<u32>,
+    // pub base_color_texture_uv_index: Option<u32>,
+    // pub emissive_texture_uv_index: Option<u32>,
+    // pub alpha_mode: ShaderKeyAlphaMode,
 }
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
@@ -68,7 +71,7 @@ impl ShaderKey {
         let mut source = String::new();
         source.push_str(CAMERA);
         source.push_str("\n\n");
-        if self.morphs {
+        if self.has_morphs {
             source.push_str(include_str!("./shaders/vertex/morph.wgsl"));
             source.push_str("\n\n");
         }
@@ -78,9 +81,9 @@ impl ShaderKey {
 
         let retain = |id: &str, _code: &str| -> bool {
             match id {
-                "normals" => self.normal_attribute,
-                "tangents" => self.tangent_attribute,
-                "morphs" => self.morphs,
+                "normals" => self.has_attribute_normal,
+                "tangents" => self.has_attribute_tangent,
+                "morphs" => self.has_morphs,
                 _ => false,
             }
         };
