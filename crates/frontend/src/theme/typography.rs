@@ -47,7 +47,7 @@ pub enum FontSize {
 }
 
 impl FontSize {
-    pub fn style(self) -> &'static str {
+    pub fn value(self) -> &'static str {
         match self {
             Self::H1 => "5.12rem",
             Self::H2 => "3.19rem",

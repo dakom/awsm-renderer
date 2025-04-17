@@ -147,13 +147,6 @@ pub trait Animatable: Clone {
     ) -> Self;
 }
 
-pub trait AppliedAnimation {
-    type Data;
-
-    fn apply(&self, input: Self::Data) -> Self::Data;
-    fn apply_mut(&self, input: &mut Self::Data);
-}
-
 #[derive(Debug, Clone)]
 pub struct TransformAnimation {
     pub translation: Option<Vec3>,
@@ -161,10 +154,8 @@ pub struct TransformAnimation {
     pub scale: Option<Vec3>,
 }
 
-impl AppliedAnimation for TransformAnimation {
-    type Data = Transform;
-
-    fn apply(&self, input: Self::Data) -> Self::Data {
+impl TransformAnimation {
+    pub fn apply(&self, input: Transform) -> Transform {
         let mut result = input;
         if let Some(translation) = &self.translation {
             result.translation += *translation;
@@ -178,7 +169,7 @@ impl AppliedAnimation for TransformAnimation {
         result
     }
 
-    fn apply_mut(&self, input: &mut Self::Data) {
+    pub fn apply_mut(&self, input: &mut Transform) {
         if let Some(translation) = &self.translation {
             input.translation += *translation;
         }
@@ -295,10 +286,8 @@ pub struct VertexAnimation {
     pub weights: Vec<f32>,
 }
 
-impl AppliedAnimation for VertexAnimation {
-    type Data = Vec<f32>;
-
-    fn apply(&self, input: Self::Data) -> Self::Data {
+impl VertexAnimation {
+    pub fn apply(&self, input: Vec<f32>) -> Vec<f32> {
         let mut result = input;
         for (i, weight) in self.weights.iter().enumerate() {
             if i < result.len() {
@@ -308,7 +297,7 @@ impl AppliedAnimation for VertexAnimation {
         result
     }
 
-    fn apply_mut(&self, other: &mut Vec<f32>) {
+    pub fn apply_mut(&self, other: &mut Vec<f32>) {
         for (i, weight) in self.weights.iter().enumerate() {
             if i < other.len() {
                 other[i] *= *weight;

@@ -1,12 +1,12 @@
-use slotmap::{new_key_type, DenseSlotMap};
+use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
 use crate::{mesh::MorphKey, transform::TransformKey, AwsmRenderer};
 
 use super::{
-    data::{AnimationData, AppliedAnimation},
+    data::AnimationData,
     error::Result,
     player::AnimationPlayer,
-    AwsmAnimationError,
+    AwsmAnimationError
 };
 
 new_key_type! {
@@ -15,9 +15,41 @@ new_key_type! {
 
 #[derive(Debug, Clone, Default)]
 pub struct Animations {
-    pub players: DenseSlotMap<AnimationKey, AnimationPlayer<AnimationData>>,
-    pub transforms: DenseSlotMap<AnimationKey, TransformKey>,
-    pub morphs: DenseSlotMap<AnimationKey, MorphKey>,
+    players: DenseSlotMap<AnimationKey, AnimationPlayer>,
+    transforms: SecondaryMap<AnimationKey, TransformKey>,
+    morphs: SecondaryMap<AnimationKey, MorphKey>,
+}
+
+impl Animations {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn remove(&mut self, key: AnimationKey) {
+        self.players.remove(key);
+        self.transforms.remove(key);
+        self.morphs.remove(key);
+    }
+
+    pub fn insert_transform(
+        &mut self,
+        player: AnimationPlayer,
+        transform_key: TransformKey,
+    ) -> AnimationKey {
+        let key = self.players.insert(player.into());
+        self.transforms.insert(key, transform_key);
+        key
+    }
+
+    pub fn insert_morph(
+        &mut self,
+        player: AnimationPlayer,
+        morph_key: MorphKey,
+    ) -> AnimationKey {
+        let key = self.players.insert(player.into());
+        self.morphs.insert(key, morph_key);
+        key
+    }
 }
 
 impl AwsmRenderer {

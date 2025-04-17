@@ -65,12 +65,41 @@ impl AwsmRenderer {
             //
             // the reason is two-fold:
             // 1. that's technically how the gltf spec is defined
-            // 2. we get a performance boost since we can use the same transform for all primitives in a mesh (instead of forcing a tree of some kind)
+            // 2. we get a performance boost since we can use the same transform for all primitives in a mesh (instead of forcing an unnecessary tree)
             let transform = transform_gltf_node(gltf_node);
             let transform_key = self.transforms.insert(transform, parent_transform_key);
 
             for gltf_animation in ctx.data.doc.animations() {
-                tracing::warn!("TODO - if animation applies to transform, create and set it");
+                for channel in gltf_animation.channels() {
+                    if channel.target().node().index() == gltf_node.index() {
+                        match channel.target().property() {
+                            gltf::animation::Property::Translation => {
+                                self.populate_gltf_animation_transform_translation(
+                                    ctx,
+                                    &gltf_animation,
+                                    transform_key
+                                )?;
+                            },
+                            gltf::animation::Property::Rotation => {
+                                self.populate_gltf_animation_transform_rotation(
+                                    ctx,
+                                    &gltf_animation,
+                                    transform_key
+                                )?;
+                            },
+                            gltf::animation::Property::Scale => {
+                                self.populate_gltf_animation_transform_scale(
+                                    ctx,
+                                    &gltf_animation,
+                                    transform_key
+                                )?;
+                            },
+                            gltf::animation::Property::MorphTargetWeights => {
+                                // morph targets will be dealt with later when we populate the mesh
+                            },
+                        }
+                    }
+                }
             }
 
             if let Some(gltf_mesh) = gltf_node.mesh() {
@@ -97,7 +126,7 @@ impl AwsmRenderer {
     async fn populate_gltf_primitive(
         &mut self,
         ctx: &GltfPopulateContext,
-        _gltf_node: &gltf::Node<'_>,
+        gltf_node: &gltf::Node<'_>,
         gltf_mesh: &gltf::Mesh<'_>,
         gltf_primitive: gltf::Primitive<'_>,
         transform_key: TransformKey,
@@ -236,7 +265,23 @@ impl AwsmRenderer {
         let _mesh_key = self.meshes.insert(mesh);
 
         for gltf_animation in ctx.data.doc.animations() {
-            tracing::warn!("TODO - if animation applies to mesh, create and set it");
+            for channel in gltf_animation.channels() {
+                if channel.target().node().index() == gltf_node.index() {
+                    match channel.target().property() {
+                        gltf::animation::Property::MorphTargetWeights => {
+                            self.populate_gltf_animation_morph(
+                                ctx,
+                                &gltf_animation,
+                                morph_key.ok_or(AwsmGltfError::MissingMorphForAnimation)?,
+                            )?;
+                        },
+                        // transform animations were already populated in the node
+                        gltf::animation::Property::Translation
+                        | gltf::animation::Property::Rotation
+                        | gltf::animation::Property::Scale => { }
+                    }
+                }
+            }
         }
 
         Ok(())

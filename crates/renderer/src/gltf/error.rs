@@ -1,10 +1,13 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::mesh::AwsmMeshError;
+use crate::{animation::AwsmAnimationError, mesh::AwsmMeshError};
 
 #[derive(Error, Debug)]
 pub enum AwsmGltfError {
+    #[error("[gltf] TODO: {0}")]
+    Todo(String),
+
     #[error("[gltf] Error loading file")]
     Load,
 
@@ -49,6 +52,12 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] {0:?}")]
     Mesh(#[from] AwsmMeshError),
+
+    #[error("[gltf] {0:?}")]
+    Animation(#[from] AwsmAnimationError),
+
+    #[error("[gltf] morph animation exists but no morph target found")]
+    MissingMorphForAnimation,
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

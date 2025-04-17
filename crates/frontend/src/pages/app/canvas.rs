@@ -74,8 +74,10 @@ impl AppCanvas {
                 .class(&*FULL_AREA)
                 .style("position", "absolute")
                 .style("padding", "1rem")
-                .class([FontSize::H3.class(), ColorText::GltfContent.class()])
-                .text_signal(state.display_text.signal_cloned())
+                .child(html!("div", {
+                    .class([FontSize::H3.class(), ColorText::GltfContent.class(), &*USER_SELECT_NONE])
+                    .text_signal(state.display_text.signal_cloned())
+                }))
             }))
             .future(sig.for_each(clone!(state => move |data| {
                 clone!(state => async move {

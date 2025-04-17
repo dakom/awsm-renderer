@@ -1,7 +1,7 @@
-use super::{clip::AnimationClip, data::AnimationData};
+use super::{clip::AnimationClip, data::AnimationData, TransformAnimation};
 
 #[derive(Debug, Clone)]
-pub struct AnimationPlayer<T> {
+pub struct AnimationPlayer<T = AnimationData> {
     pub speed: f64,
     pub loop_style: Option<AnimationLoopStyle>,
     // will change with ping-pong as each end is hit
