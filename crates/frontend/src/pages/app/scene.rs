@@ -11,6 +11,7 @@ use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use awsm_web::dom::resize::ResizeObserver;
 use camera::Camera;
 use glam::Vec3;
+use gloo_events::EventListener;
 use serde::de;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 
@@ -21,10 +22,11 @@ use crate::prelude::*;
 pub struct AppScene {
     pub renderer: futures::lock::Mutex<AwsmRenderer>,
     pub gltf_loader: Mutex<HashMap<GltfId, GltfLoader>>,
-    pub camera: Mutex<Camera>,
+    pub camera: Mutex<Option<Camera>>,
     pub resize_observer: Mutex<Option<ResizeObserver>>,
     pub request_animation_frame: Mutex<Option<gloo_render::AnimationFrame>>,
     pub last_request_animation_frame: Cell<Option<f64>>,
+    pub event_listeners: Mutex<Vec<EventListener>>,
 }
 
 impl AppScene {
@@ -32,10 +34,11 @@ impl AppScene {
         let state = Arc::new(Self {
             renderer: futures::lock::Mutex::new(renderer),
             gltf_loader: Mutex::new(HashMap::new()),
-            camera: Mutex::new(Camera::default()),
+            camera: Mutex::new(None),
             resize_observer: Mutex::new(None),
             request_animation_frame: Mutex::new(None),
             last_request_animation_frame: Cell::new(None),
+            event_listeners: Mutex::new(Vec::new()),
         });
 
         let resize_observer = ResizeObserver::new(
@@ -63,6 +66,51 @@ impl AppScene {
         resize_observer.observe(&canvas);
 
         *state.resize_observer.lock().unwrap() = Some(resize_observer);
+
+        let event_listeners = vec![
+            EventListener::new(
+                &canvas,
+                "pointerdown",
+                clone!(state => move |event| {
+                    if let Some(camera) = state.camera.lock().unwrap().as_mut() {
+                        let event = event.unchecked_ref::<web_sys::PointerEvent>();
+                        camera.on_pointer_down(event.client_x(), event.client_y());
+                    }
+                }),
+            ),
+            EventListener::new(
+                &web_sys::window().unwrap(),
+                "pointermove",
+                clone!(state => move |event| {
+                    if let Some(camera) = state.camera.lock().unwrap().as_mut() {
+                        let event = event.unchecked_ref::<web_sys::PointerEvent>();
+                        camera.on_pointer_move(event.client_x(), event.client_y());
+                    }
+                }),
+            ),
+            EventListener::new(
+                &web_sys::window().unwrap(),
+                "pointerup",
+                clone!(state => move |event| {
+                    if let Some(camera) = state.camera.lock().unwrap().as_mut() {
+                        let event = event.unchecked_ref::<web_sys::PointerEvent>();
+                        camera.on_pointer_up(event.client_x(), event.client_y());
+                    }
+                }),
+            ),
+            EventListener::new(
+                &canvas,
+                "wheel",
+                clone!(state => move |event| {
+                    if let Some(camera) = state.camera.lock().unwrap().as_mut() {
+                        let event = event.unchecked_ref::<web_sys::WheelEvent>();
+                        camera.on_wheel(event.delta_y());
+                    }
+                }),
+            ),
+        ];
+
+        *state.event_listeners.lock().unwrap() = event_listeners;
 
         state
     }
@@ -147,7 +195,7 @@ impl AppScene {
 
         let mut camera = self.camera.lock().unwrap();
         if let Some(extents) = extents {
-            camera.set_extents(extents);
+            *camera = Some(Camera::new(renderer.gpu.canvas(), extents));
         }
 
         Ok(())
@@ -156,12 +204,12 @@ impl AppScene {
     pub async fn update_all(self: &Arc<Self>, global_time_delta: f64) -> Result<()> {
         let state = self;
 
-        let camera = self.camera.lock().unwrap();
-
-        self.renderer
-            .lock()
-            .await
-            .update_all(global_time_delta, &*camera)?;
+        if let Some(camera) = self.camera.lock().unwrap().clone() {
+            self.renderer
+                .lock()
+                .await
+                .update_all(global_time_delta, &camera)?;
+        }
 
         Ok(())
     }

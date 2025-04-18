@@ -24,6 +24,9 @@ impl AppCanvas {
 
         static FULL_AREA: LazyLock<String> = LazyLock::new(|| {
             class! {
+                .style("margin", "0")
+                .style("padding", "0")
+                .style("position", "absolute")
                 .style("top", "0")
                 .style("left", "0")
                 .style("width", "100%")
@@ -47,9 +50,12 @@ impl AppCanvas {
         };
 
         html!("div", {
-            .class(&*FULL_AREA)
             .style("position", "relative")
+            .style("width", "100%")
+            .style("height", "100%")
             .child(html!("canvas" => web_sys::HtmlCanvasElement, {
+                .class(&*CURSOR_POINTER)
+                .class(&*FULL_AREA)
                 .after_inserted(clone!(state => move |canvas| {
                     spawn_local(clone!(state => async move {
                         let renderer = AwsmRendererBuilder::new(web_sys::window().unwrap().navigator().gpu())
@@ -67,14 +73,12 @@ impl AppCanvas {
                         state.scene.set(Some(AppScene::new(renderer, canvas)));
                     }));
                 }))
-                .class(&*FULL_AREA)
-                .style("position", "absolute")
             }))
             .child(html!("div", {
                 .class(&*FULL_AREA)
-                .style("position", "absolute")
-                .style("padding", "1rem")
+                .style("pointer-events", "none")
                 .child(html!("div", {
+                    .style("padding", "1rem")
                     .class([FontSize::H3.class(), ColorText::GltfContent.class(), &*USER_SELECT_NONE])
                     .text_signal(state.display_text.signal_cloned())
                 }))

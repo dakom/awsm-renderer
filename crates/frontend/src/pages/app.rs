@@ -19,13 +19,8 @@ impl AppUi {
             class! {
                 .style("display", "flex")
                 .style("flex-direction", "row")  // changed to row for horizontal layout
-                .style("width", "100%")
-                .style("height", "100vh")        // full viewport height
-                .style("overflow", "hidden")     // prevent window-level scrolling
-                .style("position", "fixed")      // ensure it stays fixed to viewport
-                .style("top", "0")
-                .style("left", "0")
-                .style("margin", "0")            // remove the top margin
+                .style("width", "100vw")         // full viewport
+                .style("height", "100vh")
             }
         });
         html!("div", {

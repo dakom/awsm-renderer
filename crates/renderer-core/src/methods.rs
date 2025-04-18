@@ -10,6 +10,10 @@ use crate::{
 };
 
 impl AwsmRendererWebGpu {
+    pub fn canvas(&self) -> web_sys::HtmlCanvasElement {
+        self.context.canvas().unchecked_into()
+    }
+
     pub fn current_context_format(&self) -> TextureFormat {
         self.context
             .get_configuration()
