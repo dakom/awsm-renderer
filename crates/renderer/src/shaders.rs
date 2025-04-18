@@ -88,11 +88,9 @@ impl ShaderKey {
             }
         };
 
-        let source = preprocess_shader(&source, retain);
-
         // tracing::info!("{}", source);
         // tracing::info!("{:#?}", self);
 
-        source
+        preprocess_shader(&source, retain)
     }
 }

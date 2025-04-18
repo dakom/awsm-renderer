@@ -84,7 +84,8 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
         )
     }
 
-    pub fn new(
+    #[allow(clippy::too_many_arguments)]
+    fn new(
         byte_size: usize,
         aligned_slice_size: usize,
         bind_group_binding: u32,
@@ -245,7 +246,7 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
         }
 
         // just write the whole thing :)
-        Ok(gpu.write_buffer(&self.gpu_buffer, None, self.raw_data.as_slice(), None, None)?)
+        gpu.write_buffer(&self.gpu_buffer, None, self.raw_data.as_slice(), None, None)
     }
 
     /// Removes the slot corresponding to the given key.

@@ -31,7 +31,7 @@ pub struct AwsmRenderer {
     pub storage: StorageBuffers,
 
     #[cfg(feature = "gltf")]
-    pub gltf: gltf::cache::GltfCache,
+    gltf: gltf::cache::GltfCache,
 
     #[cfg(feature = "animation")]
     pub animations: animation::Animations,

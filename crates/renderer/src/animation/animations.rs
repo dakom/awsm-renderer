@@ -31,13 +31,13 @@ impl Animations {
         player: AnimationPlayer,
         transform_key: TransformKey,
     ) -> AnimationKey {
-        let key = self.players.insert(player.into());
+        let key = self.players.insert(player);
         self.transforms.insert(key, transform_key);
         key
     }
 
     pub fn insert_morph(&mut self, player: AnimationPlayer, morph_key: MorphKey) -> AnimationKey {
-        let key = self.players.insert(player.into());
+        let key = self.players.insert(player);
         self.morphs.insert(key, morph_key);
         key
     }

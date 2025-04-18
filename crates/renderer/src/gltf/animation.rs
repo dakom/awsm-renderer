@@ -1,6 +1,5 @@
 use crate::animation::{
-    AnimationClip, AnimationData, AnimationKey, AnimationPlayer, AnimationSampler,
-    TransformAnimation, VertexAnimation,
+    AnimationClip, AnimationData, AnimationKey, AnimationPlayer, AnimationSampler, VertexAnimation,
 };
 use crate::buffers::helpers::u8_to_f32_vec;
 use crate::mesh::MorphKey;
@@ -62,7 +61,6 @@ impl AwsmRenderer {
 
         let values = values
             .chunks(morph_info.targets_len)
-            .into_iter()
             .map(|chunk| AnimationData::Vertex(VertexAnimation::new(chunk.to_vec())))
             .collect();
 
@@ -109,19 +107,10 @@ fn sampler_timestamps(
 }
 
 fn gltf_animation_clip_transform(
-    ctx: &GltfPopulateContext,
-    gltf_sampler: &gltf::animation::Sampler,
+    _ctx: &GltfPopulateContext,
+    _gltf_sampler: &gltf::animation::Sampler,
 ) -> Result<AnimationClip> {
     Err(AwsmGltfError::Todo(
         "create animation clip for transform".to_string(),
-    ))
-}
-
-fn gltf_animation_clip_morph(
-    ctx: &GltfPopulateContext,
-    gltf_animation: &gltf::Animation,
-) -> Result<AnimationClip> {
-    Err(AwsmGltfError::Todo(
-        "create animation clip for morph".to_string(),
     ))
 }

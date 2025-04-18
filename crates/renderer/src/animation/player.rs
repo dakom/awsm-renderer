@@ -1,4 +1,4 @@
-use super::{clip::AnimationClip, data::AnimationData, TransformAnimation};
+use super::{clip::AnimationClip, data::AnimationData};
 
 #[derive(Debug, Clone)]
 pub struct AnimationPlayer<T = AnimationData> {

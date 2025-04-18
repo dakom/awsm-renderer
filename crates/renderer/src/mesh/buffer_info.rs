@@ -34,7 +34,7 @@ impl From<gltf::mesh::Semantic> for MeshAttributeSemantic {
             gltf::mesh::Semantic::Positions => MeshAttributeSemantic::Position,
             gltf::mesh::Semantic::Normals => MeshAttributeSemantic::Normal,
             gltf::mesh::Semantic::Tangents => MeshAttributeSemantic::Tangent,
-            _ => panic!("Unsupported mesh attribute semantic"),
+            _ => panic!("Unsupported mesh attribute semantic {:?}", semantic),
         }
     }
 }

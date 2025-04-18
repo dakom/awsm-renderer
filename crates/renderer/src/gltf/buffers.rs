@@ -1,7 +1,6 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use awsm_renderer_core::buffer::{BufferDescriptor, BufferUsage};
-use glam::Vec3;
 
 use crate::{
     buffers::helpers::{
@@ -480,6 +479,8 @@ fn sparse_to_indices(
     indices
 }
 
+// currently just a helper, not used anywhere
+#[allow(dead_code)]
 pub(super) fn accessor_to_vec(
     accessor: &gltf::Accessor<'_>,
     buffers: &[Vec<u8>],

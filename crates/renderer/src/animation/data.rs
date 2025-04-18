@@ -301,7 +301,7 @@ impl VertexAnimation {
         result
     }
 
-    pub fn apply_mut(&self, other: &mut Vec<f32>) {
+    pub fn apply_mut(&self, other: &mut [f32]) {
         for (i, weight) in self.weights.iter().enumerate() {
             if i < other.len() {
                 other[i] *= *weight;

@@ -32,7 +32,7 @@ pub(super) fn primitive_vertex_buffer_layout(
             .vertex
             .attribute_stride_sizes
             .get(&semantic.clone().into())
-            .ok_or_else(|| AwsmGltfError::MissingPositionAttribute(semantic))?;
+            .ok_or(AwsmGltfError::MissingPositionAttribute(semantic))?;
     }
 
     Ok(VertexBufferLayout {

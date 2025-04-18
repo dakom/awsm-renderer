@@ -15,8 +15,6 @@ use crate::buffers::{
 
 const MORPH_WEIGHTS_BYTE_SIZE: usize = 32; // 8xf32 is 32 bytes
 const MORPH_WEIGHTS_BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment
-const MORPH_TARGETS: usize = 2;
-const MORPH_VALUES_BYTE_ALIGNMENT: usize = 48 * MORPH_TARGETS; // 4 bytes per float, 3 floats per vec3, 3 vec3's per struct = 36. Nearest padding = 48
 
 // The weights are dynamic and updated on a per-mesh basis as frequently as needed
 // The values are essentially static, but may be sourced from different (large) buffers
@@ -47,9 +45,7 @@ impl Morphs {
     }
 
     pub fn get_info(&self, key: MorphKey) -> Result<&MorphInfo> {
-        self.infos
-            .get(key)
-            .ok_or_else(|| AwsmMeshError::MorphNotFound(key))
+        self.infos.get(key).ok_or(AwsmMeshError::MorphNotFound(key))
     }
 
     pub fn insert(
@@ -117,7 +113,7 @@ impl Morphs {
     pub fn weights_buffer_offset(&self, key: MorphKey) -> Result<usize> {
         self.weights
             .offset(key)
-            .ok_or_else(|| AwsmMeshError::MorphNotFound(key))
+            .ok_or(AwsmMeshError::MorphNotFound(key))
     }
 
     // this does *not* write to the GPU, so it can be called relatively frequently for physics etc.

@@ -17,7 +17,7 @@ use super::populate::GltfPopulateContext;
 
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
-pub(super) struct RenderPipelineKey {
+pub(crate) struct RenderPipelineKey {
     pub shader_key: ShaderKey,
     pub layout_key: PipelineLayoutKey,
     pub fragment_targets: Vec<ColorTargetState>,
@@ -27,12 +27,13 @@ pub(super) struct RenderPipelineKey {
 
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
-pub(super) struct PipelineLayoutKey {
+pub(crate) struct PipelineLayoutKey {
     pub morph_buffer_storage_key: Option<StorageBufferKey>,
     pub morph_targets_len: Option<usize>, // TODO - override constant in shader
 }
 
 impl PipelineLayoutKey {
+    #[allow(private_interfaces)]
     pub fn new(ctx: &GltfPopulateContext, buffer_info: &MeshBufferInfo) -> Self {
         let mut key = Self::default();
 
@@ -74,19 +75,19 @@ impl PipelineLayoutKey {
 }
 
 impl RenderPipelineKey {
-    pub fn new(
-        renderer: &AwsmRenderer,
-        shader_key: ShaderKey,
-        layout_key: PipelineLayoutKey,
-        vertex_buffer_layouts: Vec<VertexBufferLayout>,
-    ) -> Self {
+    pub fn new(shader_key: ShaderKey, layout_key: PipelineLayoutKey) -> Self {
         Self {
             shader_key,
             layout_key,
-            fragment_targets: vec![ColorTargetState::new(renderer.gpu.current_context_format())],
-            vertex_buffer_layouts,
+            fragment_targets: Vec::new(),
+            vertex_buffer_layouts: Vec::new(),
             vertex_constants: BTreeMap::new(),
         }
+    }
+
+    pub fn with_vertex_buffer_layout(mut self, vertex_buffer_layout: VertexBufferLayout) -> Self {
+        self.vertex_buffer_layouts.push(vertex_buffer_layout);
+        self
     }
 
     pub fn with_fragment_target(mut self, target: ColorTargetState) -> Self {
