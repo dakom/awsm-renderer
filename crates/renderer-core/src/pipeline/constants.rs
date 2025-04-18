@@ -39,7 +39,6 @@ pub enum ConstantOverrideValue {
     //F16(f16),
 }
 
-
 impl From<ConstantOverrideValue> for JsValue {
     fn from(constant: ConstantOverrideValue) -> Self {
         match constant {

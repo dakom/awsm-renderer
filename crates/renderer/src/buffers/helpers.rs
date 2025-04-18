@@ -5,41 +5,48 @@ pub fn slice_zeroes(size: usize) -> &'static [u8] {
 
 #[allow(dead_code)]
 pub fn debug_chunks_to_f32(slice: &[u8], chunk_size: usize) -> Vec<Vec<f32>> {
-    debug_slice_to_f32(slice)
+    u8_to_f32_vec(slice)
         .chunks(chunk_size)
         .map(|chunk| chunk.to_vec())
         .collect()
 }
 
-#[allow(dead_code)]
-pub fn debug_slice_to_f32(slice: &[u8]) -> Vec<f32> {
-    let mut f32s = Vec::new();
-    for i in (0..slice.len()).step_by(4) {
-        let bytes = &slice[i..i + 4];
-        let f32_value = f32::from_le_bytes(bytes.try_into().unwrap());
-        f32s.push(f32_value);
-    }
-    f32s
+pub fn u8_to_f32_vec(v: &[u8]) -> Vec<f32> {
+    v.chunks_exact(4)
+        .map(TryInto::try_into)
+        .map(Result::unwrap)
+        .map(f32::from_le_bytes)
+        .collect()
 }
 
-#[allow(dead_code)]
-pub fn debug_slice_to_u16(slice: &[u8]) -> Vec<u16> {
-    let mut u16s = Vec::new();
-    for i in (0..slice.len()).step_by(2) {
-        let bytes = &slice[i..i + 2];
-        let u16_value = u16::from_le_bytes(bytes.try_into().unwrap());
-        u16s.push(u16_value);
-    }
-    u16s
+pub fn u8_to_i8_vec(v: &[u8]) -> Vec<i8> {
+    v.chunks_exact(1)
+        .map(TryInto::try_into)
+        .map(Result::unwrap)
+        .map(i8::from_le_bytes)
+        .collect()
 }
 
-#[allow(dead_code)]
-pub fn debug_slice_to_u32(slice: &[u8]) -> Vec<u32> {
-    let mut u32s = Vec::new();
-    for i in (0..slice.len()).step_by(4) {
-        let bytes = &slice[i..i + 4];
-        let u32_value = u32::from_le_bytes(bytes.try_into().unwrap());
-        u32s.push(u32_value);
-    }
-    u32s
+pub fn u8_to_u16_vec(v: &[u8]) -> Vec<u16> {
+    v.chunks_exact(2)
+        .map(TryInto::try_into)
+        .map(Result::unwrap)
+        .map(u16::from_le_bytes)
+        .collect()
+}
+
+pub fn u8_to_i16_vec(v: &[u8]) -> Vec<i16> {
+    v.chunks_exact(2)
+        .map(TryInto::try_into)
+        .map(Result::unwrap)
+        .map(i16::from_le_bytes)
+        .collect()
+}
+
+pub fn u8_to_u32_vec(v: &[u8]) -> Vec<u32> {
+    v.chunks_exact(4)
+        .map(TryInto::try_into)
+        .map(Result::unwrap)
+        .map(u32::from_le_bytes)
+        .collect()
 }

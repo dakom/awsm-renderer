@@ -33,11 +33,11 @@ pub enum AnimationPlayDirection {
 impl<T> AnimationPlayer<T> {
     pub fn new(clip: AnimationClip<T>) -> Self {
         Self {
-            speed: 1.0,
-            loop_style: None,
+            speed: 1.0 / 1000.0,
+            loop_style: Some(AnimationLoopStyle::Loop),
             play_direction: AnimationPlayDirection::Forward,
             clip,
-            state: AnimationState::Paused,
+            state: AnimationState::Playing,
             local_time: 0.0,
         }
     }

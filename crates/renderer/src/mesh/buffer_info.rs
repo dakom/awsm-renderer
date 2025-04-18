@@ -13,7 +13,7 @@ pub struct MeshBufferVertexInfo {
     pub offset: usize,
     // number of vertices for this primitive
     pub count: usize,
-    // total size in bytes of this vertex 
+    // total size in bytes of this vertex
     // same as vertex_count * sum_of_all_vertex_attribute_stride_sizes
     pub size: usize,
     // size of each individual vertex attribute stride
@@ -76,7 +76,10 @@ impl MeshBufferInfo {
     pub fn draw_count(&self) -> usize {
         // if we have indices, we use that count
         // otherwise, we use the vertex count
-        self.index.as_ref().map(|index| index.count).unwrap_or(self.vertex.count)
+        self.index
+            .as_ref()
+            .map(|index| index.count)
+            .unwrap_or(self.vertex.count)
     }
 
     // the size in bytes of the index buffer for this primitive, if it exists

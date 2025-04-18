@@ -22,7 +22,7 @@ pub(super) struct RenderPipelineKey {
     pub layout_key: PipelineLayoutKey,
     pub fragment_targets: Vec<ColorTargetState>,
     pub vertex_buffer_layouts: Vec<VertexBufferLayout>,
-    pub vertex_constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>
+    pub vertex_constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
 }
 
 // merely a key to hash ad-hoc pipeline generation
@@ -46,7 +46,11 @@ impl PipelineLayoutKey {
 }
 
 impl PipelineLayoutKey {
-    pub fn into_descriptor(self, renderer: &AwsmRenderer, morph_key: Option<MorphKey>) -> Result<PipelineLayoutDescriptor> {
+    pub fn into_descriptor(
+        self,
+        renderer: &AwsmRenderer,
+        morph_key: Option<MorphKey>,
+    ) -> Result<PipelineLayoutDescriptor> {
         let mut bind_group_layouts = vec![
             renderer.camera.bind_group_layout.clone(),
             renderer.transforms.bind_group_layout().clone(),
@@ -54,11 +58,17 @@ impl PipelineLayoutKey {
 
         if let Some(morph_key) = morph_key {
             bind_group_layouts.push(renderer.meshes.morphs.weights_bind_group_layout().clone());
-            bind_group_layouts.push(renderer.meshes.morphs.values_bind_group_layout(morph_key)?.clone());
+            bind_group_layouts.push(
+                renderer
+                    .meshes
+                    .morphs
+                    .values_bind_group_layout(morph_key)?
+                    .clone(),
+            );
         }
         Ok(PipelineLayoutDescriptor::new(
             Some("Mesh (from gltf primitive)"),
-            bind_group_layouts
+            bind_group_layouts,
         ))
     }
 }
@@ -84,7 +94,11 @@ impl RenderPipelineKey {
         self
     }
 
-    pub fn with_vertex_constant(mut self, key: ConstantOverrideKey, value: ConstantOverrideValue) -> Self {
+    pub fn with_vertex_constant(
+        mut self,
+        key: ConstantOverrideKey,
+        value: ConstantOverrideValue,
+    ) -> Self {
         self.vertex_constants.insert(key, value);
         self
     }
@@ -93,19 +107,22 @@ impl RenderPipelineKey {
         self,
         renderer: &mut AwsmRenderer,
         shader_module: &web_sys::GpuShaderModule,
-        morph_key: Option<MorphKey>
+        morph_key: Option<MorphKey>,
     ) -> Result<web_sys::GpuRenderPipelineDescriptor> {
         let mut vertex = VertexState::new(shader_module, None);
         vertex.buffer_layouts = self.vertex_buffer_layouts;
         vertex.constants = self.vertex_constants;
-
 
         let fragment = FragmentState::new(shader_module, None, self.fragment_targets.clone());
 
         let layout = match renderer.gltf.pipeline_layouts.get(&self.layout_key) {
             None => {
                 let layout = renderer.gpu.create_pipeline_layout(
-                    &self.layout_key.clone().into_descriptor(renderer, morph_key)?.into(),
+                    &self
+                        .layout_key
+                        .clone()
+                        .into_descriptor(renderer, morph_key)?
+                        .into(),
                 );
 
                 renderer
@@ -120,9 +137,11 @@ impl RenderPipelineKey {
 
         let layout = PipelineLayoutKind::Custom(layout);
 
-        Ok(RenderPipelineDescriptor::new(vertex,Some("Mesh (from gltf primitive)"))
-            .with_layout(layout)
-            .with_fragment(fragment)
-            .into())
+        Ok(
+            RenderPipelineDescriptor::new(vertex, Some("Mesh (from gltf primitive)"))
+                .with_layout(layout)
+                .with_fragment(fragment)
+                .into(),
+        )
     }
 }

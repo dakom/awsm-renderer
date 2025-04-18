@@ -2,9 +2,8 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, DenseSlotMap};
 
 use super::error::{AwsmMeshError, Result};
-use super::Mesh;
 use super::morphs::Morphs;
-
+use super::Mesh;
 
 pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
@@ -44,11 +43,9 @@ impl Meshes {
         }
     }
 
-
     pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
         self.morphs.write_weights_gpu(gpu)
     }
-
 }
 
 new_key_type! {

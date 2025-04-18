@@ -1,5 +1,7 @@
 use crate::{
-    models::collections::{GltfId, GLTF_SETS}, pages::app::sidebar::current_model_signal, prelude::*
+    models::collections::{GltfId, GLTF_SETS},
+    pages::app::sidebar::current_model_signal,
+    prelude::*,
 };
 
 pub struct SidebarGltf {}

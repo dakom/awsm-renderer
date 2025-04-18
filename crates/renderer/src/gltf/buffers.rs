@@ -3,7 +3,16 @@ use std::{borrow::Cow, collections::HashMap};
 use awsm_renderer_core::buffer::{BufferDescriptor, BufferUsage};
 use glam::Vec3;
 
-use crate::{buffers::helpers::{debug_chunks_to_f32, debug_slice_to_f32, slice_zeroes}, mesh::{MeshAttributeSemantic, MeshBufferIndexInfo, MeshBufferInfo, MeshBufferMorphInfo, MeshBufferVertexInfo}, AwsmRenderer};
+use crate::{
+    buffers::helpers::{
+        slice_zeroes, u8_to_f32_vec, u8_to_i16_vec, u8_to_i8_vec, u8_to_u16_vec, u8_to_u32_vec,
+    },
+    mesh::{
+        MeshAttributeSemantic, MeshBufferIndexInfo, MeshBufferInfo, MeshBufferMorphInfo,
+        MeshBufferVertexInfo,
+    },
+    AwsmRenderer,
+};
 
 use super::{
     accessors::semantic_ordering,
@@ -12,6 +21,7 @@ use super::{
 
 #[derive(Debug)]
 pub struct GltfBuffers {
+    pub raw: Vec<Vec<u8>>,
     // this is definitely its own buffer
     // isn't passed to the shader at all
     pub index_bytes: Option<Vec<u8>>,
@@ -35,7 +45,6 @@ pub struct GltfBuffers {
     pub meshes: Vec<Vec<MeshBufferInfo>>,
 }
 
-
 impl GltfBuffers {
     pub async fn new(
         renderer: &AwsmRenderer,
@@ -56,7 +65,7 @@ impl GltfBuffers {
             let mut primitive_buffer_infos = Vec::new();
 
             for primitive in mesh.primitives() {
-                // Index buffer 
+                // Index buffer
                 let index = match primitive.indices() {
                     None => None,
                     Some(accessor) => {
@@ -72,7 +81,7 @@ impl GltfBuffers {
                     }
                 };
 
-                // Vertex buffer 
+                // Vertex buffer
                 let vertex = {
                     let offset = vertex_bytes.len();
 
@@ -97,11 +106,14 @@ impl GltfBuffers {
                     //
                     // otherwise, it's just a slice of the original buffer
                     for (semantic, accessor) in attributes {
-                        let semantic:MeshAttributeSemantic = semantic.into();
+                        let semantic: MeshAttributeSemantic = semantic.into();
                         let attribute_bytes = accessor_to_bytes(&accessor, &buffers)?;
 
                         // while we're at it, we can stash the stride sizes
-                        let attribute_stride_size = accessor.view().and_then(|view| view.stride()).unwrap_or(accessor.size());
+                        let attribute_stride_size = accessor
+                            .view()
+                            .and_then(|view| view.stride())
+                            .unwrap_or(accessor.size());
                         attribute_stride_sizes.insert(semantic.clone(), attribute_stride_size);
 
                         attributes_bytes.push((attribute_bytes, attribute_stride_size));
@@ -112,26 +124,32 @@ impl GltfBuffers {
                     for vertex in 0..vertex_count {
                         for (attribute_bytes, attribute_stride_size) in attributes_bytes.iter() {
                             let attribute_byte_offset = vertex * attribute_stride_size;
-                            let attribute_bytes = &attribute_bytes
-                                [attribute_byte_offset..attribute_byte_offset + attribute_stride_size];
+                            let attribute_bytes = &attribute_bytes[attribute_byte_offset
+                                ..attribute_byte_offset + attribute_stride_size];
 
                             vertex_bytes.extend_from_slice(attribute_bytes);
                         }
                     }
 
-                    MeshBufferVertexInfo { 
-                        offset, 
+                    MeshBufferVertexInfo {
+                        offset,
                         count: vertex_count,
                         size: vertex_bytes.len() - offset,
-                        attribute_stride_sizes
+                        attribute_stride_sizes,
                     }
                 };
 
-                // Morph buffer 
+                // Morph buffer
                 let morph = {
-                    let morph_has_position = primitive.morph_targets().any(|morph_target| morph_target.positions().is_some());
-                    let morph_has_normal = primitive.morph_targets().any(|morph_target| morph_target.normals().is_some());
-                    let morph_has_tangent = primitive.morph_targets().any(|morph_target| morph_target.tangents().is_some());
+                    let morph_has_position = primitive
+                        .morph_targets()
+                        .any(|morph_target| morph_target.positions().is_some());
+                    let morph_has_normal = primitive
+                        .morph_targets()
+                        .any(|morph_target| morph_target.normals().is_some());
+                    let morph_has_tangent = primitive
+                        .morph_targets()
+                        .any(|morph_target| morph_target.tangents().is_some());
 
                     if !morph_has_position && !morph_has_normal && !morph_has_tangent {
                         None
@@ -139,7 +157,7 @@ impl GltfBuffers {
                         let mut morph_targets_buffer_data = Vec::new();
 
                         #[derive(Default)]
-                        struct MorphTargetBufferData <'a> {
+                        struct MorphTargetBufferData<'a> {
                             positions: Option<Cow<'a, [u8]>>,
                             normals: Option<Cow<'a, [u8]>>,
                             tangents: Option<Cow<'a, [u8]>>,
@@ -148,14 +166,17 @@ impl GltfBuffers {
                             let mut morph_target_buffer_data = MorphTargetBufferData::default();
 
                             if let Some(accessor) = morph_target.positions() {
-                                morph_target_buffer_data.positions = Some(accessor_to_bytes(&accessor, &buffers)?);
+                                morph_target_buffer_data.positions =
+                                    Some(accessor_to_bytes(&accessor, &buffers)?);
                             }
 
                             if let Some(accessor) = morph_target.normals() {
-                                morph_target_buffer_data.normals = Some(accessor_to_bytes(&accessor, &buffers)?);
+                                morph_target_buffer_data.normals =
+                                    Some(accessor_to_bytes(&accessor, &buffers)?);
                             }
                             if let Some(accessor) = morph_target.tangents() {
-                                morph_target_buffer_data.tangents = Some(accessor_to_bytes(&accessor, &buffers)?);
+                                morph_target_buffer_data.tangents =
+                                    Some(accessor_to_bytes(&accessor, &buffers)?);
                             }
 
                             morph_targets_buffer_data.push(morph_target_buffer_data);
@@ -176,7 +197,6 @@ impl GltfBuffers {
                         // if a semantic is not used, we skip it instead of
                         // filling with 0's, since the shader will be different anyway
 
-
                         let offset = morph_bytes.len();
 
                         let mut vertex_morph_stride_size = 0;
@@ -187,37 +207,57 @@ impl GltfBuffers {
                             vertex_morph_stride_size = 0;
 
                             for morph_target_buffer_data in &morph_targets_buffer_data {
-                                let mut push_bytes = |data: Option<&Cow<'_, [u8]>>, stride_size: usize| {
-                                    match data {
-                                        Some(data) => {
-                                            let data_byte_offset = vertex_index * stride_size;
-                                            let data_bytes = &data[data_byte_offset..data_byte_offset + stride_size];
-                                            morph_bytes.extend_from_slice(data_bytes);
+                                let mut push_bytes =
+                                    |data: Option<&Cow<'_, [u8]>>, stride_size: usize| {
+                                        match data {
+                                            Some(data) => {
+                                                let data_byte_offset = vertex_index * stride_size;
+                                                let data_bytes = &data[data_byte_offset
+                                                    ..data_byte_offset + stride_size];
+                                                morph_bytes.extend_from_slice(data_bytes);
+                                            }
+                                            None => {
+                                                morph_bytes
+                                                    .extend_from_slice(slice_zeroes(stride_size));
+                                            }
                                         }
-                                        None => {
-                                            morph_bytes.extend_from_slice(slice_zeroes(stride_size));
-                                        }
-                                    }
 
-                                    vertex_morph_stride_size += stride_size;
-                                };
+                                        vertex_morph_stride_size += stride_size;
+                                    };
 
                                 if morph_has_position {
-                                    let attribute_stride_size = *vertex.attribute_stride_sizes.get(&MeshAttributeSemantic::Position).unwrap();
-                                    push_bytes(morph_target_buffer_data.positions.as_ref(), attribute_stride_size);
+                                    let attribute_stride_size = *vertex
+                                        .attribute_stride_sizes
+                                        .get(&MeshAttributeSemantic::Position)
+                                        .unwrap();
+                                    push_bytes(
+                                        morph_target_buffer_data.positions.as_ref(),
+                                        attribute_stride_size,
+                                    );
                                 }
 
                                 if morph_has_normal {
-                                    let attribute_stride_size = *vertex.attribute_stride_sizes.get(&MeshAttributeSemantic::Normal).unwrap();
-                                    push_bytes(morph_target_buffer_data.normals.as_ref(), attribute_stride_size);
+                                    let attribute_stride_size = *vertex
+                                        .attribute_stride_sizes
+                                        .get(&MeshAttributeSemantic::Normal)
+                                        .unwrap();
+                                    push_bytes(
+                                        morph_target_buffer_data.normals.as_ref(),
+                                        attribute_stride_size,
+                                    );
                                 }
 
                                 if morph_has_tangent {
-                                    let attribute_stride_size = *vertex.attribute_stride_sizes.get(&MeshAttributeSemantic::Tangent).unwrap();
-                                    push_bytes(morph_target_buffer_data.tangents.as_ref(), attribute_stride_size);
+                                    let attribute_stride_size = *vertex
+                                        .attribute_stride_sizes
+                                        .get(&MeshAttributeSemantic::Tangent)
+                                        .unwrap();
+                                    push_bytes(
+                                        morph_target_buffer_data.tangents.as_ref(),
+                                        attribute_stride_size,
+                                    );
                                 }
                             }
-
                         }
 
                         let size = morph_bytes.len() - offset;
@@ -234,8 +274,6 @@ impl GltfBuffers {
                         })
                     }
                 };
-
-
 
                 // Done for this primitive
                 primitive_buffer_infos.push(MeshBufferInfo {
@@ -287,7 +325,7 @@ impl GltfBuffers {
                         &BufferDescriptor::new(
                             Some("gltf morph buffer"),
                             morph_bytes.len(),
-                            BufferUsage::new().with_copy_dst().with_storage()
+                            BufferUsage::new().with_copy_dst().with_storage(),
                         )
                         .into(),
                     )
@@ -301,7 +339,6 @@ impl GltfBuffers {
                 Some(morph_buffer)
             }
         };
-
 
         // pad to multiple of 4 to satisfy WebGPU
         let pad = 4 - (vertex_bytes.len() % 4);
@@ -327,6 +364,7 @@ impl GltfBuffers {
             .map_err(AwsmGltfError::BufferWrite)?;
 
         Ok(Self {
+            raw: buffers,
             index_bytes: if index_bytes.is_empty() {
                 None
             } else {
@@ -355,7 +393,7 @@ impl Drop for GltfBuffers {
     }
 }
 
-fn accessor_to_bytes<'a>(
+pub(super) fn accessor_to_bytes<'a>(
     accessor: &gltf::Accessor<'_>,
     buffers: &'a [Vec<u8>],
 ) -> Result<Cow<'a, [u8]>> {
@@ -440,4 +478,318 @@ fn sparse_to_indices(
     }
 
     indices
+}
+
+pub(super) fn accessor_to_vec(
+    accessor: &gltf::Accessor<'_>,
+    buffers: &[Vec<u8>],
+) -> Result<AccessorVec> {
+    let bytes = accessor_to_bytes(accessor, buffers)?;
+
+    Ok(match accessor.data_type() {
+        gltf::accessor::DataType::I8 => {
+            let values = u8_to_i8_vec(&bytes);
+            match accessor.dimensions() {
+                gltf::accessor::Dimensions::Scalar => AccessorVec::ScalarI8(values),
+                gltf::accessor::Dimensions::Vec2 => {
+                    AccessorVec::Vec2I8(values.chunks_exact(2).map(|v| [v[0], v[1]]).collect())
+                }
+                gltf::accessor::Dimensions::Vec3 => AccessorVec::Vec3I8(
+                    values.chunks_exact(3).map(|v| [v[0], v[1], v[2]]).collect(),
+                ),
+                gltf::accessor::Dimensions::Vec4 => AccessorVec::Vec4I8(
+                    values
+                        .chunks_exact(4)
+                        .map(|v| [v[0], v[1], v[2], v[3]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat2 => AccessorVec::Mat2I8(
+                    values
+                        .chunks_exact(4)
+                        .map(|v| [[v[0], v[1]], [v[2], v[3]]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat3 => AccessorVec::Mat3I8(
+                    values
+                        .chunks_exact(9)
+                        .map(|v| [[v[0], v[1], v[2]], [v[3], v[4], v[5]], [v[6], v[7], v[8]]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat4 => AccessorVec::Mat4I8(
+                    values
+                        .chunks_exact(16)
+                        .map(|v| {
+                            [
+                                [v[0], v[1], v[2], v[3]],
+                                [v[4], v[5], v[6], v[7]],
+                                [v[8], v[9], v[10], v[11]],
+                                [v[12], v[13], v[14], v[15]],
+                            ]
+                        })
+                        .collect(),
+                ),
+            }
+        }
+        gltf::accessor::DataType::U8 => {
+            let values = bytes;
+            match accessor.dimensions() {
+                gltf::accessor::Dimensions::Scalar => AccessorVec::ScalarU8(values.to_vec()),
+                gltf::accessor::Dimensions::Vec2 => {
+                    AccessorVec::Vec2U8(values.chunks_exact(2).map(|v| [v[0], v[1]]).collect())
+                }
+                gltf::accessor::Dimensions::Vec3 => AccessorVec::Vec3U8(
+                    values.chunks_exact(3).map(|v| [v[0], v[1], v[2]]).collect(),
+                ),
+                gltf::accessor::Dimensions::Vec4 => AccessorVec::Vec4U8(
+                    values
+                        .chunks_exact(4)
+                        .map(|v| [v[0], v[1], v[2], v[3]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat2 => AccessorVec::Mat2U8(
+                    values
+                        .chunks_exact(4)
+                        .map(|v| [[v[0], v[1]], [v[2], v[3]]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat3 => AccessorVec::Mat3U8(
+                    values
+                        .chunks_exact(9)
+                        .map(|v| [[v[0], v[1], v[2]], [v[3], v[4], v[5]], [v[6], v[7], v[8]]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat4 => AccessorVec::Mat4U8(
+                    values
+                        .chunks_exact(16)
+                        .map(|v| {
+                            [
+                                [v[0], v[1], v[2], v[3]],
+                                [v[4], v[5], v[6], v[7]],
+                                [v[8], v[9], v[10], v[11]],
+                                [v[12], v[13], v[14], v[15]],
+                            ]
+                        })
+                        .collect(),
+                ),
+            }
+        }
+        gltf::accessor::DataType::I16 => {
+            let values = u8_to_i16_vec(&bytes);
+            match accessor.dimensions() {
+                gltf::accessor::Dimensions::Scalar => AccessorVec::ScalarI16(values.to_vec()),
+                gltf::accessor::Dimensions::Vec2 => {
+                    AccessorVec::Vec2I16(values.chunks_exact(2).map(|v| [v[0], v[1]]).collect())
+                }
+                gltf::accessor::Dimensions::Vec3 => AccessorVec::Vec3I16(
+                    values.chunks_exact(3).map(|v| [v[0], v[1], v[2]]).collect(),
+                ),
+                gltf::accessor::Dimensions::Vec4 => AccessorVec::Vec4I16(
+                    values
+                        .chunks_exact(4)
+                        .map(|v| [v[0], v[1], v[2], v[3]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat2 => AccessorVec::Mat2I16(
+                    values
+                        .chunks_exact(4)
+                        .map(|v| [[v[0], v[1]], [v[2], v[3]]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat3 => AccessorVec::Mat3I16(
+                    values
+                        .chunks_exact(9)
+                        .map(|v| [[v[0], v[1], v[2]], [v[3], v[4], v[5]], [v[6], v[7], v[8]]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat4 => AccessorVec::Mat4I16(
+                    values
+                        .chunks_exact(16)
+                        .map(|v| {
+                            [
+                                [v[0], v[1], v[2], v[3]],
+                                [v[4], v[5], v[6], v[7]],
+                                [v[8], v[9], v[10], v[11]],
+                                [v[12], v[13], v[14], v[15]],
+                            ]
+                        })
+                        .collect(),
+                ),
+            }
+        }
+        gltf::accessor::DataType::U16 => {
+            let values = u8_to_u16_vec(&bytes);
+            match accessor.dimensions() {
+                gltf::accessor::Dimensions::Scalar => AccessorVec::ScalarU16(values.to_vec()),
+                gltf::accessor::Dimensions::Vec2 => {
+                    AccessorVec::Vec2U16(values.chunks_exact(2).map(|v| [v[0], v[1]]).collect())
+                }
+                gltf::accessor::Dimensions::Vec3 => AccessorVec::Vec3U16(
+                    values.chunks_exact(3).map(|v| [v[0], v[1], v[2]]).collect(),
+                ),
+                gltf::accessor::Dimensions::Vec4 => AccessorVec::Vec4U16(
+                    values
+                        .chunks_exact(4)
+                        .map(|v| [v[0], v[1], v[2], v[3]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat2 => AccessorVec::Mat2U16(
+                    values
+                        .chunks_exact(4)
+                        .map(|v| [[v[0], v[1]], [v[2], v[3]]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat3 => AccessorVec::Mat3U16(
+                    values
+                        .chunks_exact(9)
+                        .map(|v| [[v[0], v[1], v[2]], [v[3], v[4], v[5]], [v[6], v[7], v[8]]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat4 => AccessorVec::Mat4U16(
+                    values
+                        .chunks_exact(16)
+                        .map(|v| {
+                            [
+                                [v[0], v[1], v[2], v[3]],
+                                [v[4], v[5], v[6], v[7]],
+                                [v[8], v[9], v[10], v[11]],
+                                [v[12], v[13], v[14], v[15]],
+                            ]
+                        })
+                        .collect(),
+                ),
+            }
+        }
+        gltf::accessor::DataType::U32 => {
+            let values = u8_to_u32_vec(&bytes);
+            match accessor.dimensions() {
+                gltf::accessor::Dimensions::Scalar => AccessorVec::ScalarU32(values.to_vec()),
+                gltf::accessor::Dimensions::Vec2 => {
+                    AccessorVec::Vec2U32(values.chunks_exact(2).map(|v| [v[0], v[1]]).collect())
+                }
+                gltf::accessor::Dimensions::Vec3 => AccessorVec::Vec3U32(
+                    values.chunks_exact(3).map(|v| [v[0], v[1], v[2]]).collect(),
+                ),
+                gltf::accessor::Dimensions::Vec4 => AccessorVec::Vec4U32(
+                    values
+                        .chunks_exact(4)
+                        .map(|v| [v[0], v[1], v[2], v[3]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat2 => AccessorVec::Mat2U32(
+                    values
+                        .chunks_exact(4)
+                        .map(|v| [[v[0], v[1]], [v[2], v[3]]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat3 => AccessorVec::Mat3U32(
+                    values
+                        .chunks_exact(9)
+                        .map(|v| [[v[0], v[1], v[2]], [v[3], v[4], v[5]], [v[6], v[7], v[8]]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat4 => AccessorVec::Mat4U32(
+                    values
+                        .chunks_exact(16)
+                        .map(|v| {
+                            [
+                                [v[0], v[1], v[2], v[3]],
+                                [v[4], v[5], v[6], v[7]],
+                                [v[8], v[9], v[10], v[11]],
+                                [v[12], v[13], v[14], v[15]],
+                            ]
+                        })
+                        .collect(),
+                ),
+            }
+        }
+        gltf::accessor::DataType::F32 => {
+            let values = u8_to_f32_vec(&bytes);
+            match accessor.dimensions() {
+                gltf::accessor::Dimensions::Scalar => AccessorVec::ScalarF32(values.to_vec()),
+                gltf::accessor::Dimensions::Vec2 => {
+                    AccessorVec::Vec2F32(values.chunks_exact(2).map(|v| [v[0], v[1]]).collect())
+                }
+                gltf::accessor::Dimensions::Vec3 => AccessorVec::Vec3F32(
+                    values.chunks_exact(3).map(|v| [v[0], v[1], v[2]]).collect(),
+                ),
+                gltf::accessor::Dimensions::Vec4 => AccessorVec::Vec4F32(
+                    values
+                        .chunks_exact(4)
+                        .map(|v| [v[0], v[1], v[2], v[3]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat2 => AccessorVec::Mat2F32(
+                    values
+                        .chunks_exact(4)
+                        .map(|v| [[v[0], v[1]], [v[2], v[3]]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat3 => AccessorVec::Mat3F32(
+                    values
+                        .chunks_exact(9)
+                        .map(|v| [[v[0], v[1], v[2]], [v[3], v[4], v[5]], [v[6], v[7], v[8]]])
+                        .collect(),
+                ),
+                gltf::accessor::Dimensions::Mat4 => AccessorVec::Mat4F32(
+                    values
+                        .chunks_exact(16)
+                        .map(|v| {
+                            [
+                                [v[0], v[1], v[2], v[3]],
+                                [v[4], v[5], v[6], v[7]],
+                                [v[8], v[9], v[10], v[11]],
+                                [v[12], v[13], v[14], v[15]],
+                            ]
+                        })
+                        .collect(),
+                ),
+            }
+        }
+    })
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AccessorVec {
+    ScalarU8(Vec<u8>),
+    ScalarI8(Vec<i8>),
+    ScalarU16(Vec<u16>),
+    ScalarI16(Vec<i16>),
+    ScalarU32(Vec<u32>),
+    ScalarF32(Vec<f32>),
+    Vec2U8(Vec<[u8; 2]>),
+    Vec2I8(Vec<[i8; 2]>),
+    Vec2U16(Vec<[u16; 2]>),
+    Vec2I16(Vec<[i16; 2]>),
+    Vec2U32(Vec<[u32; 2]>),
+    Vec2F32(Vec<[f32; 2]>),
+    Vec3U8(Vec<[u8; 3]>),
+    Vec3I8(Vec<[i8; 3]>),
+    Vec3U16(Vec<[u16; 3]>),
+    Vec3I16(Vec<[i16; 3]>),
+    Vec3U32(Vec<[u32; 3]>),
+    Vec3F32(Vec<[f32; 3]>),
+    Vec4U8(Vec<[u8; 4]>),
+    Vec4I8(Vec<[i8; 4]>),
+    Vec4U16(Vec<[u16; 4]>),
+    Vec4I16(Vec<[i16; 4]>),
+    Vec4U32(Vec<[u32; 4]>),
+    Vec4F32(Vec<[f32; 4]>),
+    Mat2U8(Vec<[[u8; 2]; 2]>),
+    Mat2I8(Vec<[[i8; 2]; 2]>),
+    Mat2U16(Vec<[[u16; 2]; 2]>),
+    Mat2I16(Vec<[[i16; 2]; 2]>),
+    Mat2U32(Vec<[[u32; 2]; 2]>),
+    Mat2F32(Vec<[[f32; 2]; 2]>),
+    Mat3U8(Vec<[[u8; 3]; 3]>),
+    Mat3I8(Vec<[[i8; 3]; 3]>),
+    Mat3U16(Vec<[[u16; 3]; 3]>),
+    Mat3I16(Vec<[[i16; 3]; 3]>),
+    Mat3U32(Vec<[[u32; 3]; 3]>),
+    Mat3F32(Vec<[[f32; 3]; 3]>),
+    Mat4U8(Vec<[[u8; 4]; 4]>),
+    Mat4I8(Vec<[[i8; 4]; 4]>),
+    Mat4U16(Vec<[[u16; 4]; 4]>),
+    Mat4I16(Vec<[[i16; 4]; 4]>),
+    Mat4U32(Vec<[[u32; 4]; 4]>),
+    Mat4F32(Vec<[[f32; 4]; 4]>),
 }

@@ -1,7 +1,12 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use crate::{
-    buffers::storage::StorageBufferKey, gltf::{error::AwsmGltfError, pipelines::RenderPipelineKey}, mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer, PositionExtents}, shaders::{ShaderConstantIds, ShaderKey}, transform::TransformKey, AwsmRenderer
+    buffers::storage::StorageBufferKey,
+    gltf::{error::AwsmGltfError, pipelines::RenderPipelineKey},
+    mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer, PositionExtents},
+    shaders::{ShaderConstantIds, ShaderKey},
+    transform::TransformKey,
+    AwsmRenderer,
 };
 use awsm_renderer_core::{
     pipeline::primitive::{IndexFormat, PrimitiveTopology},
@@ -29,7 +34,10 @@ impl AwsmRenderer {
             None
         };
 
-        let ctx = GltfPopulateContext { data: gltf_data, morph_buffer_storage_key };
+        let ctx = GltfPopulateContext {
+            data: gltf_data,
+            morph_buffer_storage_key,
+        };
 
         let scene = match scene {
             Some(index) => ctx
@@ -76,27 +84,48 @@ impl AwsmRenderer {
                             gltf::animation::Property::Translation => {
                                 self.populate_gltf_animation_transform_translation(
                                     ctx,
-                                    &gltf_animation,
-                                    transform_key
+                                    gltf_animation
+                                        .samplers()
+                                        .nth(channel.sampler().index())
+                                        .ok_or(AwsmGltfError::MissingAnimationSampler {
+                                            animation_index: gltf_animation.index(),
+                                            channel_index: channel.index(),
+                                            sampler_index: channel.sampler().index(),
+                                        })?,
+                                    transform_key,
                                 )?;
-                            },
+                            }
                             gltf::animation::Property::Rotation => {
                                 self.populate_gltf_animation_transform_rotation(
                                     ctx,
-                                    &gltf_animation,
-                                    transform_key
+                                    gltf_animation
+                                        .samplers()
+                                        .nth(channel.sampler().index())
+                                        .ok_or(AwsmGltfError::MissingAnimationSampler {
+                                            animation_index: gltf_animation.index(),
+                                            channel_index: channel.index(),
+                                            sampler_index: channel.sampler().index(),
+                                        })?,
+                                    transform_key,
                                 )?;
-                            },
+                            }
                             gltf::animation::Property::Scale => {
                                 self.populate_gltf_animation_transform_scale(
                                     ctx,
-                                    &gltf_animation,
-                                    transform_key
+                                    gltf_animation
+                                        .samplers()
+                                        .nth(channel.sampler().index())
+                                        .ok_or(AwsmGltfError::MissingAnimationSampler {
+                                            animation_index: gltf_animation.index(),
+                                            channel_index: channel.index(),
+                                            sampler_index: channel.sampler().index(),
+                                        })?,
+                                    transform_key,
                                 )?;
-                            },
+                            }
                             gltf::animation::Property::MorphTargetWeights => {
                                 // morph targets will be dealt with later when we populate the mesh
-                            },
+                            }
                         }
                     }
                 }
@@ -139,17 +168,20 @@ impl AwsmRenderer {
         let morph_key = match primitive_buffer_info.morph.clone() {
             None => None,
             Some(morph_buffer_info) => {
-                let storage_key = ctx.morph_buffer_storage_key
+                let storage_key = ctx
+                    .morph_buffer_storage_key
                     .ok_or(AwsmGltfError::MorphStorageKeyMissing)?;
 
                 let buffer = self.storage.get(storage_key)?;
-                Some(self.meshes.morphs.insert(&self.gpu, buffer, morph_buffer_info)?)
+                Some(
+                    self.meshes
+                        .morphs
+                        .insert(&self.gpu, buffer, morph_buffer_info)?,
+                )
             }
         };
 
-
         let pipeline_layout_key = PipelineLayoutKey::new(ctx, primitive_buffer_info);
-
 
         let shader_module = match self.gltf.shaders.get(&shader_key) {
             None => {
@@ -183,12 +215,18 @@ impl AwsmRenderer {
         );
 
         if let Some(morph) = &primitive_buffer_info.morph {
-            pipeline_key = pipeline_key.with_vertex_constant((ShaderConstantIds::MaxMorphTargets as u16).into(), (morph.targets_len as u32).into());
+            pipeline_key = pipeline_key.with_vertex_constant(
+                (ShaderConstantIds::MaxMorphTargets as u16).into(),
+                (morph.targets_len as u32).into(),
+            );
         }
 
         let render_pipeline = match self.gltf.render_pipelines.get(&pipeline_key).cloned() {
             None => {
-                let descriptor = pipeline_key.clone().into_descriptor(self, &shader_module, morph_key)?;
+                let descriptor =
+                    pipeline_key
+                        .clone()
+                        .into_descriptor(self, &shader_module, morph_key)?;
 
                 let render_pipeline = self.gpu.create_render_pipeline(&descriptor).await?;
 
@@ -241,7 +279,6 @@ impl AwsmRenderer {
             mesh = mesh.with_morph_key(morph_key);
         }
 
-
         if let Some(indices) = gltf_primitive.indices() {
             mesh = mesh.with_index_buffer(MeshIndexBuffer {
                 // safe, only exists if we have an index
@@ -271,14 +308,21 @@ impl AwsmRenderer {
                         gltf::animation::Property::MorphTargetWeights => {
                             self.populate_gltf_animation_morph(
                                 ctx,
-                                &gltf_animation,
+                                gltf_animation
+                                    .samplers()
+                                    .nth(channel.sampler().index())
+                                    .ok_or(AwsmGltfError::MissingAnimationSampler {
+                                        animation_index: gltf_animation.index(),
+                                        channel_index: channel.index(),
+                                        sampler_index: channel.sampler().index(),
+                                    })?,
                                 morph_key.ok_or(AwsmGltfError::MissingMorphForAnimation)?,
                             )?;
-                        },
+                        }
                         // transform animations were already populated in the node
                         gltf::animation::Property::Translation
                         | gltf::animation::Property::Rotation
-                        | gltf::animation::Property::Scale => { }
+                        | gltf::animation::Property::Scale => {}
                     }
                 }
             }
@@ -324,6 +368,5 @@ fn try_position_extents(gltf_primitive: &gltf::Primitive<'_>) -> Option<Position
 pub(super) struct GltfPopulateContext {
     pub data: Arc<GltfData>,
 
-    pub morph_buffer_storage_key: Option<StorageBufferKey>
-    // we may need more stuff here
+    pub morph_buffer_storage_key: Option<StorageBufferKey>, // we may need more stuff here
 }

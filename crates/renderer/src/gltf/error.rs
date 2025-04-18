@@ -44,10 +44,10 @@ pub enum AwsmGltfError {
     #[error("[gltf] unsupported morph semantic: {0:?}")]
     UnsupportedMorphSemantic(gltf::mesh::Semantic),
 
-    #[error("[gltf] morph storage key missing")] 
+    #[error("[gltf] morph storage key missing")]
     MorphStorageKeyMissing,
 
-    #[error("[gltf] invalid morph buffer size: {0}")] 
+    #[error("[gltf] invalid morph buffer size: {0}")]
     InvalidMorphBufferSize(String),
 
     #[error("[gltf] {0:?}")]
@@ -58,6 +58,13 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] morph animation exists but no morph target found")]
     MissingMorphForAnimation,
+
+    #[error("[gltf] missing animation sampler. animation_index: {animation_index}, channel_index: {channel_index}, sampler_index: {sampler_index}")]
+    MissingAnimationSampler {
+        animation_index: usize,
+        channel_index: usize,
+        sampler_index: usize,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

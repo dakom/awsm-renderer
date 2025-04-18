@@ -8,7 +8,7 @@ use crate::{
 };
 
 pub struct AppSidebar {
-    section: Mutable<Section>
+    section: Mutable<Option<Section>>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -16,13 +16,13 @@ enum Section {
     Gltf,
     Animation,
     Lighting,
-    Environment
+    Environment,
 }
 
 impl AppSidebar {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
-            section: Mutable::new(Section::Gltf)
+            section: Mutable::new(Some(Section::Gltf)),
         })
     }
 
@@ -54,28 +54,33 @@ impl AppSidebar {
         html!("div", {
             .child(state.render_section_header(section))
             .child_signal(state.section.signal().map(move |current| {
-                if current == section {
-                    Some(html!("div", {
-                        .style("margin-left", "1rem")
-                        .style("margin-bottom", "1rem")
-                        .child(match section {
-                            Section::Gltf => SidebarGltf::new().render(),
-                            Section::Animation => html!("div", { 
-                                .class([FontSize::Lg.class(), ColorText::SidebarHeader.class()])
-                                .text("TODO") 
-                            }),
-                            Section::Lighting => html!("div", { 
-                                .class([FontSize::Lg.class(), ColorText::SidebarHeader.class()])
-                                .text("TODO") 
-                            }),
-                            Section::Environment => html!("div", { 
-                                .class([FontSize::Lg.class(), ColorText::SidebarHeader.class()])
-                                .text("TODO") 
-                            }),
-                        })
-                    }))
-                } else {
-                    None
+                match current {
+                    None => None,
+                    Some(current) => {
+                        if current == section {
+                            Some(html!("div", {
+                                .style("margin-left", "1rem")
+                                .style("margin-bottom", "1rem")
+                                .child(match section {
+                                    Section::Gltf => SidebarGltf::new().render(),
+                                    Section::Animation => html!("div", {
+                                        .class([FontSize::Lg.class(), ColorText::SidebarHeader.class()])
+                                        .text("TODO")
+                                    }),
+                                    Section::Lighting => html!("div", {
+                                        .class([FontSize::Lg.class(), ColorText::SidebarHeader.class()])
+                                        .text("TODO")
+                                    }),
+                                    Section::Environment => html!("div", {
+                                        .class([FontSize::Lg.class(), ColorText::SidebarHeader.class()])
+                                        .text("TODO")
+                                    }),
+                                })
+                            }))
+                        } else {
+                            None
+                        }
+                    }
                 }
             }))
         })
@@ -112,7 +117,12 @@ impl AppSidebar {
 
         html!("div", {
             .apply(handle_on_click(clone!(state => move || {
-                state.section.set_neq(section);
+                let current = state.section.get();
+                if current == Some(section) {
+                    state.section.set(None);
+                } else {
+                    state.section.set_neq(Some(section));
+                }
             })))
             .class(&*MENU_ITEM)
             .child(
@@ -160,9 +170,7 @@ impl AppSidebar {
             )
         })
     }
-
 }
-
 
 pub fn current_model_signal() -> impl Signal<Item = Option<GltfId>> {
     Route::signal().map(|route| match route {

@@ -1,19 +1,20 @@
+mod buffer_info;
 mod error;
 mod meshes;
 mod morphs;
-mod buffer_info;
 
 use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
 use glam::{Mat4, Vec3};
 
-use crate::buffers::bind_group::{BIND_GROUP_TRANSFORM, BIND_GROUP_MORPH_TARGET_VALUES, BIND_GROUP_MORPH_TARGET_WEIGHTS};
+use crate::buffers::bind_group::{
+    BIND_GROUP_MORPH_TARGET_VALUES, BIND_GROUP_MORPH_TARGET_WEIGHTS, BIND_GROUP_TRANSFORM,
+};
 use crate::render::RenderContext;
 use crate::transform::TransformKey;
 
-
+pub use buffer_info::*;
 pub use error::AwsmMeshError;
 pub use meshes::{MeshKey, Meshes};
-pub use buffer_info::*;
 pub use morphs::MorphKey;
 
 use super::error::Result;
@@ -126,17 +127,13 @@ impl Mesh {
             ctx.render_pass.set_bind_group(
                 BIND_GROUP_MORPH_TARGET_WEIGHTS,
                 ctx.meshes.morphs.weights_bind_group(),
-                Some(&[
-                    ctx.meshes.morphs.weights_buffer_offset(morph_key)? as u32
-                ]),
+                Some(&[ctx.meshes.morphs.weights_buffer_offset(morph_key)? as u32]),
             )?;
 
             ctx.render_pass.set_bind_group(
                 BIND_GROUP_MORPH_TARGET_VALUES,
                 ctx.meshes.morphs.values_bind_group(morph_key)?,
-                Some(&[
-                    ctx.meshes.morphs.values_buffer_offset(morph_key)? as u32
-                ]),
+                Some(&[ctx.meshes.morphs.values_buffer_offset(morph_key)? as u32]),
             )?;
         }
 

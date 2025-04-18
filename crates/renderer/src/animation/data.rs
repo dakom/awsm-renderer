@@ -287,6 +287,10 @@ pub struct VertexAnimation {
 }
 
 impl VertexAnimation {
+    pub fn new(weights: Vec<f32>) -> Self {
+        Self { weights }
+    }
+
     pub fn apply(&self, input: Vec<f32>) -> Vec<f32> {
         let mut result = input;
         for (i, weight) in self.weights.iter().enumerate() {

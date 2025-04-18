@@ -13,9 +13,9 @@ impl StorageBuffers {
     }
 
     pub fn get(&self, key: StorageBufferKey) -> Result<&web_sys::GpuBuffer> {
-        self.buffers.get(key).ok_or_else(|| {
-            AwsmStorageError::KeyNotFound(key)
-        })
+        self.buffers
+            .get(key)
+            .ok_or_else(|| AwsmStorageError::KeyNotFound(key))
     }
 
     pub fn insert(&mut self, buffer: web_sys::GpuBuffer) -> StorageBufferKey {

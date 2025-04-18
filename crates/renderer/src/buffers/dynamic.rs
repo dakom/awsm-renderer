@@ -39,9 +39,7 @@ pub struct DynamicBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
     pub usage: BufferUsage,
 }
 
-impl<K: Key, const ZERO_VALUE: u8>
-    DynamicBuffer<K, ZERO_VALUE>
-{
+impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
     pub fn new_uniform(
         byte_size: usize,
         aligned_slice_size: usize,
@@ -105,12 +103,7 @@ impl<K: Key, const ZERO_VALUE: u8>
 
         // Create the GPU buffer.
         let gpu_buffer = gpu.create_buffer(
-            &BufferDescriptor::new(
-                label.as_deref(),
-                initial_size_bytes,
-                usage,
-            )
-            .into(),
+            &BufferDescriptor::new(label.as_deref(), initial_size_bytes, usage).into(),
         )?;
 
         // Create the bind group layout (one binding, marked as dynamic).
@@ -120,7 +113,7 @@ impl<K: Key, const ZERO_VALUE: u8>
             BindGroupLayoutResource::Buffer(
                 BufferBindingLayout::new()
                     .with_binding_type(binding_type)
-                    .with_dynamic_offset(true)
+                    .with_dynamic_offset(true),
             ),
         );
 
@@ -133,7 +126,7 @@ impl<K: Key, const ZERO_VALUE: u8>
         if visibility_compute {
             layout_entry = layout_entry.with_visibility_compute();
         }
-                
+
         let bind_group_layout = gpu.create_bind_group_layout(
             &BindGroupLayoutDescriptor::new(label.as_deref())
                 .with_entries(vec![layout_entry])
@@ -176,7 +169,7 @@ impl<K: Key, const ZERO_VALUE: u8>
 
     // Inserts or updates an item in the buffer.
     // the values should be of size `byte_size` not `alignment_size`
-    // 
+    //
     // this will efficiently:
     // * write into the slot if it already has one
     // * use a free slot if available
@@ -227,12 +220,8 @@ impl<K: Key, const ZERO_VALUE: u8>
         if self.gpu_buffer_needs_resize {
             // Create a new GPU buffer with the new size.
             self.gpu_buffer = gpu.create_buffer(
-                &BufferDescriptor::new(
-                    self.label.as_deref(),
-                    self.raw_data.len(),
-                    self.usage,
-                )
-                .into(),
+                &BufferDescriptor::new(self.label.as_deref(), self.raw_data.len(), self.usage)
+                    .into(),
             )?;
 
             // Replace the bind group to point at the new buffer

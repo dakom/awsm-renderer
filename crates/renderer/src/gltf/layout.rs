@@ -3,7 +3,8 @@ use awsm_renderer_core::pipeline::vertex::{VertexAttribute, VertexBufferLayout};
 use crate::mesh::MeshBufferInfo;
 
 use super::{
-    accessors::accessor_vertex_format, error::{AwsmGltfError, Result},
+    accessors::accessor_vertex_format,
+    error::{AwsmGltfError, Result},
     shaders::semantic_shader_location,
 };
 
@@ -27,7 +28,11 @@ pub(super) fn primitive_vertex_buffer_layout(
 
         // because the vertex strides are in a specific order
         // we can just add the stride of the current attribute to the offset
-        stride_offset += buffer_info.vertex.attribute_stride_sizes.get(&semantic.clone().into()).ok_or_else(|| AwsmGltfError::MissingPositionAttribute(semantic))?;
+        stride_offset += buffer_info
+            .vertex
+            .attribute_stride_sizes
+            .get(&semantic.clone().into())
+            .ok_or_else(|| AwsmGltfError::MissingPositionAttribute(semantic))?;
     }
 
     Ok(VertexBufferLayout {

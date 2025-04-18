@@ -81,7 +81,11 @@ impl<'a> FragmentState<'a> {
         }
     }
 
-    pub fn with_constant(mut self, binding: ConstantOverrideKey, constant: ConstantOverrideValue) -> Self {
+    pub fn with_constant(
+        mut self,
+        binding: ConstantOverrideKey,
+        constant: ConstantOverrideValue,
+    ) -> Self {
         self.constants.insert(binding, constant);
         self
     }

@@ -3,13 +3,13 @@ use camera::{CameraBuffer, CameraExt};
 use mesh::Meshes;
 use transform::Transforms;
 
+pub mod buffers;
 pub mod camera;
 pub mod error;
 pub mod mesh;
 pub mod render;
-pub mod buffers;
-pub mod transform;
 pub mod shaders;
+pub mod transform;
 pub mod core {
     pub use awsm_renderer_core::*;
 }
