@@ -1,8 +1,13 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
+use crate::{animation::AwsmAnimationError, mesh::AwsmMeshError};
+
 #[derive(Error, Debug)]
 pub enum AwsmGltfError {
+    #[error("[gltf] TODO: {0}")]
+    Todo(String),
+
     #[error("[gltf] Error loading file")]
     Load,
 
@@ -27,14 +32,39 @@ pub enum AwsmGltfError {
     #[error("[gltf] Unsupported primitive mode: {0:?}")]
     UnsupportedPrimitiveMode(gltf::mesh::Mode),
 
-    #[error("[gltf] missing positions attribute")]
-    MissingPositionAttribute,
+    #[error("[gltf] missing positions attribute: {0:?}")]
+    MissingPositionAttribute(gltf::mesh::Semantic),
 
     #[error("[gltf] Unsupported index data type: {0:?}")]
     UnsupportedIndexDataType(gltf::accessor::DataType),
 
     #[error("[gltf] Invalid sparse index size: {0:?}")]
     InvalidSparseIndexSize(gltf::accessor::DataType),
+
+    #[error("[gltf] unsupported morph semantic: {0:?}")]
+    UnsupportedMorphSemantic(gltf::mesh::Semantic),
+
+    #[error("[gltf] morph storage key missing")]
+    MorphStorageKeyMissing,
+
+    #[error("[gltf] invalid morph buffer size: {0}")]
+    InvalidMorphBufferSize(String),
+
+    #[error("[gltf] {0:?}")]
+    Mesh(#[from] AwsmMeshError),
+
+    #[error("[gltf] {0:?}")]
+    Animation(#[from] AwsmAnimationError),
+
+    #[error("[gltf] morph animation exists but no morph target found")]
+    MissingMorphForAnimation,
+
+    #[error("[gltf] missing animation sampler. animation_index: {animation_index}, channel_index: {channel_index}, sampler_index: {sampler_index}")]
+    MissingAnimationSampler {
+        animation_index: usize,
+        channel_index: usize,
+        sampler_index: usize,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

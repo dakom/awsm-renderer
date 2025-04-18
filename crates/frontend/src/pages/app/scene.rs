@@ -1,5 +1,6 @@
 mod camera;
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::ops::Deref;
 
@@ -22,6 +23,8 @@ pub struct AppScene {
     pub gltf_loader: Mutex<HashMap<GltfId, GltfLoader>>,
     pub camera: Mutex<Camera>,
     pub resize_observer: Mutex<Option<ResizeObserver>>,
+    pub request_animation_frame: Mutex<Option<gloo_render::AnimationFrame>>,
+    pub last_request_animation_frame: Cell<Option<f64>>,
 }
 
 impl AppScene {
@@ -31,6 +34,8 @@ impl AppScene {
             gltf_loader: Mutex::new(HashMap::new()),
             camera: Mutex::new(Camera::default()),
             resize_observer: Mutex::new(None),
+            request_animation_frame: Mutex::new(None),
+            last_request_animation_frame: Cell::new(None),
         });
 
         let resize_observer = ResizeObserver::new(
@@ -65,11 +70,13 @@ impl AppScene {
     pub async fn clear(self: &Arc<Self>) {
         let state = self;
 
-        let mut lock = state.renderer.lock().await;
+        let mut renderer = state.renderer.lock().await;
 
-        lock.meshes.clear();
-        lock.gltf.raw_datas.clear();
-        lock.render();
+        state.stop_animation_loop();
+        if let Err(err) = renderer.remove_all() {
+            tracing::error!("Failed to clear renderer: {:?}", err);
+        }
+        renderer.render();
     }
 
     pub async fn load(self: &Arc<Self>, gltf_id: GltfId) -> Result<GltfLoader> {
@@ -118,10 +125,13 @@ impl AppScene {
     pub async fn setup(self: &Arc<Self>) -> Result<()> {
         let mut renderer = self.renderer.lock().await;
 
-        renderer.transforms.update_world()?;
+        // call these first so we can get the extents
+        renderer.update_animations(0.0)?;
+        renderer.update_transforms()?;
+
         let mut extents: Option<PositionExtents> = None;
 
-        for mesh in renderer.meshes.iter() {
+        for (_, mesh) in renderer.meshes.iter() {
             if let Some(mut mesh_extents) = mesh.position_extents.clone() {
                 if let Ok(world_transform) = renderer.transforms.get_world(mesh.transform_key) {
                     mesh_extents.apply_matrix(&*world_transform);
@@ -140,10 +150,61 @@ impl AppScene {
             camera.set_extents(extents);
         }
 
-        //camera.set_canvas(renderer.gpu.context.canvas().unchecked_ref());
+        Ok(())
+    }
 
-        renderer.camera.update(&*camera)?;
+    pub async fn update_all(self: &Arc<Self>, global_time_delta: f64) -> Result<()> {
+        let state = self;
+
+        let camera = self.camera.lock().unwrap();
+
+        self.renderer
+            .lock()
+            .await
+            .update_all(global_time_delta, &*camera)?;
 
         Ok(())
+    }
+
+    pub fn start_animation_loop(self: &Arc<Self>) {
+        let state = self;
+
+        state.stop_animation_loop();
+        *state.request_animation_frame.lock().unwrap() = Some(
+            gloo_render::request_animation_frame(clone!(state => move |timestamp| {
+                state.fire_raf(timestamp);
+            })),
+        );
+    }
+
+    pub fn stop_animation_loop(self: &Arc<Self>) {
+        self.request_animation_frame.lock().unwrap().take();
+        self.last_request_animation_frame.set(None);
+    }
+
+    fn fire_raf(self: &Arc<Self>, timestamp: f64) {
+        let state = self;
+        spawn_local(clone!(state => async move {
+            if let Some(last_timestamp) = state.last_request_animation_frame.get() {
+                let time_delta = timestamp - last_timestamp;
+                if let Err(err) = state.update_all(time_delta).await {
+                    tracing::error!("Failed to animate: {:?}", err);
+                }
+
+                if let Err(err) = state.render().await {
+                    tracing::error!("Failed to render after animation: {:?}", err);
+                }
+            }
+
+            let mut lock = state.request_animation_frame.lock().unwrap();
+
+            if lock.take().is_some() {
+                state.last_request_animation_frame.set(Some(timestamp));
+
+                *lock = Some(gloo_render::request_animation_frame(clone!(state => move |timestamp| {
+                    state.fire_raf(timestamp);
+                })));
+            }
+        }));
     }
 }

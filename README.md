@@ -8,7 +8,9 @@ This does *not* use wgpu, but rather uses the WebGPU API directly via the `web-s
 
 # STATUS
 
-Nothing to see here yet, early days, slow-moving hobby and learning in progress :)
+Nothing much to see here yet, early days, slow-moving hobby and learning in progress :)
+
+See [ROADMAP](ROADMAP.md) for details.
 
 # CRATES
 

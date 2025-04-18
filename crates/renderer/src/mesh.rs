@@ -1,46 +1,23 @@
-use awsm_renderer_core::error::AwsmCoreError;
+mod buffer_info;
+mod error;
+mod meshes;
+mod morphs;
+
 use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
 use glam::{Mat4, Vec3};
-use slotmap::{new_key_type, DenseSlotMap};
-use thiserror::Error;
 
+use crate::buffers::bind_group::{
+    BIND_GROUP_MORPH_TARGET_VALUES, BIND_GROUP_MORPH_TARGET_WEIGHTS, BIND_GROUP_TRANSFORM,
+};
 use crate::render::RenderContext;
-use crate::shaders::BindGroup;
-use crate::transform::{AwsmTransformError, TransformKey};
+use crate::transform::TransformKey;
 
-pub struct Meshes {
-    list: DenseSlotMap<MeshKey, Mesh>,
-}
+pub use buffer_info::*;
+pub use error::AwsmMeshError;
+pub use meshes::{MeshKey, Meshes};
+pub use morphs::MorphKey;
 
-impl Default for Meshes {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Meshes {
-    pub fn new() -> Self {
-        Self {
-            list: DenseSlotMap::with_key(),
-        }
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &Mesh> {
-        self.list.values()
-    }
-
-    pub fn insert(&mut self, mesh: Mesh) -> MeshKey {
-        self.list.insert(mesh)
-    }
-
-    pub fn clear(&mut self) {
-        self.list.clear();
-    }
-}
-
-new_key_type! {
-    pub struct MeshKey;
-}
+use super::error::Result;
 
 // this is most like a "primitive" in gltf, not the containing "mesh"
 // because for non-gltf naming, "mesh" makes more sense
@@ -53,6 +30,7 @@ pub struct Mesh {
     pub topology: PrimitiveTopology,
     pub position_extents: Option<PositionExtents>,
     pub transform_key: TransformKey,
+    pub morph_key: Option<MorphKey>,
 }
 
 #[derive(Debug, Clone)]
@@ -89,8 +67,8 @@ pub struct MeshVertexBuffer {
 pub struct MeshIndexBuffer {
     pub buffer: web_sys::GpuBuffer,
     pub format: IndexFormat,
-    pub offset: Option<u64>,
-    pub size: Option<u64>,
+    pub offset: u64,
+    pub size: u64,
 }
 
 impl Mesh {
@@ -106,6 +84,7 @@ impl Mesh {
             index_buffer: None,
             topology: PrimitiveTopology::TriangleList,
             position_extents: None,
+            morph_key: None,
             transform_key,
         }
     }
@@ -130,14 +109,33 @@ impl Mesh {
         self
     }
 
+    pub fn with_morph_key(mut self, morph_key: MorphKey) -> Self {
+        self.morph_key = Some(morph_key);
+        self
+    }
+
     pub fn push_commands(&self, ctx: &mut RenderContext) -> Result<()> {
         ctx.render_pass.set_pipeline(&self.pipeline);
 
         ctx.render_pass.set_bind_group(
-            BindGroup::Transform as u32,
+            BIND_GROUP_TRANSFORM,
             ctx.transforms.bind_group(),
             Some(&[ctx.transforms.buffer_offset(self.transform_key)? as u32]),
         )?;
+
+        if let Some(morph_key) = self.morph_key {
+            ctx.render_pass.set_bind_group(
+                BIND_GROUP_MORPH_TARGET_WEIGHTS,
+                ctx.meshes.morphs.weights_bind_group(),
+                Some(&[ctx.meshes.morphs.weights_buffer_offset(morph_key)? as u32]),
+            )?;
+
+            ctx.render_pass.set_bind_group(
+                BIND_GROUP_MORPH_TARGET_VALUES,
+                ctx.meshes.morphs.values_bind_group(morph_key)?,
+                Some(&[ctx.meshes.morphs.values_buffer_offset(morph_key)? as u32]),
+            )?;
+        }
 
         for vertex_buffer in &self.vertex_buffers {
             ctx.render_pass.set_vertex_buffer(
@@ -153,8 +151,8 @@ impl Mesh {
                 ctx.render_pass.set_index_buffer(
                     &index_buffer.buffer,
                     index_buffer.format,
-                    index_buffer.offset,
-                    index_buffer.size,
+                    Some(index_buffer.offset),
+                    Some(index_buffer.size),
                 );
                 ctx.render_pass.draw_indexed(self.draw_count as u32);
             }
@@ -165,18 +163,4 @@ impl Mesh {
 
         Ok(())
     }
-}
-
-type Result<T> = std::result::Result<T, AwsmMeshError>;
-
-#[derive(Error, Debug)]
-pub enum AwsmMeshError {
-    #[error("[mesh] not found: {0:?}")]
-    MeshNotFound(MeshKey),
-
-    #[error("[mesh] {0:?}")]
-    Core(#[from] AwsmCoreError),
-
-    #[error("[mesh] {0:?}")]
-    Transform(#[from] AwsmTransformError),
 }

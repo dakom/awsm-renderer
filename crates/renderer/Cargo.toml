@@ -8,7 +8,7 @@ authors.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["gltf", "exr"]
+default = ["gltf", "exr", "animation"]
 gltf = [
     "dep:gltf",
     "dep:gloo-net",
@@ -17,6 +17,7 @@ gltf = [
 exr = [
     "awsm-renderer-core/exr",
 ]
+animation = []
 
 [dependencies]
 awsm-renderer-core = {workspace = true} 

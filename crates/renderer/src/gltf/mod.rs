@@ -1,4 +1,5 @@
 pub mod accessors;
+pub mod animation;
 pub mod buffers;
 pub mod cache;
 pub mod data;

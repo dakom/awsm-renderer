@@ -1,13 +1,18 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use crate::{
-    gltf::{error::AwsmGltfError, pipelines::RenderPipelineKey, shaders::ShaderKey},
+    buffers::storage::StorageBufferKey,
+    gltf::{error::AwsmGltfError, pipelines::RenderPipelineKey},
     mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer, PositionExtents},
+    shaders::{ShaderConstantIds, ShaderKey},
     transform::TransformKey,
     AwsmRenderer,
 };
 use awsm_renderer_core::{
-    pipeline::primitive::{IndexFormat, PrimitiveTopology},
+    pipeline::{
+        fragment::ColorTargetState,
+        primitive::{IndexFormat, PrimitiveTopology},
+    },
     shaders::ShaderModuleExt,
 };
 use glam::Vec3;
@@ -26,7 +31,16 @@ impl AwsmRenderer {
         let gltf_data = gltf_data.into();
         self.gltf.raw_datas.push(gltf_data.clone());
 
-        let ctx = GltfPopulateContext { data: gltf_data };
+        let morph_buffer_storage_key = if let Some(morph_buffer) = &gltf_data.buffers.morph_buffer {
+            Some(self.storage.insert(morph_buffer.clone()))
+        } else {
+            None
+        };
+
+        let ctx = GltfPopulateContext {
+            data: gltf_data,
+            morph_buffer_storage_key,
+        };
 
         let scene = match scene {
             Some(index) => ctx
@@ -62,9 +76,63 @@ impl AwsmRenderer {
             //
             // the reason is two-fold:
             // 1. that's technically how the gltf spec is defined
-            // 2. we aren't forced into a strict component system, so it's absolutely fine to share the transform - giving us a performance benefit
+            // 2. we get a performance boost since we can use the same transform for all primitives in a mesh (instead of forcing an unnecessary tree)
             let transform = transform_gltf_node(gltf_node);
             let transform_key = self.transforms.insert(transform, parent_transform_key);
+
+            for gltf_animation in ctx.data.doc.animations() {
+                for channel in gltf_animation.channels() {
+                    if channel.target().node().index() == gltf_node.index() {
+                        match channel.target().property() {
+                            gltf::animation::Property::Translation => {
+                                self.populate_gltf_animation_transform_translation(
+                                    ctx,
+                                    gltf_animation
+                                        .samplers()
+                                        .nth(channel.sampler().index())
+                                        .ok_or(AwsmGltfError::MissingAnimationSampler {
+                                            animation_index: gltf_animation.index(),
+                                            channel_index: channel.index(),
+                                            sampler_index: channel.sampler().index(),
+                                        })?,
+                                    transform_key,
+                                )?;
+                            }
+                            gltf::animation::Property::Rotation => {
+                                self.populate_gltf_animation_transform_rotation(
+                                    ctx,
+                                    gltf_animation
+                                        .samplers()
+                                        .nth(channel.sampler().index())
+                                        .ok_or(AwsmGltfError::MissingAnimationSampler {
+                                            animation_index: gltf_animation.index(),
+                                            channel_index: channel.index(),
+                                            sampler_index: channel.sampler().index(),
+                                        })?,
+                                    transform_key,
+                                )?;
+                            }
+                            gltf::animation::Property::Scale => {
+                                self.populate_gltf_animation_transform_scale(
+                                    ctx,
+                                    gltf_animation
+                                        .samplers()
+                                        .nth(channel.sampler().index())
+                                        .ok_or(AwsmGltfError::MissingAnimationSampler {
+                                            animation_index: gltf_animation.index(),
+                                            channel_index: channel.index(),
+                                            sampler_index: channel.sampler().index(),
+                                        })?,
+                                    transform_key,
+                                )?;
+                            }
+                            gltf::animation::Property::MorphTargetWeights => {
+                                // morph targets will be dealt with later when we populate the mesh
+                            }
+                        }
+                    }
+                }
+            }
 
             if let Some(gltf_mesh) = gltf_node.mesh() {
                 for gltf_primitive in gltf_mesh.primitives() {
@@ -90,7 +158,7 @@ impl AwsmRenderer {
     async fn populate_gltf_primitive(
         &mut self,
         ctx: &GltfPopulateContext,
-        _gltf_node: &gltf::Node<'_>,
+        gltf_node: &gltf::Node<'_>,
         gltf_mesh: &gltf::Mesh<'_>,
         gltf_primitive: gltf::Primitive<'_>,
         transform_key: TransformKey,
@@ -98,9 +166,25 @@ impl AwsmRenderer {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
-        let pipeline_layout_key = PipelineLayoutKey::default();
+        let shader_key = ShaderKey::gltf_primitive_new(&gltf_primitive);
 
-        let shader_key = ShaderKey::new(&gltf_primitive);
+        let morph_key = match primitive_buffer_info.morph.clone() {
+            None => None,
+            Some(morph_buffer_info) => {
+                let storage_key = ctx
+                    .morph_buffer_storage_key
+                    .ok_or(AwsmGltfError::MorphStorageKeyMissing)?;
+
+                let buffer = self.storage.get(storage_key)?;
+                Some(
+                    self.meshes
+                        .morphs
+                        .insert(&self.gpu, buffer, morph_buffer_info)?,
+                )
+            }
+        };
+
+        let pipeline_layout_key = PipelineLayoutKey::new(ctx, primitive_buffer_info);
 
         let shader_module = match self.gltf.shaders.get(&shader_key) {
             None => {
@@ -126,16 +210,23 @@ impl AwsmRenderer {
         // tracing::info!("positions: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[0].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
         //tracing::info!("normals: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[1].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
 
-        let pipeline_key = RenderPipelineKey::new(
-            self,
-            shader_key,
-            pipeline_layout_key,
-            vec![vertex_buffer_layout],
-        );
+        let mut pipeline_key = RenderPipelineKey::new(shader_key, pipeline_layout_key)
+            .with_vertex_buffer_layout(vertex_buffer_layout)
+            .with_fragment_target(ColorTargetState::new(self.gpu.current_context_format()));
+
+        if let Some(morph) = &primitive_buffer_info.morph {
+            pipeline_key = pipeline_key.with_vertex_constant(
+                (ShaderConstantIds::MaxMorphTargets as u16).into(),
+                (morph.targets_len as u32).into(),
+            );
+        }
 
         let render_pipeline = match self.gltf.render_pipelines.get(&pipeline_key).cloned() {
             None => {
-                let descriptor = pipeline_key.clone().into_descriptor(self, &shader_module)?;
+                let descriptor =
+                    pipeline_key
+                        .clone()
+                        .into_descriptor(self, &shader_module, morph_key)?;
 
                 let render_pipeline = self.gpu.create_render_pipeline(&descriptor).await?;
 
@@ -162,8 +253,8 @@ impl AwsmRenderer {
                 // slot here points to the first one
                 slot: 0,
                 // but we need to point to this primitive's slice within the larger buffer
-                offset: Some(primitive_buffer_info.vertex_offset as u64),
-                size: Some(primitive_buffer_info.vertex_len() as u64),
+                offset: Some(primitive_buffer_info.vertex.offset as u64),
+                size: Some(primitive_buffer_info.vertex.size as u64),
             }],
         )
         .with_topology(match gltf_primitive.mode() {
@@ -184,6 +275,10 @@ impl AwsmRenderer {
             mesh = mesh.with_position_extents(position_extents);
         }
 
+        if let Some(morph_key) = morph_key {
+            mesh = mesh.with_morph_key(morph_key);
+        }
+
         if let Some(indices) = gltf_primitive.indices() {
             mesh = mesh.with_index_buffer(MeshIndexBuffer {
                 // safe, only exists if we have an index
@@ -198,12 +293,40 @@ impl AwsmRenderer {
                         )
                     }
                 },
-                offset: primitive_buffer_info.index_offset.map(|x| x as u64),
-                size: primitive_buffer_info.index_len().map(|x| x as u64),
+                // these are safe, we for sure have an index buffer if we have indices
+                offset: primitive_buffer_info.index.as_ref().unwrap().offset as u64,
+                size: primitive_buffer_info.index_len().unwrap() as u64,
             });
         }
 
         let _mesh_key = self.meshes.insert(mesh);
+
+        for gltf_animation in ctx.data.doc.animations() {
+            for channel in gltf_animation.channels() {
+                if channel.target().node().index() == gltf_node.index() {
+                    match channel.target().property() {
+                        gltf::animation::Property::MorphTargetWeights => {
+                            self.populate_gltf_animation_morph(
+                                ctx,
+                                gltf_animation
+                                    .samplers()
+                                    .nth(channel.sampler().index())
+                                    .ok_or(AwsmGltfError::MissingAnimationSampler {
+                                        animation_index: gltf_animation.index(),
+                                        channel_index: channel.index(),
+                                        sampler_index: channel.sampler().index(),
+                                    })?,
+                                morph_key.ok_or(AwsmGltfError::MissingMorphForAnimation)?,
+                            )?;
+                        }
+                        // transform animations were already populated in the node
+                        gltf::animation::Property::Translation
+                        | gltf::animation::Property::Rotation
+                        | gltf::animation::Property::Scale => {}
+                    }
+                }
+            }
+        }
 
         Ok(())
     }
@@ -244,5 +367,6 @@ fn try_position_extents(gltf_primitive: &gltf::Primitive<'_>) -> Option<Position
 
 pub(super) struct GltfPopulateContext {
     pub data: Arc<GltfData>,
-    // we may need more stuff here
+
+    pub morph_buffer_storage_key: Option<StorageBufferKey>, // we may need more stuff here
 }

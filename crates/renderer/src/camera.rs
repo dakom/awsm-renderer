@@ -8,7 +8,14 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::{Mat4, Vec3};
 use thiserror::Error;
 
-use crate::shaders::BindGroupBinding;
+use crate::buffers::bind_group::BIND_GROUP_CAMERA_BINDING;
+use crate::AwsmRenderer;
+
+impl AwsmRenderer {
+    pub fn update_camera(&mut self, camera: &impl CameraExt) -> Result<()> {
+        self.camera.update(camera)
+    }
+}
 
 pub struct CameraBuffer {
     pub(crate) gpu_buffer: web_sys::GpuBuffer,
@@ -44,7 +51,7 @@ impl CameraBuffer {
             .create_bind_group_layout(
                 &BindGroupLayoutDescriptor::new(Some("Camera"))
                     .with_entries(vec![BindGroupLayoutEntry::new(
-                        BindGroupBinding::Camera as u32,
+                        BIND_GROUP_CAMERA_BINDING,
                         BindGroupLayoutResource::Buffer(
                             BufferBindingLayout::new()
                                 .with_binding_type(BufferBindingType::Uniform),
@@ -61,7 +68,7 @@ impl CameraBuffer {
                 &bind_group_layout,
                 Some("Camera"),
                 vec![BindGroupEntry::new(
-                    BindGroupBinding::Camera as u32,
+                    BIND_GROUP_CAMERA_BINDING,
                     BindGroupResource::Buffer(BufferBinding::new(&gpu_buffer)),
                 )],
             )
@@ -78,7 +85,7 @@ impl CameraBuffer {
 
     // this is fast/cheap to call, so we can call it multiple times a frame
     // it will only update the data in the buffer once per frame, at render time
-    pub fn update(&mut self, camera: &impl CameraExt) -> Result<()> {
+    pub(crate) fn update(&mut self, camera: &impl CameraExt) -> Result<()> {
         let view = camera.view_matrix(); // 16 floats
         let proj = camera.projection_matrix(); // 16 floats
 
@@ -117,11 +124,10 @@ impl CameraBuffer {
         Ok(())
     }
 
-    pub fn write_buffer(&self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+    // writes to the GPU
+    pub fn write_gpu(&self, gpu: &AwsmRendererWebGpu) -> Result<()> {
         gpu.write_buffer(&self.gpu_buffer, None, self.raw_data.as_slice(), None, None)
             .map_err(AwsmCameraError::WriteBuffer)?;
-
-        // TODO - transforms, etc.
 
         Ok(())
     }

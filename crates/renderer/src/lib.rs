@@ -1,11 +1,11 @@
-use camera::CameraBuffer;
+use buffers::storage::StorageBuffers;
+use camera::{CameraBuffer, CameraExt};
 use mesh::Meshes;
 use transform::Transforms;
 
+pub mod buffers;
 pub mod camera;
 pub mod error;
-#[cfg(feature = "gltf")]
-pub mod gltf;
 pub mod mesh;
 pub mod render;
 pub mod shaders;
@@ -13,17 +13,63 @@ pub mod transform;
 pub mod core {
     pub use awsm_renderer_core::*;
 }
+#[cfg(feature = "gltf")]
+pub mod gltf;
+
+#[cfg(feature = "animation")]
+pub mod animation;
+
 pub struct AwsmRenderer {
     pub gpu: core::renderer::AwsmRendererWebGpu,
-
-    #[cfg(feature = "gltf")]
-    pub gltf: gltf::cache::GltfCache,
 
     pub meshes: Meshes,
 
     pub camera: CameraBuffer,
 
     pub transforms: Transforms,
+
+    pub storage: StorageBuffers,
+
+    #[cfg(feature = "gltf")]
+    gltf: gltf::cache::GltfCache,
+
+    #[cfg(feature = "animation")]
+    pub animations: animation::Animations,
+}
+
+impl AwsmRenderer {
+    // just a convenience function to update non-GPU properties
+    // pair this with .render() once a frame and everything should run smoothly
+    // but real-world you may want to update transforms more often for physics, for example
+    pub fn update_all(
+        &mut self,
+        global_time_delta: f64,
+        camera: &impl CameraExt,
+    ) -> crate::error::Result<()> {
+        self.update_animations(global_time_delta)?;
+        self.update_transforms()?;
+        self.update_camera(camera)?;
+
+        Ok(())
+    }
+
+    pub fn remove_all(&mut self) -> crate::error::Result<()> {
+        self.camera = camera::CameraBuffer::new(&self.gpu)?;
+        self.meshes = Meshes::new(&self.gpu)?;
+        self.transforms = Transforms::new(&self.gpu)?;
+
+        #[cfg(feature = "gltf")]
+        {
+            self.gltf = gltf::cache::GltfCache::default();
+        }
+
+        #[cfg(feature = "animation")]
+        {
+            self.animations = animation::Animations::default();
+        }
+
+        Ok(())
+    }
 }
 
 pub struct AwsmRendererBuilder {
@@ -52,34 +98,24 @@ impl AwsmRendererBuilder {
         Ok(self)
     }
 
-    #[cfg(feature = "gltf")]
     pub fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
         let gpu = self.gpu.build()?;
         let camera = camera::CameraBuffer::new(&gpu)?;
-        let meshes = Meshes::new();
+        let meshes = Meshes::new(&gpu)?;
         let transforms = Transforms::new(&gpu)?;
 
         Ok(AwsmRenderer {
             gpu,
-            gltf: gltf::cache::GltfCache::default(),
             meshes,
             camera,
             transforms,
-        })
-    }
+            storage: StorageBuffers::new(),
 
-    #[cfg(not(feature = "gltf"))]
-    pub fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
-        let gpu = self.gpu.build()?;
-        let camera_buffer = camera::CameraBuffer::new(&gpu)?;
-        let meshes = Meshes::new();
-        let transforms = Transforms::new(&gpu)?;
+            #[cfg(feature = "gltf")]
+            gltf: gltf::cache::GltfCache::default(),
 
-        Ok(AwsmRenderer {
-            gpu,
-            meshes,
-            camera_buffer,
-            transforms,
+            #[cfg(feature = "animation")]
+            animations: animation::Animations::default(),
         })
     }
 }
