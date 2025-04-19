@@ -5,7 +5,11 @@ As more features are added, support is added into the core engine.
 
 ## Demo-only
 
-- [ ] Camera w/ arcball controls
+- [x] Camera
+    - [x] Orbit controls 
+    - [x] Orthographic
+        - [x] Fit Extents 
+    - [ ] Perspective
 
 ## Camera
 
@@ -31,6 +35,11 @@ As more features are added, support is added into the core engine.
         - Unused but present attributes do not create new shader, just 0 influence
 - [ ] Frustum culling
 
+## Drawing
+    - [ ] Early z pre-pass
+    - [ ] Opaque front to back
+    - [ ] Transparent back to front
+
 ## Animation system 
 - [x] Players
     - [x] speed control
@@ -41,6 +50,13 @@ As more features are added, support is added into the core engine.
         - [ ] test 
 - [x] Clips and samplers (see gltf features for details)
 - [ ] Events
+
+## Post-processing
+- [ ] SSAO
+- [ ] Bloom
+- [ ] FXAA
+- [ ] DOF
+- [ ] Tonemapping
 
 ## GLTF Support 
 

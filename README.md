@@ -31,3 +31,16 @@ I've taken some stabs at some variation of this sorta thing before. Some project
 * [Pure3d (typescript + webgl1)](https://github.com/dakom/pure3d-typescript)
 * [Shipyard ECS (webgl2)](https://github.com/dakom/shipyard-webgl-renderer)
 * [WebGL1+2 Rust bindings](https://github.com/dakom/awsm-web/tree/master/crate/src/webgl)
+
+# NON-GOALS
+
+### Occlusion culling
+
+This really depends on the specific needs of a project. Some examples:
+
+* no culling at all (e.g. a fighting game)
+* portal-based (e.g. a first-person shooter in an interior) 
+* space partitiong (e.g. in an open world game).
+* quadtrees (e.g. in top-down view)
+
+In all cases the renderer *does* do frustum culling, it just doesn't concern itself with the specifics of potential occluders within its view.
