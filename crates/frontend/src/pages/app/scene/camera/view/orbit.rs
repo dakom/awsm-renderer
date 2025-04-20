@@ -1,3 +1,4 @@
+use awsm_renderer::bounds::Aabb;
 use glam::{Mat4, Quat, Vec3};
 
 #[derive(Debug, Clone)]
@@ -16,6 +17,16 @@ pub struct OrbitCamera {
 }
 
 impl OrbitCamera {
+    pub fn new_aabb(aabb: &Aabb, margin: f32) -> Self {
+        let center = aabb.center();
+        let size = aabb.size();
+
+        let bounding_radius = size.length() * 0.5;
+        let radius = bounding_radius * margin;
+
+        OrbitCamera::new(center, radius)
+    }
+
     pub fn new(look_at: Vec3, radius: f32) -> Self {
         Self {
             look_at,

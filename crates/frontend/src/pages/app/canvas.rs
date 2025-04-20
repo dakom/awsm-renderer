@@ -1,20 +1,20 @@
-use awsm_renderer::{mesh::PositionExtents, AwsmRendererBuilder};
+use awsm_renderer::AwsmRendererBuilder;
 use awsm_web::dom::resize::{self, ResizeObserver};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{models::collections::GltfId, pages::app::sidebar::current_model_signal, prelude::*};
 
-use super::scene::AppScene;
+use super::{context::AppContext, scene::AppScene};
 
 pub struct AppCanvas {
-    pub scene: Mutable<Option<Arc<AppScene>>>,
+    pub ctx: AppContext,
     pub display_text: Mutable<String>,
 }
 
 impl AppCanvas {
-    pub fn new() -> Arc<Self> {
+    pub fn new(ctx: AppContext) -> Arc<Self> {
         Arc::new(Self {
-            scene: Mutable::new(None),
+            ctx,
             display_text: Mutable::new("<-- Select a model from the sidebar".to_string()),
         })
     }
@@ -36,7 +36,7 @@ impl AppCanvas {
 
         let sig = map_ref! {
             let model_id = current_model_signal(),
-            let scene = state.scene.signal_cloned()
+            let scene = state.ctx.scene.signal_cloned()
             => {
                 match (model_id, scene) {
                     (Some(model_id), Some(scene)) => {
@@ -70,7 +70,7 @@ impl AppCanvas {
                             .build()
                             .unwrap();
 
-                        state.scene.set(Some(AppScene::new(renderer, canvas)));
+                        state.ctx.scene.set(Some(AppScene::new(state.ctx.clone(), renderer)));
                     }));
                 }))
             }))

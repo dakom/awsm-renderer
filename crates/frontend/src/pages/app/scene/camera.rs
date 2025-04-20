@@ -1,18 +1,25 @@
-mod orbit;
-mod orthographic;
-mod perspective;
+mod projection;
+mod view;
 
-use awsm_renderer::{camera::CameraExt, mesh::PositionExtents};
+use awsm_renderer::bounds::Aabb;
+use awsm_renderer::camera::CameraExt;
 use glam::{Mat4, Quat, Vec2, Vec3};
-use orbit::OrbitCamera;
-use orthographic::OrthographicCamera;
-use perspective::PerspectiveCamera;
+use projection::orthographic::OrthographicCamera;
+use projection::perspective::PerspectiveCamera;
+use view::orbit::OrbitCamera;
+
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
+pub enum CameraId {
+    #[default]
+    Orthographic,
+    Perspective,
+}
 
 #[derive(Debug, Clone)]
 pub struct Camera {
     projection: CameraProjection,
     view: CameraView,
-    bounding_radius: f32,
+    aabb: Aabb,
     margin: f32,
 }
 
@@ -43,6 +50,20 @@ pub enum CameraView {
     Orbit(OrbitCamera),
 }
 
+impl CameraView {
+    pub fn position(&self) -> Vec3 {
+        match self {
+            CameraView::Orbit(camera) => camera.get_position(),
+        }
+    }
+
+    pub fn look_at(&self) -> Vec3 {
+        match self {
+            CameraView::Orbit(camera) => camera.look_at,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum CameraProjection {
     Orthographic(OrthographicCamera),
@@ -50,62 +71,33 @@ pub enum CameraProjection {
 }
 
 impl Camera {
-    pub fn new(canvas: web_sys::HtmlCanvasElement, extents: PositionExtents) -> Self {
-        let center = (extents.min + extents.max) * 0.5;
-        let size = extents.max - extents.min;
-
-        let width = size.x;
-        let height = size.y;
-        let aspect = width / height;
-        let mut half_w = width * 0.5;
-        let mut half_h = height * 0.5;
-
-        if half_w / half_h > aspect {
-            half_h = half_w / aspect;
-        } else {
-            half_w = half_h * aspect;
-        }
-
+    pub fn new_orthographic(aabb: Aabb, aspect: f32) -> Self {
         let margin = 1.1;
-        half_w *= margin;
-        half_h *= margin;
+        let view = CameraView::Orbit(OrbitCamera::new_aabb(&aabb, margin));
+        let projection = CameraProjection::Orthographic(OrthographicCamera::new_aabb(
+            &view, &aabb, margin, aspect,
+        ));
 
-        let bounding_radius = size.length() * 0.5;
-        let radius = bounding_radius * margin;
-
-        let view = OrbitCamera::new(center, radius);
-
-        let mut camera = Self {
-            projection: CameraProjection::Orthographic(OrthographicCamera {
-                left: -half_w,
-                right: half_w,
-                bottom: -half_h,
-                top: half_h,
-                near: 0.01, // initial placeholder
-                far: 100.0, // initial placeholder
-            }),
-            view: CameraView::Orbit(view),
-            bounding_radius,
+        Self {
+            projection,
+            view,
+            aabb,
             margin,
-        };
-
-        camera.update_near_far();
-
-        camera
+        }
     }
 
-    /// Call this method whenever zoom changes to adjust clipping dynamically.
-    pub fn update_near_far(&mut self) {
-        if let (CameraProjection::Orthographic(ortho), CameraView::Orbit(orbit)) =
-            (&mut self.projection, &self.view)
-        {
-            let bounding_radius = self.bounding_radius;
-            let margin = self.margin;
-            let camera_position = orbit.get_position();
-            let distance = camera_position.distance(orbit.look_at);
+    pub fn new_perspective(aabb: Aabb, aspect: f32) -> Self {
+        let margin = 1.1;
+        let view = CameraView::Orbit(OrbitCamera::new_aabb(&aabb, margin));
+        let projection = CameraProjection::Perspective(PerspectiveCamera::new_aabb(
+            &view, &aabb, margin, aspect,
+        ));
 
-            ortho.near = (distance - bounding_radius * margin * 2.0).max(0.01);
-            ortho.far = distance + bounding_radius * margin * 2.0;
+        Self {
+            projection,
+            view,
+            aabb,
+            margin,
         }
     }
 
@@ -132,11 +124,24 @@ impl Camera {
             orbit_view.on_wheel(delta as f32);
         }
 
-        if let CameraProjection::Orthographic(ortho) = &mut self.projection {
-            ortho.zoom(1.0 + delta as f32 * 0.001);
+        match &mut self.projection {
+            CameraProjection::Orthographic(ortho) => {
+                ortho.on_wheel(&self.view, &self.aabb, self.margin, delta as f32);
+            }
+            CameraProjection::Perspective(persp) => {
+                persp.on_wheel(&self.view, &self.aabb, self.margin);
+            }
         }
+    }
 
-        // Update near/far after zooming
-        self.update_near_far();
+    pub fn on_resize(&mut self, aspect: f32) {
+        match &mut self.projection {
+            CameraProjection::Orthographic(ortho) => {
+                ortho.on_resize(&self.view, &self.aabb, self.margin, aspect);
+            }
+            CameraProjection::Perspective(persp) => {
+                persp.on_resize(aspect);
+            }
+        }
     }
 }

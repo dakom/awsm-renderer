@@ -4,6 +4,8 @@ use crate::{
     prelude::*,
 };
 
+use super::render_dropdown_label;
+
 pub struct SidebarGltf {}
 
 impl SidebarGltf {
@@ -94,24 +96,4 @@ impl SidebarGltf {
                 .render(),
         )
     }
-}
-
-fn render_dropdown_label(label: &str, dropdown: Dom) -> Dom {
-    static CONTAINER: LazyLock<String> = LazyLock::new(|| {
-        class! {
-            .style("display", "flex")
-            .style("flex-direction", "column")
-            .style("margin", "1rem")
-            .style("gap", "1rem")
-        }
-    });
-
-    html!("div", {
-        .class(&*CONTAINER)
-        .child(html!("div", {
-            .class([FontSize::Xlg.class(), ColorText::SidebarHeader.class()])
-            .text(label)
-        }))
-        .child(dropdown)
-    })
 }

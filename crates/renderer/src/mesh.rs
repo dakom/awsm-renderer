@@ -4,8 +4,8 @@ mod meshes;
 mod morphs;
 
 use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
-use glam::{Mat4, Vec3};
 
+use crate::bounds::Aabb;
 use crate::buffers::bind_group::{
     BIND_GROUP_MORPH_TARGET_VALUES, BIND_GROUP_MORPH_TARGET_WEIGHTS, BIND_GROUP_TRANSFORM,
 };
@@ -28,31 +28,9 @@ pub struct Mesh {
     pub vertex_buffers: Vec<MeshVertexBuffer>,
     pub index_buffer: Option<MeshIndexBuffer>,
     pub topology: PrimitiveTopology,
-    pub position_extents: Option<PositionExtents>,
+    pub aabb: Option<Aabb>,
     pub transform_key: TransformKey,
     pub morph_key: Option<MorphKey>,
-}
-
-#[derive(Debug, Clone)]
-pub struct PositionExtents {
-    pub min: Vec3,
-    pub max: Vec3,
-}
-
-impl PositionExtents {
-    pub fn new(min: Vec3, max: Vec3) -> Self {
-        Self { min, max }
-    }
-
-    pub fn extend(&mut self, other: &Self) {
-        self.min = self.min.min(other.min);
-        self.max = self.max.max(other.max);
-    }
-
-    pub fn apply_matrix(&mut self, mat: &Mat4) {
-        self.min = mat.transform_point3(self.min);
-        self.max = mat.transform_point3(self.max);
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -83,7 +61,7 @@ impl Mesh {
             vertex_buffers: Vec::new(),
             index_buffer: None,
             topology: PrimitiveTopology::TriangleList,
-            position_extents: None,
+            aabb: None,
             morph_key: None,
             transform_key,
         }
@@ -104,8 +82,8 @@ impl Mesh {
         self
     }
 
-    pub fn with_position_extents(mut self, extents: PositionExtents) -> Self {
-        self.position_extents = Some(extents);
+    pub fn with_aabb(mut self, aabb: Aabb) -> Self {
+        self.aabb = Some(aabb);
         self
     }
 
