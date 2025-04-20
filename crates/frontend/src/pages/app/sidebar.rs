@@ -1,5 +1,7 @@
+mod camera;
 mod gltf;
 
+use camera::SidebarCamera;
 use gltf::SidebarGltf;
 
 use crate::{
@@ -7,8 +9,11 @@ use crate::{
     prelude::*,
 };
 
+use super::context::AppContext;
+
 pub struct AppSidebar {
     section: Mutable<Option<Section>>,
+    ctx: AppContext,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -17,11 +22,13 @@ enum Section {
     Animation,
     Lighting,
     Environment,
+    Camera,
 }
 
 impl AppSidebar {
-    pub fn new() -> Arc<Self> {
+    pub fn new(ctx: AppContext) -> Arc<Self> {
         Arc::new(Self {
+            ctx,
             section: Mutable::new(Some(Section::Gltf)),
         })
     }
@@ -45,6 +52,7 @@ impl AppSidebar {
                 self.render_section(Section::Animation),
                 self.render_section(Section::Lighting),
                 self.render_section(Section::Environment),
+                self.render_section(Section::Camera),
             ])
         })
     }
@@ -53,7 +61,7 @@ impl AppSidebar {
         let state = self;
         html!("div", {
             .child(state.render_section_header(section))
-            .child_signal(state.section.signal().map(move |current| {
+            .child_signal(state.section.signal().map(clone!(state => move |current| {
                 match current {
                     None => None,
                     Some(current) => {
@@ -75,6 +83,7 @@ impl AppSidebar {
                                         .class([FontSize::Lg.class(), ColorText::SidebarHeader.class()])
                                         .text("TODO")
                                     }),
+                                    Section::Camera => SidebarCamera::new(state.ctx.clone()).render(),
                                 })
                             }))
                         } else {
@@ -82,7 +91,7 @@ impl AppSidebar {
                         }
                     }
                 }
-            }))
+            })))
         })
     }
 
@@ -132,27 +141,43 @@ impl AppSidebar {
                         "xmlns": "http://www.w3.org/2000/svg",
                         "viewBox": "0 0 24 24",
                     }
-                    .child(
+                    .children(
                         match section {
                             Section::Gltf => {
-                                svg!("path", {
+                                vec![svg!("path", {
                                     .attr("d", "M12 2l8 4.5v9L12 22l-8-6.5v-9L12 2zm0 2.2L6 7v8l6 4.8 6-4.8V7l-6-2.8z")
-                                })
+                                })]
                             },
                             Section::Animation => {
-                                svg!("path", {
+                                vec![svg!("path", {
                                     .attr("d", "M8 5v14l11-7-11-7z")
-                                })
+                                })]
                             },
                             Section::Lighting => {
-                                svg!("path", {
+                                vec![svg!("path", {
                                     .attr("d", "M9 21h6v-1H9v1zm3-19a7 7 0 00-4 12.6V17a1 1 0 001 1h6a1 1 0 001-1v-2.4A7 7 0 0012 2zm3 12.7V16h-6v-1.3a5 5 0 116 0z")
-                                })
+                                })]
                             },
                             Section::Environment => {
-                                svg!("path", {
+                                vec![svg!("path", {
                                     .attr("d", "M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zm0-14a6 6 0 100 12 6 6 0 000-12z")
-                                })
+                                })]
+                            },
+                            Section::Camera => {
+                                vec![
+                                    svg!("circle", {
+                                        .attrs!{ "cx": "7", "cy": "7", "r": "3",}
+                                    }),
+                                    svg!("circle", {
+                                        .attrs!{ "cx": "15", "cy": "7", "r": "3",}
+                                    }),
+                                    svg!("rect", {
+                                        .attrs!{ "x": "3", "y": "10", "width": "12", "height": "8", "rx": "1.2",}
+                                    }),
+                                    svg!("polygon", {
+                                        .attr("points", "15 12 22 9 22 19 15 16")
+                                    }),
+                                ]
                             },
                         }
                     )
@@ -165,6 +190,7 @@ impl AppSidebar {
                         Section::Animation => "Animation Settings",
                         Section::Lighting => "Lighting Settings",
                         Section::Environment => "Environment Settings",
+                        Section::Camera => "Camera Settings",
                     })
                 })
             )
@@ -176,5 +202,25 @@ pub fn current_model_signal() -> impl Signal<Item = Option<GltfId>> {
     Route::signal().map(|route| match route {
         Route::App(AppRoute::Model(model_id)) => Some(model_id),
         _ => None,
+    })
+}
+
+pub fn render_dropdown_label(label: &str, dropdown: Dom) -> Dom {
+    static CONTAINER: LazyLock<String> = LazyLock::new(|| {
+        class! {
+            .style("display", "flex")
+            .style("flex-direction", "column")
+            .style("margin", "1rem")
+            .style("gap", "1rem")
+        }
+    });
+
+    html!("div", {
+        .class(&*CONTAINER)
+        .child(html!("div", {
+            .class([FontSize::Xlg.class(), ColorText::SidebarHeader.class()])
+            .text(label)
+        }))
+        .child(dropdown)
     })
 }

@@ -1,9 +1,10 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use crate::{
+    bounds::Aabb,
     buffers::storage::StorageBufferKey,
     gltf::{error::AwsmGltfError, pipelines::RenderPipelineKey},
-    mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer, PositionExtents},
+    mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer},
     shaders::{ShaderConstantIds, ShaderKey},
     transform::TransformKey,
     AwsmRenderer,
@@ -271,8 +272,8 @@ impl AwsmRenderer {
             }
         });
 
-        if let Some(position_extents) = try_position_extents(&gltf_primitive) {
-            mesh = mesh.with_position_extents(position_extents);
+        if let Some(aabb) = try_position_aabb(&gltf_primitive) {
+            mesh = mesh.with_aabb(aabb);
         }
 
         if let Some(morph_key) = morph_key {
@@ -332,7 +333,7 @@ impl AwsmRenderer {
     }
 }
 
-fn try_position_extents(gltf_primitive: &gltf::Primitive<'_>) -> Option<PositionExtents> {
+fn try_position_aabb(gltf_primitive: &gltf::Primitive<'_>) -> Option<Aabb> {
     let positions_attribute = gltf_primitive
         .attributes()
         .find_map(|(semantic, attribute)| {
@@ -359,7 +360,7 @@ fn try_position_extents(gltf_primitive: &gltf::Primitive<'_>) -> Option<Position
     let max_y = max[1].as_f64()?;
     let max_z = max[2].as_f64()?;
 
-    Some(PositionExtents {
+    Some(Aabb {
         min: Vec3::new(min_x as f32, min_y as f32, min_z as f32),
         max: Vec3::new(max_x as f32, max_y as f32, max_z as f32),
     })

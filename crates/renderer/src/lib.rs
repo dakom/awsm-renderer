@@ -3,6 +3,7 @@ use camera::{CameraBuffer, CameraExt};
 use mesh::Meshes;
 use transform::Transforms;
 
+pub mod bounds;
 pub mod buffers;
 pub mod camera;
 pub mod error;

@@ -1,15 +1,15 @@
-mod camera;
+pub mod camera;
 
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::ops::Deref;
 
+use awsm_renderer::bounds::Aabb;
 use awsm_renderer::gltf::data::GltfData;
 use awsm_renderer::gltf::loader::GltfLoader;
-use awsm_renderer::mesh::PositionExtents;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use awsm_web::dom::resize::ResizeObserver;
-use camera::Camera;
+use camera::{Camera, CameraId};
 use glam::Vec3;
 use gloo_events::EventListener;
 use serde::de;
@@ -19,7 +19,11 @@ use crate::models::collections::GltfId;
 use crate::pages::app::sidebar::current_model_signal;
 use crate::prelude::*;
 
+use super::canvas;
+use super::context::AppContext;
+
 pub struct AppScene {
+    pub ctx: AppContext,
     pub renderer: futures::lock::Mutex<AwsmRenderer>,
     pub gltf_loader: Mutex<HashMap<GltfId, GltfLoader>>,
     pub camera: Mutex<Option<Camera>>,
@@ -30,8 +34,11 @@ pub struct AppScene {
 }
 
 impl AppScene {
-    pub fn new(renderer: AwsmRenderer, canvas: web_sys::HtmlCanvasElement) -> Arc<Self> {
+    pub fn new(ctx: AppContext, renderer: AwsmRenderer) -> Arc<Self> {
+        let canvas = renderer.gpu.canvas();
+
         let state = Arc::new(Self {
+            ctx,
             renderer: futures::lock::Mutex::new(renderer),
             gltf_loader: Mutex::new(HashMap::new()),
             camera: Mutex::new(None),
@@ -49,15 +56,7 @@ impl AppScene {
                     canvas.set_width(width);
                     canvas.set_height(height);
 
-                    spawn_local(clone!(state => async move {
-                        if let Err(err) = state.setup().await {
-                            tracing::error!("Failed to setup scene after canvas resize: {:?}", err);
-                        }
-
-                        if let Err(err) = state.render().await {
-                            tracing::error!("Failed to render after canvas resize: {:?}", err);
-                        }
-                    }));
+                    state.on_viewport_change();
                 }
             }),
             None,
@@ -112,7 +111,33 @@ impl AppScene {
 
         *state.event_listeners.lock().unwrap() = event_listeners;
 
+        spawn_local(clone!(state => async move {
+            state.ctx.camera_id.signal().for_each(clone!(state => move |_| clone!(state => async move {
+                state.on_viewport_change();
+            }))).await;
+        }));
+
         state
+    }
+
+    fn on_viewport_change(self: &Arc<Self>) {
+        let state = self;
+
+        spawn_local(clone!(state => async move {
+            let aspect = {
+                let renderer = state.renderer.lock().await;
+                let canvas = renderer.gpu.canvas();
+                canvas.width() as f32 / canvas.height() as f32
+            };
+
+            if let Err(err) = state.setup().await {
+                tracing::error!("Failed to setup scene after canvas resize: {:?}", err);
+            }
+
+            if let Err(err) = state.render().await {
+                tracing::error!("Failed to render after canvas resize: {:?}", err);
+            }
+        }));
     }
 
     pub async fn clear(self: &Arc<Self>) {
@@ -177,25 +202,33 @@ impl AppScene {
         renderer.update_animations(0.0)?;
         renderer.update_transforms()?;
 
-        let mut extents: Option<PositionExtents> = None;
+        let mut scene_aabb: Option<Aabb> = None;
 
         for (_, mesh) in renderer.meshes.iter() {
-            if let Some(mut mesh_extents) = mesh.position_extents.clone() {
+            if let Some(mut mesh_aabb) = mesh.aabb.clone() {
                 if let Ok(world_transform) = renderer.transforms.get_world(mesh.transform_key) {
-                    mesh_extents.apply_matrix(&*world_transform);
+                    mesh_aabb.transform(&*world_transform);
                 }
-                if let Some(mut current_extents) = extents {
-                    current_extents.extend(&mesh_extents);
-                    extents = Some(current_extents);
+                if let Some(current_scene_aabb) = &mut scene_aabb {
+                    current_scene_aabb.extend(&mesh_aabb);
                 } else {
-                    extents = Some(mesh_extents);
+                    scene_aabb = Some(mesh_aabb);
                 }
             }
         }
 
+        let aspect = renderer.gpu.canvas().width() as f32 / renderer.gpu.canvas().height() as f32;
+
         let mut camera = self.camera.lock().unwrap();
-        if let Some(extents) = extents {
-            *camera = Some(Camera::new(renderer.gpu.canvas(), extents));
+        if let Some(scene_aabb) = scene_aabb.clone() {
+            match self.ctx.camera_id.get() {
+                CameraId::Orthographic => {
+                    *camera = Some(Camera::new_orthographic(scene_aabb, aspect));
+                }
+                CameraId::Perspective => {
+                    *camera = Some(Camera::new_perspective(scene_aabb, aspect));
+                }
+            }
         }
 
         Ok(())

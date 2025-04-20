@@ -9,7 +9,7 @@ As more features are added, support is added into the core engine.
     - [x] Orbit controls 
     - [x] Orthographic
         - [x] Fit Extents 
-    - [ ] Perspective
+    - [x] Perspective
 
 ## Camera
 
@@ -36,6 +36,9 @@ As more features are added, support is added into the core engine.
 - [ ] Frustum culling
 
 ## Drawing
+    - [x] non-indexed
+    - [x] indexed
+    - [ ] instancing
     - [ ] Early z pre-pass
     - [ ] Opaque front to back
     - [ ] Transparent back to front
@@ -76,10 +79,7 @@ If it's supported here, corresponding core functionality is also supported
 - Hierarchy
     - [x] transforms
     - [x] scene graph
-- Drawing
-    - [x] non-indexed
-    - [x] indexed
-    - [ ] instancing
+- [ ] Instancing
 - Geometry
     - [x] positions
     - [x] morphing
