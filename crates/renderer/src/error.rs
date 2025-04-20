@@ -1,7 +1,7 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::{camera::AwsmCameraError, mesh::AwsmMeshError, transform::AwsmTransformError};
+use crate::{camera::AwsmCameraError, mesh::AwsmMeshError, skin::AwsmSkinError, transform::AwsmTransformError};
 
 #[derive(Error, Debug)]
 pub enum AwsmError {
@@ -20,6 +20,9 @@ pub enum AwsmError {
     #[cfg(feature = "animation")]
     #[error("{0}")]
     Animation(#[from] crate::animation::AwsmAnimationError),
+
+    #[error("{0}")]
+    Skin(#[from] AwsmSkinError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;

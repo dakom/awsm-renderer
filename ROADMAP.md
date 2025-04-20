@@ -1,3 +1,12 @@
+# Next up
+
+- Skins
+    - finish write to GPU (bind group etc.)
+    - associate mesh attributes with data
+
+- Revisit bind groups for morphs, should only have 1 - use dynamic buffer mechanism?
+
+## Approach 
 
 High-level, approach is to keep going through gltf models, one at a time, making them each work starting with minimal and feature-tests.
 
@@ -18,12 +27,13 @@ As more features are added, support is added into the core engine.
 
 ## Optimizations
 
-- [x] Dynamic buffer
+- [x] Dynamic buffer primitive
     - Single gpu binding
     - Offset-driven
     - Allows insertions and deletions at runtime
     - Separate CPU vs. GPU updates
 - [x] Transforms
+    - just one bind group
     - One dynamic uniform buffer
     - Dirty flag
 - [x] Morphs
@@ -33,15 +43,16 @@ As more features are added, support is added into the core engine.
         - Number of targets -> weights -> constant override -> new shader
         - Presence of attributes -> new shader
         - Unused but present attributes do not create new shader, just 0 influence
+    - [ ] Just one bind group
 - [ ] Frustum culling
 
 ## Drawing
-    - [x] non-indexed
-    - [x] indexed
-    - [ ] instancing
-    - [ ] Early z pre-pass
-    - [ ] Opaque front to back
-    - [ ] Transparent back to front
+- [x] non-indexed
+- [x] indexed
+- [ ] instancing
+- [ ] Early z pre-pass
+- [ ] Opaque front to back
+- [ ] Transparent back to front
 
 ## Animation system 
 - [x] Players

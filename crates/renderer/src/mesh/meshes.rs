@@ -44,7 +44,9 @@ impl Meshes {
     }
 
     pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
-        self.morphs.write_weights_gpu(gpu)
+        self.morphs.write_weights_gpu(gpu)?;
+        self.morphs.write_values_gpu(gpu)?;
+        Ok(())
     }
 }
 

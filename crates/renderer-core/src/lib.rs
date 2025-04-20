@@ -11,3 +11,4 @@ pub mod renderer;
 pub mod sampler;
 pub mod shaders;
 pub mod texture;
+pub mod alignment;

@@ -17,6 +17,7 @@ impl AwsmRenderer {
     pub fn render(&mut self) -> Result<()> {
         self.transforms.write_gpu(&self.gpu)?;
         self.meshes.write_gpu(&self.gpu)?;
+        self.skins.update_and_write_gpu(&self.gpu, self.transforms.world_matrices_ref())?;
         self.camera.write_gpu(&self.gpu)?;
 
         let current_texture_view = self.gpu.current_context_texture_view()?;

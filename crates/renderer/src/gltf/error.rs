@@ -1,7 +1,7 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::{animation::AwsmAnimationError, mesh::AwsmMeshError};
+use crate::{animation::AwsmAnimationError, buffers::storage::StorageBufferKey, mesh::AwsmMeshError, skin::AwsmSkinError};
 
 #[derive(Error, Debug)]
 pub enum AwsmGltfError {
@@ -47,14 +47,26 @@ pub enum AwsmGltfError {
     #[error("[gltf] morph storage key missing")]
     MorphStorageKeyMissing,
 
+    #[error("[gltf] morph storage missing for key {0:?}")]
+    MorphStorageMissing(StorageBufferKey),
+
     #[error("[gltf] invalid morph buffer size: {0}")]
     InvalidMorphBufferSize(String),
 
     #[error("[gltf] {0:?}")]
     Mesh(#[from] AwsmMeshError),
 
+    #[error("[gltf] mesh primitive shader: {0:?}")]
+    MeshPrimitiveShader(AwsmCoreError),
+
+    #[error("[gltf] mesh primitive render pipeline: {0:?}")]
+    MeshPrimitiveRenderPipeline(AwsmCoreError),
+
     #[error("[gltf] {0:?}")]
     Animation(#[from] AwsmAnimationError),
+
+    #[error("[gltf] {0:?}")]
+    Skin(#[from] AwsmSkinError),
 
     #[error("[gltf] morph animation exists but no morph target found")]
     MissingMorphForAnimation,
@@ -65,6 +77,15 @@ pub enum AwsmGltfError {
         channel_index: usize,
         sampler_index: usize,
     },
+
+    #[error("[gltf] invalid skin joint count. joints: {joint_count}, inverse_bind_matrices: {matrix_count}")]
+    InvalidSkinInverseBindMatrixCount {
+        matrix_count: usize,
+        joint_count: usize,
+    },
+
+    #[error("[gltf] skin joint transform not found: {0}")]
+    SkinJointTransformNotFound(usize),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

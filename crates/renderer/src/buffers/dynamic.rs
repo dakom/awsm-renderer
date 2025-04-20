@@ -9,11 +9,15 @@ use awsm_renderer_core::{
 };
 use slotmap::{Key, SecondaryMap};
 
-/// This gives us a generic helper for dynamic buffers.
+/// This gives us a generic helper for dynamic buffers of a constant alignment size
 /// It internally manages free slots for re‑use, and reallocates (grows) the underlying buffer only when needed.
 ///
 /// The bind group layout and bind group are created once (and updated on buffer reallocation)
 /// so that even with thousands of draw calls, we only use one bind group layout.
+/// 
+/// This is particularly useful for things like transforms and morph weights which have a known
+/// alignment size, but may be inserted/removed at any time, so we can re-use their slots
+/// without having to reallocate the entire buffer every time.
 #[derive(Debug)]
 pub struct DynamicBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
     /// Raw CPU‑side data for all items, organized in BYTE_SIZE slots.

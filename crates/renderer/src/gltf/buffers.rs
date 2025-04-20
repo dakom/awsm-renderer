@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashMap};
 
-use awsm_renderer_core::buffer::{BufferDescriptor, BufferUsage};
+use awsm_renderer_core::{alignment::padding_for, buffer::{BufferDescriptor, BufferUsage}};
 
 use crate::{
     buffers::helpers::{
@@ -261,7 +261,7 @@ impl GltfBuffers {
 
                         let size = morph_bytes.len() - offset;
                         // pad to satisfy WebGPU
-                        let padding = 4 - (size % 4);
+                        let padding = padding_for(size, 4);
                         if padding != 4 {
                             morph_bytes.extend_from_slice(slice_zeroes(padding));
                         }
@@ -289,9 +289,9 @@ impl GltfBuffers {
             true => None,
             false => {
                 // pad to multiple of 4 to satisfy WebGPU
-                let pad = 4 - (index_bytes.len() % 4);
-                if pad != 4 {
-                    index_bytes.extend_from_slice(slice_zeroes(pad));
+                let padding = padding_for(index_bytes.len(), 4);
+                if padding != 4 {
+                    index_bytes.extend_from_slice(slice_zeroes(padding));
                 }
 
                 let index_buffer = renderer
@@ -340,9 +340,9 @@ impl GltfBuffers {
         };
 
         // pad to multiple of 4 to satisfy WebGPU
-        let pad = 4 - (vertex_bytes.len() % 4);
-        if pad != 4 {
-            vertex_bytes.extend_from_slice(slice_zeroes(pad));
+        let padding = padding_for(vertex_bytes.len(), 4);
+        if padding != 4 {
+            vertex_bytes.extend_from_slice(slice_zeroes(padding));
         }
 
         let vertex_buffer = renderer
