@@ -110,6 +110,15 @@ impl Meshes {
 
     pub fn remove(&mut self, mesh_key: MeshKey) -> Option<Mesh> {
         if let Some(mesh) = self.list.remove(mesh_key) {
+            self.vertex_buffers.remove(mesh_key);
+            self.vertex_infos.remove(mesh_key);
+            self.vertex_dirty = true;
+
+            self.index_buffers.remove(mesh_key);
+            if self.index_infos.remove(mesh_key).is_some() {
+                self.index_dirty = true;
+            }
+
             if let Some(morph_key) = mesh.morph_key {
                 self.morphs.remove(morph_key);
             }
