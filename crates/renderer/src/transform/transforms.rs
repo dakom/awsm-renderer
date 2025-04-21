@@ -79,7 +79,6 @@ impl Transforms {
         self.world_matrices.insert(key, world_matrix);
         self.children.insert(key, Vec::new());
         self.dirties.insert(key);
-        // gpu_dirty will flow naturally (and, perhaps more correctly) from the update call
 
         self.set_parent(key, parent);
 
@@ -167,9 +166,9 @@ impl Transforms {
     // This is the only way to update the world matrices
     // it does *not* write to the GPU, so it can be called relatively frequently for physics etc.
     pub(crate) fn update_world(&mut self) {
-        if self.update_inner(self.root_node, false) {
-            self.gpu_dirty = true;
-        }
+        self.gpu_dirty = self.gpu_dirty || !self.dirties.is_empty();
+
+        self.update_inner(self.root_node, false);
 
         self.dirties.clear();
     }
