@@ -36,6 +36,8 @@ pub struct Transforms {
     children: SecondaryMap<TransformKey, Vec<TransformKey>>,
     parents: SecondaryMap<TransformKey, TransformKey>,
     dirties: HashSet<TransformKey>,
+    // not every transform here is definitely a skin joint, just in potential
+    dirty_skin_joints: HashSet<TransformKey>, 
     gpu_dirty: bool,
     root_node: TransformKey,
     buffer: DynamicFixedBuffer<TransformKey>,
@@ -65,6 +67,7 @@ impl Transforms {
             children,
             parents: SecondaryMap::new(),
             dirties: HashSet::new(),
+            dirty_skin_joints: HashSet::new(),
             gpu_dirty: true,
             root_node,
             buffer,
@@ -183,6 +186,10 @@ impl Transforms {
         Ok(())
     }
 
+    pub fn take_dirty_skin_joints(&mut self) -> HashSet<TransformKey> {
+        std::mem::take(&mut self.dirty_skin_joints)
+    }
+
     pub fn bind_group(&self) -> &web_sys::GpuBindGroup {
         self.buffer.bind_group.as_ref().unwrap()
     }
@@ -231,6 +238,8 @@ impl Transforms {
                 std::slice::from_raw_parts(values.as_ptr() as *const u8, TRANSFORM_BYTE_SIZE)
             };
             self.buffer.update(key, values_u8);
+
+            self.dirty_skin_joints.insert(key);
         }
 
         // safety: can't keep a mutable reference to self while it has a borrow of the iterator

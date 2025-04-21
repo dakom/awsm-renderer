@@ -47,6 +47,10 @@ impl AwsmRenderer {
                         transform_key
                     }
                 };
+
+                // TODO - does this apply to mesh or primitives?
+                let skin_key = ctx.node_to_skin.lock().unwrap().get(&gltf_node.index());
+
                 for gltf_primitive in gltf_mesh.primitives() {
                     self.populate_gltf_primitive(
                         ctx,

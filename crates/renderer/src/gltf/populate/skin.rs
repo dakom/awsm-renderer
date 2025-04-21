@@ -23,17 +23,7 @@ impl AwsmRenderer {
         mark_gltf_node_as_joint(ctx, gltf_node)?;
 
         if let Some(skin) = gltf_node.skin() {
-            // I think this isn't actually used for anything, just for debugging and assisting creation tools, can safely ignore
-            // let skeleton_root_transform = match skin.skeleton() {
-            //     Some(skeleton_root) => {
-            //         ctx.node_to_transform
-            //             .lock()
-            //             .unwrap()
-            //             .get(&skeleton_root.index())
-            //             .cloned()
-            //     }
-            //     None => None,
-            // };
+            // note: skin.skeleton() is not actually used for anything, it's just decorative to help authoring tools 
 
             let mut joints = Vec::with_capacity(skin.joints().len());
             let node_to_transform = ctx.node_to_transform.lock().unwrap();
@@ -68,9 +58,11 @@ impl AwsmRenderer {
                 None => None,
             };
 
-            let _skin_key = self
+            let skin_key = self
                 .skins
-                .insert(joints, inverse_bind_matrices.unwrap_or_default());
+                .insert(joints, inverse_bind_matrices.unwrap_or_default())?;
+
+            ctx.node_to_skin.lock().unwrap().insert(gltf_node.index(), skin_key);
         }
 
         for child in gltf_node.children() {
