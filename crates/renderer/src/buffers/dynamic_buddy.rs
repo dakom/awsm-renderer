@@ -9,17 +9,23 @@ use awsm_renderer_core::{
 };
 use slotmap::{Key, SecondaryMap};
 
-//-------------------------------- PERFORMANCE NOTES --------------------------//
-//  • variable‑length, power‑of‑two blocks, 256‑byte aligned
-//  • alloc/free:          O(log N) worst‑case
-//  • external fragmentation: 0     (buddies always coalesce)
-//  • internal waste:          ≤ 50 % of each allocation
-//  • resize strategy:         capacity doubles; live blocks re‑inserted
-//  • deterministic timings:   one code‑path, no vector sorts
-//  • ideal for:               mixed‑size UBO/SBO payloads when you care more
-//                              about predictable frame time than squeezing
-//                              every last byte.
-//---------------------------------------------------------------------------//
+//-------------------------------- PERFORMANCE SUMMARY ------------------------//
+//
+// • insert/update/remove:   O(log N) (amortized, ignoring rare growth)
+// • GPU write (per frame):  uploads entire buffer each time
+// • Resize strategy:        doubles capacity when needed; rebuilds tree
+//                           (infrequent pauses)
+// • External fragmentation: none (buddy blocks always coalesce)
+// • Internal fragmentation: ≤ 50% per allocation (due to power-of-two rounding)
+// • Memory overhead:        raw_data.len() rounded up + buddy tree (~2× leaves)
+//
+// • Ideal usage:
+//    Mixed-size uniform/storage buffer items where predictable performance
+//    matters more than perfect memory efficiency, like:
+//      - Heterogeneous UBO/SBO payloads
+//      - Variable-sized dynamic allocations
+//
+//----------------------------------------------------------------------------//
 
 /// Minimum alloc unit – choose 256 B so every buddy is WebGPU‑aligned.
 /// Must be power‑of‑two.

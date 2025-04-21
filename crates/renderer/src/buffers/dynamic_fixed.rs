@@ -9,16 +9,22 @@ use awsm_renderer_core::{
 };
 use slotmap::{Key, SecondaryMap};
 
-//-------------------------------- PERFORMANCE NOTES --------------------------//
-// DynamicFixedBuffer
-//  • slot size is fixed (ALIGNED_SLICE_SIZE) → no fragmentation
-//  • insert/update/remove: O(1)     (except when buffer doubles)
-//  • resize strategy:      capacity = capacity * 2
-//  • GPU write:            whole buffer every frame (call write_to_gpu())
-//  • memory overhead:      exactly capacity * ALIGNED_SLICE_SIZE
-//  • ideal for:            transforms, morph‑weights, skin matrices where
-//                          every item is the same byte size.
-//---------------------------------------------------------------------------//
+//-------------------------------- PERFORMANCE SUMMARY ------------------------//
+//
+// • insert/update/remove:   O(1)  (amortized, ignoring rare growth)
+// • GPU write (per frame):  uploads entire buffer each time
+// • Resize strategy:        doubles capacity when needed (infrequent pauses)
+// • External fragmentation: none (fixed-size slots)
+// • Internal fragmentation: none
+// • Memory overhead:        exactly `capacity × ALIGNED_SLICE_SIZE`
+//
+// • Ideal usage:
+//    Thousands of items with identical sizes, like:
+//      - Transforms
+//      - Morph weights
+//      - Skin matrices
+//
+//----------------------------------------------------------------------------//
 
 /// This gives us a generic helper for dynamic buffers of a fixed alignment size
 /// It internally manages free slots for re‑use, and reallocates (grows) the underlying buffer only when needed.
