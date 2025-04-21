@@ -4,7 +4,14 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::Mat4;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
-use crate::{buffers::{bind_group::BIND_GROUP_SKIN_JOINT_MATRICES_BINDING, dynamic::DynamicBufferKind, dynamic_buddy::DynamicBuddyBuffer}, transform::{TransformKey, Transforms}, AwsmRenderer};
+use crate::{
+    buffers::{
+        bind_group::BIND_GROUP_SKIN_JOINT_MATRICES_BINDING, dynamic::DynamicBufferKind,
+        dynamic_buddy::DynamicBuddyBuffer,
+    },
+    transform::{TransformKey, Transforms},
+    AwsmRenderer,
+};
 
 use super::error::{AwsmSkinError, Result};
 
@@ -25,7 +32,7 @@ pub struct Skins {
     // may be None, in which case its virtually an identity matrix
     inverse_bind_matrices: SecondaryMap<TransformKey, Mat4>,
     skin_matrices: DynamicBuddyBuffer<SkinKey>,
-    gpu_dirty: bool
+    gpu_dirty: bool,
 }
 
 impl Skins {
@@ -75,13 +82,15 @@ impl Skins {
 
         let skin_key = self.skeleton_transforms.insert(skeleton_joint_transforms);
 
-        self.skin_matrices.update(skin_key, &vec![0;16 * 4 * len]);
+        self.skin_matrices.update(skin_key, &vec![0; 16 * 4 * len]);
 
         Ok(skin_key)
     }
 
     pub fn joint_matrices_offset(&self, skin_key: SkinKey) -> Result<usize> {
-        self.skin_matrices.offset(skin_key).ok_or(AwsmSkinError::SkinNotFound(skin_key))
+        self.skin_matrices
+            .offset(skin_key)
+            .ok_or(AwsmSkinError::SkinNotFound(skin_key))
     }
 
     pub fn joint_matrices_bind_group(&self) -> &web_sys::GpuBindGroup {
@@ -92,32 +101,34 @@ impl Skins {
         self.skin_matrices.bind_group_layout.as_ref().unwrap()
     }
 
-    pub fn update(
-        &mut self,
-        dirty_skin_joints: HashSet<TransformKey>,
-        transforms: &Transforms,
-    ) {
+    pub fn update(&mut self, dirty_skin_joints: HashSet<TransformKey>, transforms: &Transforms) {
         // different skins can theoretically share the same joint, so, iterate over them all
         for (skin_key, skeleton_joints) in self.skeleton_transforms.iter() {
             for (index, skeleton_joint) in skeleton_joints.iter().enumerate() {
                 if dirty_skin_joints.contains(skeleton_joint) {
                     // could cache this for revisited joints, but, it's not a huge deal - might even be faster to redo the math
-                    let world_matrix = match self.inverse_bind_matrices.get(*skeleton_joint).cloned() {
-                        Some(inverse_bind_matrix) => transforms.get_world(*skeleton_joint)
-                            .map(|m| *m * inverse_bind_matrix)
-                            .unwrap(),
-                        None => transforms.get_world(*skeleton_joint).cloned().unwrap(),
-                    };
-
-                    // just overwrite this one matrix
-                    self.skin_matrices.update_with_unchecked(skin_key, &mut |values_u8| {
-                        let offset = 16 * 4 * index;
-                        let bytes = unsafe {
-                            std::slice::from_raw_parts(world_matrix.as_ref().as_ptr() as *const u8, 16 * 4)
+                    let world_matrix =
+                        match self.inverse_bind_matrices.get(*skeleton_joint).cloned() {
+                            Some(inverse_bind_matrix) => transforms
+                                .get_world(*skeleton_joint)
+                                .map(|m| *m * inverse_bind_matrix)
+                                .unwrap(),
+                            None => transforms.get_world(*skeleton_joint).cloned().unwrap(),
                         };
 
-                        values_u8[offset..offset + (16 * 4)].copy_from_slice(bytes);
-                    });
+                    // just overwrite this one matrix
+                    self.skin_matrices
+                        .update_with_unchecked(skin_key, &mut |values_u8| {
+                            let offset = 16 * 4 * index;
+                            let bytes = unsafe {
+                                std::slice::from_raw_parts(
+                                    world_matrix.as_ref().as_ptr() as *const u8,
+                                    16 * 4,
+                                )
+                            };
+
+                            values_u8[offset..offset + (16 * 4)].copy_from_slice(bytes);
+                        });
                 }
             }
         }

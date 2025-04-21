@@ -10,6 +10,7 @@ use crate::buffers::bind_group::{
     BIND_GROUP_MORPH_TARGET_VALUES, BIND_GROUP_MORPH_TARGET_WEIGHTS, BIND_GROUP_TRANSFORM,
 };
 use crate::render::RenderContext;
+use crate::skin::SkinKey;
 use crate::transform::TransformKey;
 
 pub use buffer_info::*;
@@ -29,6 +30,7 @@ pub struct Mesh {
     pub aabb: Option<Aabb>,
     pub transform_key: TransformKey,
     pub morph_key: Option<MorphKey>,
+    pub skin_key: Option<SkinKey>,
 }
 
 #[derive(Debug, Clone)]
@@ -57,9 +59,10 @@ impl Mesh {
             pipeline,
             draw_count,
             topology: PrimitiveTopology::TriangleList,
+            transform_key,
             aabb: None,
             morph_key: None,
-            transform_key,
+            skin_key: None,
         }
     }
 
@@ -75,6 +78,11 @@ impl Mesh {
 
     pub fn with_morph_key(mut self, morph_key: MorphKey) -> Self {
         self.morph_key = Some(morph_key);
+        self
+    }
+
+    pub fn with_skin_key(mut self, skin_key: SkinKey) -> Self {
+        self.skin_key = Some(skin_key);
         self
     }
 

@@ -10,8 +10,7 @@ pub enum ShaderConstantIds {
 //
 // uniform and other runtime data for mesh
 // is controlled via various components as-needed
-#[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
-#[derive(Template)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq, Default, Template)]
 #[template(path = "main.wgsl")]
 pub struct ShaderKey {
     // attributes

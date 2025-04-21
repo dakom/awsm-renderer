@@ -3,7 +3,7 @@ use glam::Mat4;
 use crate::{
     buffers::helpers::u8_to_f32_vec,
     gltf::{
-        buffers::accessor_to_bytes,
+        buffers::accessor::accessor_to_bytes,
         error::{AwsmGltfError, Result},
     },
     AwsmRenderer,
@@ -23,7 +23,7 @@ impl AwsmRenderer {
         mark_gltf_node_as_joint(ctx, gltf_node)?;
 
         if let Some(skin) = gltf_node.skin() {
-            // note: skin.skeleton() is not actually used for anything, it's just decorative to help authoring tools 
+            // note: skin.skeleton() is not actually used for anything, it's just decorative to help authoring tools
 
             let mut joints = Vec::with_capacity(skin.joints().len());
             let node_to_transform = ctx.node_to_transform.lock().unwrap();
@@ -62,7 +62,10 @@ impl AwsmRenderer {
                 .skins
                 .insert(joints, inverse_bind_matrices.unwrap_or_default())?;
 
-            ctx.node_to_skin.lock().unwrap().insert(gltf_node.index(), skin_key);
+            ctx.node_to_skin
+                .lock()
+                .unwrap()
+                .insert(gltf_node.index(), skin_key);
         }
 
         for child in gltf_node.children() {

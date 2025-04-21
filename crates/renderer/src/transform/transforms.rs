@@ -37,7 +37,7 @@ pub struct Transforms {
     parents: SecondaryMap<TransformKey, TransformKey>,
     dirties: HashSet<TransformKey>,
     // not every transform here is definitely a skin joint, just in potential
-    dirty_skin_joints: HashSet<TransformKey>, 
+    dirty_skin_joints: HashSet<TransformKey>,
     gpu_dirty: bool,
     root_node: TransformKey,
     buffer: DynamicFixedBuffer<TransformKey>,

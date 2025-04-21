@@ -5,7 +5,7 @@ use crate::{
     },
     buffers::helpers::u8_to_f32_vec,
     gltf::{
-        buffers::accessor_to_bytes,
+        buffers::accessor::accessor_to_bytes,
         error::{AwsmGltfError, Result},
     },
     mesh::MorphKey,

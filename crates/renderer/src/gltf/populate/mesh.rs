@@ -9,6 +9,7 @@ use crate::{
     },
     mesh::{Mesh, MeshBufferInfo},
     shaders::{ShaderConstantIds, ShaderKey},
+    skin::SkinKey,
     transform::{Transform, TransformKey},
     AwsmRenderer,
 };
@@ -48,8 +49,15 @@ impl AwsmRenderer {
                     }
                 };
 
-                // TODO - does this apply to mesh or primitives?
-                let skin_key = ctx.node_to_skin.lock().unwrap().get(&gltf_node.index());
+                // We use the same matrices across the primitives
+                // but the skin as a whole is defined on the mesh
+                // from the spec: "When defined, mesh MUST also be defined."
+                let mesh_skin_key = ctx
+                    .node_to_skin
+                    .lock()
+                    .unwrap()
+                    .get(&gltf_node.index())
+                    .cloned();
 
                 for gltf_primitive in gltf_mesh.primitives() {
                     self.populate_gltf_primitive(
@@ -58,6 +66,7 @@ impl AwsmRenderer {
                         &gltf_mesh,
                         gltf_primitive,
                         mesh_transform_key,
+                        mesh_skin_key,
                     )
                     .await?;
                 }
@@ -77,6 +86,7 @@ impl AwsmRenderer {
         gltf_mesh: &gltf::Mesh<'_>,
         gltf_primitive: gltf::Primitive<'_>,
         transform_key: TransformKey,
+        skin_key: Option<SkinKey>,
     ) -> Result<()> {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
@@ -191,6 +201,10 @@ impl AwsmRenderer {
 
         if let Some(morph_key) = morph_key {
             mesh = mesh.with_morph_key(morph_key);
+        }
+
+        if let Some(skin_key) = skin_key {
+            mesh = mesh.with_skin_key(skin_key);
         }
 
         let _mesh_key = {
