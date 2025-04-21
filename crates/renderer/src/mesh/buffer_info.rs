@@ -62,14 +62,12 @@ pub struct MeshBufferIndexInfo {
 
 #[derive(Default, Debug, Clone)]
 pub struct MeshBufferMorphInfo {
-    // offset in morph_bytes where this primitive starts
-    pub offset: usize,
     // number of morph targets
     pub targets_len: usize,
     // the stride of all morph targets across the vertice, without padding
     pub vertex_stride_size: usize,
     // the size of the whole slice of data (all vertices and targets)
-    pub size: usize,
+    pub values_size: usize,
 }
 
 impl MeshBufferInfo {

@@ -1,4 +1,3 @@
-use buffers::storage::StorageBuffers;
 use camera::CameraBuffer;
 use mesh::Meshes;
 use skin::Skins;
@@ -11,8 +10,8 @@ pub mod error;
 pub mod mesh;
 pub mod render;
 pub mod shaders;
-pub mod transform;
 pub mod skin;
+pub mod transform;
 pub mod update;
 pub mod core {
     pub use awsm_renderer_core::*;
@@ -33,8 +32,6 @@ pub struct AwsmRenderer {
     pub transforms: Transforms,
 
     pub skins: Skins,
-
-    pub storage: StorageBuffers,
 
     #[cfg(feature = "gltf")]
     gltf: gltf::cache::GltfCache,
@@ -102,7 +99,6 @@ impl AwsmRendererBuilder {
             camera,
             transforms,
             skins,
-            storage: StorageBuffers::new(),
 
             #[cfg(feature = "gltf")]
             gltf: gltf::cache::GltfCache::default(),

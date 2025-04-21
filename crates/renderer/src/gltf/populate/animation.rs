@@ -1,4 +1,17 @@
-use crate::{animation::{AnimationClip, AnimationData, AnimationKey, AnimationPlayer, AnimationSampler, VertexAnimation}, buffers::helpers::u8_to_f32_vec, gltf::{buffers::accessor_to_bytes, error::{AwsmGltfError, Result}}, mesh::MorphKey, transform::TransformKey, AwsmRenderer};
+use crate::{
+    animation::{
+        AnimationClip, AnimationData, AnimationKey, AnimationPlayer, AnimationSampler,
+        VertexAnimation,
+    },
+    buffers::helpers::u8_to_f32_vec,
+    gltf::{
+        buffers::accessor_to_bytes,
+        error::{AwsmGltfError, Result},
+    },
+    mesh::MorphKey,
+    transform::TransformKey,
+    AwsmRenderer,
+};
 
 use super::GltfPopulateContext;
 
@@ -8,7 +21,13 @@ impl AwsmRenderer {
         ctx: &'c GltfPopulateContext,
         gltf_node: &'b gltf::Node<'b>,
     ) -> Result<()> {
-        let transform_key = ctx.node_to_transform.lock().unwrap().get(&gltf_node.index()).cloned().unwrap();
+        let transform_key = ctx
+            .node_to_transform
+            .lock()
+            .unwrap()
+            .get(&gltf_node.index())
+            .cloned()
+            .unwrap();
 
         for gltf_animation in ctx.data.doc.animations() {
             for channel in gltf_animation.channels() {
@@ -78,7 +97,7 @@ impl AwsmRenderer {
         gltf_sampler: gltf::animation::Sampler<'b>,
         morph_key: MorphKey,
     ) -> Result<AnimationKey> {
-        let morph_info = &self.meshes.morphs.get_info(morph_key)?.morph_buffer_info;
+        let morph_info = &self.meshes.morphs.get_info(morph_key)?;
 
         let times = sampler_timestamps(ctx, &gltf_sampler)?;
         let duration = (times.last().copied().unwrap_or(0.0) - times[0]) as f64;
@@ -155,7 +174,6 @@ impl AwsmRenderer {
 
         Ok(self.animations.insert_transform(player, transform_key))
     }
-
 }
 
 fn sampler_timestamps(

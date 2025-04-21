@@ -16,9 +16,7 @@ pub enum AwsmSkinError {
     SkinNotFound(SkinKey),
 
     #[error("[skin] joint transform not found: {joint_transform:?}")]
-    JointTransformNotFound {
-        joint_transform: TransformKey,
-    },
+    JointTransformNotFound { joint_transform: TransformKey },
 
     #[error("[skin] skin joint matrix mismatch, skin: {skin_key:?}, matrix len: {matrix_len:?} joint_len: {joint_len:?}")]
     SkinJointMatrixMismatch {
@@ -28,7 +26,5 @@ pub enum AwsmSkinError {
     },
 
     #[error("[skin] joint already exists but is different: {joint_transform:?}")]
-    JointAlreadyExistsButDifferent {
-        joint_transform: TransformKey,
-    },
+    JointAlreadyExistsButDifferent { joint_transform: TransformKey },
 }

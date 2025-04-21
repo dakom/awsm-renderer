@@ -1,10 +1,12 @@
 use glam::{Mat4, Quat, Vec3};
 
-use crate::{transform::{Transform, TransformKey}, AwsmRenderer};
+use crate::{
+    transform::{Transform, TransformKey},
+    AwsmRenderer,
+};
 
 use super::GltfPopulateContext;
 use crate::gltf::error::Result;
-
 
 impl AwsmRenderer {
     pub(super) fn populate_gltf_node_transform<'a, 'b: 'a, 'c: 'a>(
@@ -22,7 +24,10 @@ impl AwsmRenderer {
         let transform = transform_gltf_node(gltf_node);
         let transform_key = self.transforms.insert(transform, parent_transform_key);
 
-        ctx.node_to_transform.lock().unwrap().insert(gltf_node.index(), transform_key);
+        ctx.node_to_transform
+            .lock()
+            .unwrap()
+            .insert(gltf_node.index(), transform_key);
 
         for child in gltf_node.children() {
             self.populate_gltf_node_transform(ctx, &child, Some(transform_key))?;

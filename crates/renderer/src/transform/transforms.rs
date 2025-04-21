@@ -1,11 +1,10 @@
 use std::collections::HashSet;
 
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
-use glam::Mat4;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::{
-    buffers::{bind_group::BIND_GROUP_TRANSFORM_BINDING, dynamic::DynamicBuffer},
+    buffers::{bind_group::BIND_GROUP_TRANSFORM_BINDING, dynamic_fixed::DynamicFixedBuffer},
     AwsmRenderer,
 };
 
@@ -19,7 +18,7 @@ new_key_type! {
 }
 
 impl AwsmRenderer {
-    pub fn update_transforms(&mut self)  {
+    pub fn update_transforms(&mut self) {
         self.transforms.update_world();
     }
 }
@@ -34,12 +33,12 @@ pub struct Transforms {
     parents: SecondaryMap<TransformKey, TransformKey>,
     dirties: HashSet<TransformKey>,
     root_node: TransformKey,
-    buffer: DynamicBuffer<TransformKey>,
+    buffer: DynamicFixedBuffer<TransformKey>,
 }
 
 impl Transforms {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let buffer = DynamicBuffer::new_uniform(
+        let buffer = DynamicFixedBuffer::new_uniform(
             TRANSFORM_BYTE_SIZE,
             TRANSFORM_BYTE_ALIGNMENT,
             BIND_GROUP_TRANSFORM_BINDING,
@@ -133,7 +132,7 @@ impl Transforms {
         self.parents.insert(child, parent);
     }
 
-    pub fn get_parent(&self, child: TransformKey) -> Result<TransformKey>{
+    pub fn get_parent(&self, child: TransformKey) -> Result<TransformKey> {
         if child == self.root_node {
             return Err(AwsmTransformError::CannotGetParentOfRootNode);
         }

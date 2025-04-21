@@ -1,76 +1,16 @@
 # Next up
 
-- Skins
-    - finish write to GPU (bind group etc.)
-    - associate mesh attributes with data
+- change index and vertex buffers to use buddy system (makes renderer more general-purpose, not just gltf)
 
-- Revisit bind groups for morphs, should only have 1 - use dynamic buffer mechanism?
+- Skins
+    - finish write to GPU (buddy system)
+    - associate mesh attributes with data
 
 ## Approach 
 
 High-level, approach is to keep going through gltf models, one at a time, making them each work starting with minimal and feature-tests.
 
 As more features are added, support is added into the core engine.
-
-## Demo-only
-
-- [x] Camera
-    - [x] Orbit controls 
-    - [x] Orthographic
-        - [x] Fit Extents 
-    - [x] Perspective
-
-## Camera
-
-- [x] Basic orthographic
-- [x] Single uniform buffer 
-
-## Optimizations
-
-- [x] Dynamic buffer primitive
-    - Single gpu binding
-    - Offset-driven
-    - Allows insertions and deletions at runtime
-    - Separate CPU vs. GPU updates
-- [x] Transforms
-    - just one bind group
-    - One dynamic uniform buffer
-    - Dirty flag
-- [x] Morphs
-    - One dynamic uniform buffer for weights
-    - One-ish gpu binding for values (keyable by StorageBufferKey)
-    - Conscious shader generation
-        - Number of targets -> weights -> constant override -> new shader
-        - Presence of attributes -> new shader
-        - Unused but present attributes do not create new shader, just 0 influence
-    - [ ] Just one bind group
-- [ ] Frustum culling
-
-## Drawing
-- [x] non-indexed
-- [x] indexed
-- [ ] instancing
-- [ ] Early z pre-pass
-- [ ] Opaque front to back
-- [ ] Transparent back to front
-
-## Animation system 
-- [x] Players
-    - [x] speed control
-    - [x] loop control
-    - [x] play/pause
-        - [ ] test 
-    - [x] direction 
-        - [ ] test 
-- [x] Clips and samplers (see gltf features for details)
-- [ ] Events
-
-## Post-processing
-- [ ] SSAO
-- [ ] Bloom
-- [ ] FXAA
-- [ ] DOF
-- [ ] Tonemapping
 
 ## GLTF Support 
 
@@ -108,3 +48,61 @@ If it's supported here, corresponding core functionality is also supported
 - Materials (TODO - fill this out as we go)
 - Lighting (TODO - fill this out as we go)
 - Skybox (TODO - fill this out as we go)
+
+## Optimizations
+
+- [x] Dynamic buffer primitives
+    - Single gpu binding
+    - Offset-driven
+    - Allows insertions and deletions at runtime
+    - Separate CPU vs. GPU updates
+    - Fixed and flexible (buddy) modes
+- [x] Transforms
+    - One dynamic uniform bind group
+    - Dirty flag
+- [x] Morphs
+    - One dynamic uniform bind group for weights
+        - gpu gating on dirty flag
+    - One dynamic storage bind group for values
+        - gpu gating on dirty flag
+    - Conscious shader generation
+        - Number of targets -> weights -> constant override -> new shader
+        - Presence of attributes -> new shader
+        - Unused but present attributes do not create new shader, just 0 influence
+- Camera
+    - [x] Single uniform buffer 
+    - [ ] Frustum culling
+
+## Drawing
+- [x] non-indexed
+- [x] indexed
+- [ ] instancing
+- [ ] Early z pre-pass
+- [ ] Opaque front to back
+- [ ] Transparent back to front
+
+## Animation system 
+- [x] Players
+    - [x] speed control
+    - [x] loop control
+    - [x] play/pause
+        - [ ] test 
+    - [x] direction 
+        - [ ] test 
+- [x] Clips and samplers (see gltf features for details)
+- [ ] Events
+
+## Post-processing
+- [ ] SSAO
+- [ ] Bloom
+- [ ] FXAA
+- [ ] DOF
+- [ ] Tonemapping
+
+## Demo-only
+
+- [x] Camera
+    - [x] Orbit controls 
+    - [x] Orthographic
+    - [x] Perspective
+    - [x] Initial fit for AABB (not perfect, but good enough) 

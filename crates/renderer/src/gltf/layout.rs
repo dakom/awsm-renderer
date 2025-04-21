@@ -1,16 +1,15 @@
 use awsm_renderer_core::pipeline::vertex::{VertexAttribute, VertexBufferLayout};
 
-use crate::mesh::MeshBufferInfo;
-
 use super::{
     accessors::accessor_vertex_format,
+    buffers::GltfMeshBufferInfo,
     error::{AwsmGltfError, Result},
     shaders::semantic_shader_location,
 };
 
 pub(super) fn primitive_vertex_buffer_layout(
     primitive: &gltf::Primitive<'_>,
-    buffer_info: &MeshBufferInfo,
+    buffer_info: &GltfMeshBufferInfo,
 ) -> Result<VertexBufferLayout> {
     // not strictly necessary for the attributes array, which only needs the shader location
     // but this makes it quicker to lookup the individual array strides

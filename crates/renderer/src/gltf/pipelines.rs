@@ -6,13 +6,13 @@ use awsm_renderer_core::pipeline::layout::{PipelineLayoutDescriptor, PipelineLay
 use awsm_renderer_core::pipeline::vertex::{VertexBufferLayout, VertexState};
 use awsm_renderer_core::pipeline::RenderPipelineDescriptor;
 
-use crate::buffers::storage::StorageBufferKey;
 use crate::gltf::error::Result;
 
-use crate::mesh::{MeshBufferInfo, MorphKey};
+use crate::mesh::MorphKey;
 use crate::shaders::ShaderKey;
 use crate::AwsmRenderer;
 
+use super::buffers::GltfMeshBufferInfo;
 use super::populate::GltfPopulateContext;
 
 // merely a key to hash ad-hoc pipeline generation
@@ -28,18 +28,16 @@ pub(crate) struct RenderPipelineKey {
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
 pub(crate) struct PipelineLayoutKey {
-    pub morph_buffer_storage_key: Option<StorageBufferKey>,
     pub morph_targets_len: Option<usize>, // TODO - override constant in shader
 }
 
 impl PipelineLayoutKey {
     #[allow(private_interfaces)]
-    pub fn new(ctx: &GltfPopulateContext, buffer_info: &MeshBufferInfo) -> Self {
+    pub fn new(_ctx: &GltfPopulateContext, buffer_info: &GltfMeshBufferInfo) -> Self {
         let mut key = Self::default();
 
         if let Some(morph) = buffer_info.morph.as_ref() {
             key.morph_targets_len = Some(morph.targets_len);
-            key.morph_buffer_storage_key = Some(ctx.morph_buffer_storage_key.unwrap());
         }
 
         key
@@ -57,15 +55,9 @@ impl PipelineLayoutKey {
             renderer.transforms.bind_group_layout().clone(),
         ];
 
-        if let Some(morph_key) = morph_key {
+        if morph_key.is_some() {
             bind_group_layouts.push(renderer.meshes.morphs.weights_bind_group_layout().clone());
-            bind_group_layouts.push(
-                renderer
-                    .meshes
-                    .morphs
-                    .values_bind_group_layout(morph_key)?
-                    .clone(),
-            );
+            bind_group_layouts.push(renderer.meshes.morphs.values_bind_group_layout().clone());
         }
         Ok(PipelineLayoutDescriptor::new(
             Some("Mesh (from gltf primitive)"),

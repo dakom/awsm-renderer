@@ -9,41 +9,42 @@ use awsm_renderer_core::{
 };
 use slotmap::{Key, SecondaryMap};
 
-/// This gives us a generic helper for dynamic buffers of a constant alignment size
+/// This gives us a generic helper for dynamic buffers of a fixed alignment size
 /// It internally manages free slots for re‑use, and reallocates (grows) the underlying buffer only when needed.
 ///
 /// The bind group layout and bind group are created once (and updated on buffer reallocation)
 /// so that even with thousands of draw calls, we only use one bind group layout.
-/// 
-/// This is particularly useful for things like transforms and morph weights which have a known
-/// alignment size, but may be inserted/removed at any time, so we can re-use their slots
+///
+/// This is particularly useful for things like transforms and morph weights which have a fixed size,
+/// but may be inserted/removed at any time, so we can re-use their slots
 /// without having to reallocate the entire buffer every time.
+///
+/// This also has the benefit of not needing complicated logic to avoid coalescing etc.
 #[derive(Debug)]
-pub struct DynamicBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
+pub struct DynamicFixedBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
     /// Raw CPU‑side data for all items, organized in BYTE_SIZE slots.
-    pub raw_data: Vec<u8>,
+    raw_data: Vec<u8>,
     /// The GPU buffer storing the raw data.
-    pub gpu_buffer: web_sys::GpuBuffer,
-    pub gpu_buffer_needs_resize: bool,
+    gpu_buffer: web_sys::GpuBuffer,
+    gpu_buffer_needs_resize: bool,
     /// Mapping from a Key to a slot index within the buffer.
-    pub slot_indices: SecondaryMap<K, usize>,
+    slot_indices: SecondaryMap<K, usize>,
     /// The bind group used for binding this buffer in shaders.
     pub bind_group: web_sys::GpuBindGroup,
     /// The bind group layout (static, created once).
     pub bind_group_layout: web_sys::GpuBindGroupLayout,
     /// List of free slot indices available for reuse.
-    pub free_slots: Vec<usize>,
+    free_slots: Vec<usize>,
     /// Total capacity of the buffer in number of slots.
-    pub capacity_slots: usize,
-    pub label: Option<String>,
-    pub byte_size: usize,
-    pub bind_group_binding: u32,
-    pub aligned_slice_size: usize,
-    pub binding_type: BufferBindingType,
-    pub usage: BufferUsage,
+    capacity_slots: usize,
+    label: Option<String>,
+    byte_size: usize,
+    bind_group_binding: u32,
+    aligned_slice_size: usize,
+    usage: BufferUsage,
 }
 
-impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
+impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
     pub fn new_uniform(
         byte_size: usize,
         aligned_slice_size: usize,
@@ -146,7 +147,8 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
                     bind_group_binding,
                     BindGroupResource::Buffer(
                         BufferBinding::new(&gpu_buffer)
-                            .with_offset(0)
+                            // we know exactly how much is used per draw call
+                            // so let's just expose that slice
                             .with_size(aligned_slice_size),
                     ),
                 )],
@@ -167,7 +169,6 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
             byte_size,
             bind_group_binding,
             aligned_slice_size,
-            binding_type,
             usage,
         })
     }

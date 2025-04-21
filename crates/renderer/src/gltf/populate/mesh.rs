@@ -1,7 +1,24 @@
 use std::{future::Future, pin::Pin};
 
-use crate::{bounds::Aabb, gltf::{error::{AwsmGltfError, Result}, layout::primitive_vertex_buffer_layout, pipelines::{PipelineLayoutKey, RenderPipelineKey}}, mesh::{Mesh, MeshIndexBuffer, MeshVertexBuffer}, shaders::{ShaderConstantIds, ShaderKey}, transform::{Transform, TransformKey}, AwsmRenderer};
-use awsm_renderer_core::{pipeline::{fragment::ColorTargetState, primitive::{IndexFormat, PrimitiveTopology}}, shaders::ShaderModuleExt};
+use crate::{
+    bounds::Aabb,
+    gltf::{
+        error::{AwsmGltfError, Result},
+        layout::primitive_vertex_buffer_layout,
+        pipelines::{PipelineLayoutKey, RenderPipelineKey},
+    },
+    mesh::{Mesh, MeshBufferInfo, MeshIndexBuffer, MeshVertexBuffer},
+    shaders::{ShaderConstantIds, ShaderKey},
+    transform::{Transform, TransformKey},
+    AwsmRenderer,
+};
+use awsm_renderer_core::{
+    pipeline::{
+        fragment::ColorTargetState,
+        primitive::{IndexFormat, PrimitiveTopology},
+    },
+    shaders::ShaderModuleExt,
+};
 use glam::Vec3;
 
 use super::GltfPopulateContext;
@@ -13,7 +30,6 @@ impl AwsmRenderer {
         gltf_node: &'b gltf::Node<'b>,
     ) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>> {
         Box::pin(async move {
-
             if let Some(gltf_mesh) = gltf_node.mesh() {
                 // from the spec: "Only the joint transforms are applied to the skinned mesh; the transform of the skinned mesh node MUST be ignored."
                 // so we swap out this node's transform with an identity matrix, but keep the hierarchy intact
@@ -21,9 +37,15 @@ impl AwsmRenderer {
                 let mesh_transform_key = {
                     let node_to_transform = ctx.node_to_transform.lock().unwrap();
                     let transform_key = node_to_transform.get(&gltf_node.index()).cloned().unwrap();
-                    if ctx.transform_is_joint.lock().unwrap().contains(&transform_key) {
+                    if ctx
+                        .transform_is_joint
+                        .lock()
+                        .unwrap()
+                        .contains(&transform_key)
+                    {
                         let parent_transform_key = self.transforms.get_parent(transform_key).ok();
-                        self.transforms.insert(Transform::IDENTITY, parent_transform_key)
+                        self.transforms
+                            .insert(Transform::IDENTITY, parent_transform_key)
                     } else {
                         transform_key
                     }
@@ -63,15 +85,15 @@ impl AwsmRenderer {
         let morph_key = match primitive_buffer_info.morph.clone() {
             None => None,
             Some(morph_buffer_info) => {
-                let storage_key = ctx
-                    .morph_buffer_storage_key
-                    .ok_or(AwsmGltfError::MorphStorageKeyMissing)?;
+                // safe, can't have morph info without backing bytes
+                let values = ctx.data.buffers.morph_bytes.as_ref().unwrap();
+                let values = &values[morph_buffer_info.values_offset
+                    ..morph_buffer_info.values_offset + morph_buffer_info.values_size];
 
-                let buffer = self.storage.get(storage_key).map_err(|_| AwsmGltfError::MorphStorageMissing(storage_key))?;
                 Some(
                     self.meshes
                         .morphs
-                        .insert(&self.gpu, buffer, morph_buffer_info)?,
+                        .insert(morph_buffer_info.into(), values)?,
                 )
             }
         };
@@ -81,7 +103,10 @@ impl AwsmRenderer {
         let shader_module = match self.gltf.shaders.get(&shader_key) {
             None => {
                 let shader_module = self.gpu.compile_shader(&shader_key.into_descriptor());
-                shader_module.validate_shader().await.map_err(|e| AwsmGltfError::MeshPrimitiveShader(e))?;
+                shader_module
+                    .validate_shader()
+                    .await
+                    .map_err(|e| AwsmGltfError::MeshPrimitiveShader(e))?;
 
                 self.gltf
                     .shaders
@@ -120,7 +145,11 @@ impl AwsmRenderer {
                         .clone()
                         .into_descriptor(self, &shader_module, morph_key)?;
 
-                let render_pipeline = self.gpu.create_render_pipeline(&descriptor).await.map_err(|e| AwsmGltfError::MeshPrimitiveRenderPipeline(e))?;
+                let render_pipeline = self
+                    .gpu
+                    .create_render_pipeline(&descriptor)
+                    .await
+                    .map_err(|e| AwsmGltfError::MeshPrimitiveRenderPipeline(e))?;
 
                 self.gltf
                     .render_pipelines
@@ -131,6 +160,7 @@ impl AwsmRenderer {
             Some(pipeline) => pipeline,
         };
 
+        let primitive_buffer_info = MeshBufferInfo::from(primitive_buffer_info.clone());
         let mut mesh = Mesh::new(
             render_pipeline,
             primitive_buffer_info.draw_count(),

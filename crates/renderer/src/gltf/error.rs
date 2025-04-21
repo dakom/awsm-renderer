@@ -1,7 +1,7 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::{animation::AwsmAnimationError, buffers::storage::StorageBufferKey, mesh::AwsmMeshError, skin::AwsmSkinError};
+use crate::{animation::AwsmAnimationError, mesh::AwsmMeshError, skin::AwsmSkinError};
 
 #[derive(Error, Debug)]
 pub enum AwsmGltfError {
@@ -46,9 +46,6 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] morph storage key missing")]
     MorphStorageKeyMissing,
-
-    #[error("[gltf] morph storage missing for key {0:?}")]
-    MorphStorageMissing(StorageBufferKey),
 
     #[error("[gltf] invalid morph buffer size: {0}")]
     InvalidMorphBufferSize(String),

@@ -1,7 +1,10 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::{camera::AwsmCameraError, mesh::AwsmMeshError, skin::AwsmSkinError, transform::AwsmTransformError};
+use crate::{
+    camera::AwsmCameraError, mesh::AwsmMeshError, skin::AwsmSkinError,
+    transform::AwsmTransformError,
+};
 
 #[derive(Error, Debug)]
 pub enum AwsmError {

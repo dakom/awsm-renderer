@@ -1,3 +1,4 @@
+pub mod alignment;
 pub mod bind_groups;
 pub mod buffer;
 pub mod command;
@@ -11,4 +12,3 @@ pub mod renderer;
 pub mod sampler;
 pub mod shaders;
 pub mod texture;
-pub mod alignment;

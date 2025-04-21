@@ -1,5 +1,5 @@
-mod skins;
 mod error;
+mod skins;
 
-pub use skins::Skins;
 pub use error::AwsmSkinError;
+pub use skins::Skins;
