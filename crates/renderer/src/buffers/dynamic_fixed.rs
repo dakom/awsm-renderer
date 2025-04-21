@@ -37,6 +37,8 @@ pub struct DynamicFixedBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
     free_slots: Vec<usize>,
     /// Total capacity of the buffer in number of slots.
     capacity_slots: usize,
+    // first unused index >= capacity used so far
+    next_slot: usize,
     label: Option<String>,
     byte_size: usize,
     bind_group_binding: u32,
@@ -165,6 +167,7 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
             bind_group_layout,
             free_slots: (0..initial_capacity).collect(),
             capacity_slots: initial_capacity,
+            next_slot: initial_capacity,
             label,
             byte_size,
             bind_group_binding,
@@ -190,13 +193,12 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
                 let slot = if let Some(free_slot) = self.free_slots.pop() {
                     free_slot
                 } else {
-                    let new_slot = self.capacity_slots;
+                    let new_slot = self.next_slot;
                     // Check if we need to grow the raw_data and GPU buffer.
                     if (new_slot + 1) * self.aligned_slice_size > self.raw_data.len() {
                         self.resize(new_slot + 1);
                     }
-                    // Increase our logical capacity count.
-                    self.capacity_slots += 1;
+                    self.next_slot += 1;
                     new_slot
                 };
 
@@ -283,12 +285,12 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
         // We grow by doubling the capacity of required slots.
         // Take the max of current capacity vs. required_slots to avoid accidental shrinking
         // though this should really never happen
-        self.capacity_slots = self.capacity_slots.max(required_slots) * 2;
-
+        let new_cap = required_slots.max(self.capacity_slots) * 2;
         // Resize the CPU-side data; new bytes are zeroed out.
         self.raw_data
-            .resize(self.capacity_slots * self.aligned_slice_size, ZERO_VALUE);
-
+            .resize(new_cap * self.aligned_slice_size, ZERO_VALUE);
+        self.free_slots.extend(self.capacity_slots..new_cap);
+        self.capacity_slots = new_cap;
         // mark this so it will resize before the next gpu write
         self.gpu_buffer_needs_resize = true;
     }
