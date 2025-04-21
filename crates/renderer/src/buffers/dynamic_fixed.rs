@@ -9,6 +9,17 @@ use awsm_renderer_core::{
 };
 use slotmap::{Key, SecondaryMap};
 
+//-------------------------------- PERFORMANCE NOTES --------------------------//
+// DynamicFixedBuffer
+//  • slot size is fixed (ALIGNED_SLICE_SIZE) → no fragmentation
+//  • insert/update/remove: O(1)     (except when buffer doubles)
+//  • resize strategy:      capacity = capacity * 2
+//  • GPU write:            whole buffer every frame (call write_to_gpu())
+//  • memory overhead:      exactly capacity * ALIGNED_SLICE_SIZE
+//  • ideal for:            transforms, morph‑weights, skin matrices where
+//                          every item is the same byte size.
+//---------------------------------------------------------------------------//
+
 /// This gives us a generic helper for dynamic buffers of a fixed alignment size
 /// It internally manages free slots for re‑use, and reallocates (grows) the underlying buffer only when needed.
 ///
@@ -48,6 +59,7 @@ pub struct DynamicFixedBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
 
 impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
     pub fn new_uniform(
+        initial_capacity: usize,
         byte_size: usize,
         aligned_slice_size: usize,
         bind_group_binding: u32,
@@ -55,10 +67,10 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
         label: Option<String>,
     ) -> std::result::Result<Self, AwsmCoreError> {
         Self::new(
+            initial_capacity,
             byte_size,
             aligned_slice_size,
             bind_group_binding,
-            32, // just some reasonable default
             BufferBindingType::Uniform,
             BufferUsage::new().with_copy_dst().with_uniform(),
             true,
@@ -70,6 +82,7 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
     }
 
     pub fn new_storage(
+        initial_capacity: usize,
         byte_size: usize,
         aligned_slice_size: usize,
         bind_group_binding: u32,
@@ -77,10 +90,10 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
         label: Option<String>,
     ) -> std::result::Result<Self, AwsmCoreError> {
         Self::new(
+            initial_capacity,
             byte_size,
             aligned_slice_size,
             bind_group_binding,
-            32, // just some reasonable default
             BufferBindingType::ReadOnlyStorage,
             BufferUsage::new().with_copy_dst().with_storage(),
             true,
@@ -93,10 +106,10 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
 
     #[allow(clippy::too_many_arguments)]
     fn new(
+        initial_capacity: usize,
         byte_size: usize,
         aligned_slice_size: usize,
         bind_group_binding: u32,
-        initial_capacity: usize,
         binding_type: BufferBindingType,
         usage: BufferUsage,
         visibility_vertex: bool,
@@ -279,19 +292,17 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
         self.slot_indices.keys()
     }
 
-    /// Resizes the buffer so that it can store at least `required_slots`.
-    /// This method grows the raw_data and creates a new GPU buffer (and updates the bind group).
     fn resize(&mut self, required_slots: usize) {
-        // We grow by doubling the capacity of required slots.
-        // Take the max of current capacity vs. required_slots to avoid accidental shrinking
-        // though this should really never happen
+        // grow to at least double, exactly like Vec
         let new_cap = required_slots.max(self.capacity_slots) * 2;
-        // Resize the CPU-side data; new bytes are zeroed out.
+
         self.raw_data
             .resize(new_cap * self.aligned_slice_size, ZERO_VALUE);
-        self.free_slots.extend(self.capacity_slots..new_cap);
+
+        // **avoid duplicating the soon‑to‑be‑allocated slot**
+        self.free_slots.extend(required_slots..new_cap);
+
         self.capacity_slots = new_cap;
-        // mark this so it will resize before the next gpu write
         self.gpu_buffer_needs_resize = true;
     }
 }

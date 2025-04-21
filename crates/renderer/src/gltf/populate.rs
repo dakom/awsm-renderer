@@ -24,6 +24,7 @@ impl AwsmRenderer {
         gltf_data: GltfData,
         scene: Option<usize>,
     ) -> anyhow::Result<()> {
+        #[allow(clippy::arc_with_non_send_sync)]
         let gltf_data = Arc::new(gltf_data);
         self.gltf.raw_datas.push(gltf_data.clone());
 

@@ -23,6 +23,7 @@ impl AwsmRenderer {
     }
 }
 
+const TRANSFORM_INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
 const TRANSFORM_BYTE_SIZE: usize = 64; // 4x4 matrix of f32 is 64 bytes
 const TRANSFORM_BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment
 
@@ -39,6 +40,7 @@ pub struct Transforms {
 impl Transforms {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let buffer = DynamicFixedBuffer::new_uniform(
+            TRANSFORM_INITIAL_CAPACITY,
             TRANSFORM_BYTE_SIZE,
             TRANSFORM_BYTE_ALIGNMENT,
             BIND_GROUP_TRANSFORM_BINDING,

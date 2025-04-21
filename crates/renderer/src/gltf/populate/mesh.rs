@@ -183,13 +183,17 @@ impl AwsmRenderer {
             gltf::mesh::Mode::Points => PrimitiveTopology::PointList,
             gltf::mesh::Mode::Lines => PrimitiveTopology::LineList,
             gltf::mesh::Mode::LineLoop => {
-                return Err(AwsmGltfError::UnsupportedPrimitiveMode(gltf_primitive.mode()))
+                return Err(AwsmGltfError::UnsupportedPrimitiveMode(
+                    gltf_primitive.mode(),
+                ))
             }
             gltf::mesh::Mode::LineStrip => PrimitiveTopology::LineStrip,
             gltf::mesh::Mode::Triangles => PrimitiveTopology::TriangleList,
             gltf::mesh::Mode::TriangleStrip => PrimitiveTopology::TriangleStrip,
             gltf::mesh::Mode::TriangleFan => {
-                return Err(AwsmGltfError::UnsupportedPrimitiveMode(gltf_primitive.mode()))
+                return Err(AwsmGltfError::UnsupportedPrimitiveMode(
+                    gltf_primitive.mode(),
+                ))
             }
         });
 
@@ -209,11 +213,7 @@ impl AwsmRenderer {
                     gltf::accessor::DataType::I16 => IndexFormat::Uint16,
                     gltf::accessor::DataType::U16 => IndexFormat::Uint16,
                     gltf::accessor::DataType::U32 => IndexFormat::Uint32,
-                    _ => {
-                        return Err(
-                            AwsmGltfError::UnsupportedIndexDataType(indices.data_type())
-                        )
-                    }
+                    _ => return Err(AwsmGltfError::UnsupportedIndexDataType(indices.data_type())),
                 },
                 // these are safe, we for sure have an index buffer if we have indices
                 offset: primitive_buffer_info.index.as_ref().unwrap().offset as u64,

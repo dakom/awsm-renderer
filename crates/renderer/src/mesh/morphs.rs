@@ -9,6 +9,7 @@ use crate::buffers::{
     dynamic_fixed::DynamicFixedBuffer,
 };
 
+const MORPH_WEIGHTS_INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
 const MORPH_WEIGHTS_BYTE_SIZE: usize = 32; // 8xf32 is 32 bytes
 const MORPH_WEIGHTS_BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment
 const MORPH_VALUES_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
@@ -28,6 +29,7 @@ impl Morphs {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Self {
             weights: DynamicFixedBuffer::new_uniform(
+                MORPH_WEIGHTS_INITIAL_CAPACITY,
                 MORPH_WEIGHTS_BYTE_SIZE,
                 MORPH_WEIGHTS_BYTE_ALIGNMENT,
                 BIND_GROUP_MORPH_TARGET_WEIGHTS_BINDING,
@@ -38,7 +40,7 @@ impl Morphs {
                 MORPH_VALUES_INITIAL_SIZE,
                 BIND_GROUP_MORPH_TARGET_VALUES_BINDING,
                 gpu,
-                Some("MorphTargetValues".to_string()),
+                Some("MorphValues".to_string()),
             )?,
             weights_dirty: true,
             values_dirty: true,
