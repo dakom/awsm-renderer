@@ -32,10 +32,10 @@ impl ShaderKey {
         for (semantic, _accessor) in primitive.attributes() {
             match semantic {
                 gltf::Semantic::Positions => {
-                    key.has_attribute_position = true;
+                    key.has_position = true;
                 }
                 gltf::Semantic::Normals => {
-                    key.has_attribute_normal = true;
+                    key.has_normal = true;
                 }
                 gltf::Semantic::Tangents => {
                     tracing::warn!("TODO - primitive tangents");

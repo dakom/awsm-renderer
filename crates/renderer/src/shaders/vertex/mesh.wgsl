@@ -10,11 +10,16 @@ struct TransformUniform {
 //***** INPUT/OUTPUT *****
 struct VertexInput {
     @builtin(vertex_index) vertex_index: u32,
+
     @location(0) position: vec3<f32>,
-    // #IF normals
+
+    {% if has_normal %}
     @location(1) normal: vec3<f32>,
-    // #IF tangents
+    {% endif %}
+
+    {% if has_tangent %}
     @location(2) tangent: vec3<f32>,
+    {% endif %}
 };
 
 struct VertexOutput {
@@ -25,8 +30,10 @@ struct VertexOutput {
 @vertex
 fn vert_main(raw_input: VertexInput) -> VertexOutput {
     var input = raw_input;
-    // #IF morphs
+
+    {% if has_morphs %}
     input = apply_morphs(input);
+    {% endif %}
 
     // Transform the vertex position by the model matrix, and then by the view projection matrix
     var pos = u_transform.model * vec4<f32>(input.position, 1.0);
