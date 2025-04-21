@@ -26,6 +26,8 @@ impl<'a> BufferDescriptor<'a> {
 
 #[derive(Debug, Clone)]
 pub struct BufferBinding<'a> {
+    // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroup#gpubufferbinding_objects
+    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBufferBinding.html
     pub buffer: &'a web_sys::GpuBuffer,
     pub offset: Option<usize>,
     pub size: Option<usize>,

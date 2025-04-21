@@ -110,7 +110,7 @@ impl Mesh {
 
             ctx.render_pass.set_bind_group(
                 BIND_GROUP_MORPH_TARGET_VALUES,
-                ctx.meshes.morphs.values_bind_group(morph_key)?,
+                ctx.meshes.morphs.values_bind_group(),
                 Some(&[ctx.meshes.morphs.values_buffer_offset(morph_key)? as u32]),
             )?;
         }

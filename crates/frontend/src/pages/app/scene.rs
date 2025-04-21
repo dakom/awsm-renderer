@@ -200,7 +200,7 @@ impl AppScene {
 
         // call these first so we can get the extents
         renderer.update_animations(0.0)?;
-        renderer.update_transforms()?;
+        renderer.update_transforms();
 
         let mut scene_aabb: Option<Aabb> = None;
 

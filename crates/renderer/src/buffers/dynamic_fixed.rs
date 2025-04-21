@@ -9,38 +9,57 @@ use awsm_renderer_core::{
 };
 use slotmap::{Key, SecondaryMap};
 
-/// This gives us a generic helper for dynamic buffers.
+//-------------------------------- PERFORMANCE NOTES --------------------------//
+// DynamicFixedBuffer
+//  • slot size is fixed (ALIGNED_SLICE_SIZE) → no fragmentation
+//  • insert/update/remove: O(1)     (except when buffer doubles)
+//  • resize strategy:      capacity = capacity * 2
+//  • GPU write:            whole buffer every frame (call write_to_gpu())
+//  • memory overhead:      exactly capacity * ALIGNED_SLICE_SIZE
+//  • ideal for:            transforms, morph‑weights, skin matrices where
+//                          every item is the same byte size.
+//---------------------------------------------------------------------------//
+
+/// This gives us a generic helper for dynamic buffers of a fixed alignment size
 /// It internally manages free slots for re‑use, and reallocates (grows) the underlying buffer only when needed.
 ///
 /// The bind group layout and bind group are created once (and updated on buffer reallocation)
 /// so that even with thousands of draw calls, we only use one bind group layout.
+///
+/// This is particularly useful for things like transforms and morph weights which have a fixed size,
+/// but may be inserted/removed at any time, so we can re-use their slots
+/// without having to reallocate the entire buffer every time.
+///
+/// This also has the benefit of not needing complicated logic to avoid coalescing etc.
 #[derive(Debug)]
-pub struct DynamicBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
+pub struct DynamicFixedBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
     /// Raw CPU‑side data for all items, organized in BYTE_SIZE slots.
-    pub raw_data: Vec<u8>,
+    raw_data: Vec<u8>,
     /// The GPU buffer storing the raw data.
-    pub gpu_buffer: web_sys::GpuBuffer,
-    pub gpu_buffer_needs_resize: bool,
+    gpu_buffer: web_sys::GpuBuffer,
+    gpu_buffer_needs_resize: bool,
     /// Mapping from a Key to a slot index within the buffer.
-    pub slot_indices: SecondaryMap<K, usize>,
+    slot_indices: SecondaryMap<K, usize>,
     /// The bind group used for binding this buffer in shaders.
     pub bind_group: web_sys::GpuBindGroup,
     /// The bind group layout (static, created once).
     pub bind_group_layout: web_sys::GpuBindGroupLayout,
     /// List of free slot indices available for reuse.
-    pub free_slots: Vec<usize>,
+    free_slots: Vec<usize>,
     /// Total capacity of the buffer in number of slots.
-    pub capacity_slots: usize,
-    pub label: Option<String>,
-    pub byte_size: usize,
-    pub bind_group_binding: u32,
-    pub aligned_slice_size: usize,
-    pub binding_type: BufferBindingType,
-    pub usage: BufferUsage,
+    capacity_slots: usize,
+    // first unused index >= capacity used so far
+    next_slot: usize,
+    label: Option<String>,
+    byte_size: usize,
+    bind_group_binding: u32,
+    aligned_slice_size: usize,
+    usage: BufferUsage,
 }
 
-impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
+impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
     pub fn new_uniform(
+        initial_capacity: usize,
         byte_size: usize,
         aligned_slice_size: usize,
         bind_group_binding: u32,
@@ -48,10 +67,10 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
         label: Option<String>,
     ) -> std::result::Result<Self, AwsmCoreError> {
         Self::new(
+            initial_capacity,
             byte_size,
             aligned_slice_size,
             bind_group_binding,
-            32, // just some reasonable default
             BufferBindingType::Uniform,
             BufferUsage::new().with_copy_dst().with_uniform(),
             true,
@@ -63,6 +82,7 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
     }
 
     pub fn new_storage(
+        initial_capacity: usize,
         byte_size: usize,
         aligned_slice_size: usize,
         bind_group_binding: u32,
@@ -70,10 +90,10 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
         label: Option<String>,
     ) -> std::result::Result<Self, AwsmCoreError> {
         Self::new(
+            initial_capacity,
             byte_size,
             aligned_slice_size,
             bind_group_binding,
-            32, // just some reasonable default
             BufferBindingType::ReadOnlyStorage,
             BufferUsage::new().with_copy_dst().with_storage(),
             true,
@@ -86,10 +106,10 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
 
     #[allow(clippy::too_many_arguments)]
     fn new(
+        initial_capacity: usize,
         byte_size: usize,
         aligned_slice_size: usize,
         bind_group_binding: u32,
-        initial_capacity: usize,
         binding_type: BufferBindingType,
         usage: BufferUsage,
         visibility_vertex: bool,
@@ -142,7 +162,8 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
                     bind_group_binding,
                     BindGroupResource::Buffer(
                         BufferBinding::new(&gpu_buffer)
-                            .with_offset(0)
+                            // we know exactly how much is used per draw call
+                            // so let's just expose that slice
                             .with_size(aligned_slice_size),
                     ),
                 )],
@@ -159,11 +180,11 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
             bind_group_layout,
             free_slots: (0..initial_capacity).collect(),
             capacity_slots: initial_capacity,
+            next_slot: initial_capacity,
             label,
             byte_size,
             bind_group_binding,
             aligned_slice_size,
-            binding_type,
             usage,
         })
     }
@@ -185,13 +206,12 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
                 let slot = if let Some(free_slot) = self.free_slots.pop() {
                     free_slot
                 } else {
-                    let new_slot = self.capacity_slots;
+                    let new_slot = self.next_slot;
                     // Check if we need to grow the raw_data and GPU buffer.
                     if (new_slot + 1) * self.aligned_slice_size > self.raw_data.len() {
                         self.resize(new_slot + 1);
                     }
-                    // Increase our logical capacity count.
-                    self.capacity_slots += 1;
+                    self.next_slot += 1;
                     new_slot
                 };
 
@@ -272,19 +292,17 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicBuffer<K, ZERO_VALUE> {
         self.slot_indices.keys()
     }
 
-    /// Resizes the buffer so that it can store at least `required_slots`.
-    /// This method grows the raw_data and creates a new GPU buffer (and updates the bind group).
     fn resize(&mut self, required_slots: usize) {
-        // We grow by doubling the capacity of required slots.
-        // Take the max of current capacity vs. required_slots to avoid accidental shrinking
-        // though this should really never happen
-        self.capacity_slots = self.capacity_slots.max(required_slots) * 2;
+        // grow to at least double, exactly like Vec
+        let new_cap = required_slots.max(self.capacity_slots) * 2;
 
-        // Resize the CPU-side data; new bytes are zeroed out.
         self.raw_data
-            .resize(self.capacity_slots * self.aligned_slice_size, ZERO_VALUE);
+            .resize(new_cap * self.aligned_slice_size, ZERO_VALUE);
 
-        // mark this so it will resize before the next gpu write
+        // **avoid duplicating the soon‑to‑be‑allocated slot**
+        self.free_slots.extend(required_slots..new_cap);
+
+        self.capacity_slots = new_cap;
         self.gpu_buffer_needs_resize = true;
     }
 }

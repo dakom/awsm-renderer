@@ -19,7 +19,7 @@ impl Default for Transform {
 }
 
 impl Transform {
-    const IDENTITY: Self = Self {
+    pub const IDENTITY: Self = Self {
         translation: Vec3::ZERO,
         rotation: Quat::IDENTITY,
         scale: Vec3::ONE,

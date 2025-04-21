@@ -1,3 +1,4 @@
+pub mod alignment;
 pub mod bind_groups;
 pub mod buffer;
 pub mod command;

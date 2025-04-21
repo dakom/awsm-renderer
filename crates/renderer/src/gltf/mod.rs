@@ -1,5 +1,4 @@
 pub mod accessors;
-pub mod animation;
 pub mod buffers;
 pub mod cache;
 pub mod data;
@@ -9,4 +8,3 @@ pub mod loader;
 pub mod pipelines;
 pub mod populate;
 pub mod shaders;
-pub mod transform;

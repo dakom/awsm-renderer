@@ -1,6 +1,6 @@
-use buffers::storage::StorageBuffers;
-use camera::{CameraBuffer, CameraExt};
+use camera::CameraBuffer;
 use mesh::Meshes;
+use skin::Skins;
 use transform::Transforms;
 
 pub mod bounds;
@@ -10,7 +10,9 @@ pub mod error;
 pub mod mesh;
 pub mod render;
 pub mod shaders;
+pub mod skin;
 pub mod transform;
+pub mod update;
 pub mod core {
     pub use awsm_renderer_core::*;
 }
@@ -29,7 +31,7 @@ pub struct AwsmRenderer {
 
     pub transforms: Transforms,
 
-    pub storage: StorageBuffers,
+    pub skins: Skins,
 
     #[cfg(feature = "gltf")]
     gltf: gltf::cache::GltfCache,
@@ -39,21 +41,6 @@ pub struct AwsmRenderer {
 }
 
 impl AwsmRenderer {
-    // just a convenience function to update non-GPU properties
-    // pair this with .render() once a frame and everything should run smoothly
-    // but real-world you may want to update transforms more often for physics, for example
-    pub fn update_all(
-        &mut self,
-        global_time_delta: f64,
-        camera: &impl CameraExt,
-    ) -> crate::error::Result<()> {
-        self.update_animations(global_time_delta)?;
-        self.update_transforms()?;
-        self.update_camera(camera)?;
-
-        Ok(())
-    }
-
     pub fn remove_all(&mut self) -> crate::error::Result<()> {
         self.camera = camera::CameraBuffer::new(&self.gpu)?;
         self.meshes = Meshes::new(&self.gpu)?;
@@ -104,13 +91,14 @@ impl AwsmRendererBuilder {
         let camera = camera::CameraBuffer::new(&gpu)?;
         let meshes = Meshes::new(&gpu)?;
         let transforms = Transforms::new(&gpu)?;
+        let skins = Skins::new(&gpu)?;
 
         Ok(AwsmRenderer {
             gpu,
             meshes,
             camera,
             transforms,
-            storage: StorageBuffers::new(),
+            skins,
 
             #[cfg(feature = "gltf")]
             gltf: gltf::cache::GltfCache::default(),

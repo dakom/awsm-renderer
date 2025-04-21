@@ -1,3 +1,5 @@
+use crate::skin::AwsmSkinError;
+
 use super::transforms::TransformKey;
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
@@ -18,6 +20,15 @@ pub enum AwsmTransformError {
     #[error("[transform] buffer slot missing {0:?}")]
     TransformBufferSlotMissing(TransformKey),
 
+    #[error("[transform] cannot get parent of root node")]
+    CannotGetParentOfRootNode,
+
+    #[error("[transform] cannot get parent for {0:?}")]
+    CannotGetParent(TransformKey),
+
     #[error("[transform] {0:?}")]
     Core(#[from] AwsmCoreError),
+
+    #[error("[transform] {0:?}")]
+    Skin(#[from] AwsmSkinError),
 }

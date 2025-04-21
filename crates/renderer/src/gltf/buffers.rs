@@ -1,6 +1,9 @@
 use std::{borrow::Cow, collections::HashMap};
 
-use awsm_renderer_core::buffer::{BufferDescriptor, BufferUsage};
+use awsm_renderer_core::{
+    alignment::padding_for,
+    buffer::{BufferDescriptor, BufferUsage},
+};
 
 use crate::{
     buffers::helpers::{
@@ -21,8 +24,8 @@ use super::{
 #[derive(Debug)]
 pub struct GltfBuffers {
     pub raw: Vec<Vec<u8>>,
-    // this is definitely its own buffer
-    // isn't passed to the shader at all
+    // this isn't passed to the shader at all
+    // just used in the pipeline for drawing
     pub index_bytes: Option<Vec<u8>>,
     pub index_buffer: Option<web_sys::GpuBuffer>,
     // this might later be split into positions, texcoords, normals, etc
@@ -38,10 +41,92 @@ pub struct GltfBuffers {
     // these also always follow the same interleaving pattern
     // and we track where each primitive starts
     pub morph_bytes: Option<Vec<u8>>,
-    pub morph_buffer: Option<web_sys::GpuBuffer>,
 
     // first level is mesh, second level is primitive
-    pub meshes: Vec<Vec<MeshBufferInfo>>,
+    pub meshes: Vec<Vec<GltfMeshBufferInfo>>,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct GltfMeshBufferInfo {
+    pub vertex: GltfMeshBufferVertexInfo,
+    pub index: Option<GltfMeshBufferIndexInfo>,
+    pub morph: Option<GltfMeshBufferMorphInfo>,
+}
+
+impl From<GltfMeshBufferInfo> for MeshBufferInfo {
+    fn from(info: GltfMeshBufferInfo) -> Self {
+        Self {
+            vertex: info.vertex.into(),
+            index: info.index.map(|i| i.into()),
+            morph: info.morph.map(|m| m.into()),
+        }
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct GltfMeshBufferVertexInfo {
+    // offset in vertex_bytes where this primitive starts
+    pub offset: usize,
+    // number of vertices for this primitive
+    pub count: usize,
+    // total size in bytes of this vertex
+    // same as vertex_count * sum_of_all_vertex_attribute_stride_sizes
+    pub size: usize,
+    // size of each individual vertex attribute stride
+    pub attribute_stride_sizes: HashMap<MeshAttributeSemantic, usize>,
+}
+
+impl From<GltfMeshBufferVertexInfo> for MeshBufferVertexInfo {
+    fn from(info: GltfMeshBufferVertexInfo) -> Self {
+        Self {
+            offset: info.offset,
+            count: info.count,
+            size: info.size,
+            attribute_stride_sizes: info.attribute_stride_sizes,
+        }
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct GltfMeshBufferIndexInfo {
+    // offset in index_bytes where this primitive starts
+    pub offset: usize,
+    // number of index elements for this primitive
+    pub count: usize,
+    // number of bytes per index (e.g. 2 for u16, 4 for u32)
+    pub stride: usize,
+}
+impl From<GltfMeshBufferIndexInfo> for MeshBufferIndexInfo {
+    fn from(info: GltfMeshBufferIndexInfo) -> Self {
+        Self {
+            offset: info.offset,
+            count: info.count,
+            stride: info.stride,
+        }
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct GltfMeshBufferMorphInfo {
+    // offset in morph_bytes where this primitive starts
+    pub values_offset: usize,
+
+    // number of morph targets
+    pub targets_len: usize,
+    // the stride of all morph targets across the vertice, without padding
+    pub vertex_stride_size: usize,
+    // the size of the whole slice of data (all vertices and targets)
+    pub values_size: usize,
+}
+
+impl From<GltfMeshBufferMorphInfo> for MeshBufferMorphInfo {
+    fn from(info: GltfMeshBufferMorphInfo) -> Self {
+        Self {
+            targets_len: info.targets_len,
+            vertex_stride_size: info.vertex_stride_size,
+            values_size: info.values_size,
+        }
+    }
 }
 
 impl GltfBuffers {
@@ -58,7 +143,7 @@ impl GltfBuffers {
         let mut index_bytes: Vec<u8> = Vec::new();
         let mut vertex_bytes: Vec<u8> = Vec::new();
         let mut morph_bytes: Vec<u8> = Vec::new();
-        let mut meshes: Vec<Vec<MeshBufferInfo>> = Vec::new();
+        let mut meshes: Vec<Vec<GltfMeshBufferInfo>> = Vec::new();
 
         for mesh in doc.meshes() {
             let mut primitive_buffer_infos = Vec::new();
@@ -72,7 +157,7 @@ impl GltfBuffers {
                         let accessor_bytes = accessor_to_bytes(&accessor, &buffers)?;
                         index_bytes.extend_from_slice(&accessor_bytes);
 
-                        Some(MeshBufferIndexInfo {
+                        Some(GltfMeshBufferIndexInfo {
                             offset,
                             count: accessor.count(),
                             stride: accessor.size(),
@@ -130,7 +215,7 @@ impl GltfBuffers {
                         }
                     }
 
-                    MeshBufferVertexInfo {
+                    GltfMeshBufferVertexInfo {
                         offset,
                         count: vertex_count,
                         size: vertex_bytes.len() - offset,
@@ -196,7 +281,7 @@ impl GltfBuffers {
                         // if a semantic is not used, we skip it instead of
                         // filling with 0's, since the shader will be different anyway
 
-                        let offset = morph_bytes.len();
+                        let values_offset = morph_bytes.len();
 
                         let mut vertex_morph_stride_size = 0;
 
@@ -259,15 +344,9 @@ impl GltfBuffers {
                             }
                         }
 
-                        let size = morph_bytes.len() - offset;
-                        // pad to satisfy WebGPU
-                        let padding = 4 - (size % 4);
-                        if padding != 4 {
-                            morph_bytes.extend_from_slice(slice_zeroes(padding));
-                        }
-                        Some(MeshBufferMorphInfo {
-                            size: morph_bytes.len() - offset,
-                            offset,
+                        Some(GltfMeshBufferMorphInfo {
+                            values_offset,
+                            values_size: morph_bytes.len() - values_offset,
                             targets_len: primitive.morph_targets().len(),
                             vertex_stride_size: vertex_morph_stride_size,
                         })
@@ -275,7 +354,7 @@ impl GltfBuffers {
                 };
 
                 // Done for this primitive
-                primitive_buffer_infos.push(MeshBufferInfo {
+                primitive_buffer_infos.push(GltfMeshBufferInfo {
                     index,
                     vertex,
                     morph,
@@ -289,9 +368,9 @@ impl GltfBuffers {
             true => None,
             false => {
                 // pad to multiple of 4 to satisfy WebGPU
-                let pad = 4 - (index_bytes.len() % 4);
-                if pad != 4 {
-                    index_bytes.extend_from_slice(slice_zeroes(pad));
+                let padding = padding_for(index_bytes.len(), 4);
+                if padding != 4 {
+                    index_bytes.extend_from_slice(slice_zeroes(padding));
                 }
 
                 let index_buffer = renderer
@@ -315,34 +394,10 @@ impl GltfBuffers {
             }
         };
 
-        let morph_buffer = match morph_bytes.is_empty() {
-            true => None,
-            false => {
-                let morph_buffer = renderer
-                    .gpu
-                    .create_buffer(
-                        &BufferDescriptor::new(
-                            Some("gltf morph buffer"),
-                            morph_bytes.len(),
-                            BufferUsage::new().with_copy_dst().with_storage(),
-                        )
-                        .into(),
-                    )
-                    .map_err(AwsmGltfError::BufferCreate)?;
-
-                renderer
-                    .gpu
-                    .write_buffer(&morph_buffer, None, morph_bytes.as_slice(), None, None)
-                    .map_err(AwsmGltfError::BufferWrite)?;
-
-                Some(morph_buffer)
-            }
-        };
-
         // pad to multiple of 4 to satisfy WebGPU
-        let pad = 4 - (vertex_bytes.len() % 4);
-        if pad != 4 {
-            vertex_bytes.extend_from_slice(slice_zeroes(pad));
+        let padding = padding_for(vertex_bytes.len(), 4);
+        if padding != 4 {
+            vertex_bytes.extend_from_slice(slice_zeroes(padding));
         }
 
         let vertex_buffer = renderer
@@ -377,7 +432,6 @@ impl GltfBuffers {
             } else {
                 Some(morph_bytes)
             },
-            morph_buffer,
             meshes,
         })
     }

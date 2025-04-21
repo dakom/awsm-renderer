@@ -4,7 +4,7 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::{
-    buffers::{bind_group::BIND_GROUP_TRANSFORM_BINDING, dynamic::DynamicBuffer},
+    buffers::{bind_group::BIND_GROUP_TRANSFORM_BINDING, dynamic_fixed::DynamicFixedBuffer},
     AwsmRenderer,
 };
 
@@ -18,11 +18,12 @@ new_key_type! {
 }
 
 impl AwsmRenderer {
-    pub fn update_transforms(&mut self) -> Result<()> {
-        self.transforms.update_world()
+    pub fn update_transforms(&mut self) {
+        self.transforms.update_world();
     }
 }
 
+const TRANSFORM_INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
 const TRANSFORM_BYTE_SIZE: usize = 64; // 4x4 matrix of f32 is 64 bytes
 const TRANSFORM_BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment
 
@@ -33,12 +34,13 @@ pub struct Transforms {
     parents: SecondaryMap<TransformKey, TransformKey>,
     dirties: HashSet<TransformKey>,
     root_node: TransformKey,
-    buffer: DynamicBuffer<TransformKey>,
+    buffer: DynamicFixedBuffer<TransformKey>,
 }
 
 impl Transforms {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let buffer = DynamicBuffer::new_uniform(
+        let buffer = DynamicFixedBuffer::new_uniform(
+            TRANSFORM_INITIAL_CAPACITY,
             TRANSFORM_BYTE_SIZE,
             TRANSFORM_BYTE_ALIGNMENT,
             BIND_GROUP_TRANSFORM_BINDING,
@@ -132,6 +134,17 @@ impl Transforms {
         self.parents.insert(child, parent);
     }
 
+    pub fn get_parent(&self, child: TransformKey) -> Result<TransformKey> {
+        if child == self.root_node {
+            return Err(AwsmTransformError::CannotGetParentOfRootNode);
+        }
+
+        self.parents
+            .get(child)
+            .copied()
+            .ok_or(AwsmTransformError::CannotGetParent(child))
+    }
+
     pub fn get_local(&self, key: TransformKey) -> Result<&Transform> {
         self.locals
             .get(key)
@@ -146,12 +159,10 @@ impl Transforms {
 
     // This is the only way to update the world matrices
     // it does *not* write to the GPU, so it can be called relatively frequently for physics etc.
-    pub(crate) fn update_world(&mut self) -> Result<()> {
+    pub(crate) fn update_world(&mut self) {
         self.update_inner(self.root_node, false);
 
         self.dirties.clear();
-
-        Ok(())
     }
 
     // This *does* write to the gpu, should be called only once per frame
@@ -172,6 +183,10 @@ impl Transforms {
         self.buffer
             .offset(key)
             .ok_or(AwsmTransformError::TransformBufferSlotMissing(key))
+    }
+
+    pub fn world_matrices_ref(&self) -> &SecondaryMap<TransformKey, glam::Mat4> {
+        &self.world_matrices
     }
 
     // internal-only function
