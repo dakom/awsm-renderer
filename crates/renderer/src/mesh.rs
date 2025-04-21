@@ -25,8 +25,6 @@ use super::error::Result;
 pub struct Mesh {
     pub pipeline: web_sys::GpuRenderPipeline,
     pub draw_count: usize, // indices or vertices
-    pub vertex_buffers: Vec<MeshVertexBuffer>,
-    pub index_buffer: Option<MeshIndexBuffer>,
     pub topology: PrimitiveTopology,
     pub aabb: Option<Aabb>,
     pub transform_key: TransformKey,
@@ -58,23 +56,11 @@ impl Mesh {
         Self {
             pipeline,
             draw_count,
-            vertex_buffers: Vec::new(),
-            index_buffer: None,
             topology: PrimitiveTopology::TriangleList,
             aabb: None,
             morph_key: None,
             transform_key,
         }
-    }
-
-    pub fn with_vertex_buffers(mut self, vertex_buffers: Vec<MeshVertexBuffer>) -> Self {
-        self.vertex_buffers = vertex_buffers;
-        self
-    }
-
-    pub fn with_index_buffer(mut self, index_buffer: MeshIndexBuffer) -> Self {
-        self.index_buffer = Some(index_buffer);
-        self
     }
 
     pub fn with_topology(mut self, topology: PrimitiveTopology) -> Self {
@@ -92,7 +78,7 @@ impl Mesh {
         self
     }
 
-    pub fn push_commands(&self, ctx: &mut RenderContext) -> Result<()> {
+    pub fn push_commands(&self, ctx: &mut RenderContext, mesh_key: MeshKey) -> Result<()> {
         ctx.render_pass.set_pipeline(&self.pipeline);
 
         ctx.render_pass.set_bind_group(
@@ -115,22 +101,20 @@ impl Mesh {
             )?;
         }
 
-        for vertex_buffer in &self.vertex_buffers {
-            ctx.render_pass.set_vertex_buffer(
-                vertex_buffer.slot,
-                &vertex_buffer.buffer,
-                vertex_buffer.offset,
-                vertex_buffer.size,
-            );
-        }
+        ctx.render_pass.set_vertex_buffer(
+            0,
+            ctx.meshes.gpu_vertex_buffer(),
+            Some(ctx.meshes.vertex_buffer_offset(mesh_key)? as u64),
+            None,
+        );
 
-        match &self.index_buffer {
-            Some(index_buffer) => {
+        match ctx.meshes.index_buffer_offset_format(mesh_key).ok() {
+            Some((offset, format)) => {
                 ctx.render_pass.set_index_buffer(
-                    &index_buffer.buffer,
-                    index_buffer.format,
-                    Some(index_buffer.offset),
-                    Some(index_buffer.size),
+                    ctx.meshes.gpu_index_buffer(),
+                    format,
+                    Some(offset as u64),
+                    None,
                 );
                 ctx.render_pass.draw_indexed(self.draw_count as u32);
             }

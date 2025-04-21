@@ -1,7 +1,10 @@
-use crate::AwsmRenderer;
 use awsm_renderer_core::image::ImageLoader;
 
-use super::{buffers::GltfBuffers, error::Result, loader::GltfLoader};
+use super::{
+    buffers::GltfBuffers,
+    error::{AwsmGltfError, Result},
+    loader::GltfLoader,
+};
 
 #[derive(Debug)]
 pub struct GltfData {
@@ -11,9 +14,11 @@ pub struct GltfData {
     pub images: Vec<ImageLoader>,
 }
 
-impl GltfData {
-    pub async fn new(renderer: &AwsmRenderer, loader: GltfLoader) -> Result<Self> {
-        let buffers = GltfBuffers::new(renderer, &loader.doc, loader.buffers).await?;
+impl TryFrom<GltfLoader> for GltfData {
+    type Error = AwsmGltfError;
+
+    fn try_from(loader: GltfLoader) -> Result<Self> {
+        let buffers = GltfBuffers::new(&loader.doc, loader.buffers)?;
 
         Ok(Self {
             doc: loader.doc,

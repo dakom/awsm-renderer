@@ -179,8 +179,7 @@ impl AppScene {
     ) -> Result<GltfData> {
         let state = self;
 
-        let lock = state.renderer.lock().await;
-        Ok(GltfData::new(&lock, loader).await?)
+        Ok(loader.try_into()?)
     }
 
     pub async fn populate(self: &Arc<Self>, data: GltfData) -> Result<()> {

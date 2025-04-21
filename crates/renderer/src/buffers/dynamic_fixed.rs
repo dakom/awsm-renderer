@@ -1,13 +1,15 @@
 use awsm_renderer_core::{
     bind_groups::{
         BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-        BindGroupLayoutResource, BindGroupResource, BufferBindingLayout, BufferBindingType,
+        BindGroupLayoutResource, BindGroupResource, BufferBindingLayout,
     },
-    buffer::{BufferBinding, BufferDescriptor, BufferUsage},
+    buffers::{BufferBinding, BufferDescriptor},
     error::AwsmCoreError,
     renderer::AwsmRendererWebGpu,
 };
 use slotmap::{Key, SecondaryMap};
+
+use super::dynamic::DynamicBufferKind;
 
 //-------------------------------- PERFORMANCE SUMMARY ------------------------//
 //
@@ -39,17 +41,20 @@ use slotmap::{Key, SecondaryMap};
 /// This also has the benefit of not needing complicated logic to avoid coalescing etc.
 #[derive(Debug)]
 pub struct DynamicFixedBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
+    /// The bind group used for binding this buffer in shaders.
+    pub bind_group: Option<web_sys::GpuBindGroup>,
+    /// The bind group layout (static, created once).
+    pub bind_group_layout: Option<web_sys::GpuBindGroupLayout>,
+    /// The GPU buffer used for this dynamic buffer.
+    pub gpu_buffer: web_sys::GpuBuffer,
+    /// The kind of dynamic buffer
+    kind: DynamicBufferKind,
     /// Raw CPU‑side data for all items, organized in BYTE_SIZE slots.
     raw_data: Vec<u8>,
     /// The GPU buffer storing the raw data.
-    gpu_buffer: web_sys::GpuBuffer,
     gpu_buffer_needs_resize: bool,
     /// Mapping from a Key to a slot index within the buffer.
     slot_indices: SecondaryMap<K, usize>,
-    /// The bind group used for binding this buffer in shaders.
-    pub bind_group: web_sys::GpuBindGroup,
-    /// The bind group layout (static, created once).
-    pub bind_group_layout: web_sys::GpuBindGroupLayout,
     /// List of free slot indices available for reuse.
     free_slots: Vec<usize>,
     /// Total capacity of the buffer in number of slots.
@@ -58,69 +63,16 @@ pub struct DynamicFixedBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
     next_slot: usize,
     label: Option<String>,
     byte_size: usize,
-    bind_group_binding: u32,
     aligned_slice_size: usize,
-    usage: BufferUsage,
 }
 
 impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
-    pub fn new_uniform(
-        initial_capacity: usize,
-        byte_size: usize,
-        aligned_slice_size: usize,
-        bind_group_binding: u32,
-        gpu: &AwsmRendererWebGpu,
-        label: Option<String>,
-    ) -> std::result::Result<Self, AwsmCoreError> {
-        Self::new(
-            initial_capacity,
-            byte_size,
-            aligned_slice_size,
-            bind_group_binding,
-            BufferBindingType::Uniform,
-            BufferUsage::new().with_copy_dst().with_uniform(),
-            true,
-            false,
-            false,
-            gpu,
-            label,
-        )
-    }
-
-    pub fn new_storage(
-        initial_capacity: usize,
-        byte_size: usize,
-        aligned_slice_size: usize,
-        bind_group_binding: u32,
-        gpu: &AwsmRendererWebGpu,
-        label: Option<String>,
-    ) -> std::result::Result<Self, AwsmCoreError> {
-        Self::new(
-            initial_capacity,
-            byte_size,
-            aligned_slice_size,
-            bind_group_binding,
-            BufferBindingType::ReadOnlyStorage,
-            BufferUsage::new().with_copy_dst().with_storage(),
-            true,
-            false,
-            false,
-            gpu,
-            label,
-        )
-    }
-
     #[allow(clippy::too_many_arguments)]
-    fn new(
+    pub fn new(
         initial_capacity: usize,
         byte_size: usize,
         aligned_slice_size: usize,
-        bind_group_binding: u32,
-        binding_type: BufferBindingType,
-        usage: BufferUsage,
-        visibility_vertex: bool,
-        visibility_fragment: bool,
-        visibility_compute: bool,
+        kind: DynamicBufferKind,
         gpu: &AwsmRendererWebGpu,
         label: Option<String>,
     ) -> std::result::Result<Self, AwsmCoreError> {
@@ -130,69 +82,93 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
 
         // Create the GPU buffer.
         let gpu_buffer = gpu.create_buffer(
-            &BufferDescriptor::new(label.as_deref(), initial_size_bytes, usage).into(),
+            &BufferDescriptor::new(label.as_deref(), initial_size_bytes, kind.usage()).into(),
         )?;
 
         // Create the bind group layout (one binding, marked as dynamic).
+        if let DynamicBufferKind::Object {
+            binding,
+            visibility_vertex,
+            visibility_fragment,
+            visibility_compute,
+            binding_type,
+            usage: _,
+        } = kind
+        {
+            let mut layout_entry = BindGroupLayoutEntry::new(
+                binding,
+                BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(binding_type)
+                        .with_dynamic_offset(true),
+                ),
+            );
 
-        let mut layout_entry = BindGroupLayoutEntry::new(
-            bind_group_binding,
-            BindGroupLayoutResource::Buffer(
-                BufferBindingLayout::new()
-                    .with_binding_type(binding_type)
-                    .with_dynamic_offset(true),
-            ),
-        );
+            if visibility_vertex {
+                layout_entry = layout_entry.with_visibility_vertex();
+            }
+            if visibility_fragment {
+                layout_entry = layout_entry.with_visibility_fragment();
+            }
+            if visibility_compute {
+                layout_entry = layout_entry.with_visibility_compute();
+            }
 
-        if visibility_vertex {
-            layout_entry = layout_entry.with_visibility_vertex();
-        }
-        if visibility_fragment {
-            layout_entry = layout_entry.with_visibility_fragment();
-        }
-        if visibility_compute {
-            layout_entry = layout_entry.with_visibility_compute();
-        }
+            let bind_group_layout = gpu.create_bind_group_layout(
+                &BindGroupLayoutDescriptor::new(label.as_deref())
+                    .with_entries(vec![layout_entry])
+                    .into(),
+            )?;
 
-        let bind_group_layout = gpu.create_bind_group_layout(
-            &BindGroupLayoutDescriptor::new(label.as_deref())
-                .with_entries(vec![layout_entry])
+            let bind_group = gpu.create_bind_group(
+                &BindGroupDescriptor::new(
+                    &bind_group_layout,
+                    label.as_deref(),
+                    vec![BindGroupEntry::new(
+                        binding,
+                        BindGroupResource::Buffer(
+                            BufferBinding::new(&gpu_buffer)
+                                // we know exactly how much is used per draw call
+                                // so let's just expose that slice
+                                .with_size(aligned_slice_size),
+                        ),
+                    )],
+                )
                 .into(),
-        )?;
+            );
 
-        let bind_group = gpu.create_bind_group(
-            &BindGroupDescriptor::new(
-                &bind_group_layout,
-                label.as_deref(),
-                vec![BindGroupEntry::new(
-                    bind_group_binding,
-                    BindGroupResource::Buffer(
-                        BufferBinding::new(&gpu_buffer)
-                            // we know exactly how much is used per draw call
-                            // so let's just expose that slice
-                            .with_size(aligned_slice_size),
-                    ),
-                )],
-            )
-            .into(),
-        );
-
-        Ok(Self {
-            raw_data,
-            gpu_buffer,
-            gpu_buffer_needs_resize: false,
-            slot_indices: SecondaryMap::new(),
-            bind_group,
-            bind_group_layout,
-            free_slots: (0..initial_capacity).collect(),
-            capacity_slots: initial_capacity,
-            next_slot: initial_capacity,
-            label,
-            byte_size,
-            bind_group_binding,
-            aligned_slice_size,
-            usage,
-        })
+            Ok(Self {
+                kind,
+                raw_data,
+                gpu_buffer,
+                gpu_buffer_needs_resize: false,
+                slot_indices: SecondaryMap::new(),
+                free_slots: (0..initial_capacity).collect(),
+                capacity_slots: initial_capacity,
+                next_slot: initial_capacity,
+                label,
+                byte_size,
+                bind_group: Some(bind_group),
+                bind_group_layout: Some(bind_group_layout),
+                aligned_slice_size,
+            })
+        } else {
+            Ok(Self {
+                kind,
+                raw_data,
+                gpu_buffer,
+                gpu_buffer_needs_resize: false,
+                slot_indices: SecondaryMap::new(),
+                free_slots: (0..initial_capacity).collect(),
+                capacity_slots: initial_capacity,
+                next_slot: initial_capacity,
+                label,
+                byte_size,
+                bind_group: None,
+                bind_group_layout: None,
+                aligned_slice_size,
+            })
+        }
     }
 
     // Inserts or updates an item in the buffer.
@@ -245,28 +221,44 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
         gpu: &AwsmRendererWebGpu,
     ) -> std::result::Result<(), AwsmCoreError> {
         if self.gpu_buffer_needs_resize {
-            // Create a new GPU buffer with the new size.
+            // it's fine to replace this because rendering only refers to the buffer as-needed
+            self.gpu_buffer.destroy();
             self.gpu_buffer = gpu.create_buffer(
-                &BufferDescriptor::new(self.label.as_deref(), self.raw_data.len(), self.usage)
-                    .into(),
-            )?;
-
-            // Replace the bind group to point at the new buffer
-            self.bind_group = gpu.create_bind_group(
-                &BindGroupDescriptor::new(
-                    &self.bind_group_layout,
+                &BufferDescriptor::new(
                     self.label.as_deref(),
-                    vec![BindGroupEntry::new(
-                        self.bind_group_binding,
-                        BindGroupResource::Buffer(
-                            BufferBinding::new(&self.gpu_buffer)
-                                .with_offset(0)
-                                .with_size(self.aligned_slice_size),
-                        ),
-                    )],
+                    self.raw_data.len(),
+                    self.kind.usage(),
                 )
                 .into(),
-            );
+            )?;
+
+            // it's fine to replace this because pipelines only refer to the layout, which is consistent
+            if let Some(bind_group_layout) = &self.bind_group_layout {
+                let bind_group_binding =
+                    if let DynamicBufferKind::Object { binding, .. } = self.kind {
+                        binding
+                    } else {
+                        unreachable!()
+                    };
+                // Replace the bind group to point at the new buffer
+                self.bind_group = Some(
+                    gpu.create_bind_group(
+                        &BindGroupDescriptor::new(
+                            bind_group_layout,
+                            self.label.as_deref(),
+                            vec![BindGroupEntry::new(
+                                bind_group_binding,
+                                BindGroupResource::Buffer(
+                                    BufferBinding::new(&self.gpu_buffer)
+                                        .with_offset(0)
+                                        .with_size(self.aligned_slice_size),
+                                ),
+                            )],
+                        )
+                        .into(),
+                    ),
+                );
+            }
 
             self.gpu_buffer_needs_resize = false;
         }
@@ -310,5 +302,11 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
 
         self.capacity_slots = new_cap;
         self.gpu_buffer_needs_resize = true;
+    }
+}
+
+impl<K: Key, const ZERO_VALUE: u8> Drop for DynamicFixedBuffer<K, ZERO_VALUE> {
+    fn drop(&mut self) {
+        self.gpu_buffer.destroy();
     }
 }

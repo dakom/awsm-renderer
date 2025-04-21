@@ -2,7 +2,7 @@ use awsm_renderer_core::bind_groups::{
     BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindGroupLayoutResource, BindGroupResource, BufferBindingLayout, BufferBindingType,
 };
-use awsm_renderer_core::buffer::{BufferBinding, BufferDescriptor, BufferUsage};
+use awsm_renderer_core::buffers::{BufferBinding, BufferDescriptor, BufferUsage};
 use awsm_renderer_core::error::AwsmCoreError;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::{Mat4, Vec3};

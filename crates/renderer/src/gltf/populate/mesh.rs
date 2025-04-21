@@ -7,16 +7,13 @@ use crate::{
         layout::primitive_vertex_buffer_layout,
         pipelines::{PipelineLayoutKey, RenderPipelineKey},
     },
-    mesh::{Mesh, MeshBufferInfo, MeshIndexBuffer, MeshVertexBuffer},
+    mesh::{Mesh, MeshBufferInfo},
     shaders::{ShaderConstantIds, ShaderKey},
     transform::{Transform, TransformKey},
     AwsmRenderer,
 };
 use awsm_renderer_core::{
-    pipeline::{
-        fragment::ColorTargetState,
-        primitive::{IndexFormat, PrimitiveTopology},
-    },
+    pipeline::{fragment::ColorTargetState, primitive::PrimitiveTopology},
     shaders::ShaderModuleExt,
 };
 use glam::Vec3;
@@ -160,24 +157,11 @@ impl AwsmRenderer {
             Some(pipeline) => pipeline,
         };
 
-        let primitive_buffer_info = MeshBufferInfo::from(primitive_buffer_info.clone());
+        let native_primitive_buffer_info = MeshBufferInfo::from(primitive_buffer_info.clone());
         let mut mesh = Mesh::new(
             render_pipeline,
-            primitive_buffer_info.draw_count(),
+            native_primitive_buffer_info.draw_count(),
             transform_key,
-        )
-        .with_vertex_buffers(
-            // We only need one vertex buffer per-mesh, because we've already constructed our buffers
-            // to be one contiguous buffer of interleaved vertex data.
-            vec![MeshVertexBuffer {
-                buffer: ctx.data.buffers.vertex_buffer.clone(),
-                // similar, but different, there is only one vertex layout (with multiple attributes)
-                // slot here points to the first one
-                slot: 0,
-                // but we need to point to this primitive's slice within the larger buffer
-                offset: Some(primitive_buffer_info.vertex.offset as u64),
-                size: Some(primitive_buffer_info.vertex.size as u64),
-            }],
         )
         .with_topology(match gltf_primitive.mode() {
             gltf::mesh::Mode::Points => PrimitiveTopology::PointList,
@@ -205,23 +189,28 @@ impl AwsmRenderer {
             mesh = mesh.with_morph_key(morph_key);
         }
 
-        if let Some(indices) = gltf_primitive.indices() {
-            mesh = mesh.with_index_buffer(MeshIndexBuffer {
-                // safe, only exists if we have an index
-                buffer: ctx.data.buffers.index_buffer.clone().unwrap(),
-                format: match indices.data_type() {
-                    gltf::accessor::DataType::I16 => IndexFormat::Uint16,
-                    gltf::accessor::DataType::U16 => IndexFormat::Uint16,
-                    gltf::accessor::DataType::U32 => IndexFormat::Uint32,
-                    _ => return Err(AwsmGltfError::UnsupportedIndexDataType(indices.data_type())),
-                },
-                // these are safe, we for sure have an index buffer if we have indices
-                offset: primitive_buffer_info.index.as_ref().unwrap().offset as u64,
-                size: primitive_buffer_info.index_len().unwrap() as u64,
-            });
-        }
+        let _mesh_key = {
+            let index = match primitive_buffer_info.index.clone() {
+                None => None,
+                Some(index_buffer_info) => {
+                    // safe, can't have info without backing bytes
+                    let index_values = ctx.data.buffers.index_bytes.as_ref().unwrap();
+                    let index_values = &index_values[index_buffer_info.offset
+                        ..index_buffer_info.offset + index_buffer_info.size];
+                    Some((index_values, index_buffer_info.into()))
+                }
+            };
 
-        let _mesh_key = self.meshes.insert(mesh);
+            let vertex_values = &ctx.data.buffers.vertex_bytes;
+            let vertex_values = &vertex_values[primitive_buffer_info.vertex.offset
+                ..primitive_buffer_info.vertex.offset + primitive_buffer_info.vertex.size];
+            self.meshes.insert(
+                mesh,
+                vertex_values,
+                native_primitive_buffer_info.vertex,
+                index,
+            )
+        };
 
         for gltf_animation in ctx.data.doc.animations() {
             for channel in gltf_animation.channels() {

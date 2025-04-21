@@ -3,6 +3,7 @@ use slotmap::{new_key_type, SlotMap};
 
 use super::error::{AwsmMeshError, Result};
 use super::MeshBufferMorphInfo;
+use crate::buffers::dynamic::DynamicBufferKind;
 use crate::buffers::dynamic_buddy::DynamicBuddyBuffer;
 use crate::buffers::{
     bind_group::{BIND_GROUP_MORPH_TARGET_VALUES_BINDING, BIND_GROUP_MORPH_TARGET_WEIGHTS_BINDING},
@@ -28,17 +29,17 @@ pub struct Morphs {
 impl Morphs {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Self {
-            weights: DynamicFixedBuffer::new_uniform(
+            weights: DynamicFixedBuffer::new(
                 MORPH_WEIGHTS_INITIAL_CAPACITY,
                 MORPH_WEIGHTS_BYTE_SIZE,
                 MORPH_WEIGHTS_BYTE_ALIGNMENT,
-                BIND_GROUP_MORPH_TARGET_WEIGHTS_BINDING,
+                DynamicBufferKind::new_uniform(BIND_GROUP_MORPH_TARGET_WEIGHTS_BINDING),
                 gpu,
                 Some("MorphWeights".to_string()),
             )?,
-            values: DynamicBuddyBuffer::new_storage(
+            values: DynamicBuddyBuffer::new(
                 MORPH_VALUES_INITIAL_SIZE,
-                BIND_GROUP_MORPH_TARGET_VALUES_BINDING,
+                DynamicBufferKind::new_storage(BIND_GROUP_MORPH_TARGET_VALUES_BINDING, true),
                 gpu,
                 Some("MorphValues".to_string()),
             )?,
@@ -77,11 +78,11 @@ impl Morphs {
     }
 
     pub fn weights_bind_group(&self) -> &web_sys::GpuBindGroup {
-        &self.weights.bind_group
+        self.weights.bind_group.as_ref().unwrap()
     }
 
     pub fn weights_bind_group_layout(&self) -> &web_sys::GpuBindGroupLayout {
-        &self.weights.bind_group_layout
+        self.weights.bind_group_layout.as_ref().unwrap()
     }
 
     pub fn weights_buffer_offset(&self, key: MorphKey) -> Result<usize> {
@@ -91,10 +92,10 @@ impl Morphs {
     }
 
     pub fn values_bind_group(&self) -> &web_sys::GpuBindGroup {
-        &self.values.bind_group
+        self.values.bind_group.as_ref().unwrap()
     }
     pub fn values_bind_group_layout(&self) -> &web_sys::GpuBindGroupLayout {
-        &self.values.bind_group_layout
+        self.values.bind_group_layout.as_ref().unwrap()
     }
     pub fn values_buffer_offset(&self, key: MorphKey) -> Result<usize> {
         self.values
