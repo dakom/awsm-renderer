@@ -1,5 +1,5 @@
 use crate::{
-    buffer::BufferBinding,
+    buffers::BufferBinding,
     texture::{TextureFormat, TextureSampleType, TextureViewDimension},
 };
 

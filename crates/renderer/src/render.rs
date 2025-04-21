@@ -47,8 +47,8 @@ impl AwsmRenderer {
         ctx.render_pass
             .set_bind_group(BIND_GROUP_CAMERA, &self.camera.bind_group, None)?;
 
-        for (_, mesh) in self.meshes.iter() {
-            mesh.push_commands(&mut ctx)?;
+        for (key, mesh) in self.meshes.iter() {
+            mesh.push_commands(&mut ctx, key)?;
         }
 
         ctx.render_pass.end();

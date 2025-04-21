@@ -4,7 +4,10 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::{
-    buffers::{bind_group::BIND_GROUP_TRANSFORM_BINDING, dynamic_fixed::DynamicFixedBuffer},
+    buffers::{
+        bind_group::BIND_GROUP_TRANSFORM_BINDING, dynamic::DynamicBufferKind,
+        dynamic_fixed::DynamicFixedBuffer,
+    },
     AwsmRenderer,
 };
 
@@ -39,11 +42,11 @@ pub struct Transforms {
 
 impl Transforms {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let buffer = DynamicFixedBuffer::new_uniform(
+        let buffer = DynamicFixedBuffer::new(
             TRANSFORM_INITIAL_CAPACITY,
             TRANSFORM_BYTE_SIZE,
             TRANSFORM_BYTE_ALIGNMENT,
-            BIND_GROUP_TRANSFORM_BINDING,
+            DynamicBufferKind::new_uniform(BIND_GROUP_TRANSFORM_BINDING),
             gpu,
             Some("Transforms".to_string()),
         )?;
@@ -172,11 +175,11 @@ impl Transforms {
     }
 
     pub fn bind_group(&self) -> &web_sys::GpuBindGroup {
-        &self.buffer.bind_group
+        self.buffer.bind_group.as_ref().unwrap()
     }
 
     pub fn bind_group_layout(&self) -> &web_sys::GpuBindGroupLayout {
-        &self.buffer.bind_group_layout
+        self.buffer.bind_group_layout.as_ref().unwrap()
     }
 
     pub fn buffer_offset(&self, key: TransformKey) -> Result<usize> {

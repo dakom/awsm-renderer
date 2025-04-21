@@ -1,9 +1,6 @@
 use std::{borrow::Cow, collections::HashMap};
 
-use awsm_renderer_core::{
-    alignment::padding_for,
-    buffer::{BufferDescriptor, BufferUsage},
-};
+use awsm_renderer_core::pipeline::primitive::IndexFormat;
 
 use crate::{
     buffers::helpers::{
@@ -13,7 +10,6 @@ use crate::{
         MeshAttributeSemantic, MeshBufferIndexInfo, MeshBufferInfo, MeshBufferMorphInfo,
         MeshBufferVertexInfo,
     },
-    AwsmRenderer,
 };
 
 use super::{
@@ -27,7 +23,6 @@ pub struct GltfBuffers {
     // this isn't passed to the shader at all
     // just used in the pipeline for drawing
     pub index_bytes: Option<Vec<u8>>,
-    pub index_buffer: Option<web_sys::GpuBuffer>,
     // this might later be split into positions, texcoords, normals, etc
     // but for now, we just want to pack it all into one buffer
     //
@@ -36,7 +31,6 @@ pub struct GltfBuffers {
     // the important thing is that they always follow the same interleaving pattern
     // and we track where each primitive starts
     pub vertex_bytes: Vec<u8>,
-    pub vertex_buffer: web_sys::GpuBuffer,
 
     // these also always follow the same interleaving pattern
     // and we track where each primitive starts
@@ -79,7 +73,6 @@ pub struct GltfMeshBufferVertexInfo {
 impl From<GltfMeshBufferVertexInfo> for MeshBufferVertexInfo {
     fn from(info: GltfMeshBufferVertexInfo) -> Self {
         Self {
-            offset: info.offset,
             count: info.count,
             size: info.size,
             attribute_stride_sizes: info.attribute_stride_sizes,
@@ -87,7 +80,7 @@ impl From<GltfMeshBufferVertexInfo> for MeshBufferVertexInfo {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct GltfMeshBufferIndexInfo {
     // offset in index_bytes where this primitive starts
     pub offset: usize,
@@ -95,13 +88,19 @@ pub struct GltfMeshBufferIndexInfo {
     pub count: usize,
     // number of bytes per index (e.g. 2 for u16, 4 for u32)
     pub stride: usize,
+    // total size in bytes of this index buffer
+    pub size: usize,
+
+    // the format of the index data
+    pub format: IndexFormat,
 }
 impl From<GltfMeshBufferIndexInfo> for MeshBufferIndexInfo {
     fn from(info: GltfMeshBufferIndexInfo) -> Self {
         Self {
-            offset: info.offset,
             count: info.count,
             stride: info.stride,
+            size: info.size,
+            format: info.format,
         }
     }
 }
@@ -130,11 +129,7 @@ impl From<GltfMeshBufferMorphInfo> for MeshBufferMorphInfo {
 }
 
 impl GltfBuffers {
-    pub async fn new(
-        renderer: &AwsmRenderer,
-        doc: &gltf::Document,
-        buffers: Vec<Vec<u8>>,
-    ) -> Result<Self> {
+    pub fn new(doc: &gltf::Document, buffers: Vec<Vec<u8>>) -> Result<Self> {
         // refactor original buffers into the format we want
         // namely, pack the data in a predictable order
         // arranged by primitive
@@ -159,8 +154,19 @@ impl GltfBuffers {
 
                         Some(GltfMeshBufferIndexInfo {
                             offset,
+                            size: index_bytes.len() - offset,
                             count: accessor.count(),
                             stride: accessor.size(),
+                            format: match accessor.data_type() {
+                                // https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuIndexFormat.html
+                                gltf::accessor::DataType::U16 => IndexFormat::Uint16,
+                                gltf::accessor::DataType::U32 => IndexFormat::Uint32,
+                                _ => {
+                                    return Err(AwsmGltfError::UnsupportedIndexDataType(
+                                        accessor.data_type(),
+                                    ))
+                                }
+                            },
                         })
                     }
                 };
@@ -364,85 +370,21 @@ impl GltfBuffers {
             meshes.push(primitive_buffer_infos);
         }
 
-        let index_buffer = match index_bytes.is_empty() {
-            true => None,
-            false => {
-                // pad to multiple of 4 to satisfy WebGPU
-                let padding = padding_for(index_bytes.len(), 4);
-                if padding != 4 {
-                    index_bytes.extend_from_slice(slice_zeroes(padding));
-                }
-
-                let index_buffer = renderer
-                    .gpu
-                    .create_buffer(
-                        &BufferDescriptor::new(
-                            Some("gltf index buffer"),
-                            index_bytes.len(),
-                            BufferUsage::new().with_copy_dst().with_index(),
-                        )
-                        .into(),
-                    )
-                    .map_err(AwsmGltfError::BufferCreate)?;
-
-                renderer
-                    .gpu
-                    .write_buffer(&index_buffer, None, index_bytes.as_slice(), None, None)
-                    .map_err(AwsmGltfError::BufferWrite)?;
-
-                Some(index_buffer)
-            }
-        };
-
-        // pad to multiple of 4 to satisfy WebGPU
-        let padding = padding_for(vertex_bytes.len(), 4);
-        if padding != 4 {
-            vertex_bytes.extend_from_slice(slice_zeroes(padding));
-        }
-
-        let vertex_buffer = renderer
-            .gpu
-            .create_buffer(
-                &BufferDescriptor::new(
-                    Some("gltf vertex buffer"),
-                    vertex_bytes.len(),
-                    BufferUsage::new().with_copy_dst().with_vertex(),
-                )
-                .into(),
-            )
-            .map_err(AwsmGltfError::BufferCreate)?;
-
-        renderer
-            .gpu
-            .write_buffer(&vertex_buffer, None, vertex_bytes.as_slice(), None, None)
-            .map_err(AwsmGltfError::BufferWrite)?;
-
         Ok(Self {
             raw: buffers,
+            vertex_bytes,
+            meshes,
             index_bytes: if index_bytes.is_empty() {
                 None
             } else {
                 Some(index_bytes)
             },
-            index_buffer,
-            vertex_bytes,
-            vertex_buffer,
             morph_bytes: if morph_bytes.is_empty() {
                 None
             } else {
                 Some(morph_bytes)
             },
-            meshes,
         })
-    }
-}
-
-impl Drop for GltfBuffers {
-    fn drop(&mut self) {
-        if let Some(index_buffer) = &self.index_buffer {
-            index_buffer.destroy();
-        }
-        self.vertex_buffer.destroy();
     }
 }
 

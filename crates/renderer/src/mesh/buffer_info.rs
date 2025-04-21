@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use awsm_renderer_core::pipeline::primitive::IndexFormat;
+
 #[derive(Default, Debug, Clone)]
 pub struct MeshBufferInfo {
     pub vertex: MeshBufferVertexInfo,
@@ -9,8 +11,6 @@ pub struct MeshBufferInfo {
 
 #[derive(Default, Debug, Clone)]
 pub struct MeshBufferVertexInfo {
-    // offset in vertex_bytes where this primitive starts
-    pub offset: usize,
     // number of vertices for this primitive
     pub count: usize,
     // total size in bytes of this vertex
@@ -50,14 +50,16 @@ impl From<MeshAttributeSemantic> for gltf::mesh::Semantic {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct MeshBufferIndexInfo {
-    // offset in index_bytes where this primitive starts
-    pub offset: usize,
     // number of index elements for this primitive
     pub count: usize,
     // number of bytes per index (e.g. 2 for u16, 4 for u32)
     pub stride: usize,
+    // the size of the whole slice of data (all indices)
+    pub size: usize,
+    // the format of the index data
+    pub format: IndexFormat,
 }
 
 #[derive(Default, Debug, Clone)]

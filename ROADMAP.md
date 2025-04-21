@@ -1,7 +1,5 @@
 # Next up
 
-- change index and vertex buffers to use buddy system (makes renderer more general-purpose, not just gltf)
-
 - Skins
     - finish write to GPU (buddy system)
     - associate mesh attributes with data
@@ -69,6 +67,10 @@ If it's supported here, corresponding core functionality is also supported
         - Number of targets -> weights -> constant override -> new shader
         - Presence of attributes -> new shader
         - Unused but present attributes do not create new shader, just 0 influence
+- [x] Meshes
+    - One vertex buffer
+    - One index buffer
+    - Gpu gating on dirty flag
 - Camera
     - [x] Single uniform buffer 
     - [ ] Frustum culling
