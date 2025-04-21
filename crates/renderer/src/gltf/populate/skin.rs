@@ -50,7 +50,7 @@ impl AwsmRenderer {
                     let values = u8_to_f32_vec(&bytes);
                     let matrices = values
                         .chunks(16)
-                        .map(|chunk| Mat4::from_cols_slice(chunk))
+                        .map(Mat4::from_cols_slice)
                         .collect::<Vec<_>>();
 
                     // from the spec: "The order of joints is defined by the skin.joints array and it

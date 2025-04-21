@@ -106,7 +106,7 @@ impl AwsmRenderer {
                 shader_module
                     .validate_shader()
                     .await
-                    .map_err(|e| AwsmGltfError::MeshPrimitiveShader(e))?;
+                    .map_err(AwsmGltfError::MeshPrimitiveShader)?;
 
                 self.gltf
                     .shaders
@@ -149,7 +149,7 @@ impl AwsmRenderer {
                     .gpu
                     .create_render_pipeline(&descriptor)
                     .await
-                    .map_err(|e| AwsmGltfError::MeshPrimitiveRenderPipeline(e))?;
+                    .map_err(AwsmGltfError::MeshPrimitiveRenderPipeline)?;
 
                 self.gltf
                     .render_pipelines
@@ -183,13 +183,13 @@ impl AwsmRenderer {
             gltf::mesh::Mode::Points => PrimitiveTopology::PointList,
             gltf::mesh::Mode::Lines => PrimitiveTopology::LineList,
             gltf::mesh::Mode::LineLoop => {
-                return Err(AwsmGltfError::UnsupportedPrimitiveMode(gltf_primitive.mode()).into())
+                return Err(AwsmGltfError::UnsupportedPrimitiveMode(gltf_primitive.mode()))
             }
             gltf::mesh::Mode::LineStrip => PrimitiveTopology::LineStrip,
             gltf::mesh::Mode::Triangles => PrimitiveTopology::TriangleList,
             gltf::mesh::Mode::TriangleStrip => PrimitiveTopology::TriangleStrip,
             gltf::mesh::Mode::TriangleFan => {
-                return Err(AwsmGltfError::UnsupportedPrimitiveMode(gltf_primitive.mode()).into())
+                return Err(AwsmGltfError::UnsupportedPrimitiveMode(gltf_primitive.mode()))
             }
         });
 
@@ -211,7 +211,7 @@ impl AwsmRenderer {
                     gltf::accessor::DataType::U32 => IndexFormat::Uint32,
                     _ => {
                         return Err(
-                            AwsmGltfError::UnsupportedIndexDataType(indices.data_type()).into()
+                            AwsmGltfError::UnsupportedIndexDataType(indices.data_type())
                         )
                     }
                 },
