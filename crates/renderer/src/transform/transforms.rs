@@ -36,6 +36,7 @@ pub struct Transforms {
     children: SecondaryMap<TransformKey, Vec<TransformKey>>,
     parents: SecondaryMap<TransformKey, TransformKey>,
     dirties: HashSet<TransformKey>,
+    gpu_dirty: bool,
     root_node: TransformKey,
     buffer: DynamicFixedBuffer<TransformKey>,
 }
@@ -64,6 +65,7 @@ impl Transforms {
             children,
             parents: SecondaryMap::new(),
             dirties: HashSet::new(),
+            gpu_dirty: true,
             root_node,
             buffer,
         })
@@ -77,7 +79,7 @@ impl Transforms {
         self.world_matrices.insert(key, world_matrix);
         self.children.insert(key, Vec::new());
         self.dirties.insert(key);
-        // no need to set uniforms_to_write, that will flow organically from dirty propogation
+        // gpu_dirty will flow naturally (and, perhaps more correctly) from the update call
 
         self.set_parent(key, parent);
 
@@ -97,6 +99,8 @@ impl Transforms {
         self.children.remove(key);
         self.dirties.remove(&key);
         self.buffer.remove(key);
+
+        self.gpu_dirty = true;
     }
 
     // This is the only way to modify the matrices (since it must manage the dirty flags)
@@ -163,7 +167,9 @@ impl Transforms {
     // This is the only way to update the world matrices
     // it does *not* write to the GPU, so it can be called relatively frequently for physics etc.
     pub(crate) fn update_world(&mut self) {
-        self.update_inner(self.root_node, false);
+        if self.update_inner(self.root_node, false) {
+            self.gpu_dirty = true;
+        }
 
         self.dirties.clear();
     }
@@ -171,7 +177,11 @@ impl Transforms {
     // This *does* write to the gpu, should be called only once per frame
     // just write the entire buffer in one fell swoop
     pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
-        Ok(self.buffer.write_to_gpu(gpu)?)
+        if self.gpu_dirty {
+            self.buffer.write_to_gpu(gpu)?;
+            self.gpu_dirty = false;
+        }
+        Ok(())
     }
 
     pub fn bind_group(&self) -> &web_sys::GpuBindGroup {

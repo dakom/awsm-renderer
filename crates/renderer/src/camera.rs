@@ -22,6 +22,7 @@ pub struct CameraBuffer {
     pub(crate) raw_data: [u8; BUFFER_SIZE],
     pub bind_group: web_sys::GpuBindGroup,
     pub bind_group_layout: web_sys::GpuBindGroupLayout,
+    gpu_dirty: bool,
 }
 
 pub trait CameraExt {
@@ -80,6 +81,7 @@ impl CameraBuffer {
             raw_data: [0; BUFFER_SIZE],
             bind_group,
             bind_group_layout,
+            gpu_dirty: true,
         })
     }
 
@@ -121,13 +123,19 @@ impl CameraBuffer {
         write_to_data(&inv_view.to_cols_array());
         write_to_data(&position.to_array());
 
+        self.gpu_dirty = true;
+
         Ok(())
     }
 
     // writes to the GPU
-    pub fn write_gpu(&self, gpu: &AwsmRendererWebGpu) -> Result<()> {
-        gpu.write_buffer(&self.gpu_buffer, None, self.raw_data.as_slice(), None, None)
-            .map_err(AwsmCameraError::WriteBuffer)?;
+    pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+        if self.gpu_dirty {
+            gpu.write_buffer(&self.gpu_buffer, None, self.raw_data.as_slice(), None, None)
+                .map_err(AwsmCameraError::WriteBuffer)?;
+
+            self.gpu_dirty = false;
+        }
 
         Ok(())
     }
