@@ -40,7 +40,7 @@ impl GltfMeshBufferIndexInfo {
             None => Ok(None),
             Some(accessor) => {
                 let offset = index_bytes.len();
-                let accessor_bytes = accessor_to_bytes(&accessor, &buffers)?;
+                let accessor_bytes = accessor_to_bytes(&accessor, buffers)?;
                 index_bytes.extend_from_slice(&accessor_bytes);
 
                 Ok(Some(Self {

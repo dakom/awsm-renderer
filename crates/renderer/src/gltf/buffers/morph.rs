@@ -62,16 +62,15 @@ impl GltfMeshBufferMorphInfo {
 
                 if let Some(accessor) = morph_target.positions() {
                     morph_target_buffer_data.positions =
-                        Some(accessor_to_bytes(&accessor, &buffers)?);
+                        Some(accessor_to_bytes(&accessor, buffers)?);
                 }
 
                 if let Some(accessor) = morph_target.normals() {
-                    morph_target_buffer_data.normals =
-                        Some(accessor_to_bytes(&accessor, &buffers)?);
+                    morph_target_buffer_data.normals = Some(accessor_to_bytes(&accessor, buffers)?);
                 }
                 if let Some(accessor) = morph_target.tangents() {
                     morph_target_buffer_data.tangents =
-                        Some(accessor_to_bytes(&accessor, &buffers)?);
+                        Some(accessor_to_bytes(&accessor, buffers)?);
                 }
 
                 morph_targets_buffer_data.push(morph_target_buffer_data);

@@ -58,7 +58,7 @@ impl GltfMeshBufferVertexInfo {
         // otherwise, it's just a slice of the original buffer
         for (semantic, accessor) in attributes {
             let semantic: MeshAttributeSemantic = semantic.into();
-            let attribute_bytes = accessor_to_bytes(&accessor, &buffers)?;
+            let attribute_bytes = accessor_to_bytes(&accessor, buffers)?;
 
             // while we're at it, we can stash the stride sizes
             let attribute_stride_size = accessor
