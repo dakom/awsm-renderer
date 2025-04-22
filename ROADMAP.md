@@ -27,7 +27,6 @@ If it's supported here, corresponding core functionality is also supported
 - Hierarchy
     - [x] transforms
     - [x] scene graph
-- [ ] Instancing
 - Geometry
     - [x] positions
     - [x] morphing
@@ -41,6 +40,8 @@ If it's supported here, corresponding core functionality is also supported
         - [ ] test 
     - [x] cubic spline interpolation
         - [ ] test 
+- Extensions
+    - [ ] Instancing
 - Materials (TODO - fill this out as we go)
 - Lighting (TODO - fill this out as we go)
 - Skybox (TODO - fill this out as we go)
