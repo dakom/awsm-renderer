@@ -91,7 +91,7 @@ impl AwsmRenderer {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
-        let shader_key = ShaderKey::gltf_primitive_new(&gltf_primitive);
+        let shader_key = ShaderKey::gltf_primitive_new(&gltf_primitive)?;
 
         let morph_key = match primitive_buffer_info.morph.clone() {
             None => None,
@@ -151,10 +151,12 @@ impl AwsmRenderer {
 
         let render_pipeline = match self.gltf.render_pipelines.get(&pipeline_key).cloned() {
             None => {
-                let descriptor =
-                    pipeline_key
-                        .clone()
-                        .into_descriptor(self, &shader_module, morph_key)?;
+                let descriptor = pipeline_key.clone().into_descriptor(
+                    self,
+                    &shader_module,
+                    morph_key,
+                    skin_key,
+                )?;
 
                 let render_pipeline = self
                     .gpu

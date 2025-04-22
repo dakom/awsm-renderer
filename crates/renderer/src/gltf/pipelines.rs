@@ -10,6 +10,7 @@ use crate::gltf::error::Result;
 
 use crate::mesh::MorphKey;
 use crate::shaders::ShaderKey;
+use crate::skin::SkinKey;
 use crate::AwsmRenderer;
 
 use super::buffers::GltfMeshBufferInfo;
@@ -49,16 +50,28 @@ impl PipelineLayoutKey {
         self,
         renderer: &AwsmRenderer,
         morph_key: Option<MorphKey>,
+        skin_key: Option<SkinKey>,
     ) -> Result<PipelineLayoutDescriptor> {
         let mut bind_group_layouts = vec![
-            renderer.camera.bind_group_layout.clone(),
-            renderer.transforms.bind_group_layout().clone(),
+            renderer
+                .bind_groups
+                .gpu_universal_bind_group_layout()
+                .clone(),
+            renderer
+                .bind_groups
+                .gpu_mesh_all_bind_group_layout()
+                .clone(),
         ];
 
-        if morph_key.is_some() {
-            bind_group_layouts.push(renderer.meshes.morphs.weights_bind_group_layout().clone());
-            bind_group_layouts.push(renderer.meshes.morphs.values_bind_group_layout().clone());
+        if morph_key.is_some() || skin_key.is_some() {
+            bind_group_layouts.push(
+                renderer
+                    .bind_groups
+                    .gpu_mesh_shape_bind_group_layout()
+                    .clone(),
+            );
         }
+
         Ok(PipelineLayoutDescriptor::new(
             Some("Mesh (from gltf primitive)"),
             bind_group_layouts,
@@ -101,6 +114,7 @@ impl RenderPipelineKey {
         renderer: &mut AwsmRenderer,
         shader_module: &web_sys::GpuShaderModule,
         morph_key: Option<MorphKey>,
+        skin_key: Option<SkinKey>,
     ) -> Result<web_sys::GpuRenderPipelineDescriptor> {
         let mut vertex = VertexState::new(shader_module, None);
         vertex.buffer_layouts = self.vertex_buffer_layouts;
@@ -114,7 +128,7 @@ impl RenderPipelineKey {
                     &self
                         .layout_key
                         .clone()
-                        .into_descriptor(renderer, morph_key)?
+                        .into_descriptor(renderer, morph_key, skin_key)?
                         .into(),
                 );
 

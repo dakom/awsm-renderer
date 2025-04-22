@@ -4,8 +4,8 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::{
-    buffers::{
-        bind_group::BIND_GROUP_TRANSFORM_BINDING, dynamic::DynamicBufferKind,
+    buffer::{
+        bind_groups::{BindGroupIndex, BindGroups, MeshAllBindGroupBinding},
         dynamic_fixed::DynamicFixedBuffer,
     },
     AwsmRenderer,
@@ -26,10 +26,6 @@ impl AwsmRenderer {
     }
 }
 
-const TRANSFORM_INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
-const TRANSFORM_BYTE_SIZE: usize = 64; // 4x4 matrix of f32 is 64 bytes
-const TRANSFORM_BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment
-
 pub struct Transforms {
     locals: SlotMap<TransformKey, Transform>,
     world_matrices: SecondaryMap<TransformKey, glam::Mat4>,
@@ -44,15 +40,17 @@ pub struct Transforms {
 }
 
 impl Transforms {
-    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
+    pub const INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
+    pub const BYTE_SIZE: usize = 64; // 4x4 matrix of f32 is 64 bytes
+    pub const BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment
+
+    pub fn new() -> Result<Self> {
         let buffer = DynamicFixedBuffer::new(
-            TRANSFORM_INITIAL_CAPACITY,
-            TRANSFORM_BYTE_SIZE,
-            TRANSFORM_BYTE_ALIGNMENT,
-            DynamicBufferKind::new_uniform(BIND_GROUP_TRANSFORM_BINDING),
-            gpu,
+            Self::INITIAL_CAPACITY,
+            Self::BYTE_SIZE,
+            Self::BYTE_ALIGNMENT,
             Some("Transforms".to_string()),
-        )?;
+        );
         let mut locals = SlotMap::with_key();
         let mut world_matrices = SecondaryMap::new();
         let mut children = SecondaryMap::new();
@@ -178,9 +176,24 @@ impl Transforms {
 
     // This *does* write to the gpu, should be called only once per frame
     // just write the entire buffer in one fell swoop
-    pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+    pub fn write_gpu(
+        &mut self,
+        gpu: &AwsmRendererWebGpu,
+        bind_groups: &mut BindGroups,
+    ) -> Result<()> {
         if self.gpu_dirty {
-            self.buffer.write_to_gpu(gpu)?;
+            let bind_group_index = BindGroupIndex::MeshAll(MeshAllBindGroupBinding::Transform);
+            if let Some(new_size) = self.buffer.take_gpu_needs_resize() {
+                bind_groups.gpu_resize(gpu, bind_group_index, new_size)?;
+            }
+            bind_groups.gpu_write(
+                gpu,
+                bind_group_index,
+                None,
+                self.buffer.raw_slice(),
+                None,
+                None,
+            )?;
             self.gpu_dirty = false;
         }
         Ok(())
@@ -188,14 +201,6 @@ impl Transforms {
 
     pub fn take_dirty_skin_joints(&mut self) -> HashSet<TransformKey> {
         std::mem::take(&mut self.dirty_skin_joints)
-    }
-
-    pub fn bind_group(&self) -> &web_sys::GpuBindGroup {
-        self.buffer.bind_group.as_ref().unwrap()
-    }
-
-    pub fn bind_group_layout(&self) -> &web_sys::GpuBindGroupLayout {
-        self.buffer.bind_group_layout.as_ref().unwrap()
     }
 
     pub fn buffer_offset(&self, key: TransformKey) -> Result<usize> {
@@ -235,7 +240,7 @@ impl Transforms {
 
             let values = world_matrix.to_cols_array();
             let values_u8 = unsafe {
-                std::slice::from_raw_parts(values.as_ptr() as *const u8, TRANSFORM_BYTE_SIZE)
+                std::slice::from_raw_parts(values.as_ptr() as *const u8, Self::BYTE_SIZE)
             };
             self.buffer.update(key, values_u8);
 

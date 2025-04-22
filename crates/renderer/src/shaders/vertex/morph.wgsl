@@ -9,7 +9,7 @@ var<uniform> morph_weights: array<vec4<f32>, MAX_MORPH_WEIGHTS/ 4u>;
 // always interleaved as position, normal, tangent
 // so we can use the same array for all three
 // even as we index sequentially
-@group(3) @binding(0)
+@group(2) @binding(1)
 var<storage, read> morph_values: array<f32>; 
 
 // This changes per-shader via constant overrides

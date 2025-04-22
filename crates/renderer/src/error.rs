@@ -2,8 +2,8 @@ use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
 use crate::{
-    camera::AwsmCameraError, mesh::AwsmMeshError, skin::AwsmSkinError,
-    transform::AwsmTransformError,
+    buffer::bind_groups::AwsmBindGroupError, camera::AwsmCameraError, mesh::AwsmMeshError,
+    skin::AwsmSkinError, transform::AwsmTransformError,
 };
 
 #[derive(Error, Debug)]
@@ -26,6 +26,9 @@ pub enum AwsmError {
 
     #[error("{0}")]
     Skin(#[from] AwsmSkinError),
+
+    #[error("{0}")]
+    BindGroup(#[from] AwsmBindGroupError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;

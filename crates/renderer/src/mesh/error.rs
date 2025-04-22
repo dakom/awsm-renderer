@@ -1,7 +1,7 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::transform::AwsmTransformError;
+use crate::{buffer::bind_groups::AwsmBindGroupError, transform::AwsmTransformError};
 
 use super::{morphs::MorphKey, MeshKey};
 
@@ -20,4 +20,7 @@ pub enum AwsmMeshError {
 
     #[error("[mesh] morph not found: {0:?}")]
     MorphNotFound(MorphKey),
+
+    #[error("[mesh] {0:?}")]
+    BindGroup(#[from] AwsmBindGroupError),
 }

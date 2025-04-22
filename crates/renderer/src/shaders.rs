@@ -19,6 +19,7 @@ pub struct ShaderKey {
     pub has_tangent: bool,
     // general feature
     pub has_morphs: bool,
+    pub skin_joint_sets: u32,
     // pub skin_targets: Vec<SkinTarget>,
     // pub n_skin_joints: u8,
     // pub tex_coords: Option<Vec<u32>>,

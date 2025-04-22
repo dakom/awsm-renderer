@@ -1,7 +1,7 @@
 use glam::Mat4;
 
 use crate::{
-    buffers::helpers::u8_to_f32_vec,
+    buffer::helpers::u8_to_f32_vec,
     gltf::{
         buffers::accessor::accessor_to_bytes,
         error::{AwsmGltfError, Result},

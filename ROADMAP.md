@@ -1,5 +1,17 @@
 # Next up
 
+- Better bind group management with stable ids
+- Central bind-group dispatcher needed for dynamics to re-assign
+    "The separation of bind groups into “Per Frame/Per Material/Per Draw” state as seen above is quite common."
+    - https://toji.dev/webgpu-best-practices/bind-groups.html
+    rough idea:
+        - Camera and Transforms in Bind Group 0
+            - always exists, always stable
+        - Morphs and Skins in Bind Group 1
+            - doesn't always exist, but ids within are stable
+        - Materials in Bind Group 2
+            - doesn't always exist, but ids within are stable
+
 - Skins
     - finish write to GPU (buddy system)
     - associate mesh attributes with data

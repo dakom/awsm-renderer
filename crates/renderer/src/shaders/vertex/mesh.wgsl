@@ -1,4 +1,4 @@
-//***** TRANSFORMS *****
+
 @group(1) @binding(0)
 var<uniform> u_transform: TransformUniform;
 
@@ -20,6 +20,12 @@ struct VertexInput {
     {% if has_tangent %}
     @location(2) tangent: vec3<f32>,
     {% endif %}
+
+    {% if skin_joint_sets > 0 %}
+    // probably need to adjust this for > 1 sets
+    @location(3) joint_indices: vec4<u32>,
+    @location(4) joint_weights: vec4<f32>,
+    {% endif %}
 };
 
 struct VertexOutput {
@@ -31,9 +37,14 @@ struct VertexOutput {
 fn vert_main(raw_input: VertexInput) -> VertexOutput {
     var input = raw_input;
 
+    {% if skin_joint_sets > 0 %}
+    input = apply_skin(input);
+    {% endif %}
+
     {% if has_morphs %}
     input = apply_morphs(input);
     {% endif %}
+
 
     // Transform the vertex position by the model matrix, and then by the view projection matrix
     var pos = u_transform.model * vec4<f32>(input.position, 1.0);

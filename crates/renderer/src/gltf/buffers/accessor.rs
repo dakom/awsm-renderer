@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use super::Result;
-use crate::buffers::helpers::{
+use crate::buffer::helpers::{
     u8_to_f32_vec, u8_to_i16_vec, u8_to_i8_vec, u8_to_u16_vec, u8_to_u32_vec,
 };
 

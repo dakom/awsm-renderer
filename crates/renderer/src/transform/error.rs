@@ -1,4 +1,4 @@
-use crate::skin::AwsmSkinError;
+use crate::{buffer::bind_groups::AwsmBindGroupError, skin::AwsmSkinError};
 
 use super::transforms::TransformKey;
 use awsm_renderer_core::error::AwsmCoreError;
@@ -31,4 +31,7 @@ pub enum AwsmTransformError {
 
     #[error("[transform] {0:?}")]
     Skin(#[from] AwsmSkinError),
+
+    #[error("[transform] {0:?}")]
+    BindGroup(#[from] AwsmBindGroupError),
 }

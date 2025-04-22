@@ -1,7 +1,7 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::transform::TransformKey;
+use crate::{buffer::bind_groups::AwsmBindGroupError, transform::TransformKey};
 
 use super::skins::SkinKey;
 
@@ -27,4 +27,7 @@ pub enum AwsmSkinError {
 
     #[error("[skin] joint already exists but is different: {joint_transform:?}")]
     JointAlreadyExistsButDifferent { joint_transform: TransformKey },
+
+    #[error("[skin] {0:?}")]
+    BindGroup(#[from] AwsmBindGroupError),
 }

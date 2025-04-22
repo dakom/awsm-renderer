@@ -1,14 +1,11 @@
-use awsm_renderer_core::bind_groups::{
-    BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindGroupLayoutResource, BindGroupResource, BufferBindingLayout, BufferBindingType,
-};
-use awsm_renderer_core::buffers::{BufferBinding, BufferDescriptor, BufferUsage};
 use awsm_renderer_core::error::AwsmCoreError;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::{Mat4, Vec3};
 use thiserror::Error;
 
-use crate::buffers::bind_group::BIND_GROUP_CAMERA_BINDING;
+use crate::buffer::bind_groups::{
+    AwsmBindGroupError, BindGroupIndex, BindGroups, UniversalBindGroupBinding,
+};
 use crate::AwsmRenderer;
 
 impl AwsmRenderer {
@@ -18,10 +15,7 @@ impl AwsmRenderer {
 }
 
 pub struct CameraBuffer {
-    pub(crate) gpu_buffer: web_sys::GpuBuffer,
-    pub(crate) raw_data: [u8; BUFFER_SIZE],
-    pub bind_group: web_sys::GpuBindGroup,
-    pub bind_group_layout: web_sys::GpuBindGroupLayout,
+    pub(crate) raw_data: [u8; Self::BYTE_SIZE],
     gpu_dirty: bool,
 }
 
@@ -33,54 +27,12 @@ pub trait CameraExt {
     fn position_world(&self) -> Vec3;
 }
 
-const BUFFER_SIZE: usize = 336; // see `update()` for details
-
 impl CameraBuffer {
-    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let gpu_buffer = gpu
-            .create_buffer(
-                &BufferDescriptor::new(
-                    Some("Camera"),
-                    BUFFER_SIZE,
-                    BufferUsage::new().with_uniform().with_copy_dst(),
-                )
-                .into(),
-            )
-            .map_err(AwsmCameraError::CreateBuffer)?;
+    pub const BYTE_SIZE: usize = 336; // see `update()` for details
 
-        let bind_group_layout = gpu
-            .create_bind_group_layout(
-                &BindGroupLayoutDescriptor::new(Some("Camera"))
-                    .with_entries(vec![BindGroupLayoutEntry::new(
-                        BIND_GROUP_CAMERA_BINDING,
-                        BindGroupLayoutResource::Buffer(
-                            BufferBindingLayout::new()
-                                .with_binding_type(BufferBindingType::Uniform),
-                        ),
-                    )
-                    .with_visibility_vertex()
-                    .with_visibility_fragment()])
-                    .into(),
-            )
-            .map_err(AwsmCameraError::CreateBindGroupLayout)?;
-
-        let bind_group = gpu.create_bind_group(
-            &BindGroupDescriptor::new(
-                &bind_group_layout,
-                Some("Camera"),
-                vec![BindGroupEntry::new(
-                    BIND_GROUP_CAMERA_BINDING,
-                    BindGroupResource::Buffer(BufferBinding::new(&gpu_buffer)),
-                )],
-            )
-            .into(),
-        );
-
+    pub fn new() -> Result<Self> {
         Ok(Self {
-            gpu_buffer,
-            raw_data: [0; BUFFER_SIZE],
-            bind_group,
-            bind_group_layout,
+            raw_data: [0; Self::BYTE_SIZE],
             gpu_dirty: true,
         })
     }
@@ -129,11 +81,18 @@ impl CameraBuffer {
     }
 
     // writes to the GPU
-    pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+    pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu, bind_groups: &BindGroups) -> Result<()> {
         if self.gpu_dirty {
-            gpu.write_buffer(&self.gpu_buffer, None, self.raw_data.as_slice(), None, None)
+            bind_groups
+                .gpu_write(
+                    gpu,
+                    BindGroupIndex::Universal(UniversalBindGroupBinding::Camera),
+                    None,
+                    self.raw_data.as_slice(),
+                    None,
+                    None,
+                )
                 .map_err(AwsmCameraError::WriteBuffer)?;
-
             self.gpu_dirty = false;
         }
 
@@ -145,12 +104,9 @@ type Result<T> = std::result::Result<T, AwsmCameraError>;
 
 #[derive(Error, Debug)]
 pub enum AwsmCameraError {
-    #[error("[camera] Error creating buffer")]
+    #[error("[camera] Error creating buffer: {0:?}")]
     CreateBuffer(AwsmCoreError),
 
-    #[error("[camera] Error writing buffer")]
-    WriteBuffer(AwsmCoreError),
-
-    #[error("[camera] Error creating bind group layout")]
-    CreateBindGroupLayout(AwsmCoreError),
+    #[error("[camera] Error writing buffer: {0:?}")]
+    WriteBuffer(AwsmBindGroupError),
 }

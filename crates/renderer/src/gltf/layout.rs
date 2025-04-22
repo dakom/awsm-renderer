@@ -1,8 +1,7 @@
 use awsm_renderer_core::pipeline::vertex::{VertexAttribute, VertexBufferLayout};
 
 use super::{
-    accessors::accessor_vertex_format,
-    buffers::GltfMeshBufferInfo,
+    buffers::{vertex::accessor_vertex_format, GltfMeshBufferInfo},
     error::{AwsmGltfError, Result},
     shaders::semantic_shader_location,
 };

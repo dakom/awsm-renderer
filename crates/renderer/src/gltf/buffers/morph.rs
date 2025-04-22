@@ -1,10 +1,12 @@
 use std::borrow::Cow;
 
+use gltf::Semantic;
+
 use super::vertex::GltfMeshBufferVertexInfo;
 use super::Result;
-use crate::buffers::helpers::slice_zeroes;
+use crate::buffer::helpers::slice_zeroes;
 use crate::gltf::buffers::accessor::accessor_to_bytes;
-use crate::mesh::{MeshAttributeSemantic, MeshBufferMorphInfo};
+use crate::mesh::MeshBufferMorphInfo;
 
 #[derive(Default, Debug, Clone)]
 pub struct GltfMeshBufferMorphInfo {
@@ -120,7 +122,7 @@ impl GltfMeshBufferMorphInfo {
                     if morph_has_position {
                         let attribute_stride_size = *vertex_info
                             .attribute_stride_sizes
-                            .get(&MeshAttributeSemantic::Position)
+                            .get(&Semantic::Positions)
                             .unwrap();
                         push_bytes(
                             morph_target_buffer_data.positions.as_ref(),
@@ -131,7 +133,7 @@ impl GltfMeshBufferMorphInfo {
                     if morph_has_normal {
                         let attribute_stride_size = *vertex_info
                             .attribute_stride_sizes
-                            .get(&MeshAttributeSemantic::Normal)
+                            .get(&Semantic::Normals)
                             .unwrap();
                         push_bytes(
                             morph_target_buffer_data.normals.as_ref(),
@@ -142,7 +144,7 @@ impl GltfMeshBufferMorphInfo {
                     if morph_has_tangent {
                         let attribute_stride_size = *vertex_info
                             .attribute_stride_sizes
-                            .get(&MeshAttributeSemantic::Tangent)
+                            .get(&Semantic::Tangents)
                             .unwrap();
                         push_bytes(
                             morph_target_buffer_data.tangents.as_ref(),

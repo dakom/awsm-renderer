@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use awsm_renderer_core::pipeline::primitive::IndexFormat;
 
 #[derive(Default, Debug, Clone)]
@@ -15,39 +13,9 @@ pub struct MeshBufferVertexInfo {
     pub count: usize,
     // total size in bytes of this vertex
     // same as vertex_count * sum_of_all_vertex_attribute_stride_sizes
+    // we don't need to know individual attribute sizes here
+    // since that naturally follows the draw call size
     pub size: usize,
-    // size of each individual vertex attribute stride
-    pub attribute_stride_sizes: HashMap<MeshAttributeSemantic, usize>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum MeshAttributeSemantic {
-    Position,
-    Normal,
-    Tangent,
-}
-
-#[cfg(feature = "gltf")]
-impl From<gltf::mesh::Semantic> for MeshAttributeSemantic {
-    fn from(semantic: gltf::mesh::Semantic) -> Self {
-        match semantic {
-            gltf::mesh::Semantic::Positions => MeshAttributeSemantic::Position,
-            gltf::mesh::Semantic::Normals => MeshAttributeSemantic::Normal,
-            gltf::mesh::Semantic::Tangents => MeshAttributeSemantic::Tangent,
-            _ => panic!("Unsupported mesh attribute semantic {:?}", semantic),
-        }
-    }
-}
-
-#[cfg(feature = "gltf")]
-impl From<MeshAttributeSemantic> for gltf::mesh::Semantic {
-    fn from(semantic: MeshAttributeSemantic) -> Self {
-        match semantic {
-            MeshAttributeSemantic::Position => gltf::mesh::Semantic::Positions,
-            MeshAttributeSemantic::Normal => gltf::mesh::Semantic::Normals,
-            MeshAttributeSemantic::Tangent => gltf::mesh::Semantic::Tangents,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

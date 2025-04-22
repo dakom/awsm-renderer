@@ -1,7 +1,7 @@
 pub mod accessor;
-mod index;
-mod morph;
-mod vertex;
+pub mod index;
+pub mod morph;
+pub mod vertex;
 
 use index::GltfMeshBufferIndexInfo;
 use morph::GltfMeshBufferMorphInfo;

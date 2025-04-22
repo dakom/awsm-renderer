@@ -1,10 +1,12 @@
+use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+use buffer::bind_groups::BindGroups;
 use camera::CameraBuffer;
 use mesh::Meshes;
 use skin::Skins;
 use transform::Transforms;
 
 pub mod bounds;
-pub mod buffers;
+pub mod buffer;
 pub mod camera;
 pub mod error;
 pub mod mesh;
@@ -24,13 +26,10 @@ pub mod animation;
 
 pub struct AwsmRenderer {
     pub gpu: core::renderer::AwsmRendererWebGpu,
-
+    pub bind_groups: BindGroups,
     pub meshes: Meshes,
-
     pub camera: CameraBuffer,
-
     pub transforms: Transforms,
-
     pub skins: Skins,
 
     #[cfg(feature = "gltf")]
@@ -42,18 +41,30 @@ pub struct AwsmRenderer {
 
 impl AwsmRenderer {
     pub fn remove_all(&mut self) -> crate::error::Result<()> {
-        self.camera = camera::CameraBuffer::new(&self.gpu)?;
-        self.meshes = Meshes::new(&self.gpu)?;
-        self.transforms = Transforms::new(&self.gpu)?;
+        let deps = RebuildDeps::new(&self.gpu)?;
+        let RebuildDeps {
+            bind_groups,
+            meshes,
+            camera,
+            transforms,
+            skins,
+            ..
+        } = deps;
+
+        self.bind_groups = bind_groups;
+        self.camera = camera;
+        self.meshes = meshes;
+        self.transforms = transforms;
+        self.skins = skins;
 
         #[cfg(feature = "gltf")]
         {
-            self.gltf = gltf::cache::GltfCache::default();
+            self.gltf = deps.gltf;
         }
 
         #[cfg(feature = "animation")]
         {
-            self.animations = animation::Animations::default();
+            self.animations = deps.animations;
         }
 
         Ok(())
@@ -88,13 +99,50 @@ impl AwsmRendererBuilder {
 
     pub fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
         let gpu = self.gpu.build()?;
-        let camera = camera::CameraBuffer::new(&gpu)?;
-        let meshes = Meshes::new(&gpu)?;
-        let transforms = Transforms::new(&gpu)?;
-        let skins = Skins::new(&gpu)?;
+
+        let deps = RebuildDeps::new(&gpu)?;
 
         Ok(AwsmRenderer {
             gpu,
+            meshes: deps.meshes,
+            camera: deps.camera,
+            transforms: deps.transforms,
+            skins: deps.skins,
+            bind_groups: deps.bind_groups,
+
+            #[cfg(feature = "gltf")]
+            gltf: deps.gltf,
+
+            #[cfg(feature = "animation")]
+            animations: deps.animations,
+        })
+    }
+}
+
+struct RebuildDeps {
+    pub bind_groups: BindGroups,
+    pub meshes: Meshes,
+    pub camera: CameraBuffer,
+    pub transforms: Transforms,
+    pub skins: Skins,
+
+    #[cfg(feature = "gltf")]
+    pub gltf: gltf::cache::GltfCache,
+
+    #[cfg(feature = "animation")]
+    pub animations: animation::Animations,
+}
+
+impl RebuildDeps {
+    pub fn new(gpu: &AwsmRendererWebGpu) -> std::result::Result<Self, crate::error::AwsmError> {
+        let bind_groups = buffer::bind_groups::BindGroups::new(&gpu)?;
+        let camera = camera::CameraBuffer::new()?;
+        let meshes = Meshes::new(&gpu)?;
+        let transforms = Transforms::new()?;
+        let skins = Skins::new();
+
+        Ok(Self {
+            bind_groups,
             meshes,
             camera,
             transforms,
@@ -102,7 +150,6 @@ impl AwsmRendererBuilder {
 
             #[cfg(feature = "gltf")]
             gltf: gltf::cache::GltfCache::default(),
-
             #[cfg(feature = "animation")]
             animations: animation::Animations::default(),
         })

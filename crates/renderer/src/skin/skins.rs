@@ -5,8 +5,8 @@ use glam::Mat4;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
 use crate::{
-    buffers::{
-        bind_group::BIND_GROUP_SKIN_JOINT_MATRICES_BINDING, dynamic::DynamicBufferKind,
+    buffer::{
+        bind_groups::{BindGroupIndex, BindGroups, MeshShapeBindGroupBinding},
         dynamic_buddy::DynamicBuddyBuffer,
     },
     transform::{TransformKey, Transforms},
@@ -14,8 +14,6 @@ use crate::{
 };
 
 use super::error::{AwsmSkinError, Result};
-
-const SKIN_MATRICES_INITIAL_BYTES: usize = 1024; // 32 elements is a good starting point
 
 impl AwsmRenderer {
     pub fn update_skins(&mut self) {
@@ -36,18 +34,18 @@ pub struct Skins {
 }
 
 impl Skins {
-    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        Ok(Self {
+    pub const SKIN_MATRICES_INITIAL_SIZE: usize = 4096;
+
+    pub fn new() -> Self {
+        Self {
             skeleton_transforms: DenseSlotMap::with_key(),
             inverse_bind_matrices: SecondaryMap::new(),
             skin_matrices: DynamicBuddyBuffer::new(
-                SKIN_MATRICES_INITIAL_BYTES,
-                DynamicBufferKind::new_uniform(BIND_GROUP_SKIN_JOINT_MATRICES_BINDING),
-                gpu,
+                Self::SKIN_MATRICES_INITIAL_SIZE,
                 Some("Skins".to_string()),
-            )?,
+            ),
             gpu_dirty: true,
-        })
+        }
     }
 
     pub fn insert(
@@ -62,6 +60,7 @@ impl Skins {
                 inverse_bind_matrices.get(index),
             ) {
                 (None, None) => { /* eh, they're the same, let it go */ }
+                (None, Some(_)) => { /* it's probably just a new one, let it go */ }
                 (Some(a), Some(b)) if a == b => { /* eh, they're the same, let it go */ }
                 _ => {
                     return Err(AwsmSkinError::JointAlreadyExistsButDifferent {
@@ -91,14 +90,6 @@ impl Skins {
         self.skin_matrices
             .offset(skin_key)
             .ok_or(AwsmSkinError::SkinNotFound(skin_key))
-    }
-
-    pub fn joint_matrices_bind_group(&self) -> &web_sys::GpuBindGroup {
-        self.skin_matrices.bind_group.as_ref().unwrap()
-    }
-
-    pub fn joint_matrices_bind_group_layout(&self) -> &web_sys::GpuBindGroupLayout {
-        self.skin_matrices.bind_group_layout.as_ref().unwrap()
     }
 
     pub fn update(&mut self, dirty_skin_joints: HashSet<TransformKey>, transforms: &Transforms) {
@@ -134,9 +125,25 @@ impl Skins {
         }
     }
 
-    pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+    pub fn write_gpu(
+        &mut self,
+        gpu: &AwsmRendererWebGpu,
+        bind_groups: &mut BindGroups,
+    ) -> Result<()> {
         if self.gpu_dirty {
-            self.skin_matrices.write_to_gpu(gpu)?;
+            let bind_group_index =
+                BindGroupIndex::MeshShape(MeshShapeBindGroupBinding::SkinJointMatrices);
+            if let Some(new_size) = self.skin_matrices.take_gpu_needs_resize() {
+                bind_groups.gpu_resize(gpu, bind_group_index, new_size)?;
+            }
+            bind_groups.gpu_write(
+                gpu,
+                bind_group_index,
+                None,
+                self.skin_matrices.raw_slice(),
+                None,
+                None,
+            )?;
             self.gpu_dirty = false;
         }
         Ok(())
