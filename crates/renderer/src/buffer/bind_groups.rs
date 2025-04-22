@@ -477,7 +477,7 @@ fn gpu_create_bind_group(
     layout: &web_sys::GpuBindGroupLayout,
     entries: Vec<BindGroupEntry>,
 ) -> web_sys::GpuBindGroup {
-    gpu.create_bind_group(&BindGroupDescriptor::new(&layout, Some(label), entries).into())
+    gpu.create_bind_group(&BindGroupDescriptor::new(layout, Some(label), entries).into())
 }
 
 impl Drop for BindGroup {

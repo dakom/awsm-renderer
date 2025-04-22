@@ -33,6 +33,12 @@ pub struct Skins {
     gpu_dirty: bool,
 }
 
+impl Default for Skins {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Skins {
     pub const SKIN_MATRICES_INITIAL_SIZE: usize = 4096;
 

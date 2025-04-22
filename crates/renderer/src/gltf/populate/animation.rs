@@ -218,7 +218,7 @@ fn gltf_animation_clip_transform(
     gltf_sampler: &gltf::animation::Sampler,
     target: TransformTarget,
 ) -> Result<AnimationClip> {
-    let times = sampler_timestamps(ctx, &gltf_sampler)?;
+    let times = sampler_timestamps(ctx, gltf_sampler)?;
     let duration = (times.last().copied().unwrap_or(0.0) - times[0]) as f64;
     let values = accessor_to_bytes(&gltf_sampler.output(), &ctx.data.buffers.raw)?;
     let values = u8_to_f32_vec(&values);

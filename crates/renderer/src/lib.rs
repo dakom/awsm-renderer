@@ -135,9 +135,9 @@ struct RebuildDeps {
 
 impl RebuildDeps {
     pub fn new(gpu: &AwsmRendererWebGpu) -> std::result::Result<Self, crate::error::AwsmError> {
-        let bind_groups = buffer::bind_groups::BindGroups::new(&gpu)?;
+        let bind_groups = buffer::bind_groups::BindGroups::new(gpu)?;
         let camera = camera::CameraBuffer::new()?;
-        let meshes = Meshes::new(&gpu)?;
+        let meshes = Meshes::new(gpu)?;
         let transforms = Transforms::new()?;
         let skins = Skins::new();
 

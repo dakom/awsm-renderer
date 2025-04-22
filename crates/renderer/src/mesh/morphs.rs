@@ -18,6 +18,12 @@ pub struct Morphs {
     infos: SlotMap<MorphKey, MeshBufferMorphInfo>,
 }
 
+impl Default for Morphs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Morphs {
     pub const WEIGHTS_INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
     pub const WEIGHTS_BYTE_SIZE: usize = 32; // 8xf32 is 32 bytes
