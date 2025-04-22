@@ -1,4 +1,5 @@
 use awsm_renderer_core::error::AwsmCoreError;
+use gltf::Semantic;
 use thiserror::Error;
 
 use crate::{animation::AwsmAnimationError, mesh::AwsmMeshError, skin::AwsmSkinError};
@@ -86,6 +87,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] shader key has different joint and weight count: ({weight_sets} weight sets and {joint_sets} joint sets)")]
     ShaderKeyDifferentJointsWeights { weight_sets: u32, joint_sets: u32 },
+
+    #[error("[gltf] could not get shader location for semantic: {0:?}")]
+    ShaderLocationNoSemantic(Semantic),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

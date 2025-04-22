@@ -1,7 +1,8 @@
-use std::collections::{BTreeMap, HashMap};
-
 use awsm_renderer_core::pipeline::vertex::VertexFormat;
+use gltf::accessor::{DataType, Dimensions};
+use std::collections::HashMap;
 
+use crate::buffer::helpers::{u8_to_i16_vec, u8_to_u16_vec};
 use crate::mesh::MeshBufferVertexInfo;
 
 use super::accessor::accessor_to_bytes;
@@ -18,6 +19,8 @@ pub struct GltfMeshBufferVertexInfo {
     pub size: usize,
     // size of each individual vertex attribute stride
     pub attribute_stride_sizes: HashMap<gltf::Semantic, usize>,
+    // format of each vertex attribute
+    pub attribute_formats: HashMap<gltf::Semantic, VertexFormat>,
 }
 
 impl From<GltfMeshBufferVertexInfo> for MeshBufferVertexInfo {
@@ -56,29 +59,81 @@ impl GltfMeshBufferVertexInfo {
         //
         // We need to collect the attributes that have the same discriminant into one buffer
         // but different discriminants go into different buffers
-        let (attributes_bytes, attribute_stride_sizes) = {
+        let (attributes_bytes, attribute_stride_sizes, attribute_formats) = {
             let mut attribute_stride_sizes = HashMap::new();
+            let mut attribute_formats = HashMap::new();
             let mut attributes_bytes = Vec::new();
 
-            let mut buffers_by_semantic: BTreeMap<gltf::Semantic, (Vec<u8>, usize)> =
-                BTreeMap::new();
+            let mut buffers_by_semantic = HashMap::new();
 
             for (semantic, accessor) in attributes {
-                let entry = buffers_by_semantic
-                    .entry(semantic)
-                    .or_insert_with(|| (Vec::new(), 0));
+                let entry = buffers_by_semantic.entry(semantic).or_insert_with(|| {
+                    (
+                        Vec::new(),
+                        0,
+                        accessor_vertex_format(
+                            // wgsl doesn't work with 16-bit, so we need to convert to 32-bit
+                            match accessor.data_type() {
+                                DataType::U16 => DataType::U32,
+                                DataType::I16 => DataType::U32,
+                                other => other,
+                            },
+                            accessor.dimensions(),
+                            accessor.normalized(),
+                        ),
+                    )
+                });
 
                 let bytes = accessor_to_bytes(&accessor, buffers)?;
-                entry.0.extend_from_slice(&bytes);
-                entry.1 += accessor.size();
+                // wgsl doesn't work with 16-bit, so we need to convert to 32-bit
+                match accessor.data_type() {
+                    gltf::accessor::DataType::U16 => {
+                        let values: Vec<u32> = u8_to_u16_vec(&bytes)
+                            .into_iter()
+                            .map(|v| v.into())
+                            .collect();
+
+                        let bytes = unsafe {
+                            std::slice::from_raw_parts(
+                                values.as_ptr() as *const u8,
+                                values.len() * std::mem::size_of::<u32>(),
+                            )
+                        };
+
+                        entry.0.extend_from_slice(&bytes);
+                        entry.1 += accessor.size() * 2;
+                    }
+                    gltf::accessor::DataType::I16 => {
+                        let values: Vec<i32> = u8_to_i16_vec(&bytes)
+                            .into_iter()
+                            .map(|v| v.into())
+                            .collect();
+                        let bytes = unsafe {
+                            std::slice::from_raw_parts(
+                                values.as_ptr() as *const u8,
+                                values.len() * std::mem::size_of::<i32>(),
+                            )
+                        };
+                        entry.0.extend_from_slice(&bytes);
+                        entry.1 += accessor.size() * 2;
+                    }
+                    _ => {
+                        entry.0.extend_from_slice(&bytes);
+                        entry.1 += accessor.size();
+                    }
+                }
             }
 
-            for (semantic, (bytes, stride)) in buffers_by_semantic {
-                attribute_stride_sizes.insert(semantic, stride);
+            let mut buffers_by_semantic: Vec<(_, _)> = buffers_by_semantic.into_iter().collect();
+            buffers_by_semantic.sort_by(|(a, _), (b, _)| semantic_cmp(a, b));
+
+            for (semantic, (bytes, stride, vertex_format)) in buffers_by_semantic {
+                attribute_formats.insert(semantic.clone(), vertex_format);
+                attribute_stride_sizes.insert(semantic.clone(), stride);
                 attributes_bytes.push((bytes, stride));
             }
 
-            (attributes_bytes, attribute_stride_sizes)
+            (attributes_bytes, attribute_stride_sizes, attribute_formats)
         };
 
         // now let's predictably interleave the attributes into our final vertex buffer
@@ -86,6 +141,7 @@ impl GltfMeshBufferVertexInfo {
         for vertex in 0..vertex_count {
             for (attribute_bytes, attribute_stride_size) in attributes_bytes.iter() {
                 let attribute_byte_offset = vertex * attribute_stride_size;
+
                 let attribute_bytes = &attribute_bytes
                     [attribute_byte_offset..attribute_byte_offset + attribute_stride_size];
 
@@ -93,11 +149,19 @@ impl GltfMeshBufferVertexInfo {
             }
         }
 
+        let size = vertex_bytes.len() - offset;
+
+        assert_eq!(
+            size,
+            vertex_count * attribute_stride_sizes.values().sum::<usize>()
+        );
+
         Ok(Self {
             offset,
             count: vertex_count,
-            size: vertex_bytes.len() - offset,
+            size,
             attribute_stride_sizes,
+            attribute_formats,
         })
     }
 }
@@ -137,13 +201,13 @@ fn semantic_cmp(a: &gltf::Semantic, b: &gltf::Semantic) -> std::cmp::Ordering {
     }
 }
 
-pub fn accessor_vertex_format(accessor: &gltf::Accessor<'_>) -> VertexFormat {
+fn accessor_vertex_format(
+    data_type: DataType,
+    dimensions: Dimensions,
+    normalized: bool,
+) -> VertexFormat {
     // https://gpuweb.github.io/gpuweb/#enumdef-gpuvertexformat
-    match (
-        accessor.data_type(),
-        accessor.dimensions(),
-        accessor.normalized(),
-    ) {
+    match (data_type, dimensions, normalized) {
         // I8: normalized → signed normalized formats; not normalized → signed integer formats.
         (gltf::accessor::DataType::I8, gltf::accessor::Dimensions::Scalar, true) => {
             VertexFormat::Snorm8

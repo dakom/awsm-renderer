@@ -1,7 +1,7 @@
 use awsm_renderer_core::pipeline::vertex::{VertexAttribute, VertexBufferLayout};
 
 use super::{
-    buffers::{vertex::accessor_vertex_format, GltfMeshBufferInfo},
+    buffers::GltfMeshBufferInfo,
     error::{AwsmGltfError, Result},
     shaders::semantic_shader_location,
 };
@@ -17,11 +17,15 @@ pub(super) fn primitive_vertex_buffer_layout(
     // this is the offset within the total vertex stride
     let mut stride_offset = 0;
 
-    for (semantic, accessor) in primitive.attributes() {
+    for (semantic, _) in primitive.attributes() {
         attributes.push(VertexAttribute {
-            format: accessor_vertex_format(&accessor),
+            format: *buffer_info
+                .vertex
+                .attribute_formats
+                .get(&semantic.clone())
+                .ok_or_else(|| AwsmGltfError::MissingPositionAttribute(semantic.clone()))?,
             offset: stride_offset as u64,
-            shader_location: semantic_shader_location(semantic.clone()),
+            shader_location: semantic_shader_location(semantic.clone())?,
         });
 
         // because the vertex strides are in a specific order

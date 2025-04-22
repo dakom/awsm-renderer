@@ -224,6 +224,7 @@ impl AwsmRenderer {
             let vertex_values = &ctx.data.buffers.vertex_bytes;
             let vertex_values = &vertex_values[primitive_buffer_info.vertex.offset
                 ..primitive_buffer_info.vertex.offset + primitive_buffer_info.vertex.size];
+
             self.meshes.insert(
                 mesh,
                 vertex_values,

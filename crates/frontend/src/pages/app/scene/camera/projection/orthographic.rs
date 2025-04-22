@@ -20,7 +20,7 @@ impl OrthographicCamera {
 
         let width = size.x;
         let height = size.y;
-        let aspect = width / height;
+        //let aspect = width / height;
         let mut half_w = width * 0.5;
         let mut half_h = height * 0.5;
 
