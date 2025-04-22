@@ -9,7 +9,7 @@ var<uniform> morph_weights: array<vec4<f32>, MAX_MORPH_WEIGHTS/ 4u>;
 // always interleaved as position, normal, tangent
 // so we can use the same array for all three
 // even as we index sequentially
-@group(3) @binding(0)
+@group(2) @binding(1)
 var<storage, read> morph_values: array<f32>; 
 
 // This changes per-shader via constant overrides
@@ -23,10 +23,14 @@ fn apply_morphs(input: VertexInput) -> VertexInput {
 
     // target_size is the total number of floats for each morph_target (for a given vertex, not across all of them) 
     var target_size = 3u; // vec3 for position
-    // #IF normals
+
+    {% if has_normal %}
     target_size += 3u; // vec3 for normals
-    // #IF tangents
+    {% endif %}
+
+    {% if has_tangent %}
     target_size += 3u; // vec3 for tangents
+    {% endif %}
 
     // all_targets_size is the total number of floats for all morph_targets (for a given vertex, not across all of them)
     let all_targets_size = target_size * MAX_MORPH_TARGETS; 
@@ -44,17 +48,17 @@ fn apply_morphs(input: VertexInput) -> VertexInput {
         let morph_position = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
         output.position += morph_weight * morph_position; 
 
-        // #SECTIONIF normals
+        {% if has_normal %}
         offset += 3;
         let morph_normal = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
         output.normal += morph_weight * morph_normal; 
-        // #ENDIF
+        {% endif %}
 
-        // #SECTIONIF tangents
+        {% if has_tangent %}
         offset += 3;
         let morph_tangent = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
         output.tangent += morph_weight * morph_tangent; 
-        // #ENDIF
+        {% endif %}
 
     }
 

@@ -3,17 +3,9 @@ use slotmap::{new_key_type, SlotMap};
 
 use super::error::{AwsmMeshError, Result};
 use super::MeshBufferMorphInfo;
-use crate::buffers::dynamic::DynamicBufferKind;
-use crate::buffers::dynamic_buddy::DynamicBuddyBuffer;
-use crate::buffers::{
-    bind_group::{BIND_GROUP_MORPH_TARGET_VALUES_BINDING, BIND_GROUP_MORPH_TARGET_WEIGHTS_BINDING},
-    dynamic_fixed::DynamicFixedBuffer,
-};
-
-const MORPH_WEIGHTS_INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
-const MORPH_WEIGHTS_BYTE_SIZE: usize = 32; // 8xf32 is 32 bytes
-const MORPH_WEIGHTS_BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment
-const MORPH_VALUES_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
+use crate::buffer::bind_groups::{BindGroupIndex, BindGroups, MeshShapeBindGroupBinding};
+use crate::buffer::dynamic_buddy::DynamicBuddyBuffer;
+use crate::buffer::dynamic_fixed::DynamicFixedBuffer;
 
 // The weights are dynamic and updated on a per-mesh basis as frequently as needed
 // The values are essentially static, but may be sourced from different (large) buffers
@@ -26,27 +18,34 @@ pub struct Morphs {
     infos: SlotMap<MorphKey, MeshBufferMorphInfo>,
 }
 
+impl Default for Morphs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Morphs {
-    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        Ok(Self {
+    pub const WEIGHTS_INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
+    pub const WEIGHTS_BYTE_SIZE: usize = 32; // 8xf32 is 32 bytes
+    pub const WEIGHTS_BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment
+    pub const VALUES_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
+
+    pub fn new() -> Self {
+        Self {
             weights: DynamicFixedBuffer::new(
-                MORPH_WEIGHTS_INITIAL_CAPACITY,
-                MORPH_WEIGHTS_BYTE_SIZE,
-                MORPH_WEIGHTS_BYTE_ALIGNMENT,
-                DynamicBufferKind::new_uniform(BIND_GROUP_MORPH_TARGET_WEIGHTS_BINDING),
-                gpu,
+                Self::WEIGHTS_INITIAL_CAPACITY,
+                Self::WEIGHTS_BYTE_SIZE,
+                Self::WEIGHTS_BYTE_ALIGNMENT,
                 Some("MorphWeights".to_string()),
-            )?,
+            ),
             values: DynamicBuddyBuffer::new(
-                MORPH_VALUES_INITIAL_SIZE,
-                DynamicBufferKind::new_storage(BIND_GROUP_MORPH_TARGET_VALUES_BINDING, true),
-                gpu,
+                Self::VALUES_INITIAL_SIZE,
                 Some("MorphValues".to_string()),
-            )?,
+            ),
             weights_dirty: true,
             values_dirty: true,
             infos: SlotMap::with_key(),
-        })
+        }
     }
 
     pub fn get_info(&self, key: MorphKey) -> Result<&MeshBufferMorphInfo> {
@@ -59,7 +58,7 @@ impl Morphs {
         bytes: &[u8],
     ) -> Result<MorphKey> {
         let key = self.infos.insert(morph_buffer_info.clone());
-        self.weights.update(key, &[0u8; MORPH_WEIGHTS_BYTE_SIZE]);
+        self.weights.update(key, &[0u8; Self::WEIGHTS_BYTE_SIZE]);
         self.values.update(key, bytes);
 
         self.weights_dirty = true;
@@ -77,26 +76,12 @@ impl Morphs {
         self.values_dirty = true;
     }
 
-    pub fn weights_bind_group(&self) -> &web_sys::GpuBindGroup {
-        self.weights.bind_group.as_ref().unwrap()
-    }
-
-    pub fn weights_bind_group_layout(&self) -> &web_sys::GpuBindGroupLayout {
-        self.weights.bind_group_layout.as_ref().unwrap()
-    }
-
     pub fn weights_buffer_offset(&self, key: MorphKey) -> Result<usize> {
         self.weights
             .offset(key)
             .ok_or(AwsmMeshError::MorphNotFound(key))
     }
 
-    pub fn values_bind_group(&self) -> &web_sys::GpuBindGroup {
-        self.values.bind_group.as_ref().unwrap()
-    }
-    pub fn values_bind_group_layout(&self) -> &web_sys::GpuBindGroupLayout {
-        self.values.bind_group_layout.as_ref().unwrap()
-    }
     pub fn values_buffer_offset(&self, key: MorphKey) -> Result<usize> {
         self.values
             .offset(key)
@@ -125,13 +110,41 @@ impl Morphs {
 
     // This *does* write to the gpu, should be called only once per frame
     // just write the entire buffer in one fell swoop
-    pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+    pub fn write_gpu(
+        &mut self,
+        gpu: &AwsmRendererWebGpu,
+        bind_groups: &mut BindGroups,
+    ) -> Result<()> {
         if self.weights_dirty {
-            self.weights.write_to_gpu(gpu)?;
+            let bind_group_index =
+                BindGroupIndex::MeshShape(MeshShapeBindGroupBinding::MorphTargetWeights);
+            if let Some(new_size) = self.weights.take_gpu_needs_resize() {
+                bind_groups.gpu_resize(gpu, bind_group_index, new_size)?;
+            }
+            bind_groups.gpu_write(
+                gpu,
+                bind_group_index,
+                None,
+                self.weights.raw_slice(),
+                None,
+                None,
+            )?;
             self.weights_dirty = false;
         }
         if self.values_dirty {
-            self.values.write_to_gpu(gpu)?;
+            let bind_group_index =
+                BindGroupIndex::MeshShape(MeshShapeBindGroupBinding::MorphTargetValues);
+            if let Some(new_size) = self.values.take_gpu_needs_resize() {
+                bind_groups.gpu_resize(gpu, bind_group_index, new_size)?;
+            }
+            bind_groups.gpu_write(
+                gpu,
+                bind_group_index,
+                None,
+                self.values.raw_slice(),
+                None,
+                None,
+            )?;
             self.values_dirty = false;
         }
 

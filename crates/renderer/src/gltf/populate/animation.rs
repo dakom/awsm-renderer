@@ -1,11 +1,13 @@
+use glam::{Quat, Vec3};
+
 use crate::{
     animation::{
         AnimationClip, AnimationData, AnimationKey, AnimationPlayer, AnimationSampler,
-        VertexAnimation,
+        TransformAnimation, VertexAnimation,
     },
-    buffers::helpers::u8_to_f32_vec,
+    buffer::helpers::u8_to_f32_vec,
     gltf::{
-        buffers::accessor_to_bytes,
+        buffers::accessor::accessor_to_bytes,
         error::{AwsmGltfError, Result},
     },
     mesh::MorphKey,
@@ -145,7 +147,7 @@ impl AwsmRenderer {
         gltf_sampler: gltf::animation::Sampler<'b>,
         transform_key: TransformKey,
     ) -> Result<AnimationKey> {
-        let clip = gltf_animation_clip_transform(ctx, &gltf_sampler)?;
+        let clip = gltf_animation_clip_transform(ctx, &gltf_sampler, TransformTarget::Translation)?;
         let player = AnimationPlayer::new(clip);
 
         Ok(self.animations.insert_transform(player, transform_key))
@@ -157,7 +159,7 @@ impl AwsmRenderer {
         gltf_sampler: gltf::animation::Sampler<'b>,
         transform_key: TransformKey,
     ) -> Result<AnimationKey> {
-        let clip = gltf_animation_clip_transform(ctx, &gltf_sampler)?;
+        let clip = gltf_animation_clip_transform(ctx, &gltf_sampler, TransformTarget::Rotation)?;
         let player = AnimationPlayer::new(clip);
 
         Ok(self.animations.insert_transform(player, transform_key))
@@ -169,7 +171,7 @@ impl AwsmRenderer {
         gltf_sampler: gltf::animation::Sampler<'b>,
         transform_key: TransformKey,
     ) -> Result<AnimationKey> {
-        let clip = gltf_animation_clip_transform(ctx, &gltf_sampler)?;
+        let clip = gltf_animation_clip_transform(ctx, &gltf_sampler, TransformTarget::Scale)?;
         let player = AnimationPlayer::new(clip);
 
         Ok(self.animations.insert_transform(player, transform_key))
@@ -187,11 +189,81 @@ fn sampler_timestamps(
         .collect())
 }
 
+enum TransformTarget {
+    Translation,
+    Rotation,
+    Scale,
+}
+
+impl TransformTarget {
+    fn as_str(&self) -> &'static str {
+        match self {
+            TransformTarget::Translation => "translation",
+            TransformTarget::Rotation => "rotation",
+            TransformTarget::Scale => "scale",
+        }
+    }
+
+    fn chunk_size(&self) -> usize {
+        match self {
+            TransformTarget::Translation => 3,
+            TransformTarget::Rotation => 4,
+            TransformTarget::Scale => 3,
+        }
+    }
+}
+
 fn gltf_animation_clip_transform(
-    _ctx: &GltfPopulateContext,
-    _gltf_sampler: &gltf::animation::Sampler,
+    ctx: &GltfPopulateContext,
+    gltf_sampler: &gltf::animation::Sampler,
+    target: TransformTarget,
 ) -> Result<AnimationClip> {
-    Err(AwsmGltfError::Todo(
-        "create animation clip for transform".to_string(),
+    let times = sampler_timestamps(ctx, gltf_sampler)?;
+    let duration = (times.last().copied().unwrap_or(0.0) - times[0]) as f64;
+    let values = accessor_to_bytes(&gltf_sampler.output(), &ctx.data.buffers.raw)?;
+    let values = u8_to_f32_vec(&values);
+
+    let values = values
+        .chunks(target.chunk_size())
+        .map(|chunk| {
+            AnimationData::Transform(match target {
+                TransformTarget::Translation => {
+                    TransformAnimation::new_translation(Vec3::from_slice(chunk))
+                }
+                TransformTarget::Rotation => {
+                    TransformAnimation::new_rotation(Quat::from_slice(chunk))
+                }
+                TransformTarget::Scale => TransformAnimation::new_scale(Vec3::from_slice(chunk)),
+            })
+        })
+        .collect();
+
+    let sampler = match gltf_sampler.interpolation() {
+        gltf::animation::Interpolation::Linear => AnimationSampler::Linear { times, values },
+        gltf::animation::Interpolation::Step => AnimationSampler::Step { times, values },
+        gltf::animation::Interpolation::CubicSpline => {
+            let mut in_tangents = Vec::with_capacity(values.len() / 3);
+            let mut spline_vertices = Vec::with_capacity(values.len() / 3);
+            let mut out_tangents = Vec::with_capacity(values.len() / 3);
+
+            for x in values.chunks_exact(3) {
+                in_tangents.push(x[0].clone());
+                spline_vertices.push(x[1].clone());
+                out_tangents.push(x[2].clone());
+            }
+
+            AnimationSampler::CubicSpline {
+                times,
+                in_tangents,
+                values: spline_vertices,
+                out_tangents,
+            }
+        }
+    };
+
+    Ok(AnimationClip::new(
+        Some(format!("transform {}", target.as_str())),
+        duration,
+        sampler,
     ))
 }

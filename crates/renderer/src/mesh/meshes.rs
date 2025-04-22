@@ -1,16 +1,13 @@
+use awsm_renderer_core::buffers::{BufferDescriptor, BufferUsage};
 use awsm_renderer_core::pipeline::primitive::IndexFormat;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
-use crate::buffers::dynamic::DynamicBufferKind;
-use crate::buffers::dynamic_buddy::DynamicBuddyBuffer;
+use crate::buffer::dynamic_buddy::DynamicBuddyBuffer;
 
 use super::error::{AwsmMeshError, Result};
 use super::morphs::Morphs;
 use super::{Mesh, MeshBufferIndexInfo, MeshBufferVertexInfo};
-
-const MESH_INDICES_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
-const MESH_VERTICES_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
 
 pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
@@ -18,32 +15,34 @@ pub struct Meshes {
     index_buffers: DynamicBuddyBuffer<MeshKey>,
     vertex_infos: SecondaryMap<MeshKey, MeshBufferVertexInfo>,
     index_infos: SecondaryMap<MeshKey, MeshBufferIndexInfo>,
+    gpu_vertex_buffer: web_sys::GpuBuffer,
+    gpu_index_buffer: web_sys::GpuBuffer,
     vertex_dirty: bool,
     index_dirty: bool,
     pub morphs: Morphs,
 }
 
 impl Meshes {
+    const INDICES_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
+    const VERTICES_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Self {
             list: DenseSlotMap::with_key(),
             index_buffers: DynamicBuddyBuffer::new(
-                MESH_INDICES_INITIAL_SIZE,
-                DynamicBufferKind::new_index(),
-                gpu,
+                Self::INDICES_INITIAL_SIZE,
                 Some("MeshIndexBuffer".to_string()),
-            )?,
+            ),
             vertex_buffers: DynamicBuddyBuffer::new(
-                MESH_VERTICES_INITIAL_SIZE,
-                DynamicBufferKind::new_vertex(),
-                gpu,
+                Self::VERTICES_INITIAL_SIZE,
                 Some("MeshVertexBuffer".to_string()),
-            )?,
+            ),
+            gpu_vertex_buffer: gpu_create_vertex_buffer(gpu, Self::VERTICES_INITIAL_SIZE)?,
+            gpu_index_buffer: gpu_create_index_buffer(gpu, Self::INDICES_INITIAL_SIZE)?,
             vertex_infos: SecondaryMap::new(),
             index_infos: SecondaryMap::new(),
             index_dirty: true,
             vertex_dirty: true,
-            morphs: Morphs::new(gpu)?,
+            morphs: Morphs::new(),
         })
     }
 
@@ -70,7 +69,7 @@ impl Meshes {
     }
 
     pub fn gpu_vertex_buffer(&self) -> &web_sys::GpuBuffer {
-        &self.vertex_buffers.gpu_buffer
+        &self.gpu_vertex_buffer
     }
 
     pub fn vertex_buffer_offset(&self, key: MeshKey) -> Result<usize> {
@@ -95,7 +94,7 @@ impl Meshes {
     }
 
     pub fn gpu_index_buffer(&self) -> &web_sys::GpuBuffer {
-        &self.index_buffers.gpu_buffer
+        &self.gpu_index_buffer
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (MeshKey, &Mesh)> {
@@ -130,15 +129,61 @@ impl Meshes {
 
     pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
         if self.vertex_dirty {
-            self.vertex_buffers.write_to_gpu(gpu)?;
+            if let Some(new_size) = self.vertex_buffers.take_gpu_needs_resize() {
+                self.gpu_vertex_buffer = gpu_create_vertex_buffer(gpu, new_size)?;
+            }
+            gpu.write_buffer(
+                &self.gpu_vertex_buffer,
+                None,
+                self.vertex_buffers.raw_slice(),
+                None,
+                None,
+            )?;
             self.vertex_dirty = false;
         }
         if self.index_dirty {
-            self.index_buffers.write_to_gpu(gpu)?;
+            if let Some(new_size) = self.index_buffers.take_gpu_needs_resize() {
+                self.gpu_index_buffer = gpu_create_index_buffer(gpu, new_size)?;
+            }
+            gpu.write_buffer(
+                &self.gpu_index_buffer,
+                None,
+                self.index_buffers.raw_slice(),
+                None,
+                None,
+            )?;
             self.index_dirty = false;
         }
-        self.morphs.write_gpu(gpu)?;
         Ok(())
+    }
+}
+
+fn gpu_create_vertex_buffer(gpu: &AwsmRendererWebGpu, size: usize) -> Result<web_sys::GpuBuffer> {
+    Ok(gpu.create_buffer(
+        &BufferDescriptor::new(
+            Some("MeshVertex"),
+            size,
+            BufferUsage::new().with_copy_dst().with_vertex(),
+        )
+        .into(),
+    )?)
+}
+
+fn gpu_create_index_buffer(gpu: &AwsmRendererWebGpu, size: usize) -> Result<web_sys::GpuBuffer> {
+    Ok(gpu.create_buffer(
+        &BufferDescriptor::new(
+            Some("MeshIndex"),
+            size,
+            BufferUsage::new().with_copy_dst().with_index(),
+        )
+        .into(),
+    )?)
+}
+
+impl Drop for Meshes {
+    fn drop(&mut self) {
+        self.gpu_vertex_buffer.destroy();
+        self.gpu_index_buffer.destroy();
     }
 }
 

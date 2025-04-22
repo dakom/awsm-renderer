@@ -3,10 +3,11 @@ use awsm_renderer_core::command::render_pass::{
 };
 use awsm_renderer_core::command::{LoadOp, StoreOp};
 
-use crate::buffers::bind_group::BIND_GROUP_CAMERA;
+use crate::buffer::bind_groups::BindGroups;
 use crate::core::command::CommandEncoder;
 use crate::error::Result;
 use crate::mesh::Meshes;
+use crate::skin::Skins;
 use crate::transform::Transforms;
 use crate::AwsmRenderer;
 
@@ -15,11 +16,14 @@ impl AwsmRenderer {
     // the various underlying raw data can be updated on their own cadence
     // or just call .update_all() right before .render() for convenience
     pub fn render(&mut self) -> Result<()> {
-        self.transforms.write_gpu(&self.gpu)?;
+        self.transforms
+            .write_gpu(&self.gpu, &mut self.bind_groups)?;
+        self.skins.write_gpu(&self.gpu, &mut self.bind_groups)?;
+        self.meshes
+            .morphs
+            .write_gpu(&self.gpu, &mut self.bind_groups)?;
         self.meshes.write_gpu(&self.gpu)?;
-        self.skins
-            .update_and_write_gpu(&self.gpu, self.transforms.world_matrices_ref())?;
-        self.camera.write_gpu(&self.gpu)?;
+        self.camera.write_gpu(&self.gpu, &self.bind_groups)?;
 
         let current_texture_view = self.gpu.current_context_texture_view()?;
         let command_encoder = self.gpu.create_command_encoder(Some("Render pass"));
@@ -42,10 +46,15 @@ impl AwsmRenderer {
             render_pass,
             transforms: &self.transforms,
             meshes: &self.meshes,
+            skins: &self.skins,
+            bind_groups: &self.bind_groups,
         };
 
-        ctx.render_pass
-            .set_bind_group(BIND_GROUP_CAMERA, &self.camera.bind_group, None)?;
+        ctx.render_pass.set_bind_group(
+            BindGroups::UNIVERSAL_INDEX,
+            ctx.bind_groups.gpu_universal_bind_group(),
+            None,
+        )?;
 
         for (key, mesh) in self.meshes.iter() {
             mesh.push_commands(&mut ctx, key)?;
@@ -65,4 +74,6 @@ pub struct RenderContext<'a> {
     pub render_pass: RenderPassEncoder,
     pub transforms: &'a Transforms,
     pub meshes: &'a Meshes,
+    pub skins: &'a Skins,
+    pub bind_groups: &'a BindGroups,
 }

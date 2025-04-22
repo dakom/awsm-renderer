@@ -11,6 +11,7 @@ impl AwsmRenderer {
     ) -> crate::error::Result<()> {
         self.update_animations(global_time_delta)?;
         self.update_transforms();
+        self.update_skins();
         self.update_camera(camera)?;
 
         Ok(())

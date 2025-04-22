@@ -155,6 +155,27 @@ pub struct TransformAnimation {
 }
 
 impl TransformAnimation {
+    pub fn new_translation(translation: Vec3) -> Self {
+        Self {
+            translation: Some(translation),
+            rotation: None,
+            scale: None,
+        }
+    }
+    pub fn new_rotation(rotation: Quat) -> Self {
+        Self {
+            translation: None,
+            rotation: Some(rotation),
+            scale: None,
+        }
+    }
+    pub fn new_scale(scale: Vec3) -> Self {
+        Self {
+            translation: None,
+            rotation: None,
+            scale: Some(scale),
+        }
+    }
     pub fn apply(&self, input: Transform) -> Transform {
         let mut result = input;
         if let Some(translation) = &self.translation {

@@ -83,6 +83,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] skin joint transform not found: {0}")]
     SkinJointTransformNotFound(usize),
+
+    #[error("[gltf] shader key has different joint and weight count: ({weight_sets} weight sets and {joint_sets} joint sets)")]
+    ShaderKeyDifferentJointsWeights { weight_sets: u32, joint_sets: u32 },
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

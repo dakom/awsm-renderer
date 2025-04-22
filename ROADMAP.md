@@ -1,8 +1,7 @@
 # Next up
 
 - Skins
-    - finish write to GPU (buddy system)
-    - associate mesh attributes with data
+    - fix
 
 ## Approach 
 

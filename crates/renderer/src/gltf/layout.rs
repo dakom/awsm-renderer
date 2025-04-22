@@ -1,8 +1,7 @@
 use awsm_renderer_core::pipeline::vertex::{VertexAttribute, VertexBufferLayout};
 
 use super::{
-    accessors::accessor_vertex_format,
-    buffers::GltfMeshBufferInfo,
+    buffers::{vertex::accessor_vertex_format, GltfMeshBufferInfo},
     error::{AwsmGltfError, Result},
     shaders::semantic_shader_location,
 };
@@ -30,7 +29,7 @@ pub(super) fn primitive_vertex_buffer_layout(
         stride_offset += buffer_info
             .vertex
             .attribute_stride_sizes
-            .get(&semantic.clone().into())
+            .get(&semantic.clone())
             .ok_or(AwsmGltfError::MissingPositionAttribute(semantic))?;
     }
 

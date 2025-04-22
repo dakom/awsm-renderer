@@ -1,15 +1,14 @@
 mod buffer_info;
 mod error;
 mod meshes;
-mod morphs;
+pub mod morphs;
 
 use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
 
 use crate::bounds::Aabb;
-use crate::buffers::bind_group::{
-    BIND_GROUP_MORPH_TARGET_VALUES, BIND_GROUP_MORPH_TARGET_WEIGHTS, BIND_GROUP_TRANSFORM,
-};
+use crate::buffer::bind_groups::BindGroups;
 use crate::render::RenderContext;
+use crate::skin::SkinKey;
 use crate::transform::TransformKey;
 
 pub use buffer_info::*;
@@ -29,6 +28,7 @@ pub struct Mesh {
     pub aabb: Option<Aabb>,
     pub transform_key: TransformKey,
     pub morph_key: Option<MorphKey>,
+    pub skin_key: Option<SkinKey>,
 }
 
 #[derive(Debug, Clone)]
@@ -57,9 +57,10 @@ impl Mesh {
             pipeline,
             draw_count,
             topology: PrimitiveTopology::TriangleList,
+            transform_key,
             aabb: None,
             morph_key: None,
-            transform_key,
+            skin_key: None,
         }
     }
 
@@ -78,26 +79,40 @@ impl Mesh {
         self
     }
 
+    pub fn with_skin_key(mut self, skin_key: SkinKey) -> Self {
+        self.skin_key = Some(skin_key);
+        self
+    }
+
     pub fn push_commands(&self, ctx: &mut RenderContext, mesh_key: MeshKey) -> Result<()> {
         ctx.render_pass.set_pipeline(&self.pipeline);
 
         ctx.render_pass.set_bind_group(
-            BIND_GROUP_TRANSFORM,
-            ctx.transforms.bind_group(),
+            BindGroups::MESH_ALL_INDEX,
+            ctx.bind_groups.gpu_mesh_all_bind_group(),
             Some(&[ctx.transforms.buffer_offset(self.transform_key)? as u32]),
         )?;
 
-        if let Some(morph_key) = self.morph_key {
-            ctx.render_pass.set_bind_group(
-                BIND_GROUP_MORPH_TARGET_WEIGHTS,
-                ctx.meshes.morphs.weights_bind_group(),
-                Some(&[ctx.meshes.morphs.weights_buffer_offset(morph_key)? as u32]),
-            )?;
+        // if _any_ shapes are used, set the bind group
+        // unused shapes will simply be ignored (so 0 offset is fine)
+        if self.morph_key.is_some() || self.skin_key.is_some() {
+            let (morph_weights_offset, morph_values_offset) = match self.morph_key {
+                Some(morph_key) => (
+                    ctx.meshes.morphs.weights_buffer_offset(morph_key)? as u32,
+                    ctx.meshes.morphs.values_buffer_offset(morph_key)? as u32,
+                ),
+                None => (0, 0),
+            };
+
+            let skin_offset = match self.skin_key {
+                Some(skin_key) => ctx.skins.joint_matrices_offset(skin_key)? as u32,
+                None => 0,
+            };
 
             ctx.render_pass.set_bind_group(
-                BIND_GROUP_MORPH_TARGET_VALUES,
-                ctx.meshes.morphs.values_bind_group(),
-                Some(&[ctx.meshes.morphs.values_buffer_offset(morph_key)? as u32]),
+                BindGroups::MESH_SHAPE_INDEX,
+                ctx.bind_groups.gpu_mesh_shape_bind_group(),
+                Some(&[morph_weights_offset, morph_values_offset, skin_offset]),
             )?;
         }
 
