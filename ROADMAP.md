@@ -1,7 +1,7 @@
 # Next up
 
-- Skins
-    - fix
+- AnimatedMorphCube
+    - Fix 
 
 ## Approach 
 
@@ -27,21 +27,21 @@ If it's supported here, corresponding core functionality is also supported
 - Hierarchy
     - [x] transforms
     - [x] scene graph
-- [ ] Instancing
 - Geometry
     - [x] positions
     - [x] morphing
-    - [ ] skinning
+    - [x] skinning
+        - up to 3 sets of joints/weights 
 - Animation
     - [x] morph targets (keyable by MorphKey)
-    - [ ] transform targets (keyable by TransformKey)
-        - [x] partial support so far 
-    - [ ] skin targets
+    - [x] transform targets (keyable by TransformKey)
     - [x] linear interpolation
     - [x] step interpolation
         - [ ] test 
     - [x] cubic spline interpolation
         - [ ] test 
+- Extensions
+    - [ ] Instancing
 - Materials (TODO - fill this out as we go)
 - Lighting (TODO - fill this out as we go)
 - Skybox (TODO - fill this out as we go)

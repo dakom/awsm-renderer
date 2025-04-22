@@ -40,7 +40,7 @@ impl Default for Skins {
 }
 
 impl Skins {
-    pub const SKIN_MATRICES_INITIAL_SIZE: usize = 4096;
+    pub const SKIN_MATRICES_INITIAL_SIZE: usize = 16 * 4 * 32; // 32 elements is a good starting point
 
     pub fn new() -> Self {
         Self {
@@ -59,6 +59,9 @@ impl Skins {
         skeleton_joint_transforms: Vec<TransformKey>,
         inverse_bind_matrices: Vec<Mat4>,
     ) -> Result<SkinKey> {
+        let len = skeleton_joint_transforms.len();
+        let mut initial_fill = Vec::with_capacity(len * 16 * 4);
+
         for (index, joint) in skeleton_joint_transforms.iter().enumerate() {
             // check if the inverse bind matrix has diverged
             match (
@@ -74,20 +77,25 @@ impl Skins {
                     });
                 }
             }
-            self.inverse_bind_matrices.insert(
-                *joint,
-                inverse_bind_matrices
-                    .get(index)
-                    .cloned()
-                    .unwrap_or(Mat4::IDENTITY),
-            );
-        }
 
-        let len = skeleton_joint_transforms.len();
+            let joint_matrix = inverse_bind_matrices
+                .get(index)
+                .cloned()
+                .unwrap_or(Mat4::IDENTITY);
+
+            //tracing::info!("{}: {:#?}", index, joint_matrix);
+
+            let bytes = unsafe {
+                std::slice::from_raw_parts(joint_matrix.as_ref().as_ptr() as *const u8, 16 * 4)
+            };
+            initial_fill.extend_from_slice(bytes);
+
+            self.inverse_bind_matrices.insert(*joint, joint_matrix);
+        }
 
         let skin_key = self.skeleton_transforms.insert(skeleton_joint_transforms);
 
-        self.skin_matrices.update(skin_key, &vec![0; 16 * 4 * len]);
+        self.skin_matrices.update(skin_key, &initial_fill);
 
         Ok(skin_key)
     }
@@ -114,20 +122,22 @@ impl Skins {
                         };
 
                     // just overwrite this one matrix
-                    self.skin_matrices
-                        .update_with_unchecked(skin_key, &mut |values_u8| {
-                            let offset = 16 * 4 * index;
-                            let bytes = unsafe {
-                                std::slice::from_raw_parts(
-                                    world_matrix.as_ref().as_ptr() as *const u8,
-                                    16 * 4,
-                                )
-                            };
+                    let bytes = unsafe {
+                        std::slice::from_raw_parts(
+                            world_matrix.as_ref().as_ptr() as *const u8,
+                            16 * 4,
+                        )
+                    };
 
-                            values_u8[offset..offset + (16 * 4)].copy_from_slice(bytes);
+                    self.skin_matrices
+                        .update_with_unchecked(skin_key, &mut |matrices| {
+                            let start = index * 16 * 4;
+                            matrices[start..start + (16 * 4)].copy_from_slice(bytes);
                         });
                 }
             }
+
+            //tracing::info!("{:#?}", u8_to_f32_vec(&self.skin_matrices.raw_slice()[self.skin_matrices.offset(skin_key).unwrap()..]).chunks(16).take(2).collect::<Vec<_>>());
         }
     }
 
@@ -142,6 +152,7 @@ impl Skins {
             if let Some(new_size) = self.skin_matrices.take_gpu_needs_resize() {
                 bind_groups.gpu_resize(gpu, bind_group_index, new_size)?;
             }
+
             bind_groups.gpu_write(
                 gpu,
                 bind_group_index,

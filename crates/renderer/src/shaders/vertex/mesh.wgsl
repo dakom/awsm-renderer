@@ -22,9 +22,19 @@ struct VertexInput {
     {% endif %}
 
     {% if skin_joint_sets > 0 %}
-    // probably need to adjust this for > 1 sets
-    @location(3) joint_indices: vec4<u32>,
-    @location(4) joint_weights: vec4<f32>,
+        @location(3) @interpolate(flat) joint_indices_1: vec4<u32>,
+        @location(4) joint_weights_1: vec4<f32>,
+    {% endif %}
+    {% if skin_joint_sets > 1 %}
+        @location(5) @interpolate(flat) joint_indices_2: vec4<u32>,
+        @location(6) joint_weights_2: vec4<f32>,
+    {% endif %}
+    {% if skin_joint_sets > 2 %}
+        @location(7) @interpolate(flat) joint_indices_3: vec4<u32>,
+        @location(8) joint_weights_3: vec4<f32>,
+    {% endif %}
+    {% if skin_joint_sets > 3 %}
+        More than 3 joint sets not supported in vertex shader
     {% endif %}
 };
 
@@ -37,14 +47,14 @@ struct VertexOutput {
 fn vert_main(raw_input: VertexInput) -> VertexOutput {
     var input = raw_input;
 
-    {% if skin_joint_sets > 0 %}
-    input = apply_skin(input);
-    {% endif %}
 
     {% if has_morphs %}
     input = apply_morphs(input);
     {% endif %}
 
+    {% if skin_joint_sets > 0 %}
+    input = apply_skin(input);
+    {% endif %}
 
     // Transform the vertex position by the model matrix, and then by the view projection matrix
     var pos = u_transform.model * vec4<f32>(input.position, 1.0);

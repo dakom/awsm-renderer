@@ -25,7 +25,7 @@ impl SidebarGltf {
         let ordered_keys = [
             "Todo",
             "Simple",
-            // "Animation",
+            "Animation",
             // "Standard",
             // "Extension Tests",
             // "Standard",

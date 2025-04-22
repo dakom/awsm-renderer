@@ -114,7 +114,13 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
 
     pub fn update(&mut self, key: K, values: &[u8]) {
         self.update_with(key, |data| {
-            data.copy_from_slice(values);
+            data[..values.len()].copy_from_slice(values);
+        });
+    }
+
+    pub fn update_offset(&mut self, key: K, offset: usize, values: &[u8]) {
+        self.update_with(key, |data| {
+            data[offset..offset + values.len()].copy_from_slice(values);
         });
     }
 

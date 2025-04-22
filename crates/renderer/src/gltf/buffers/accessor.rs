@@ -9,18 +9,27 @@ pub fn accessor_to_bytes<'a>(
     accessor: &gltf::Accessor<'_>,
     buffers: &'a [Vec<u8>],
 ) -> Result<Cow<'a, [u8]>> {
-    let length = accessor.size() * accessor.count();
-
     let mut buffer: Cow<[u8]> = match accessor.view() {
         Some(view) => {
             let buffer = &buffers[view.buffer().index()];
-            let start = accessor.offset() + view.offset();
-            let end = start + length;
-            Cow::Borrowed(&buffer[start..end])
+            let buffer = &buffer[accessor.offset() + view.offset()..];
+
+            match view.stride() {
+                None => Cow::Borrowed(&buffer[..accessor.size() * accessor.count()]),
+                Some(stride) => {
+                    let mut repacked = Vec::new();
+                    for i in 0..accessor.count() {
+                        let start = i * stride;
+                        repacked.extend_from_slice(&buffer[start..start + accessor.size()])
+                    }
+                    Cow::Owned(repacked)
+                }
+            }
         }
         None => {
             // gltf spec says if we have no view, fill it with zeroes
             // and these may or may not be overwritten with sparse bytes (and/or extensions)
+            let length = accessor.size() * accessor.count();
             Cow::Owned(vec![0; length])
         }
     };

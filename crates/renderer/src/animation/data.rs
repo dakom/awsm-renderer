@@ -176,29 +176,28 @@ impl TransformAnimation {
             scale: Some(scale),
         }
     }
-    pub fn apply(&self, input: Transform) -> Transform {
-        let mut result = input;
+    pub fn apply(&self, mut input: Transform) -> Transform {
         if let Some(translation) = &self.translation {
-            result.translation += *translation;
+            input.translation = *translation;
         }
         if let Some(rotation) = &self.rotation {
-            result.rotation *= *rotation;
+            input.rotation = *rotation;
         }
         if let Some(scale) = &self.scale {
-            result.scale *= *scale;
+            input.scale = *scale;
         }
-        result
+        input
     }
 
     pub fn apply_mut(&self, input: &mut Transform) {
         if let Some(translation) = &self.translation {
-            input.translation += *translation;
+            input.translation = *translation;
         }
         if let Some(rotation) = &self.rotation {
-            input.rotation *= *rotation;
+            input.rotation = *rotation;
         }
         if let Some(scale) = &self.scale {
-            input.scale *= *scale;
+            input.scale = *scale;
         }
     }
 }
@@ -325,7 +324,7 @@ impl VertexAnimation {
     pub fn apply_mut(&self, other: &mut [f32]) {
         for (i, weight) in self.weights.iter().enumerate() {
             if i < other.len() {
-                other[i] *= *weight;
+                other[i] = *weight;
             }
         }
     }

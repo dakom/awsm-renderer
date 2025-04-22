@@ -1,16 +1,20 @@
 use super::error::{AwsmGltfError, Result};
 use crate::shaders::ShaderKey;
 
-pub fn semantic_shader_location(semantic: gltf::Semantic) -> u32 {
+pub fn semantic_shader_location(semantic: gltf::Semantic) -> Result<u32> {
     match semantic {
-        gltf::Semantic::Positions => 0,
-        gltf::Semantic::Normals => 1,
-        gltf::Semantic::Tangents => 2,
-        // TODO - not sure if these are right
-        gltf::Semantic::Joints(_) => 3,
-        gltf::Semantic::Weights(_) => 4,
-        gltf::Semantic::TexCoords(index) => 5 + index,
-        gltf::Semantic::Colors(index) => 10 + index,
+        gltf::Semantic::Positions => Ok(0),
+        gltf::Semantic::Normals => Ok(1),
+        gltf::Semantic::Tangents => Ok(2),
+        gltf::Semantic::Joints(0) => Ok(3),
+        gltf::Semantic::Weights(0) => Ok(4),
+        gltf::Semantic::Joints(1) => Ok(5),
+        gltf::Semantic::Weights(1) => Ok(6),
+        gltf::Semantic::Joints(2) => Ok(7),
+        gltf::Semantic::Weights(2) => Ok(8),
+        gltf::Semantic::TexCoords(_) => Ok(9),
+        gltf::Semantic::Colors(_) => Ok(10),
+        _ => Err(AwsmGltfError::ShaderLocationNoSemantic(semantic)),
     }
 }
 
