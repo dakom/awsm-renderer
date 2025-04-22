@@ -100,7 +100,7 @@ impl GltfMeshBufferVertexInfo {
                             )
                         };
 
-                        entry.0.extend_from_slice(&bytes);
+                        entry.0.extend_from_slice(bytes);
                         entry.1 += accessor.size() * 2;
                     }
                     gltf::accessor::DataType::I16 => {
@@ -114,7 +114,7 @@ impl GltfMeshBufferVertexInfo {
                                 values.len() * std::mem::size_of::<i32>(),
                             )
                         };
-                        entry.0.extend_from_slice(&bytes);
+                        entry.0.extend_from_slice(bytes);
                         entry.1 += accessor.size() * 2;
                     }
                     _ => {

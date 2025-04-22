@@ -6,7 +6,7 @@ use crate::prelude::*;
 pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::new(|| {
     let mut h = HashMap::new();
 
-    h.insert("Todo", vec![GltfId::SimpleSkin]);
+    h.insert("Todo", vec![GltfId::AnimatedMorphCube]);
 
     // h.insert(
     //     "Feature tests",
@@ -38,22 +38,22 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
             GltfId::SimpleSparseAccessor,
             GltfId::SimpleMeshes,
             GltfId::SimpleMorph,
-            // GltfId::SimpleSkin,
+            GltfId::SimpleSkin,
             // GltfId::SimpleTexture,
             // GltfId::SimpleInstancing
             // GltfId::SimpleMaterial
         ],
     );
 
-    // h.insert(
-    //     "Animation",
-    //     vec![
-    // GltfId::AnimatedTriangle,
-    // GltfId::AnimatedMorphCube,
-    // GltfId::AnimatedMorphSphere,
-    // GltfId::InterpolationTest,
-    //     ],
-    // );
+    h.insert(
+        "Animation",
+        vec![
+            // GltfId::AnimatedTriangle,
+            // GltfId::AnimatedMorphCube,
+            // GltfId::AnimatedMorphSphere,
+            // GltfId::InterpolationTest,
+        ],
+    );
 
     // h.insert(
     //     "Standard",
@@ -111,6 +111,7 @@ pub enum GltfId {
     AnimatedMorphCube,
     AnimatedMorphSphere,
     SimpleSkin,
+    SimpleInstancing,
     InterpolationTest,
     // skipping unicode test...
 
@@ -192,6 +193,7 @@ impl GltfId {
             Self::SimpleSparseAccessor => "SimpleSparseAccessor/glTF/SimpleSparseAccessor.gltf",
             Self::SimpleMeshes => "SimpleMeshes/glTF/SimpleMeshes.gltf",
             Self::SimpleMorph => "SimpleMorph/glTF/SimpleMorph.gltf",
+            Self::SimpleInstancing => "SimpleInstancing/glTF/SimpleInstancing.gltf",
             Self::AnimatedTriangle => "AnimatedTriangle/glTF/AnimatedTriangle.gltf",
             Self::AnimatedMorphCube => "AnimatedMorphCube/glTF/AnimatedMorphCube.gltf",
             Self::AnimatedMorphSphere => "AnimatedMorphSphere/glTF/AnimatedMorphSphere.gltf",
@@ -239,6 +241,7 @@ impl GltfId {
             Self::SimpleSparseAccessor => "Simple Sparse Accessor",
             Self::SimpleMeshes => "Simple Meshes",
             Self::SimpleMorph => "Simple Morph",
+            Self::SimpleInstancing => "Simple Instancing",
             Self::AnimatedTriangle => "Animated Triangle",
             Self::AnimatedMorphCube => "Animated Morph Cube",
             Self::AnimatedMorphSphere => "Animated Morph Sphere",
