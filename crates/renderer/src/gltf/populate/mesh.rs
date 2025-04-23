@@ -91,7 +91,15 @@ impl AwsmRenderer {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
-        let shader_key = ShaderKey::gltf_primitive_new(&gltf_primitive)?;
+        let shader_key = ShaderKey::new(
+            primitive_buffer_info
+                .vertex
+                .attributes
+                .iter()
+                .map(|s| s.shader_key_kind.clone())
+                .collect(),
+            primitive_buffer_info.morph.is_some(),
+        );
 
         let morph_key = match primitive_buffer_info.morph.clone() {
             None => None,
@@ -113,7 +121,7 @@ impl AwsmRenderer {
 
         let shader_module = match self.gltf.shaders.get(&shader_key) {
             None => {
-                let shader_module = self.gpu.compile_shader(&shader_key.into_descriptor());
+                let shader_module = self.gpu.compile_shader(&shader_key.into_descriptor()?);
                 shader_module
                     .validate_shader()
                     .await
@@ -131,8 +139,7 @@ impl AwsmRenderer {
         // we only need one vertex buffer per-mesh, because we've already constructed our buffers
         // to be one contiguous buffer of interleaved vertex data.
         // the attributes of this one vertex buffer layout contain all the info needed for the shader locations
-        let vertex_buffer_layout =
-            primitive_vertex_buffer_layout(&gltf_primitive, primitive_buffer_info)?;
+        let vertex_buffer_layout = primitive_vertex_buffer_layout(primitive_buffer_info)?;
 
         // tracing::info!("indices: {:?}", debug_slice_to_u16(ctx.data.buffers.index_bytes.as_ref().unwrap()));
         // tracing::info!("positions: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[0].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
@@ -144,7 +151,7 @@ impl AwsmRenderer {
 
         if let Some(morph) = &primitive_buffer_info.morph {
             pipeline_key = pipeline_key.with_vertex_constant(
-                (ShaderConstantIds::MaxMorphTargets as u16).into(),
+                (ShaderConstantIds::MorphTargetLen as u16).into(),
                 (morph.targets_len as u32).into(),
             );
         }

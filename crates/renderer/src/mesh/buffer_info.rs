@@ -1,4 +1,6 @@
-use awsm_renderer_core::pipeline::primitive::IndexFormat;
+use awsm_renderer_core::pipeline::{primitive::IndexFormat, vertex::VertexFormat};
+
+use crate::shaders::ShaderKeyAttribute;
 
 #[derive(Default, Debug, Clone)]
 pub struct MeshBufferInfo {
@@ -12,10 +14,25 @@ pub struct MeshBufferVertexInfo {
     // number of vertices for this primitive
     pub count: usize,
     // total size in bytes of this vertex
-    // same as vertex_count * sum_of_all_vertex_attribute_stride_sizes
+    // same as vertex_count * sum_of_all_attribute_sizes
     // we don't need to know individual attribute sizes here
     // since that naturally follows the draw call size
+    // though it is available for debugging purposes in `attributes`
     pub size: usize,
+
+    pub attributes: Vec<MeshBufferVertexAttribute>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MeshBufferVertexAttribute {
+    // the size of the attribute in bytes
+    pub size: usize,
+    // the offset of this attribute within the vertex
+    pub offset: usize,
+    // the format of this attribute
+    pub format: VertexFormat,
+    // shader key kind
+    pub shader_key_kind: ShaderKeyAttribute,
 }
 
 #[derive(Debug, Clone)]

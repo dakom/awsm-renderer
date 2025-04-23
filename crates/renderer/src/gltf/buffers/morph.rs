@@ -1,12 +1,11 @@
 use std::borrow::Cow;
 
-use gltf::Semantic;
-
 use super::vertex::GltfMeshBufferVertexInfo;
 use super::Result;
 use crate::buffer::helpers::slice_zeroes;
 use crate::gltf::buffers::accessor::accessor_to_bytes;
 use crate::mesh::MeshBufferMorphInfo;
+use crate::shaders::ShaderKeyAttribute;
 
 #[derive(Default, Debug, Clone)]
 pub struct GltfMeshBufferMorphInfo {
@@ -120,9 +119,13 @@ impl GltfMeshBufferMorphInfo {
                     };
 
                     if morph_has_position {
-                        let attribute_stride_size = *vertex_info
-                            .attribute_stride_sizes
-                            .get(&Semantic::Positions)
+                        let attribute_stride_size = vertex_info
+                            .attributes
+                            .iter()
+                            .find_map(|attribute| match attribute.shader_key_kind {
+                                ShaderKeyAttribute::Positions => Some(attribute.size),
+                                _ => None,
+                            })
                             .unwrap();
                         push_bytes(
                             morph_target_buffer_data.positions.as_ref(),
@@ -131,10 +134,15 @@ impl GltfMeshBufferMorphInfo {
                     }
 
                     if morph_has_normal {
-                        let attribute_stride_size = *vertex_info
-                            .attribute_stride_sizes
-                            .get(&Semantic::Normals)
+                        let attribute_stride_size = vertex_info
+                            .attributes
+                            .iter()
+                            .find_map(|attribute| match attribute.shader_key_kind {
+                                ShaderKeyAttribute::Normals => Some(attribute.size),
+                                _ => None,
+                            })
                             .unwrap();
+
                         push_bytes(
                             morph_target_buffer_data.normals.as_ref(),
                             attribute_stride_size,
@@ -142,9 +150,13 @@ impl GltfMeshBufferMorphInfo {
                     }
 
                     if morph_has_tangent {
-                        let attribute_stride_size = *vertex_info
-                            .attribute_stride_sizes
-                            .get(&Semantic::Tangents)
+                        let attribute_stride_size = vertex_info
+                            .attributes
+                            .iter()
+                            .find_map(|attribute| match attribute.shader_key_kind {
+                                ShaderKeyAttribute::Tangents => Some(attribute.size),
+                                _ => None,
+                            })
                             .unwrap();
                         push_bytes(
                             morph_target_buffer_data.tangents.as_ref(),

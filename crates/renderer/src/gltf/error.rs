@@ -2,7 +2,10 @@ use awsm_renderer_core::error::AwsmCoreError;
 use gltf::Semantic;
 use thiserror::Error;
 
-use crate::{animation::AwsmAnimationError, mesh::AwsmMeshError, skin::AwsmSkinError};
+use crate::{
+    animation::AwsmAnimationError, mesh::AwsmMeshError, shaders::AwsmShaderError,
+    skin::AwsmSkinError,
+};
 
 #[derive(Error, Debug)]
 pub enum AwsmGltfError {
@@ -90,6 +93,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] could not get shader location for semantic: {0:?}")]
     ShaderLocationNoSemantic(Semantic),
+
+    #[error("[gltf] {0:?}")]
+    Shader(#[from] AwsmShaderError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

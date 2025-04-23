@@ -1,45 +1,31 @@
 use awsm_renderer_core::pipeline::vertex::{VertexAttribute, VertexBufferLayout};
 
-use super::{
-    buffers::GltfMeshBufferInfo,
-    error::{AwsmGltfError, Result},
-    shaders::semantic_shader_location,
-};
+use super::{buffers::GltfMeshBufferInfo, error::Result};
 
 pub(super) fn primitive_vertex_buffer_layout(
-    primitive: &gltf::Primitive<'_>,
     buffer_info: &GltfMeshBufferInfo,
 ) -> Result<VertexBufferLayout> {
-    // not strictly necessary for the attributes array, which only needs the shader location
-    // but this makes it quicker to lookup the individual array strides
-    let mut attributes = Vec::with_capacity(primitive.attributes().len());
+    let mut attributes = Vec::new();
 
-    // this is the offset within the total vertex stride
-    let mut stride_offset = 0;
+    let mut shader_location: u32 = 0;
 
-    for (semantic, _) in primitive.attributes() {
-        attributes.push(VertexAttribute {
-            format: *buffer_info
-                .vertex
-                .attribute_formats
-                .get(&semantic.clone())
-                .ok_or_else(|| AwsmGltfError::MissingPositionAttribute(semantic.clone()))?,
-            offset: stride_offset as u64,
-            shader_location: semantic_shader_location(semantic.clone())?,
-        });
+    let mut offset = 0u64;
+    for attribute in &buffer_info.vertex.attributes {
+        for _ in 0..attribute.shader_key_kind.count() {
+            attributes.push(VertexAttribute {
+                format: attribute.format,
+                offset,
+                shader_location,
+            });
 
-        // because the vertex strides are in a specific order
-        // we can just add the stride of the current attribute to the offset
-        stride_offset += buffer_info
-            .vertex
-            .attribute_stride_sizes
-            .get(&semantic.clone())
-            .ok_or(AwsmGltfError::MissingPositionAttribute(semantic))?;
+            offset += attribute.size as u64;
+            shader_location += 1;
+        }
     }
 
     Ok(VertexBufferLayout {
         // this is the stride across all of the attributes
-        array_stride: stride_offset as u64,
+        array_stride: offset as u64,
         step_mode: None, // TODO - instancing
         attributes,
     })
