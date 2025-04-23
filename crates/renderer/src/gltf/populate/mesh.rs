@@ -96,7 +96,7 @@ impl AwsmRenderer {
                 .vertex
                 .attributes
                 .iter()
-                .map(|s| s.shader_key_kind.clone())
+                .map(|s| s.shader_key_kind)
                 .collect(),
             primitive_buffer_info.morph.is_some(),
         );

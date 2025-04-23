@@ -25,7 +25,7 @@ pub(super) fn primitive_vertex_buffer_layout(
 
     Ok(VertexBufferLayout {
         // this is the stride across all of the attributes
-        array_stride: offset as u64,
+        array_stride: offset,
         step_mode: None, // TODO - instancing
         attributes,
     })
