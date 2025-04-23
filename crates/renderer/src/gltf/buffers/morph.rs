@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-use super::vertex::GltfMeshBufferVertexInfo;
 use super::Result;
 use crate::buffer::helpers::slice_zeroes;
 use crate::gltf::buffers::accessor::accessor_to_bytes;
@@ -34,7 +33,7 @@ impl GltfMeshBufferMorphInfo {
     pub fn maybe_new(
         primitive: &gltf::Primitive<'_>,
         buffers: &[Vec<u8>],
-        vertex_info: &GltfMeshBufferVertexInfo,
+        vertex_count: usize,
         morph_bytes: &mut Vec<u8>,
     ) -> Result<Option<Self>> {
         let morph_has_position = primitive
@@ -96,71 +95,54 @@ impl GltfMeshBufferMorphInfo {
 
             let mut vertex_morph_stride_size = 0;
 
-            for vertex_index in 0..vertex_info.count {
+            for vertex_index in 0..vertex_count {
                 // eh, we could only set this once, but this is slightly nicer to read
                 // when the loop breaks we return the latest-and-greatest value
                 vertex_morph_stride_size = 0;
 
                 for morph_target_buffer_data in &morph_targets_buffer_data {
-                    let mut push_bytes = |data: Option<&Cow<'_, [u8]>>, stride_size: usize| {
-                        match data {
-                            Some(data) => {
-                                let data_byte_offset = vertex_index * stride_size;
-                                let data_bytes =
-                                    &data[data_byte_offset..data_byte_offset + stride_size];
-                                morph_bytes.extend_from_slice(data_bytes);
+                    let mut push_bytes =
+                        |attribute_kind: ShaderKeyAttribute, data: Option<&Cow<'_, [u8]>>| {
+                            let stride_size = match attribute_kind {
+                                ShaderKeyAttribute::Positions => 12, // vec3 of floats
+                                ShaderKeyAttribute::Normals => 12,   // vec3 of floats
+                                ShaderKeyAttribute::Tangents => 12, // vec3 of floats (yes, not a vec4, morph targets do not include w component)
+                                _ => unreachable!(),
+                            };
+                            match data {
+                                Some(data) => {
+                                    let data_byte_offset = vertex_index * stride_size;
+                                    //tracing::info!("{:?} {} -> {} of {}", attr_kind, data_byte_offset, data_byte_offset + stride_size, data.len());
+                                    let data_bytes =
+                                        &data[data_byte_offset..data_byte_offset + stride_size];
+                                    morph_bytes.extend_from_slice(data_bytes);
+                                }
+                                None => {
+                                    morph_bytes.extend_from_slice(slice_zeroes(stride_size));
+                                }
                             }
-                            None => {
-                                morph_bytes.extend_from_slice(slice_zeroes(stride_size));
-                            }
-                        }
 
-                        vertex_morph_stride_size += stride_size;
-                    };
+                            vertex_morph_stride_size += stride_size;
+                        };
 
                     if morph_has_position {
-                        let attribute_stride_size = vertex_info
-                            .attributes
-                            .iter()
-                            .find_map(|attribute| match attribute.shader_key_kind {
-                                ShaderKeyAttribute::Positions => Some(attribute.size),
-                                _ => None,
-                            })
-                            .unwrap();
                         push_bytes(
+                            ShaderKeyAttribute::Positions,
                             morph_target_buffer_data.positions.as_ref(),
-                            attribute_stride_size,
                         );
                     }
 
                     if morph_has_normal {
-                        let attribute_stride_size = vertex_info
-                            .attributes
-                            .iter()
-                            .find_map(|attribute| match attribute.shader_key_kind {
-                                ShaderKeyAttribute::Normals => Some(attribute.size),
-                                _ => None,
-                            })
-                            .unwrap();
-
                         push_bytes(
+                            ShaderKeyAttribute::Normals,
                             morph_target_buffer_data.normals.as_ref(),
-                            attribute_stride_size,
                         );
                     }
 
                     if morph_has_tangent {
-                        let attribute_stride_size = vertex_info
-                            .attributes
-                            .iter()
-                            .find_map(|attribute| match attribute.shader_key_kind {
-                                ShaderKeyAttribute::Tangents => Some(attribute.size),
-                                _ => None,
-                            })
-                            .unwrap();
                         push_bytes(
+                            ShaderKeyAttribute::Tangents,
                             morph_target_buffer_data.tangents.as_ref(),
-                            attribute_stride_size,
                         );
                     }
                 }
