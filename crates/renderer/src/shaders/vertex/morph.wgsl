@@ -29,8 +29,13 @@ fn apply_morphs(input: VertexInput) -> VertexInput {
     {% endif %}
 
     {% if has_tangent %}
-    target_size += 3u; // vec3 for tangents
+    // vec3 for tangents, not vec4
+    // from spec: "Note that the W component for handedness is omitted when targeting TANGENT data since handedness cannot be displaced."
+    target_size += 3u; 
     {% endif %}
+
+    // TODO - TEXCOORD_n and COLOR_n
+    // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#morph-targets
 
     // all_targets_size is the total number of floats for all morph_targets (for a given vertex, not across all of them)
     let all_targets_size = target_size * morph_target_len; 
@@ -57,7 +62,9 @@ fn apply_morphs(input: VertexInput) -> VertexInput {
         {% if has_tangent %}
         offset += 3;
         let morph_tangent = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
-        output.tangent += morph_weight * morph_tangent; 
+        output.tangent.x += morph_weight * morph_tangent.x; 
+        output.tangent.y += morph_weight * morph_tangent.y; 
+        output.tangent.z += morph_weight * morph_tangent.z; 
         {% endif %}
 
     }

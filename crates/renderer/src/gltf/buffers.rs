@@ -74,7 +74,7 @@ impl GltfBuffers {
                 let morph = GltfMeshBufferMorphInfo::maybe_new(
                     &primitive,
                     &buffers,
-                    &vertex,
+                    vertex.count,
                     &mut morph_bytes,
                 )?;
 
