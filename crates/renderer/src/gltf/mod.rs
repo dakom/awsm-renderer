@@ -6,4 +6,3 @@ pub mod layout;
 pub mod loader;
 pub mod pipelines;
 pub mod populate;
-pub mod shaders;

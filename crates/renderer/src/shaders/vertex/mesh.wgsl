@@ -10,32 +10,14 @@ struct TransformUniform {
 //***** INPUT/OUTPUT *****
 struct VertexInput {
     @builtin(vertex_index) vertex_index: u32,
-
-    @location(0) position: vec3<f32>,
-
-    {% if has_normal %}
-    @location(1) normal: vec3<f32>,
-    {% endif %}
-
-    {% if has_tangent %}
-    @location(2) tangent: vec3<f32>,
-    {% endif %}
-
-    {% if skin_joint_sets > 0 %}
-        @location(3) @interpolate(flat) joint_indices_1: vec4<u32>,
-        @location(4) joint_weights_1: vec4<f32>,
-    {% endif %}
-    {% if skin_joint_sets > 1 %}
-        @location(5) @interpolate(flat) joint_indices_2: vec4<u32>,
-        @location(6) joint_weights_2: vec4<f32>,
-    {% endif %}
-    {% if skin_joint_sets > 2 %}
-        @location(7) @interpolate(flat) joint_indices_3: vec4<u32>,
-        @location(8) joint_weights_3: vec4<f32>,
-    {% endif %}
-    {% if skin_joint_sets > 3 %}
-        More than 3 joint sets not supported in vertex shader
-    {% endif %}
+    {% for loc in vertex_input_locations %}
+        {%- match loc.interpolation %}
+            {% when Some with (interpolation) %}
+                @location({{ loc.location }}) @interpolate({{ interpolation }}) {{ loc.name }}: {{ loc.data_type }},
+            {% when _ %}
+                @location({{ loc.location }}) {{ loc.name }}: {{ loc.data_type }},
+        {% endmatch %}
+    {% endfor %}
 };
 
 struct VertexOutput {
@@ -52,7 +34,7 @@ fn vert_main(raw_input: VertexInput) -> VertexOutput {
     input = apply_morphs(input);
     {% endif %}
 
-    {% if skin_joint_sets > 0 %}
+    {% if has_skins %}
     input = apply_skin(input);
     {% endif %}
 

@@ -30,8 +30,9 @@ If it's supported here, corresponding core functionality is also supported
 - Geometry
     - [x] positions
     - [x] morphing
+        - up to 8 weights
     - [x] skinning
-        - up to 3 sets of joints/weights 
+        - multiple sets (as many as fit in attribute slots)
 - Animation
     - [x] morph targets (keyable by MorphKey)
     - [x] transform targets (keyable by TransformKey)

@@ -16,7 +16,7 @@ var<storage, read> morph_values: array<f32>;
 // the rest of the calculations flow from the presence of attributes (which cause the shader to change anyway)
 // i.e. if a shader supports normals, then even if there are no morphs for it, 
 // calculations will be done and the buffer data has zeroes filled in for the morphs
-@id(1) override MAX_MORPH_TARGETS:u32;
+@id(1) override morph_target_len:u32;
 
 fn apply_morphs(input: VertexInput) -> VertexInput {
     var output = input;
@@ -33,9 +33,9 @@ fn apply_morphs(input: VertexInput) -> VertexInput {
     {% endif %}
 
     // all_targets_size is the total number of floats for all morph_targets (for a given vertex, not across all of them)
-    let all_targets_size = target_size * MAX_MORPH_TARGETS; 
+    let all_targets_size = target_size * morph_target_len; 
 
-    for (var morph_target = 0u; morph_target < MAX_MORPH_TARGETS; morph_target = morph_target + 1u) {
+    for (var morph_target = 0u; morph_target < morph_target_len; morph_target = morph_target + 1u) {
         // 2d index into the array
         // 4 floats per vec4, so we need to divide by 4 to get "which vec4" we are in
         // and then mod by 4 to get the index into that vec4

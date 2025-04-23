@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use crate::{
     buffer::bind_groups::AwsmBindGroupError, camera::AwsmCameraError, mesh::AwsmMeshError,
-    skin::AwsmSkinError, transform::AwsmTransformError,
+    shaders::AwsmShaderError, skin::AwsmSkinError, transform::AwsmTransformError,
 };
 
 #[derive(Error, Debug)]
@@ -29,6 +29,9 @@ pub enum AwsmError {
 
     #[error("{0}")]
     BindGroup(#[from] AwsmBindGroupError),
+
+    #[error("{0}")]
+    Shader(#[from] AwsmShaderError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;

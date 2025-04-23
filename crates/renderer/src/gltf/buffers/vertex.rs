@@ -1,9 +1,11 @@
 use awsm_renderer_core::pipeline::vertex::VertexFormat;
 use gltf::accessor::{DataType, Dimensions};
+use gltf::Semantic;
 use std::collections::HashMap;
 
 use crate::buffer::helpers::{u8_to_i16_vec, u8_to_u16_vec};
-use crate::mesh::MeshBufferVertexInfo;
+use crate::mesh::{MeshBufferVertexAttribute, MeshBufferVertexInfo};
+use crate::shaders::ShaderKeyAttribute;
 
 use super::accessor::accessor_to_bytes;
 use super::Result;
@@ -17,10 +19,7 @@ pub struct GltfMeshBufferVertexInfo {
     // total size in bytes of this vertex
     // same as vertex_count * sum_of_all_vertex_attribute_stride_sizes
     pub size: usize,
-    // size of each individual vertex attribute stride
-    pub attribute_stride_sizes: HashMap<gltf::Semantic, usize>,
-    // format of each vertex attribute
-    pub attribute_formats: HashMap<gltf::Semantic, VertexFormat>,
+    pub attributes: Vec<MeshBufferVertexAttribute>,
 }
 
 impl From<GltfMeshBufferVertexInfo> for MeshBufferVertexInfo {
@@ -28,6 +27,7 @@ impl From<GltfMeshBufferVertexInfo> for MeshBufferVertexInfo {
         Self {
             count: info.count,
             size: info.size,
+            attributes: info.attributes,
         }
     }
 }
@@ -40,13 +40,13 @@ impl GltfMeshBufferVertexInfo {
     ) -> Result<Self> {
         let offset = vertex_bytes.len();
 
-        let mut attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> =
+        let mut gltf_attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> =
             primitive.attributes().collect();
 
-        attributes.sort_by(|(a, _), (b, _)| semantic_cmp(a, b));
+        gltf_attributes.sort_by(|(a, _), (b, _)| semantic_cmp(a, b));
 
         // this should never be empty, but let's be safe
-        let vertex_count = attributes
+        let vertex_count = gltf_attributes
             .first()
             .map(|(_, accessor)| accessor.count())
             .unwrap_or(0);
@@ -59,30 +59,65 @@ impl GltfMeshBufferVertexInfo {
         //
         // We need to collect the attributes that have the same discriminant into one buffer
         // but different discriminants go into different buffers
-        let (attributes_bytes, attribute_stride_sizes, attribute_formats) = {
-            let mut attribute_stride_sizes = HashMap::new();
-            let mut attribute_formats = HashMap::new();
-            let mut attributes_bytes = Vec::new();
+        let attributes = {
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+            enum TempAttributeKind {
+                Positions,
+                Normals,
+                Tangents,
+                Colors,
+                TexCoords,
+                Joints,
+                Weights,
+            }
 
-            let mut buffers_by_semantic = HashMap::new();
+            impl From<Semantic> for TempAttributeKind {
+                fn from(semantic: Semantic) -> Self {
+                    match semantic {
+                        Semantic::Positions => TempAttributeKind::Positions,
+                        Semantic::Normals => TempAttributeKind::Normals,
+                        Semantic::Tangents => TempAttributeKind::Tangents,
+                        Semantic::Colors(_) => TempAttributeKind::Colors,
+                        Semantic::TexCoords(_) => TempAttributeKind::TexCoords,
+                        Semantic::Joints(_) => TempAttributeKind::Joints,
+                        Semantic::Weights(_) => TempAttributeKind::Weights,
+                    }
+                }
+            }
 
-            for (semantic, accessor) in attributes {
-                let entry = buffers_by_semantic.entry(semantic).or_insert_with(|| {
-                    (
-                        Vec::new(),
-                        0,
-                        accessor_vertex_format(
-                            // wgsl doesn't work with 16-bit, so we need to convert to 32-bit
-                            match accessor.data_type() {
-                                DataType::U16 => DataType::U32,
-                                DataType::I16 => DataType::U32,
-                                other => other,
-                            },
-                            accessor.dimensions(),
-                            accessor.normalized(),
-                        ),
-                    )
-                });
+            // semantic -> (attribute_bytes, attribute_size, vertex_format, attribute_kind_count)
+            let mut buffers_by_attribute_kind = HashMap::new();
+
+            for (semantic, accessor) in gltf_attributes {
+                let entry = buffers_by_attribute_kind
+                    .entry(TempAttributeKind::from(semantic))
+                    .or_insert_with(|| {
+                        (
+                            Vec::new(),
+                            0usize,
+                            accessor_vertex_format(
+                                // wgsl doesn't work with 16-bit, so we need to convert to 32-bit
+                                match accessor.data_type() {
+                                    DataType::U16 => DataType::U32,
+                                    DataType::I16 => DataType::U32,
+                                    other => other,
+                                },
+                                accessor.dimensions(),
+                                accessor.normalized(),
+                            ),
+                            0u32,
+                        )
+                    });
+
+                entry.1 = match accessor.data_type() {
+                    gltf::accessor::DataType::U16 | gltf::accessor::DataType::I16 => {
+                        // 2 bytes per element
+                        accessor.size() * 2
+                    }
+                    _ => accessor.size(),
+                };
+
+                entry.3 += 1;
 
                 let bytes = accessor_to_bytes(&accessor, buffers)?;
                 // wgsl doesn't work with 16-bit, so we need to convert to 32-bit
@@ -101,7 +136,6 @@ impl GltfMeshBufferVertexInfo {
                         };
 
                         entry.0.extend_from_slice(bytes);
-                        entry.1 += accessor.size() * 2;
                     }
                     gltf::accessor::DataType::I16 => {
                         let values: Vec<i32> = u8_to_i16_vec(&bytes)
@@ -115,53 +149,99 @@ impl GltfMeshBufferVertexInfo {
                             )
                         };
                         entry.0.extend_from_slice(bytes);
-                        entry.1 += accessor.size() * 2;
                     }
                     _ => {
                         entry.0.extend_from_slice(&bytes);
-                        entry.1 += accessor.size();
                     }
                 }
             }
 
-            let mut buffers_by_semantic: Vec<(_, _)> = buffers_by_semantic.into_iter().collect();
-            buffers_by_semantic.sort_by(|(a, _), (b, _)| semantic_cmp(a, b));
+            let mut attributes: Vec<(Vec<u8>, MeshBufferVertexAttribute)> = Vec::new();
+            let mut offset = 0;
+            for (kind, (bytes, size, format, count)) in buffers_by_attribute_kind.into_iter() {
+                attributes.push((
+                    bytes,
+                    MeshBufferVertexAttribute {
+                        size,
+                        offset,
+                        format,
+                        shader_key_kind: match kind {
+                            TempAttributeKind::Positions => ShaderKeyAttribute::Positions,
+                            TempAttributeKind::Normals => ShaderKeyAttribute::Normals,
+                            TempAttributeKind::Tangents => ShaderKeyAttribute::Tangents,
+                            TempAttributeKind::Colors => ShaderKeyAttribute::Colors { count },
+                            TempAttributeKind::TexCoords => ShaderKeyAttribute::TexCoords { count },
+                            TempAttributeKind::Joints => ShaderKeyAttribute::Joints { count },
+                            TempAttributeKind::Weights => ShaderKeyAttribute::Weights { count },
+                        },
+                    },
+                ));
 
-            for (semantic, (bytes, stride, vertex_format)) in buffers_by_semantic {
-                attribute_formats.insert(semantic.clone(), vertex_format);
-                attribute_stride_sizes.insert(semantic.clone(), stride);
-                attributes_bytes.push((bytes, stride));
+                offset += size;
             }
 
-            (attributes_bytes, attribute_stride_sizes, attribute_formats)
+            attributes.sort_by(|(_, a), (_, b)| {
+                fn inner_num(x: &ShaderKeyAttribute) -> u32 {
+                    match x {
+                        ShaderKeyAttribute::Positions => 0,
+                        ShaderKeyAttribute::Normals => 1,
+                        ShaderKeyAttribute::Tangents => 2,
+                        ShaderKeyAttribute::Colors { .. } => 3,
+                        ShaderKeyAttribute::TexCoords { .. } => 4,
+                        ShaderKeyAttribute::Joints { .. } => 5,
+                        ShaderKeyAttribute::Weights { .. } => 6,
+                    }
+                }
+
+                inner_num(&a.shader_key_kind).cmp(&inner_num(&b.shader_key_kind))
+            });
+
+            attributes
         };
 
         // now let's predictably interleave the attributes into our final vertex buffer
         // this does extend/copy the data, but it saves us additional calls at render time
         for vertex in 0..vertex_count {
-            for (attribute_bytes, attribute_stride_size) in attributes_bytes.iter() {
-                let attribute_byte_offset = vertex * attribute_stride_size;
+            for (
+                attribute_bytes,
+                MeshBufferVertexAttribute {
+                    size,
+                    shader_key_kind,
+                    ..
+                },
+            ) in attributes.iter()
+            {
+                for i in 0..shader_key_kind.count() {
+                    let attribute_byte_offset = vertex * (size * (i as usize + 1));
 
-                let attribute_bytes = &attribute_bytes
-                    [attribute_byte_offset..attribute_byte_offset + attribute_stride_size];
+                    let attribute_bytes =
+                        &attribute_bytes[attribute_byte_offset..attribute_byte_offset + size];
 
-                vertex_bytes.extend_from_slice(attribute_bytes);
+                    vertex_bytes.extend_from_slice(attribute_bytes);
+                }
             }
         }
 
         let size = vertex_bytes.len() - offset;
+        let attributes = attributes
+            .into_iter()
+            .map(|(_, attribute)| attribute)
+            .collect::<Vec<_>>();
 
         assert_eq!(
             size,
-            vertex_count * attribute_stride_sizes.values().sum::<usize>()
+            vertex_count
+                * attributes
+                    .iter()
+                    .map(|x| (x.size * x.shader_key_kind.count() as usize))
+                    .sum::<usize>()
         );
 
         Ok(Self {
             offset,
             count: vertex_count,
             size,
-            attribute_stride_sizes,
-            attribute_formats,
+            attributes,
         })
     }
 }
