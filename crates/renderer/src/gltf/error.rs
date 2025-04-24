@@ -42,6 +42,9 @@ pub enum AwsmGltfError {
     #[error("[gltf] Unsupported index data type: {0:?}")]
     UnsupportedIndexDataType(gltf::accessor::DataType),
 
+    #[error("[gltf] Unsupported integer conversion: {0:?}")]
+    UnsupportedIntConversion(#[from] std::num::TryFromIntError),
+
     #[error("[gltf] Invalid sparse index size: {0:?}")]
     InvalidSparseIndexSize(gltf::accessor::DataType),
 

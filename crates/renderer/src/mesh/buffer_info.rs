@@ -1,6 +1,6 @@
 use awsm_renderer_core::pipeline::{primitive::IndexFormat, vertex::VertexFormat};
 
-use crate::shaders::ShaderKeyAttribute;
+use crate::shaders::{ShaderKeyAttribute, ShaderKeyMorphs};
 
 #[derive(Default, Debug, Clone)]
 pub struct MeshBufferInfo {
@@ -40,17 +40,24 @@ pub struct MeshBufferIndexInfo {
     // number of index elements for this primitive
     pub count: usize,
     // number of bytes per index (e.g. 2 for u16, 4 for u32)
-    pub stride: usize,
-    // the size of the whole slice of data (all indices)
-    pub size: usize,
+    pub data_size: usize,
     // the format of the index data
     pub format: IndexFormat,
+}
+
+impl MeshBufferIndexInfo {
+    // the size in bytes of the index buffer for this primitive
+    pub fn total_size(&self) -> usize {
+        self.count * self.data_size
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 pub struct MeshBufferMorphInfo {
     // number of morph targets
     pub targets_len: usize,
+    // contains info about the specific attribute targets
+    pub shader_key: ShaderKeyMorphs,
     // the stride of all morph targets across the vertice, without padding
     pub vertex_stride_size: usize,
     // the size of the whole slice of data (all vertices and targets)
@@ -69,6 +76,6 @@ impl MeshBufferInfo {
 
     // the size in bytes of the index buffer for this primitive, if it exists
     pub fn index_len(&self) -> Option<usize> {
-        self.index.as_ref().map(|index| index.count * index.stride)
+        self.index.as_ref().map(|index| index.total_size())
     }
 }

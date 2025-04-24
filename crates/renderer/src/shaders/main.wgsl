@@ -1,11 +1,11 @@
 {% include "util/math.wgsl" %}
 {% include "camera.wgsl" %}
 
-{% if has_morphs %}
+{% if morphs.any() %}
     {% include "vertex/morph.wgsl" %}
 {% endif %}
 
-{% if has_skins %}
+{% if skins > 0 %}
     {% include "vertex/skin.wgsl" %}
 {% endif %}
 

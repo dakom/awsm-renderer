@@ -86,7 +86,7 @@ impl<K: Key, const ZERO: u8> DynamicBuddyBuffer<K, ZERO> {
     }
 
     // careful, just to update existing data that definitely will not grow (or insert)
-    pub fn update_with_unchecked(&mut self, key: K, f: &mut impl FnMut(&mut [u8])) {
+    pub fn update_with_unchecked(&mut self, key: K, f: impl FnOnce(&mut [u8])) {
         match self.slot_indices.get(key) {
             Some((off, size)) => {
                 f(&mut self.raw_data[*off..*off + *size]);
