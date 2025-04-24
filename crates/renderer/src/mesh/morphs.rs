@@ -54,7 +54,7 @@ impl Morphs {
         value_bytes: &[u8],
     ) -> Result<MorphKey> {
         if weights.len() != morph_buffer_info.targets_len {
-            return Err(AwsmMeshError::MorphWeightsTargetsMismatch{
+            return Err(AwsmMeshError::MorphWeightsTargetsMismatch {
                 weights: weights.len(),
                 targets: morph_buffer_info.targets_len,
             });

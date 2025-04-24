@@ -1,6 +1,9 @@
 use awsm_renderer_core::pipeline::primitive::IndexFormat;
 
-use crate::{buffer::helpers::{u8_to_i16_vec, u8_to_i8_vec}, mesh::MeshBufferIndexInfo};
+use crate::{
+    buffer::helpers::{u8_to_i16_vec, u8_to_i8_vec},
+    mesh::MeshBufferIndexInfo,
+};
 
 use super::{accessor::accessor_to_bytes, AwsmGltfError, Result};
 
@@ -73,10 +76,9 @@ impl GltfMeshBufferIndexInfo {
                 };
 
                 match accessor.data_type() {
-                    gltf::accessor::DataType::U16 |  
-                    gltf::accessor::DataType::U32 => {
+                    gltf::accessor::DataType::U16 | gltf::accessor::DataType::U32 => {
                         index_bytes.extend_from_slice(&accessor_bytes);
-                    },
+                    }
                     gltf::accessor::DataType::I16 => {
                         let values: Vec<u16> = u8_to_i16_vec(&accessor_bytes)
                             .into_iter()
@@ -89,7 +91,7 @@ impl GltfMeshBufferIndexInfo {
                             )
                         };
                         index_bytes.extend_from_slice(&bytes);
-                    },
+                    }
                     gltf::accessor::DataType::I8 => {
                         let values: Vec<u16> = u8_to_i8_vec(&accessor_bytes)
                             .into_iter()
@@ -102,12 +104,9 @@ impl GltfMeshBufferIndexInfo {
                             )
                         };
                         index_bytes.extend_from_slice(&bytes);
-                    },
+                    }
                     gltf::accessor::DataType::U8 => {
-                        let values: Vec<u16> = accessor_bytes 
-                            .iter()
-                            .map(|v| (*v).into())
-                            .collect();
+                        let values: Vec<u16> = accessor_bytes.iter().map(|v| (*v).into()).collect();
                         let bytes = unsafe {
                             std::slice::from_raw_parts(
                                 values.as_ptr() as *const u8,
@@ -115,14 +114,13 @@ impl GltfMeshBufferIndexInfo {
                             )
                         };
                         index_bytes.extend_from_slice(&bytes);
-                    },
+                    }
                     gltf::accessor::DataType::F32 => {
                         return Err(AwsmGltfError::UnsupportedIndexDataType(
                             accessor.data_type(),
                         ))
                     }
                 }
-
 
                 let info = Self {
                     offset,
@@ -132,7 +130,6 @@ impl GltfMeshBufferIndexInfo {
                 };
 
                 assert_eq!(index_bytes.len() - offset, info.total_size());
-                
 
                 Ok(Some(info))
             }

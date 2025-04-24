@@ -66,7 +66,6 @@ impl ShaderKeyMorphs {
     }
 }
 
-
 impl ShaderKeyAttribute {
     pub fn count(&self) -> u32 {
         match self {

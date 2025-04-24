@@ -139,9 +139,7 @@ impl MeshShapeBindGroupBinding {
 
     pub fn initial_buffer_size(self) -> usize {
         match self {
-            Self::MorphTargetWeights => {
-                Morphs::WEIGHTS_INITIAL_SIZE
-            }
+            Self::MorphTargetWeights => Morphs::WEIGHTS_INITIAL_SIZE,
             Self::MorphTargetValues => Morphs::VALUES_INITIAL_SIZE,
             Self::SkinJointMatrices => Skins::SKIN_MATRICES_INITIAL_SIZE,
         }
