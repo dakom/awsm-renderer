@@ -1,7 +1,11 @@
 # Next up
 
 - Very minimal placeholder light for viewing
+    - nice example at https://webgpufundamentals.org/webgpu/lessons/webgpu-optimization.html
+        - "let's make a shader module" 
 - Instancing
+    - via extension?
+
 
 ## Approach 
 
@@ -58,6 +62,7 @@ If it's supported here, corresponding core functionality is also supported
     - Allows insertions and deletions at runtime
     - Separate CPU vs. GPU updates
     - Fixed and flexible (buddy) modes
+    - [ ] Evaluate if mapped buffers helps here
 - [x] Transforms
     - One dynamic uniform bind group
     - Dirty flag
