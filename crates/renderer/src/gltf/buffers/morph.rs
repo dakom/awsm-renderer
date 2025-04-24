@@ -40,16 +40,17 @@ impl GltfMeshBufferMorphInfo {
         vertex_count: usize,
         morph_bytes: &mut Vec<u8>,
     ) -> Result<Option<Self>> {
-        let mut shader_key = ShaderKeyMorphs::default();
-        shader_key.position = primitive
-            .morph_targets()
-            .any(|morph_target| morph_target.positions().is_some());
-        shader_key.normal = primitive
-            .morph_targets()
-            .any(|morph_target| morph_target.normals().is_some());
-        shader_key.tangent = primitive
-            .morph_targets()
-            .any(|morph_target| morph_target.tangents().is_some());
+        let shader_key = ShaderKeyMorphs {
+            position: primitive
+                .morph_targets()
+                .any(|morph_target| morph_target.positions().is_some()),
+            normal: primitive
+                .morph_targets()
+                .any(|morph_target| morph_target.normals().is_some()),
+            tangent: primitive
+                .morph_targets()
+                .any(|morph_target| morph_target.tangents().is_some()),
+        };
 
         if !shader_key.any() {
             Ok(None)

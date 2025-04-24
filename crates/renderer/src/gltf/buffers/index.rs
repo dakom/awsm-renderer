@@ -90,7 +90,7 @@ impl GltfMeshBufferIndexInfo {
                                 values.len() * data_size,
                             )
                         };
-                        index_bytes.extend_from_slice(&bytes);
+                        index_bytes.extend_from_slice(bytes);
                     }
                     gltf::accessor::DataType::I8 => {
                         let values: Vec<u16> = u8_to_i8_vec(&accessor_bytes)
@@ -103,7 +103,7 @@ impl GltfMeshBufferIndexInfo {
                                 values.len() * data_size,
                             )
                         };
-                        index_bytes.extend_from_slice(&bytes);
+                        index_bytes.extend_from_slice(bytes);
                     }
                     gltf::accessor::DataType::U8 => {
                         let values: Vec<u16> = accessor_bytes.iter().map(|v| (*v).into()).collect();
@@ -113,7 +113,7 @@ impl GltfMeshBufferIndexInfo {
                                 values.len() * data_size,
                             )
                         };
-                        index_bytes.extend_from_slice(&bytes);
+                        index_bytes.extend_from_slice(bytes);
                     }
                     gltf::accessor::DataType::F32 => {
                         return Err(AwsmGltfError::UnsupportedIndexDataType(
