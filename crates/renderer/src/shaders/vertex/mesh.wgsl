@@ -29,12 +29,12 @@ struct VertexOutput {
 fn vert_main(raw_input: VertexInput) -> VertexOutput {
     var input = raw_input;
 
-
-    {% if has_morphs %}
+    // morphs first: https://github.com/KhronosGroup/glTF/issues/1646#issuecomment-542815692
+    {% if morphs.any() %}
     input = apply_morphs(input);
     {% endif %}
 
-    {% if has_skins %}
+    {% if skins > 0 %}
     input = apply_skin(input);
     {% endif %}
 

@@ -1,9 +1,6 @@
 //***** MORPHS *****
-const MAX_MORPH_WEIGHTS:u32= 8;
-
-// alignment rules dictate we can't just have an array of floats 
 @group(2) @binding(0)
-var<uniform> morph_weights: array<vec4<f32>, MAX_MORPH_WEIGHTS/ 4u>; 
+var<storage, read> morph_weights: array<f32>;
 
 // this is the array of morph target deltas
 // always interleaved as position, normal, tangent
@@ -13,25 +10,26 @@ var<uniform> morph_weights: array<vec4<f32>, MAX_MORPH_WEIGHTS/ 4u>;
 var<storage, read> morph_values: array<f32>; 
 
 // This changes per-shader via constant overrides
-// the rest of the calculations flow from the presence of attributes (which cause the shader to change anyway)
-// i.e. if a shader supports normals, then even if there are no morphs for it, 
-// calculations will be done and the buffer data has zeroes filled in for the morphs
 @id(1) override morph_target_len:u32;
 
 fn apply_morphs(input: VertexInput) -> VertexInput {
     var output = input;
 
     // target_size is the total number of floats for each morph_target (for a given vertex, not across all of them) 
-    var target_size = 3u; // vec3 for position
+    var target_size = 0u; // vec3 for position
 
-    {% if has_normal %}
-    target_size += 3u; // vec3 for normals
+    {% if morphs.position %}
+        target_size += 3u; // vec3 for normals
     {% endif %}
 
-    {% if has_tangent %}
+    {% if morphs.normal %}
+        target_size += 3u; // vec3 for normals
+    {% endif %}
+
+    {% if morphs.tangent %}
     // vec3 for tangents, not vec4
     // from spec: "Note that the W component for handedness is omitted when targeting TANGENT data since handedness cannot be displaced."
-    target_size += 3u; 
+        target_size += 3u; 
     {% endif %}
 
     // TODO - TEXCOORD_n and COLOR_n
@@ -44,27 +42,32 @@ fn apply_morphs(input: VertexInput) -> VertexInput {
         // 2d index into the array
         // 4 floats per vec4, so we need to divide by 4 to get "which vec4" we are in
         // and then mod by 4 to get the index into that vec4
-        var morph_weight = morph_weights[morph_target / 4u][morph_target % 4u];
+        var morph_weight = morph_weights[morph_target];
 
         // For each vertex, skip the "full" morph-target data for all targets
         // then, for reach morph target, skip the morph-target data up until this count
         var offset = (input.vertex_index * all_targets_size) + (morph_target * target_size);
 
-        let morph_position = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
-        output.position += morph_weight * morph_position; 
-
-        {% if has_normal %}
-        offset += 3;
-        let morph_normal = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
-        output.normal += morph_weight * morph_normal; 
+        {% if morphs.position %}
+            let morph_position = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
+            output.position += morph_weight * morph_position; 
+            offset += 3;
         {% endif %}
 
-        {% if has_tangent %}
-        offset += 3;
-        let morph_tangent = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
-        output.tangent.x += morph_weight * morph_tangent.x; 
-        output.tangent.y += morph_weight * morph_tangent.y; 
-        output.tangent.z += morph_weight * morph_tangent.z; 
+        {% if morphs.normal %}
+            let morph_normal = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
+            output.normal += morph_weight * morph_normal; 
+            offset += 3;
+        {% endif %}
+
+        {% if morphs.tangent %}
+            let morph_tangent = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
+            // vec3 for tangents, not vec4
+            // from spec: "Note that the W component for handedness is omitted when targeting TANGENT data since handedness cannot be displaced."
+            output.tangent.x += morph_weight * morph_tangent.x; 
+            output.tangent.y += morph_weight * morph_tangent.y; 
+            output.tangent.z += morph_weight * morph_tangent.z; 
+            offset += 3;
         {% endif %}
 
     }

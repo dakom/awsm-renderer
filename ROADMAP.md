@@ -1,7 +1,7 @@
 # Next up
 
-- InterpolationTest
-    - Fix 
+- Very minimal placeholder light for viewing
+- Instancing
 
 ## Approach 
 
@@ -30,7 +30,6 @@ If it's supported here, corresponding core functionality is also supported
 - Geometry
     - [x] positions
     - [x] morphing
-        - up to 8 weights
     - [x] skinning
         - multiple sets (as many as fit in attribute slots)
 - Animation
@@ -38,11 +37,15 @@ If it's supported here, corresponding core functionality is also supported
     - [x] transform targets (keyable by TransformKey)
     - [x] linear interpolation
     - [x] step interpolation
-        - [ ] test 
     - [x] cubic spline interpolation
-        - [ ] test 
 - Extensions
-    - [ ] Instancing
+    - [ ] EXT_mesh_gpu_instancing
+    - [ ] KHR_materials_unlit
+    - [ ] KHR_lights_punctual
+        - [ ] Directional
+        - [ ] Point
+        - [ ] Spot
+    - [ ]  more at https://github.com/KhronosGroup/glTF/blob/main/extensions/README.md#ratified-khronos-extensions 
 - Materials (TODO - fill this out as we go)
 - Lighting (TODO - fill this out as we go)
 - Skybox (TODO - fill this out as we go)

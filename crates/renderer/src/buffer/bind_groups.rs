@@ -140,7 +140,7 @@ impl MeshShapeBindGroupBinding {
     pub fn initial_buffer_size(self) -> usize {
         match self {
             Self::MorphTargetWeights => {
-                Morphs::WEIGHTS_INITIAL_CAPACITY * Morphs::WEIGHTS_BYTE_ALIGNMENT
+                Morphs::WEIGHTS_INITIAL_SIZE
             }
             Self::MorphTargetValues => Morphs::VALUES_INITIAL_SIZE,
             Self::SkinJointMatrices => Skins::SKIN_MATRICES_INITIAL_SIZE,
@@ -157,7 +157,7 @@ impl MeshShapeBindGroupBinding {
 
     pub fn buffer_usage(self) -> BufferUsage {
         match self {
-            Self::MorphTargetWeights => BufferUsage::new().with_uniform().with_copy_dst(),
+            Self::MorphTargetWeights => BufferUsage::new().with_storage().with_copy_dst(),
             Self::MorphTargetValues => BufferUsage::new().with_storage().with_copy_dst(),
             Self::SkinJointMatrices => BufferUsage::new().with_storage().with_copy_dst(),
         }
@@ -167,9 +167,7 @@ impl MeshShapeBindGroupBinding {
         BindGroupEntry::new(
             self as u32,
             match self {
-                Self::MorphTargetWeights => BindGroupResource::Buffer(
-                    BufferBinding::new(buffer).with_size(Morphs::WEIGHTS_BYTE_ALIGNMENT),
-                ),
+                Self::MorphTargetWeights => BindGroupResource::Buffer(BufferBinding::new(buffer)),
                 Self::MorphTargetValues => BindGroupResource::Buffer(BufferBinding::new(buffer)),
                 Self::SkinJointMatrices => BindGroupResource::Buffer(BufferBinding::new(buffer)),
             },
@@ -291,7 +289,7 @@ impl BindGroups {
                         MeshShapeBindGroupBinding::MorphTargetWeights as u32,
                         BindGroupLayoutResource::Buffer(
                             BufferBindingLayout::new()
-                                .with_binding_type(BufferBindingType::Uniform)
+                                .with_binding_type(BufferBindingType::ReadOnlyStorage)
                                 .with_dynamic_offset(true),
                         ),
                     )

@@ -98,7 +98,7 @@ impl AwsmRenderer {
                 .iter()
                 .map(|s| s.shader_key_kind)
                 .collect(),
-            primitive_buffer_info.morph.is_some(),
+            primitive_buffer_info.morph.as_ref().map(|m| m.shader_key),
         );
 
         let morph_key = match primitive_buffer_info.morph.clone() {
@@ -109,10 +109,14 @@ impl AwsmRenderer {
                 let values = &values[morph_buffer_info.values_offset
                     ..morph_buffer_info.values_offset + morph_buffer_info.values_size];
 
+                // from spec: "The number of array elements MUST match the number of morph targets."
+                // this is generally verified in the insert() call too
+                let weights = gltf_mesh.weights().unwrap();
+
                 Some(
                     self.meshes
                         .morphs
-                        .insert(morph_buffer_info.into(), values)?,
+                        .insert(morph_buffer_info.into(), weights, values)?,
                 )
             }
         };
@@ -223,7 +227,7 @@ impl AwsmRenderer {
                     // safe, can't have info without backing bytes
                     let index_values = ctx.data.buffers.index_bytes.as_ref().unwrap();
                     let index_values = &index_values[index_buffer_info.offset
-                        ..index_buffer_info.offset + index_buffer_info.size];
+                        ..index_buffer_info.offset + index_buffer_info.total_size()];
                     Some((index_values, index_buffer_info.into()))
                 }
             };

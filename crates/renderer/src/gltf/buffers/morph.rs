@@ -4,12 +4,15 @@ use super::Result;
 use crate::buffer::helpers::slice_zeroes;
 use crate::gltf::buffers::accessor::accessor_to_bytes;
 use crate::mesh::MeshBufferMorphInfo;
-use crate::shaders::ShaderKeyAttribute;
+use crate::shaders::{ShaderKeyAttribute, ShaderKeyMorphs};
 
 #[derive(Default, Debug, Clone)]
 pub struct GltfMeshBufferMorphInfo {
     // offset in morph_bytes where this primitive starts
     pub values_offset: usize,
+
+    // contains info about the specific attribute targets
+    pub shader_key: ShaderKeyMorphs,
 
     // number of morph targets
     pub targets_len: usize,
@@ -23,6 +26,7 @@ impl From<GltfMeshBufferMorphInfo> for MeshBufferMorphInfo {
     fn from(info: GltfMeshBufferMorphInfo) -> Self {
         Self {
             targets_len: info.targets_len,
+            shader_key: info.shader_key,
             vertex_stride_size: info.vertex_stride_size,
             values_size: info.values_size,
         }
@@ -36,17 +40,18 @@ impl GltfMeshBufferMorphInfo {
         vertex_count: usize,
         morph_bytes: &mut Vec<u8>,
     ) -> Result<Option<Self>> {
-        let morph_has_position = primitive
+        let mut shader_key = ShaderKeyMorphs::default();
+        shader_key.position = primitive
             .morph_targets()
             .any(|morph_target| morph_target.positions().is_some());
-        let morph_has_normal = primitive
+        shader_key.normal = primitive
             .morph_targets()
             .any(|morph_target| morph_target.normals().is_some());
-        let morph_has_tangent = primitive
+        shader_key.tangent = primitive
             .morph_targets()
             .any(|morph_target| morph_target.tangents().is_some());
 
-        if !morph_has_position && !morph_has_normal && !morph_has_tangent {
+        if !shader_key.any() {
             Ok(None)
         } else {
             let mut morph_targets_buffer_data = Vec::new();
@@ -125,21 +130,21 @@ impl GltfMeshBufferMorphInfo {
                             vertex_morph_stride_size += stride_size;
                         };
 
-                    if morph_has_position {
+                    if shader_key.position {
                         push_bytes(
                             ShaderKeyAttribute::Positions,
                             morph_target_buffer_data.positions.as_ref(),
                         );
                     }
 
-                    if morph_has_normal {
+                    if shader_key.normal {
                         push_bytes(
                             ShaderKeyAttribute::Normals,
                             morph_target_buffer_data.normals.as_ref(),
                         );
                     }
 
-                    if morph_has_tangent {
+                    if shader_key.tangent {
                         push_bytes(
                             ShaderKeyAttribute::Tangents,
                             morph_target_buffer_data.tangents.as_ref(),
@@ -150,6 +155,7 @@ impl GltfMeshBufferMorphInfo {
 
             Ok(Some(Self {
                 values_offset,
+                shader_key,
                 values_size: morph_bytes.len() - values_offset,
                 targets_len: primitive.morph_targets().len(),
                 vertex_stride_size: vertex_morph_stride_size,

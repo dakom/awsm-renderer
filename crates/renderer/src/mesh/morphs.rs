@@ -5,13 +5,12 @@ use super::error::{AwsmMeshError, Result};
 use super::MeshBufferMorphInfo;
 use crate::buffer::bind_groups::{BindGroupIndex, BindGroups, MeshShapeBindGroupBinding};
 use crate::buffer::dynamic_buddy::DynamicBuddyBuffer;
-use crate::buffer::dynamic_fixed::DynamicFixedBuffer;
 
 // The weights are dynamic and updated on a per-mesh basis as frequently as needed
 // The values are essentially static, but may be sourced from different (large) buffers
 // e.g. they are loaded up front per-gltf file
 pub struct Morphs {
-    weights: DynamicFixedBuffer<MorphKey>,
+    weights: DynamicBuddyBuffer<MorphKey>,
     values: DynamicBuddyBuffer<MorphKey>,
     weights_dirty: bool,
     values_dirty: bool,
@@ -25,17 +24,13 @@ impl Default for Morphs {
 }
 
 impl Morphs {
-    pub const WEIGHTS_INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
-    pub const WEIGHTS_BYTE_SIZE: usize = 32; // 8xf32 is 32 bytes
-    pub const WEIGHTS_BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment
+    pub const WEIGHTS_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
     pub const VALUES_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
 
     pub fn new() -> Self {
         Self {
-            weights: DynamicFixedBuffer::new(
-                Self::WEIGHTS_INITIAL_CAPACITY,
-                Self::WEIGHTS_BYTE_SIZE,
-                Self::WEIGHTS_BYTE_ALIGNMENT,
+            weights: DynamicBuddyBuffer::new(
+                Self::WEIGHTS_INITIAL_SIZE,
                 Some("MorphWeights".to_string()),
             ),
             values: DynamicBuddyBuffer::new(
@@ -55,11 +50,20 @@ impl Morphs {
     pub fn insert(
         &mut self,
         morph_buffer_info: MeshBufferMorphInfo,
-        bytes: &[u8],
+        weights: &[f32],
+        value_bytes: &[u8],
     ) -> Result<MorphKey> {
+        if weights.len() != morph_buffer_info.targets_len {
+            return Err(AwsmMeshError::MorphWeightsTargetsMismatch{
+                weights: weights.len(),
+                targets: morph_buffer_info.targets_len,
+            });
+        }
         let key = self.infos.insert(morph_buffer_info.clone());
-        self.weights.update(key, &[0u8; Self::WEIGHTS_BYTE_SIZE]);
-        self.values.update(key, bytes);
+        let weights_u8 =
+            unsafe { std::slice::from_raw_parts(weights.as_ptr() as *const u8, weights.len() * 4) };
+        self.weights.update(key, weights_u8);
+        self.values.update(key, value_bytes);
 
         self.weights_dirty = true;
         self.values_dirty = true;
@@ -96,7 +100,7 @@ impl Morphs {
     ) -> Result<()> {
         let len = self.get_info(key).map(|info| info.targets_len)?;
 
-        self.weights.update_with(key, |slice_u8| {
+        self.weights.update_with_unchecked(key, |slice_u8| {
             let weights_f32 =
                 unsafe { std::slice::from_raw_parts_mut(slice_u8.as_ptr() as *mut f32, len) };
 

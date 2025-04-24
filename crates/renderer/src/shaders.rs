@@ -16,14 +16,14 @@ pub enum ShaderConstantIds {
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
 pub struct ShaderKey {
     attributes: Vec<ShaderKeyAttribute>,
-    has_morphs: bool,
+    morphs: ShaderKeyMorphs,
 }
 
 impl ShaderKey {
-    pub fn new(attributes: Vec<ShaderKeyAttribute>, has_morphs: bool) -> Self {
+    pub fn new(attributes: Vec<ShaderKeyAttribute>, morphs: Option<ShaderKeyMorphs>) -> Self {
         Self {
             attributes,
-            has_morphs,
+            morphs: morphs.unwrap_or_default(),
         }
     }
 }
@@ -52,6 +52,20 @@ pub enum ShaderKeyAttribute {
     /// Joint weights.
     Weights { count: u32 },
 }
+
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ShaderKeyMorphs {
+    pub position: bool,
+    pub normal: bool,
+    pub tangent: bool,
+}
+
+impl ShaderKeyMorphs {
+    pub fn any(&self) -> bool {
+        self.position || self.normal || self.tangent
+    }
+}
+
 
 impl ShaderKeyAttribute {
     pub fn count(&self) -> u32 {
@@ -149,16 +163,8 @@ impl ShaderKey {
 
         let tmpl = ShaderTemplate {
             vertex_input_locations,
-            has_normal: self.attributes.contains(&ShaderKeyAttribute::Normals),
-            has_tangent: self.attributes.contains(&ShaderKeyAttribute::Tangents),
-            has_morphs: self.has_morphs,
-            has_skins: self.attributes.iter().any(|a| {
-                matches!(
-                    a,
-                    ShaderKeyAttribute::Joints { .. } | ShaderKeyAttribute::Weights { .. }
-                )
-            }),
-            skin_count: self
+            morphs: self.morphs,
+            skins: self
                 .attributes
                 .iter()
                 .find_map(|a| {
@@ -182,14 +188,10 @@ impl ShaderKey {
 struct ShaderTemplate {
     // location, interpolation, name, data-type
     pub vertex_input_locations: Vec<VertexInputLocation>,
-    // attributes
-    pub has_normal: bool,
-    pub has_tangent: bool,
     // morphs
-    pub has_morphs: bool,
+    pub morphs: ShaderKeyMorphs,
     // skins
-    pub has_skins: bool,
-    pub skin_count: u32,
+    pub skins: u32,
     // pub skin_targets: Vec<SkinTarget>,
     // pub n_skin_joints: u8,
     // pub tex_coords: Option<Vec<u32>>,

@@ -21,6 +21,12 @@ pub enum AwsmMeshError {
     #[error("[mesh] morph not found: {0:?}")]
     MorphNotFound(MorphKey),
 
+    #[error("[mesh] morph must have same number of weights as targets: {weights} weights != {targets} targets")]
+    MorphWeightsTargetsMismatch {
+        weights: usize,
+        targets: usize,
+    },
+
     #[error("[mesh] {0:?}")]
     BindGroup(#[from] AwsmBindGroupError),
 }

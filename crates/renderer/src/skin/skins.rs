@@ -130,7 +130,7 @@ impl Skins {
                     };
 
                     self.skin_matrices
-                        .update_with_unchecked(skin_key, &mut |matrices| {
+                        .update_with_unchecked(skin_key, |matrices| {
                             let start = index * 16 * 4;
                             matrices[start..start + (16 * 4)].copy_from_slice(bytes);
                         });
