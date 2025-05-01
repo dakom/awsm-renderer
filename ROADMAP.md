@@ -1,10 +1,9 @@
 # Next up
 
-- Very minimal placeholder light for viewing
-    - nice example at https://webgpufundamentals.org/webgpu/lessons/webgpu-optimization.html
-        - "let's make a shader module" 
 - Instancing
     - via extension?
+
+- Optional performance logging
 
 - Initial allocation?
     - derive from gltf?
