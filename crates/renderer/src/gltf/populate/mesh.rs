@@ -14,10 +14,13 @@ use crate::{
     AwsmRenderer,
 };
 use awsm_renderer_core::{
-    pipeline::{fragment::ColorTargetState, primitive::PrimitiveTopology},
+    pipeline::{
+        fragment::ColorTargetState,
+        primitive::{CullMode, FrontFace, PrimitiveState, PrimitiveTopology},
+    },
     shaders::ShaderModuleExt,
 };
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 
 use super::GltfPopulateContext;
 
@@ -149,7 +152,36 @@ impl AwsmRenderer {
         // tracing::info!("positions: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[0].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
         //tracing::info!("normals: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[1].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
 
+        let primitive_state = PrimitiveState::new()
+            .with_topology(match gltf_primitive.mode() {
+                gltf::mesh::Mode::Points => PrimitiveTopology::PointList,
+                gltf::mesh::Mode::Lines => PrimitiveTopology::LineList,
+                gltf::mesh::Mode::LineLoop => {
+                    return Err(AwsmGltfError::UnsupportedPrimitiveMode(
+                        gltf_primitive.mode(),
+                    ))
+                }
+                gltf::mesh::Mode::LineStrip => PrimitiveTopology::LineStrip,
+                gltf::mesh::Mode::Triangles => PrimitiveTopology::TriangleList,
+                gltf::mesh::Mode::TriangleStrip => PrimitiveTopology::TriangleStrip,
+                gltf::mesh::Mode::TriangleFan => {
+                    return Err(AwsmGltfError::UnsupportedPrimitiveMode(
+                        gltf_primitive.mode(),
+                    ))
+                }
+            })
+            .with_front_face(transform_to_winding_order(
+                self.transforms
+                    .get_world(transform_key)
+                    .map_err(AwsmGltfError::TransformToWindingOrder)?,
+            ))
+            .with_cull_mode(match gltf_primitive.material().double_sided() {
+                true => CullMode::None,
+                false => CullMode::Back,
+            });
+
         let mut pipeline_key = RenderPipelineKey::new(shader_key, pipeline_layout_key)
+            .with_primitive(primitive_state)
             .with_vertex_buffer_layout(vertex_buffer_layout)
             .with_fragment_target(ColorTargetState::new(self.gpu.current_context_format()));
 
@@ -189,24 +221,7 @@ impl AwsmRenderer {
             render_pipeline,
             native_primitive_buffer_info.draw_count(),
             transform_key,
-        )
-        .with_topology(match gltf_primitive.mode() {
-            gltf::mesh::Mode::Points => PrimitiveTopology::PointList,
-            gltf::mesh::Mode::Lines => PrimitiveTopology::LineList,
-            gltf::mesh::Mode::LineLoop => {
-                return Err(AwsmGltfError::UnsupportedPrimitiveMode(
-                    gltf_primitive.mode(),
-                ))
-            }
-            gltf::mesh::Mode::LineStrip => PrimitiveTopology::LineStrip,
-            gltf::mesh::Mode::Triangles => PrimitiveTopology::TriangleList,
-            gltf::mesh::Mode::TriangleStrip => PrimitiveTopology::TriangleStrip,
-            gltf::mesh::Mode::TriangleFan => {
-                return Err(AwsmGltfError::UnsupportedPrimitiveMode(
-                    gltf_primitive.mode(),
-                ))
-            }
-        });
+        );
 
         if let Some(aabb) = try_position_aabb(&gltf_primitive) {
             mesh = mesh.with_aabb(aabb);
@@ -306,4 +321,18 @@ fn try_position_aabb(gltf_primitive: &gltf::Primitive<'_>) -> Option<Aabb> {
         min: Vec3::new(min_x as f32, min_y as f32, min_z as f32),
         max: Vec3::new(max_x as f32, max_y as f32, max_z as f32),
     })
+}
+
+fn transform_to_winding_order(world_matrix: &Mat4) -> FrontFace {
+    /*
+     From spec: "When a mesh primitive uses any triangle-based topology (i.e., triangles, triangle strip, or triangle fan),
+     the determinant of the node’s global transform defines the winding order of that primitive.
+     If the determinant is a positive value, the winding order triangle faces is counterclockwise;
+     in the opposite case, the winding order is clockwise.
+    */
+    if world_matrix.determinant() > 0.0 {
+        FrontFace::Ccw
+    } else {
+        FrontFace::Cw
+    }
 }

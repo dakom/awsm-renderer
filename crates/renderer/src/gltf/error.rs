@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{
     animation::AwsmAnimationError, mesh::AwsmMeshError, shaders::AwsmShaderError,
-    skin::AwsmSkinError,
+    skin::AwsmSkinError, transform::AwsmTransformError,
 };
 
 #[derive(Error, Debug)]
@@ -99,6 +99,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] {0:?}")]
     Shader(#[from] AwsmShaderError),
+
+    #[error("[gltf] could not convert transform to winding order: {0:?}")]
+    TransformToWindingOrder(AwsmTransformError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

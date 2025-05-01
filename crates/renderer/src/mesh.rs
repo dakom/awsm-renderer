@@ -3,7 +3,7 @@ mod error;
 mod meshes;
 pub mod morphs;
 
-use awsm_renderer_core::pipeline::primitive::{IndexFormat, PrimitiveTopology};
+use awsm_renderer_core::pipeline::primitive::IndexFormat;
 
 use crate::bounds::Aabb;
 use crate::buffer::bind_groups::BindGroups;
@@ -24,7 +24,6 @@ use super::error::Result;
 pub struct Mesh {
     pub pipeline: web_sys::GpuRenderPipeline,
     pub draw_count: usize, // indices or vertices
-    pub topology: PrimitiveTopology,
     pub aabb: Option<Aabb>,
     pub transform_key: TransformKey,
     pub morph_key: Option<MorphKey>,
@@ -56,17 +55,11 @@ impl Mesh {
         Self {
             pipeline,
             draw_count,
-            topology: PrimitiveTopology::TriangleList,
             transform_key,
             aabb: None,
             morph_key: None,
             skin_key: None,
         }
-    }
-
-    pub fn with_topology(mut self, topology: PrimitiveTopology) -> Self {
-        self.topology = topology;
-        self
     }
 
     pub fn with_aabb(mut self, aabb: Aabb) -> Self {
