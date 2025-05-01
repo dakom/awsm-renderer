@@ -54,6 +54,8 @@ impl AwsmRenderer {
             self.populate_gltf_node_transform(&ctx, &node, None)?;
         }
 
+        self.transforms.update_world();
+
         for node in scene.nodes() {
             self.populate_gltf_node_skin(&ctx, &node)?;
         }

@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use awsm_renderer_core::pipeline::constants::{ConstantOverrideKey, ConstantOverrideValue};
 use awsm_renderer_core::pipeline::fragment::{ColorTargetState, FragmentState};
 use awsm_renderer_core::pipeline::layout::{PipelineLayoutDescriptor, PipelineLayoutKind};
+use awsm_renderer_core::pipeline::primitive::PrimitiveState;
 use awsm_renderer_core::pipeline::vertex::{VertexBufferLayout, VertexState};
 use awsm_renderer_core::pipeline::RenderPipelineDescriptor;
 
@@ -21,6 +22,7 @@ use super::populate::GltfPopulateContext;
 pub(crate) struct RenderPipelineKey {
     pub shader_key: ShaderKey,
     pub layout_key: PipelineLayoutKey,
+    pub primitive: PrimitiveState,
     pub fragment_targets: Vec<ColorTargetState>,
     pub vertex_buffer_layouts: Vec<VertexBufferLayout>,
     pub vertex_constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
@@ -84,6 +86,7 @@ impl RenderPipelineKey {
         Self {
             shader_key,
             layout_key,
+            primitive: PrimitiveState::default(),
             fragment_targets: Vec::new(),
             vertex_buffer_layouts: Vec::new(),
             vertex_constants: BTreeMap::new(),
@@ -97,6 +100,11 @@ impl RenderPipelineKey {
 
     pub fn with_fragment_target(mut self, target: ColorTargetState) -> Self {
         self.fragment_targets.push(target);
+        self
+    }
+
+    pub fn with_primitive(mut self, primitive: PrimitiveState) -> Self {
+        self.primitive = primitive;
         self
     }
 
@@ -146,6 +154,7 @@ impl RenderPipelineKey {
 
         Ok(
             RenderPipelineDescriptor::new(vertex, Some("Mesh (from gltf primitive)"))
+                .with_primitive(self.primitive)
                 .with_layout(layout)
                 .with_fragment(fragment)
                 .into(),

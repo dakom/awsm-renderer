@@ -174,6 +174,13 @@ impl ShaderKey {
                     }
                 })
                 .unwrap_or_default(),
+            has_normals: self.attributes.iter().any(|a| {
+                if let ShaderKeyAttribute::Normals = a {
+                    true
+                } else {
+                    false
+                }
+            }),
         };
 
         let source = tmpl.render().unwrap();
@@ -191,6 +198,9 @@ struct ShaderTemplate {
     pub morphs: ShaderKeyMorphs,
     // skins
     pub skins: u32,
+
+    // simpler ways of doing things
+    pub has_normals: bool,
     // pub skin_targets: Vec<SkinTarget>,
     // pub n_skin_joints: u8,
     // pub tex_coords: Option<Vec<u32>>,

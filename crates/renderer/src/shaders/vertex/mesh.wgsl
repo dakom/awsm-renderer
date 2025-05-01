@@ -22,6 +22,9 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
+    {% if has_normals %}
+        @location(0) normal: vec3<f32>,
+    {% endif %}
 };
 
 //***** MAIN *****
@@ -43,7 +46,12 @@ fn vert_main(raw_input: VertexInput) -> VertexOutput {
     pos = camera.view_proj * pos;
 
     // Assign and return final output
-    let output = VertexOutput(pos);
+    let output = VertexOutput(
+        pos,
+        {% if has_normals %}
+            input.normal,
+        {% endif %}
+    );
 
     return output;
 }

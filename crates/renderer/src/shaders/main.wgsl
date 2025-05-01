@@ -11,4 +11,5 @@
 
 {% include "vertex/mesh.wgsl" %}
 
-{% include "fragment/pbr.wgsl" %}
+{% include "fragment/light.wgsl" %}
+{% include "fragment/simple.wgsl" %}

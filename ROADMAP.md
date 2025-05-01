@@ -6,6 +6,8 @@
 - Instancing
     - via extension?
 
+- Initial allocation?
+    - derive from gltf?
 
 ## Approach 
 
