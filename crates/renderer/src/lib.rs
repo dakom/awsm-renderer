@@ -31,6 +31,7 @@ pub struct AwsmRenderer {
     pub camera: CameraBuffer,
     pub transforms: Transforms,
     pub skins: Skins,
+    pub logging: AwsmRendererLogging,
 
     #[cfg(feature = "gltf")]
     gltf: gltf::cache::GltfCache,
@@ -41,7 +42,7 @@ pub struct AwsmRenderer {
 
 impl AwsmRenderer {
     pub fn remove_all(&mut self) -> crate::error::Result<()> {
-        let deps = RebuildDeps::new(&self.gpu)?;
+        let deps = RebuildDeps::new(&self.gpu, self.logging.clone())?;
         let RebuildDeps {
             bind_groups,
             meshes,
@@ -73,13 +74,20 @@ impl AwsmRenderer {
 
 pub struct AwsmRendererBuilder {
     gpu: core::renderer::AwsmRendererWebGpuBuilder,
+    logging: AwsmRendererLogging,
 }
 
 impl AwsmRendererBuilder {
     pub fn new(gpu: web_sys::Gpu) -> Self {
         Self {
             gpu: core::renderer::AwsmRendererWebGpuBuilder::new(gpu),
+            logging: AwsmRendererLogging::default(),
         }
+    }
+
+    pub fn with_logging(mut self, logging: AwsmRendererLogging) -> Self {
+        self.logging = logging;
+        self
     }
 
     pub async fn init_adapter(mut self) -> core::error::Result<Self> {
@@ -100,7 +108,7 @@ impl AwsmRendererBuilder {
     pub fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
         let gpu = self.gpu.build()?;
 
-        let deps = RebuildDeps::new(&gpu)?;
+        let deps = RebuildDeps::new(&gpu, self.logging)?;
 
         Ok(AwsmRenderer {
             gpu,
@@ -109,6 +117,7 @@ impl AwsmRendererBuilder {
             transforms: deps.transforms,
             skins: deps.skins,
             bind_groups: deps.bind_groups,
+            logging: deps.logging,
 
             #[cfg(feature = "gltf")]
             gltf: deps.gltf,
@@ -125,6 +134,7 @@ struct RebuildDeps {
     pub camera: CameraBuffer,
     pub transforms: Transforms,
     pub skins: Skins,
+    pub logging: AwsmRendererLogging,
 
     #[cfg(feature = "gltf")]
     pub gltf: gltf::cache::GltfCache,
@@ -134,7 +144,10 @@ struct RebuildDeps {
 }
 
 impl RebuildDeps {
-    pub fn new(gpu: &AwsmRendererWebGpu) -> std::result::Result<Self, crate::error::AwsmError> {
+    pub fn new(
+        gpu: &AwsmRendererWebGpu,
+        logging: AwsmRendererLogging,
+    ) -> std::result::Result<Self, crate::error::AwsmError> {
         let bind_groups = buffer::bind_groups::BindGroups::new(gpu)?;
         let camera = camera::CameraBuffer::new()?;
         let meshes = Meshes::new(gpu)?;
@@ -147,6 +160,7 @@ impl RebuildDeps {
             camera,
             transforms,
             skins,
+            logging,
 
             #[cfg(feature = "gltf")]
             gltf: gltf::cache::GltfCache::default(),
@@ -154,4 +168,9 @@ impl RebuildDeps {
             animations: animation::Animations::default(),
         })
     }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct AwsmRendererLogging {
+    pub render_timings: bool,
 }

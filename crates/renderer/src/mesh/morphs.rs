@@ -5,6 +5,7 @@ use super::error::{AwsmMeshError, Result};
 use super::MeshBufferMorphInfo;
 use crate::buffer::bind_groups::{BindGroupIndex, BindGroups, MeshShapeBindGroupBinding};
 use crate::buffer::dynamic_buddy::DynamicBuddyBuffer;
+use crate::AwsmRendererLogging;
 
 // The weights are dynamic and updated on a per-mesh basis as frequently as needed
 // The values are essentially static, but may be sourced from different (large) buffers
@@ -116,10 +117,16 @@ impl Morphs {
     // just write the entire buffer in one fell swoop
     pub fn write_gpu(
         &mut self,
+        logging: &AwsmRendererLogging,
         gpu: &AwsmRendererWebGpu,
         bind_groups: &mut BindGroups,
     ) -> Result<()> {
         if self.weights_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Morph Weights GPU write").entered())
+            } else {
+                None
+            };
             let bind_group_index =
                 BindGroupIndex::MeshShape(MeshShapeBindGroupBinding::MorphTargetWeights);
             if let Some(new_size) = self.weights.take_gpu_needs_resize() {
@@ -136,6 +143,11 @@ impl Morphs {
             self.weights_dirty = false;
         }
         if self.values_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Morph Values GPU write").entered())
+            } else {
+                None
+            };
             let bind_group_index =
                 BindGroupIndex::MeshShape(MeshShapeBindGroupBinding::MorphTargetValues);
             if let Some(new_size) = self.values.take_gpu_needs_resize() {

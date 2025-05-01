@@ -16,14 +16,21 @@ impl AwsmRenderer {
     // the various underlying raw data can be updated on their own cadence
     // or just call .update_all() right before .render() for convenience
     pub fn render(&mut self) -> Result<()> {
+        let _maybe_span_guard = if self.logging.render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "Render").entered())
+        } else {
+            None
+        };
         self.transforms
-            .write_gpu(&self.gpu, &mut self.bind_groups)?;
-        self.skins.write_gpu(&self.gpu, &mut self.bind_groups)?;
+            .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
+        self.skins
+            .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
         self.meshes
             .morphs
-            .write_gpu(&self.gpu, &mut self.bind_groups)?;
-        self.meshes.write_gpu(&self.gpu)?;
-        self.camera.write_gpu(&self.gpu, &self.bind_groups)?;
+            .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
+        self.meshes.write_gpu(&self.logging, &self.gpu)?;
+        self.camera
+            .write_gpu(&self.logging, &self.gpu, &self.bind_groups)?;
 
         let current_texture_view = self.gpu.current_context_texture_view()?;
         let command_encoder = self.gpu.create_command_encoder(Some("Render pass"));

@@ -8,7 +8,7 @@ use crate::{
         bind_groups::{BindGroupIndex, BindGroups, MeshAllBindGroupBinding},
         dynamic_fixed::DynamicFixedBuffer,
     },
-    AwsmRenderer,
+    AwsmRenderer, AwsmRendererLogging,
 };
 
 use super::{
@@ -178,10 +178,17 @@ impl Transforms {
     // just write the entire buffer in one fell swoop
     pub fn write_gpu(
         &mut self,
+        logging: &AwsmRendererLogging,
         gpu: &AwsmRendererWebGpu,
         bind_groups: &mut BindGroups,
     ) -> Result<()> {
         if self.gpu_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Transform GPU write").entered())
+            } else {
+                None
+            };
+
             let bind_group_index = BindGroupIndex::MeshAll(MeshAllBindGroupBinding::Transform);
             if let Some(new_size) = self.buffer.take_gpu_needs_resize() {
                 bind_groups.gpu_resize(gpu, bind_group_index, new_size)?;

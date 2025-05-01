@@ -29,6 +29,8 @@ pub fn init_logger() {
             .with(tracing_env)
             .init();
 
+        tracing::info!("Logger initialized");
+
         std::panic::set_hook(Box::new(tracing_panic::panic_hook));
     });
 }

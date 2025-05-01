@@ -1,4 +1,4 @@
-use awsm_renderer::AwsmRendererBuilder;
+use awsm_renderer::{AwsmRendererBuilder, AwsmRendererLogging};
 use awsm_web::dom::resize::{self, ResizeObserver};
 use wasm_bindgen_futures::spawn_local;
 
@@ -59,6 +59,7 @@ impl AppCanvas {
                 .after_inserted(clone!(state => move |canvas| {
                     spawn_local(clone!(state => async move {
                         let renderer = AwsmRendererBuilder::new(web_sys::window().unwrap().navigator().gpu())
+                            .with_logging(AwsmRendererLogging { render_timings: true })
                             .init_adapter()
                             .await
                             .unwrap()

@@ -3,7 +3,7 @@
 - Instancing
     - via extension?
 
-- Optional performance logging
+- fix "dev-release" mode (just base path?)
 
 - Initial allocation?
     - derive from gltf?

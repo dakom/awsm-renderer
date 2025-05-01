@@ -6,7 +6,7 @@ use thiserror::Error;
 use crate::buffer::bind_groups::{
     AwsmBindGroupError, BindGroupIndex, BindGroups, UniversalBindGroupBinding,
 };
-use crate::AwsmRenderer;
+use crate::{AwsmRenderer, AwsmRendererLogging};
 
 impl AwsmRenderer {
     pub fn update_camera(&mut self, camera: &impl CameraExt) -> Result<()> {
@@ -81,8 +81,19 @@ impl CameraBuffer {
     }
 
     // writes to the GPU
-    pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu, bind_groups: &BindGroups) -> Result<()> {
+    pub fn write_gpu(
+        &mut self,
+        logging: &AwsmRendererLogging,
+        gpu: &AwsmRendererWebGpu,
+        bind_groups: &BindGroups,
+    ) -> Result<()> {
         if self.gpu_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Camera GPU write").entered())
+            } else {
+                None
+            };
+
             bind_groups
                 .gpu_write(
                     gpu,
