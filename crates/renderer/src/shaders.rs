@@ -174,13 +174,10 @@ impl ShaderKey {
                     }
                 })
                 .unwrap_or_default(),
-            has_normals: self.attributes.iter().any(|a| {
-                if let ShaderKeyAttribute::Normals = a {
-                    true
-                } else {
-                    false
-                }
-            }),
+            has_normals: self
+                .attributes
+                .iter()
+                .any(|a| matches!(a, ShaderKeyAttribute::Normals)),
         };
 
         let source = tmpl.render().unwrap();
