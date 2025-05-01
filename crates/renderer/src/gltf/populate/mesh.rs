@@ -14,7 +14,10 @@ use crate::{
     AwsmRenderer,
 };
 use awsm_renderer_core::{
-    pipeline::{fragment::ColorTargetState, primitive::{CullMode, FrontFace, PrimitiveState, PrimitiveTopology}},
+    pipeline::{
+        fragment::ColorTargetState,
+        primitive::{CullMode, FrontFace, PrimitiveState, PrimitiveTopology},
+    },
     shaders::ShaderModuleExt,
 };
 use glam::{Mat4, Vec3};
@@ -167,10 +170,14 @@ impl AwsmRenderer {
                     ))
                 }
             })
-            .with_front_face(transform_to_winding_order(self.transforms.get_world(transform_key).map_err(AwsmGltfError::TransformToWindingOrder)?))
+            .with_front_face(transform_to_winding_order(
+                self.transforms
+                    .get_world(transform_key)
+                    .map_err(AwsmGltfError::TransformToWindingOrder)?,
+            ))
             .with_cull_mode(match gltf_primitive.material().double_sided() {
                 true => CullMode::None,
-                false => CullMode::Back, 
+                false => CullMode::Back,
             });
 
         let mut pipeline_key = RenderPipelineKey::new(shader_key, pipeline_layout_key)
@@ -318,9 +325,9 @@ fn try_position_aabb(gltf_primitive: &gltf::Primitive<'_>) -> Option<Aabb> {
 
 fn transform_to_winding_order(world_matrix: &Mat4) -> FrontFace {
     /*
-     From spec: "When a mesh primitive uses any triangle-based topology (i.e., triangles, triangle strip, or triangle fan), 
-     the determinant of the node’s global transform defines the winding order of that primitive. 
-     If the determinant is a positive value, the winding order triangle faces is counterclockwise; 
+     From spec: "When a mesh primitive uses any triangle-based topology (i.e., triangles, triangle strip, or triangle fan),
+     the determinant of the node’s global transform defines the winding order of that primitive.
+     If the determinant is a positive value, the winding order triangle faces is counterclockwise;
      in the opposite case, the winding order is clockwise.
     */
     if world_matrix.determinant() > 0.0 {

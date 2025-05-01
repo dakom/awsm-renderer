@@ -1,3 +1,10 @@
+{% if morphs.any() %}
+    {% include "vertex/mesh/morph.wgsl" %}
+{% endif %}
+
+{% if skins > 0 %}
+    {% include "vertex/mesh/skin.wgsl" %}
+{% endif %}
 
 @group(1) @binding(0)
 var<uniform> u_transform: TransformUniform;
