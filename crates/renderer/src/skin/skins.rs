@@ -10,7 +10,7 @@ use crate::{
         dynamic_buddy::DynamicBuddyBuffer,
     },
     transform::{TransformKey, Transforms},
-    AwsmRenderer,
+    AwsmRenderer, AwsmRendererLogging,
 };
 
 use super::error::{AwsmSkinError, Result};
@@ -143,10 +143,17 @@ impl Skins {
 
     pub fn write_gpu(
         &mut self,
+        logging: &AwsmRendererLogging,
         gpu: &AwsmRendererWebGpu,
         bind_groups: &mut BindGroups,
     ) -> Result<()> {
         if self.gpu_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Skins GPU write").entered())
+            } else {
+                None
+            };
+
             let bind_group_index =
                 BindGroupIndex::MeshShape(MeshShapeBindGroupBinding::SkinJointMatrices);
             if let Some(new_size) = self.skin_matrices.take_gpu_needs_resize() {

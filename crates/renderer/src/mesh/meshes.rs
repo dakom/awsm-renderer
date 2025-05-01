@@ -4,6 +4,7 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
 use crate::buffer::dynamic_buddy::DynamicBuddyBuffer;
+use crate::AwsmRendererLogging;
 
 use super::error::{AwsmMeshError, Result};
 use super::morphs::Morphs;
@@ -127,8 +128,17 @@ impl Meshes {
         }
     }
 
-    pub fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+    pub fn write_gpu(
+        &mut self,
+        logging: &AwsmRendererLogging,
+        gpu: &AwsmRendererWebGpu,
+    ) -> Result<()> {
         if self.vertex_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Mesh vertex GPU write").entered())
+            } else {
+                None
+            };
             if let Some(new_size) = self.vertex_buffers.take_gpu_needs_resize() {
                 self.gpu_vertex_buffer = gpu_create_vertex_buffer(gpu, new_size)?;
             }
@@ -142,6 +152,11 @@ impl Meshes {
             self.vertex_dirty = false;
         }
         if self.index_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Mesh index GPU write").entered())
+            } else {
+                None
+            };
             if let Some(new_size) = self.index_buffers.take_gpu_needs_resize() {
                 self.gpu_index_buffer = gpu_create_index_buffer(gpu, new_size)?;
             }
