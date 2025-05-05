@@ -102,6 +102,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] could not convert transform to winding order: {0:?}")]
     TransformToWindingOrder(AwsmTransformError),
+
+    #[error("[gltf] instancing extension: {0:?}")]
+    ExtInstancing(anyhow::Error),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

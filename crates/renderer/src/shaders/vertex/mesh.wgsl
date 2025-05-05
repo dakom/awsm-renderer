@@ -49,7 +49,21 @@ fn vert_main(raw_input: VertexInput) -> VertexOutput {
     {% endif %}
 
     // Transform the vertex position by the model matrix, and then by the view projection matrix
-    var pos = u_transform.model * vec4<f32>(input.position, 1.0);
+    {% if has_instance_transform %}
+        // Transform the vertex position by the instance transform
+        let instance_transform = mat4x4<f32>(
+            raw_input.instance_transform_row_0,
+            raw_input.instance_transform_row_1,
+            raw_input.instance_transform_row_2,
+            raw_input.instance_transform_row_3,
+        );
+
+        let model_transform = u_transform.model * instance_transform;
+    {% else %}
+        let model_transform = u_transform.model;
+    {% endif %}
+
+    var pos = model_transform * vec4<f32>(input.position, 1.0);
     pos = camera.view_proj * pos;
 
     // Assign and return final output

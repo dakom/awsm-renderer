@@ -80,10 +80,11 @@ impl Mesh {
     pub fn push_commands(&self, ctx: &mut RenderContext, mesh_key: MeshKey) -> Result<()> {
         ctx.render_pass.set_pipeline(&self.pipeline);
 
+        let transform_offset = ctx.transforms.buffer_offset(self.transform_key)? as u32;
         ctx.render_pass.set_bind_group(
             BindGroups::MESH_ALL_INDEX,
             ctx.bind_groups.gpu_mesh_all_bind_group(),
-            Some(&[ctx.transforms.buffer_offset(self.transform_key)? as u32]),
+            Some(&[transform_offset]),
         )?;
 
         // if _any_ shapes are used, set the bind group
@@ -116,7 +117,16 @@ impl Mesh {
             None,
         );
 
-        match ctx.meshes.index_buffer_offset_format(mesh_key).ok() {
+        if let Ok(offset) = ctx.instances.transform_buffer_offset(self.transform_key) {
+            ctx.render_pass.set_vertex_buffer(
+                1,
+                ctx.instances.gpu_transform_buffer(),
+                Some(offset as u64),
+                None,
+            );
+        }
+
+        let indexed = match ctx.meshes.index_buffer_offset_format(mesh_key).ok() {
             Some((offset, format)) => {
                 ctx.render_pass.set_index_buffer(
                     ctx.meshes.gpu_index_buffer(),
@@ -124,10 +134,30 @@ impl Mesh {
                     Some(offset as u64),
                     None,
                 );
+                true
+            }
+            None => false,
+        };
+
+        match (
+            indexed,
+            ctx.instances.transform_instance_count(self.transform_key),
+        ) {
+            (false, None) => {
+                ctx.render_pass.draw(self.draw_count as u32);
+            }
+            (true, None) => {
                 ctx.render_pass.draw_indexed(self.draw_count as u32);
             }
-            None => {
-                ctx.render_pass.draw(self.draw_count as u32);
+            (false, Some(instance_count)) => {
+                ctx.render_pass
+                    .draw_with_instance_count(self.draw_count as u32, instance_count as u32);
+            }
+            (true, Some(instance_count)) => {
+                ctx.render_pass.draw_indexed_with_instance_count(
+                    self.draw_count as u32,
+                    instance_count as u32,
+                );
             }
         }
 
