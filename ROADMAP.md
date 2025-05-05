@@ -1,7 +1,6 @@
 # Next up
 
-- Instancing
-    - via extension?
+- Textures
 
 - fix "dev-release" mode (just base path?)
 
@@ -37,6 +36,11 @@ If it's supported here, corresponding core functionality is also supported
     - [x] morphing
     - [x] skinning
         - multiple sets (as many as fit in attribute slots)
+- Textures
+    - [ ] images and samplers
+    - [ ] texture arrays
+    - [ ] cubemaps
+    - [ ] 3D textures
 - Animation
     - [x] morph targets (keyable by MorphKey)
     - [x] transform targets (keyable by TransformKey)
@@ -44,7 +48,7 @@ If it's supported here, corresponding core functionality is also supported
     - [x] step interpolation
     - [x] cubic spline interpolation
 - Extensions
-    - [ ] EXT_mesh_gpu_instancing
+    - [x] EXT_mesh_gpu_instancing
     - [ ] KHR_materials_unlit
     - [ ] KHR_lights_punctual
         - [ ] Directional
@@ -87,7 +91,7 @@ If it's supported here, corresponding core functionality is also supported
 ## Drawing
 - [x] non-indexed
 - [x] indexed
-- [ ] instancing
+- [x] instancing
 - [ ] Early z pre-pass
 - [ ] Opaque front to back
 - [ ] Transparent back to front

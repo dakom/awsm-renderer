@@ -6,6 +6,7 @@ use awsm_renderer_core::command::{LoadOp, StoreOp};
 use crate::buffer::bind_groups::BindGroups;
 use crate::core::command::CommandEncoder;
 use crate::error::Result;
+use crate::instances::Instances;
 use crate::mesh::Meshes;
 use crate::skin::Skins;
 use crate::transform::Transforms;
@@ -21,8 +22,10 @@ impl AwsmRenderer {
         } else {
             None
         };
+
         self.transforms
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
+        self.instances.write_gpu(&self.logging, &self.gpu)?;
         self.skins
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
         self.meshes
@@ -54,6 +57,7 @@ impl AwsmRenderer {
             transforms: &self.transforms,
             meshes: &self.meshes,
             skins: &self.skins,
+            instances: &self.instances,
             bind_groups: &self.bind_groups,
         };
 
@@ -82,5 +86,6 @@ pub struct RenderContext<'a> {
     pub transforms: &'a Transforms,
     pub meshes: &'a Meshes,
     pub skins: &'a Skins,
+    pub instances: &'a Instances,
     pub bind_groups: &'a BindGroups,
 }

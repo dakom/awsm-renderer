@@ -93,12 +93,15 @@ impl RenderPipelineKey {
         }
     }
 
-    pub fn with_vertex_buffer_layout(mut self, vertex_buffer_layout: VertexBufferLayout) -> Self {
+    pub fn with_push_vertex_buffer_layout(
+        mut self,
+        vertex_buffer_layout: VertexBufferLayout,
+    ) -> Self {
         self.vertex_buffer_layouts.push(vertex_buffer_layout);
         self
     }
 
-    pub fn with_fragment_target(mut self, target: ColorTargetState) -> Self {
+    pub fn with_push_fragment_target(mut self, target: ColorTargetState) -> Self {
         self.fragment_targets.push(target);
         self
     }

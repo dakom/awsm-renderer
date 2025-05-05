@@ -15,16 +15,28 @@ pub enum ShaderConstantIds {
 // is controlled via various components as-needed
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
 pub struct ShaderKey {
-    attributes: Vec<ShaderKeyAttribute>,
-    morphs: ShaderKeyMorphs,
+    pub attributes: Vec<ShaderKeyAttribute>,
+    pub morphs: ShaderKeyMorphs,
+    pub instancing: ShaderKeyInstancing,
 }
 
 impl ShaderKey {
-    pub fn new(attributes: Vec<ShaderKeyAttribute>, morphs: Option<ShaderKeyMorphs>) -> Self {
+    pub fn new(attributes: Vec<ShaderKeyAttribute>) -> Self {
         Self {
             attributes,
-            morphs: morphs.unwrap_or_default(),
+            morphs: Default::default(),
+            instancing: Default::default(),
         }
+    }
+
+    pub fn with_morphs(mut self, morphs: ShaderKeyMorphs) -> Self {
+        self.morphs = morphs;
+        self
+    }
+
+    pub fn with_instancing(mut self, instancing: ShaderKeyInstancing) -> Self {
+        self.instancing = instancing;
+        self
     }
 }
 
@@ -64,6 +76,11 @@ impl ShaderKeyMorphs {
     pub fn any(&self) -> bool {
         self.position || self.normal || self.tangent
     }
+}
+
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ShaderKeyInstancing {
+    pub transform: bool,
 }
 
 impl ShaderKeyAttribute {
@@ -160,6 +177,18 @@ impl ShaderKey {
             }
         }
 
+        if self.instancing.transform {
+            for i in 0..4 {
+                vertex_input_locations.push(VertexInputLocation {
+                    location: shader_location,
+                    interpolation: None,
+                    name: format!("instance_transform_row_{i}"),
+                    data_type: "vec4<f32>".to_string(),
+                });
+                shader_location += 1;
+            }
+        }
+
         let tmpl = ShaderTemplate {
             vertex_input_locations,
             morphs: self.morphs,
@@ -178,6 +207,7 @@ impl ShaderKey {
                 .attributes
                 .iter()
                 .any(|a| matches!(a, ShaderKeyAttribute::Normals)),
+            has_instance_transform: self.instancing.transform,
         };
 
         let source = tmpl.render().unwrap();
@@ -198,6 +228,7 @@ struct ShaderTemplate {
 
     // simpler ways of doing things
     pub has_normals: bool,
+    pub has_instance_transform: bool,
     // pub skin_targets: Vec<SkinTarget>,
     // pub n_skin_joints: u8,
     // pub tex_coords: Option<Vec<u32>>,

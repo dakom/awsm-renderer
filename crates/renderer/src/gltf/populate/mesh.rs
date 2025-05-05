@@ -4,11 +4,11 @@ use crate::{
     bounds::Aabb,
     gltf::{
         error::{AwsmGltfError, Result},
-        layout::primitive_vertex_buffer_layout,
+        layout::{instance_transform_vertex_buffer_layout, primitive_vertex_buffer_layout},
         pipelines::{PipelineLayoutKey, RenderPipelineKey},
     },
     mesh::{Mesh, MeshBufferInfo},
-    shaders::{ShaderConstantIds, ShaderKey},
+    shaders::{ShaderConstantIds, ShaderKey, ShaderKeyInstancing},
     skin::SkinKey,
     transform::{Transform, TransformKey},
     AwsmRenderer,
@@ -94,15 +94,27 @@ impl AwsmRenderer {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
-        let shader_key = ShaderKey::new(
+        let mut shader_key = ShaderKey::new(
             primitive_buffer_info
                 .vertex
                 .attributes
                 .iter()
                 .map(|s| s.shader_key_kind)
                 .collect(),
-            primitive_buffer_info.morph.as_ref().map(|m| m.shader_key),
         );
+
+        if let Some(shader_morph_key) = primitive_buffer_info.morph.as_ref().map(|m| m.shader_key) {
+            shader_key = shader_key.with_morphs(shader_morph_key)
+        }
+
+        if ctx
+            .transform_is_instanced
+            .lock()
+            .unwrap()
+            .contains(&transform_key)
+        {
+            shader_key = shader_key.with_instancing(ShaderKeyInstancing { transform: true });
+        }
 
         let morph_key = match primitive_buffer_info.morph.clone() {
             None => None,
@@ -146,7 +158,12 @@ impl AwsmRenderer {
         // we only need one vertex buffer per-mesh, because we've already constructed our buffers
         // to be one contiguous buffer of interleaved vertex data.
         // the attributes of this one vertex buffer layout contain all the info needed for the shader locations
-        let vertex_buffer_layout = primitive_vertex_buffer_layout(primitive_buffer_info)?;
+        let (vertex_buffer_layout, shader_location) =
+            primitive_vertex_buffer_layout(primitive_buffer_info)?;
+        let instance_transform_vertex_buffer_layout = match shader_key.instancing.transform {
+            true => Some(instance_transform_vertex_buffer_layout(shader_location)),
+            false => None,
+        };
 
         // tracing::info!("indices: {:?}", debug_slice_to_u16(ctx.data.buffers.index_bytes.as_ref().unwrap()));
         // tracing::info!("positions: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[0].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
@@ -182,8 +199,15 @@ impl AwsmRenderer {
 
         let mut pipeline_key = RenderPipelineKey::new(shader_key, pipeline_layout_key)
             .with_primitive(primitive_state)
-            .with_vertex_buffer_layout(vertex_buffer_layout)
-            .with_fragment_target(ColorTargetState::new(self.gpu.current_context_format()));
+            .with_push_vertex_buffer_layout(vertex_buffer_layout)
+            .with_push_fragment_target(ColorTargetState::new(self.gpu.current_context_format()));
+
+        if let Some(instance_transform_vertex_buffer_layout) =
+            instance_transform_vertex_buffer_layout
+        {
+            pipeline_key = pipeline_key
+                .with_push_vertex_buffer_layout(instance_transform_vertex_buffer_layout);
+        }
 
         if let Some(morph) = &primitive_buffer_info.morph {
             pipeline_key = pipeline_key.with_vertex_constant(

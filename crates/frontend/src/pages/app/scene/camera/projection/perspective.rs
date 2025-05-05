@@ -54,6 +54,10 @@ impl PerspectiveCamera {
         // Give ourselves a little slack in front and behind
         self.near = (distance - bounding_radius * margin * 2.0).max(0.01);
         self.far = distance + bounding_radius * margin * 2.0;
+
+        // eh, whatever
+        self.near = self.near.min(0.001);
+        self.far = self.far.max(1000000.0);
     }
 
     /// Standard right‑handed perspective projection

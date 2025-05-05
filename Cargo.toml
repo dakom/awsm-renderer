@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 description = "awsm renderer"
 edition = "2021"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.3"
 license = "MIT"
 authors = ["David Komer"]
 rust-version = "1.80.0"
@@ -76,7 +76,7 @@ askama = {version = "0.13.1", default-features = false, features = ["config", "d
 glam = {version = "0.30.1", features = ["bytemuck"]}
 
 # Media
-gltf = {version = "1.4.1", features = ["KHR_lights_punctual"]}
+gltf = {version = "1.4.1", features = ["KHR_lights_punctual", "extensions"]}
 exr = "1.73.0"
 
 # Browser bindings and helpers
