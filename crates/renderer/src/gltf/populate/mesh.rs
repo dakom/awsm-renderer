@@ -14,13 +14,10 @@ use crate::{
     transform::{Transform, TransformKey},
     AwsmRenderer,
 };
-use awsm_renderer_core::{
-    pipeline::{
+use awsm_renderer_core::pipeline::{
         fragment::ColorTargetState,
         primitive::{CullMode, FrontFace, PrimitiveState, PrimitiveTopology},
-    },
-    shaders::ShaderModuleExt,
-};
+    };
 use glam::{Mat4, Vec3};
 
 use super::GltfPopulateContext;
@@ -105,7 +102,7 @@ impl AwsmRenderer {
                 .map(|s| s.shader_key_kind)
                 .collect(),
         )
-        .with_material(material_cache_key.into_shader_cache_key());
+        .with_material(material_cache_key.shader_cache_key());
 
         if let Some(shader_morph_key) = primitive_buffer_info.morph.as_ref().map(|m| m.shader_key) {
             shader_cache_key = shader_cache_key.with_morphs(shader_morph_key)
@@ -214,11 +211,11 @@ impl AwsmRenderer {
         let material_key = match self.gltf.materials.get(&material_cache_key).cloned() {
             Some(material_key) => material_key,
             None => {
-                let material_layout_cache_key = material_cache_key.into_layout_key();
+                let material_layout_cache_key = material_cache_key.layout_key();
                 let layout_key = match self.gltf.material_layouts.get(&material_layout_cache_key) {
-                    Some(layout_key) => layout_key.clone(),
+                    Some(layout_key) => *layout_key,
                     None => {
-                        let layout_entries = material_layout_cache_key.into_layout_entries();
+                        let layout_entries = material_layout_cache_key.layout_entries();
                         let layout_key = self
                             .bind_groups
                             .materials
@@ -226,12 +223,12 @@ impl AwsmRenderer {
                             .map_err(AwsmGltfError::MaterialBindGroupLayout)?;
                         self.gltf
                             .material_layouts
-                            .insert(material_layout_cache_key, layout_key.clone());
+                            .insert(material_layout_cache_key, layout_key);
                         layout_key
                     }
                 };
 
-                let entries = material_cache_key.into_entries(&self.gpu, ctx)?;
+                let entries = material_cache_key.entries(&self.gpu, ctx)?;
                 let material_key = self
                     .bind_groups
                     .materials
@@ -239,7 +236,7 @@ impl AwsmRenderer {
                     .map_err(AwsmGltfError::MaterialBindGroup)?;
                 self.gltf
                     .materials
-                    .insert(material_cache_key.clone(), material_key.clone());
+                    .insert(material_cache_key.clone(), material_key);
 
                 material_key
             }

@@ -185,7 +185,7 @@ impl ImageData {
     }
 }
 
-impl<'a> From<CopyExternalImageSourceInfo<'a>> for web_sys::GpuCopyExternalImageSourceInfo {
+impl From<CopyExternalImageSourceInfo<'_>> for web_sys::GpuCopyExternalImageSourceInfo {
     fn from(info: CopyExternalImageSourceInfo) -> Self {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/copyExternalImageToTexture#source
         // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuCopyExternalImageSourceInfo.html
@@ -216,11 +216,11 @@ impl<'a> From<CopyExternalImageSourceInfo<'a>> for web_sys::GpuCopyExternalImage
     }
 }
 
-impl<'a> From<CopyExternalImageDestInfo<'a>> for web_sys::GpuCopyExternalImageDestInfo {
+impl From<CopyExternalImageDestInfo<'_>> for web_sys::GpuCopyExternalImageDestInfo {
     fn from(info: CopyExternalImageDestInfo) -> Self {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/copyExternalImageToTexture#destination
         // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuCopyExternalImageDestInfo.html
-        let info_js = web_sys::GpuCopyExternalImageDestInfo::new(&info.texture);
+        let info_js = web_sys::GpuCopyExternalImageDestInfo::new(info.texture);
 
         if let Some(aspect) = info.aspect {
             info_js.set_aspect(aspect);

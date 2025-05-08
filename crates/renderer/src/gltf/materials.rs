@@ -158,13 +158,13 @@ impl GltfMaterialKey {
         key
     }
 
-    pub fn into_layout_key(&self) -> GltfMaterialLayoutKey {
+    pub fn layout_key(&self) -> GltfMaterialLayoutKey {
         GltfMaterialLayoutKey {
             base_color: self.base_color.is_some(),
         }
     }
 
-    pub fn into_shader_cache_key(&self) -> ShaderCacheKeyMaterial {
+    pub fn shader_cache_key(&self) -> ShaderCacheKeyMaterial {
         let mut key = ShaderCacheKeyMaterial::default();
         if let Some(info) = self.base_color {
             key.base_color_tex_coord_index = Some(info.tex_coord_index as u32);
@@ -172,7 +172,7 @@ impl GltfMaterialKey {
         key
     }
 
-    pub fn into_entries(
+    pub fn entries(
         &self,
         gpu: &AwsmRendererWebGpu,
         ctx: &GltfPopulateContext,
@@ -195,7 +195,7 @@ impl GltfMaterialKey {
 }
 
 impl GltfMaterialLayoutKey {
-    pub fn into_layout_entries(&self) -> Vec<MaterialBindingLayoutEntry> {
+    pub fn layout_entries(&self) -> Vec<MaterialBindingLayoutEntry> {
         let mut entries = Vec::new();
 
         if self.base_color {

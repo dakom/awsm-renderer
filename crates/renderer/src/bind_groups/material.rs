@@ -22,6 +22,12 @@ pub enum MaterialBindingEntry {
     Sampler(web_sys::GpuSampler),
     Texture(web_sys::GpuTextureView),
 }
+impl Default for MaterialBindGroups {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MaterialBindGroups {
     pub fn new() -> Self {
         Self {
@@ -44,7 +50,7 @@ impl MaterialBindGroups {
             .bind_groups
             .get(key)
             .ok_or(AwsmBindGroupError::MissingMaterial(key))?;
-        Ok(&bind_group)
+        Ok(bind_group)
     }
 
     pub fn gpu_material_bind_group_layout(
@@ -59,7 +65,7 @@ impl MaterialBindGroups {
             .layouts
             .get(layout_key)
             .ok_or(AwsmBindGroupError::MissingMaterialLayout(layout_key))?;
-        Ok(&layout)
+        Ok(layout)
     }
 
     pub fn insert_layout(

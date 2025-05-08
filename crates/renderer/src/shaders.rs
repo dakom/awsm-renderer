@@ -6,11 +6,16 @@ use awsm_renderer_core::{
     renderer::AwsmRendererWebGpu,
     shaders::{ShaderModuleDescriptor, ShaderModuleExt},
 };
-use gltf::json::extensions::material;
 use thiserror::Error;
 
 pub struct Shaders {
     cache: HashMap<ShaderCacheKey, web_sys::GpuShaderModule>,
+}
+
+impl Default for Shaders {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Shaders {
