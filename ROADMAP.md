@@ -1,7 +1,5 @@
 # Next up
 
-- Textures
-
 - fix "dev-release" mode (just base path?)
 
 - Initial allocation?
@@ -52,7 +50,7 @@ If it's supported here, corresponding core functionality is also supported
     - [ ]  more at https://github.com/KhronosGroup/glTF/blob/main/extensions/README.md#ratified-khronos-extensions 
 - Materials
     - [ ] PBR metallic-roughness
-        - [ ] base color
+        - [x] base color
         - [ ] metallic
         - [ ] roughness
         - [ ] normal
@@ -103,7 +101,7 @@ If it's supported here, corresponding core functionality is also supported
 - [ ] Transparent back to front
 
 ## Textures
-- [ ] 2D textures
+- [x] 2D textures
 - [ ] 3D textures
 - [ ] Mipmaps (port https://github.com/JolifantoBambla/webgpu-spd)
 

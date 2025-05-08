@@ -161,6 +161,12 @@ pub struct TextureBindingLayout {
     pub sample_type: Option<TextureSampleType>,
 }
 
+impl Default for TextureBindingLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TextureBindingLayout {
     pub fn new() -> Self {
         Self {

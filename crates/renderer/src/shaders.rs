@@ -188,7 +188,7 @@ impl ShaderCacheKey {
     }
 
     pub fn into_source(&self) -> Result<String> {
-        let mut has_normals = false;
+        let mut material = ShaderTemplateMaterial::default();
         let mut skins = None;
 
         let mut vertex_input_locations = Vec::new();
@@ -201,7 +201,7 @@ impl ShaderCacheKey {
             for count in 0..attribute.count() {
                 match attribute {
                     ShaderCacheKeyAttribute::Normals => {
-                        has_normals = true;
+                        material.has_normal = true;
                     }
                     ShaderCacheKeyAttribute::Joints { count } => {
                         skins = Some(*count);
@@ -256,8 +256,6 @@ impl ShaderCacheKey {
         let mut vertex_output_locations = Vec::new();
         let mut fragment_buffer_bindings = Vec::new();
 
-        let mut material = ShaderTemplateMaterial::default();
-
         if let Some(texcoord_index) = self.material.base_color_tex_coord_index {
             fragment_buffer_bindings.push(DynamicBufferBinding {
                 group: 2,
@@ -288,12 +286,16 @@ impl ShaderCacheKey {
             material.has_base_color = true;
         }
 
-        if has_normals {
+        if material.has_normal {
             vertex_output_locations.push(VertexLocation {
                 location: vertex_output_locations.len() as u32,
                 interpolation: None,
                 name: "normal".to_string(),
                 data_type: "vec3<f32>".to_string(),
+            });
+            vertex_to_fragment_assignments.push(VertexToFragmentAssignment {
+                vertex_name: "normal".to_string(),
+                fragment_name: "normal".to_string(),
             });
         }
 
@@ -305,6 +307,7 @@ impl ShaderCacheKey {
             skins: skins.unwrap_or_default(),
             has_instance_transform: self.instancing.transform,
             fragment_shader_kind: FragmentShaderKind::Pbr,
+            //fragment_shader_kind: FragmentShaderKind::DebugNormals,
             fragment_buffer_bindings,
             material,
         };
@@ -348,6 +351,7 @@ pub struct ShaderTemplateMaterial {
     // the idea here is that with these gates, we can write normal shader code
     // since the variables are assigned (and from then on, we don't care about the location)
     pub has_base_color: bool,
+    pub has_normal: bool,
 }
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]

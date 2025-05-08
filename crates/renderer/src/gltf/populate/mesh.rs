@@ -15,9 +15,9 @@ use crate::{
     AwsmRenderer,
 };
 use awsm_renderer_core::pipeline::{
-        fragment::ColorTargetState,
-        primitive::{CullMode, FrontFace, PrimitiveState, PrimitiveTopology},
-    };
+    fragment::ColorTargetState,
+    primitive::{CullMode, FrontFace, PrimitiveState, PrimitiveTopology},
+};
 use glam::{Mat4, Vec3};
 
 use super::GltfPopulateContext;

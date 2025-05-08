@@ -82,8 +82,8 @@ impl ImageData {
                         depth_or_array_layers: None,
                     },
                     Self::Bitmap(img) => Extent3d {
-                        width: img.width() as u32,
-                        height: Some(img.height() as u32),
+                        width: img.width(),
+                        height: Some(img.height()),
                         depth_or_array_layers: None,
                     },
                 }
@@ -170,7 +170,7 @@ impl ImageData {
             },
         };
 
-        let mut descriptor = TextureDescriptor::new(self.format(), self.size(), usage);
+        let descriptor = TextureDescriptor::new(self.format(), self.size(), usage);
         if generate_mipmap {
             // TODO
             //descriptor = descriptor.with_mip_level_count(12);
