@@ -3,7 +3,7 @@ use awsm_renderer_core::command::render_pass::{
 };
 use awsm_renderer_core::command::{LoadOp, StoreOp};
 
-use crate::buffer::bind_groups::BindGroups;
+use crate::bind_groups::BindGroups;
 use crate::core::command::CommandEncoder;
 use crate::error::Result;
 use crate::instances::Instances;
@@ -62,8 +62,8 @@ impl AwsmRenderer {
         };
 
         ctx.render_pass.set_bind_group(
-            BindGroups::UNIVERSAL_INDEX,
-            ctx.bind_groups.gpu_universal_bind_group(),
+            0,
+            ctx.bind_groups.buffers.gpu_universal_bind_group(),
             None,
         )?;
 

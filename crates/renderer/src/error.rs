@@ -2,7 +2,7 @@ use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
 use crate::{
-    buffer::bind_groups::AwsmBindGroupError, camera::AwsmCameraError, instances::AwsmInstanceError,
+    bind_groups::AwsmBindGroupError, camera::AwsmCameraError, instances::AwsmInstanceError,
     mesh::AwsmMeshError, shaders::AwsmShaderError, skin::AwsmSkinError,
     transform::AwsmTransformError,
 };

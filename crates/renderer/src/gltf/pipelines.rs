@@ -7,21 +7,21 @@ use awsm_renderer_core::pipeline::primitive::PrimitiveState;
 use awsm_renderer_core::pipeline::vertex::{VertexBufferLayout, VertexState};
 use awsm_renderer_core::pipeline::RenderPipelineDescriptor;
 
+use crate::bind_groups::material::MaterialKey;
 use crate::gltf::error::Result;
 
-use crate::mesh::MorphKey;
-use crate::shaders::ShaderKey;
-use crate::skin::SkinKey;
+use crate::shaders::ShaderCacheKey;
 use crate::AwsmRenderer;
 
 use super::buffers::GltfMeshBufferInfo;
+use super::error::AwsmGltfError;
 use super::populate::GltfPopulateContext;
 
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct RenderPipelineKey {
-    pub shader_key: ShaderKey,
-    pub layout_key: PipelineLayoutKey,
+pub(crate) struct GltfRenderPipelineKey {
+    pub shader_key: ShaderCacheKey,
+    pub layout_key: GltfPipelineLayoutKey,
     pub primitive: PrimitiveState,
     pub fragment_targets: Vec<ColorTargetState>,
     pub vertex_buffer_layouts: Vec<VertexBufferLayout>,
@@ -30,11 +30,13 @@ pub(crate) struct RenderPipelineKey {
 
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
-pub(crate) struct PipelineLayoutKey {
+pub(crate) struct GltfPipelineLayoutKey {
     pub morph_targets_len: Option<usize>, // TODO - override constant in shader
+    pub has_morph_key: bool,
+    pub has_skin_key: bool,
 }
 
-impl PipelineLayoutKey {
+impl GltfPipelineLayoutKey {
     #[allow(private_interfaces)]
     pub fn new(_ctx: &GltfPopulateContext, buffer_info: &GltfMeshBufferInfo) -> Self {
         let mut key = Self::default();
@@ -47,28 +49,36 @@ impl PipelineLayoutKey {
     }
 }
 
-impl PipelineLayoutKey {
+impl GltfPipelineLayoutKey {
     pub fn into_descriptor(
         self,
         renderer: &AwsmRenderer,
-        morph_key: Option<MorphKey>,
-        skin_key: Option<SkinKey>,
+        material_key: MaterialKey,
     ) -> Result<PipelineLayoutDescriptor> {
         let mut bind_group_layouts = vec![
             renderer
                 .bind_groups
+                .buffers
                 .gpu_universal_bind_group_layout()
                 .clone(),
             renderer
                 .bind_groups
+                .buffers
                 .gpu_mesh_all_bind_group_layout()
+                .clone(),
+            renderer
+                .bind_groups
+                .materials
+                .gpu_material_bind_group_layout(material_key)
+                .map_err(AwsmGltfError::MaterialBindGroupLayout)?
                 .clone(),
         ];
 
-        if morph_key.is_some() || skin_key.is_some() {
+        if self.has_morph_key || self.has_skin_key {
             bind_group_layouts.push(
                 renderer
                     .bind_groups
+                    .buffers
                     .gpu_mesh_shape_bind_group_layout()
                     .clone(),
             );
@@ -81,8 +91,8 @@ impl PipelineLayoutKey {
     }
 }
 
-impl RenderPipelineKey {
-    pub fn new(shader_key: ShaderKey, layout_key: PipelineLayoutKey) -> Self {
+impl GltfRenderPipelineKey {
+    pub fn new(shader_key: ShaderCacheKey, layout_key: GltfPipelineLayoutKey) -> Self {
         Self {
             shader_key,
             layout_key,
@@ -124,8 +134,7 @@ impl RenderPipelineKey {
         self,
         renderer: &mut AwsmRenderer,
         shader_module: &web_sys::GpuShaderModule,
-        morph_key: Option<MorphKey>,
-        skin_key: Option<SkinKey>,
+        material_key: MaterialKey,
     ) -> Result<web_sys::GpuRenderPipelineDescriptor> {
         let mut vertex = VertexState::new(shader_module, None);
         vertex.buffer_layouts = self.vertex_buffer_layouts;
@@ -139,7 +148,7 @@ impl RenderPipelineKey {
                     &self
                         .layout_key
                         .clone()
-                        .into_descriptor(renderer, morph_key, skin_key)?
+                        .into_descriptor(renderer, material_key)?
                         .into(),
                 );
 

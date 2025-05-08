@@ -3,7 +3,9 @@ use slotmap::{new_key_type, SlotMap};
 
 use super::error::{AwsmMeshError, Result};
 use super::MeshBufferMorphInfo;
-use crate::buffer::bind_groups::{BindGroupIndex, BindGroups, MeshShapeBindGroupBinding};
+use crate::bind_groups::{
+    buffer::BufferBindGroupIndex, buffer::MeshShapeBindGroupBinding, BindGroups,
+};
 use crate::buffer::dynamic_buddy::DynamicBuddyBuffer;
 use crate::AwsmRendererLogging;
 
@@ -128,11 +130,13 @@ impl Morphs {
                 None
             };
             let bind_group_index =
-                BindGroupIndex::MeshShape(MeshShapeBindGroupBinding::MorphTargetWeights);
+                BufferBindGroupIndex::MeshShape(MeshShapeBindGroupBinding::MorphTargetWeights);
             if let Some(new_size) = self.weights.take_gpu_needs_resize() {
-                bind_groups.gpu_resize(gpu, bind_group_index, new_size)?;
+                bind_groups
+                    .buffers
+                    .gpu_resize(gpu, bind_group_index, new_size)?;
             }
-            bind_groups.gpu_write(
+            bind_groups.buffers.gpu_write(
                 gpu,
                 bind_group_index,
                 None,
@@ -149,11 +153,13 @@ impl Morphs {
                 None
             };
             let bind_group_index =
-                BindGroupIndex::MeshShape(MeshShapeBindGroupBinding::MorphTargetValues);
+                BufferBindGroupIndex::MeshShape(MeshShapeBindGroupBinding::MorphTargetValues);
             if let Some(new_size) = self.values.take_gpu_needs_resize() {
-                bind_groups.gpu_resize(gpu, bind_group_index, new_size)?;
+                bind_groups
+                    .buffers
+                    .gpu_resize(gpu, bind_group_index, new_size)?;
             }
-            bind_groups.gpu_write(
+            bind_groups.buffers.gpu_write(
                 gpu,
                 bind_group_index,
                 None,

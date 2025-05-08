@@ -1,11 +1,13 @@
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
-use buffer::bind_groups::BindGroups;
+use bind_groups::BindGroups;
 use camera::CameraBuffer;
 use instances::Instances;
 use mesh::Meshes;
+use shaders::Shaders;
 use skin::Skins;
 use transform::Transforms;
 
+pub mod bind_groups;
 pub mod bounds;
 pub mod buffer;
 pub mod camera;
@@ -34,6 +36,7 @@ pub struct AwsmRenderer {
     pub transforms: Transforms,
     pub skins: Skins,
     pub instances: Instances,
+    pub shaders: Shaders,
     pub logging: AwsmRendererLogging,
 
     #[cfg(feature = "gltf")]
@@ -120,6 +123,7 @@ impl AwsmRendererBuilder {
             transforms: deps.transforms,
             skins: deps.skins,
             instances: deps.instances,
+            shaders: deps.shaders,
             bind_groups: deps.bind_groups,
             logging: deps.logging,
 
@@ -139,6 +143,7 @@ struct RebuildDeps {
     pub transforms: Transforms,
     pub skins: Skins,
     pub instances: Instances,
+    pub shaders: Shaders,
     pub logging: AwsmRendererLogging,
 
     #[cfg(feature = "gltf")]
@@ -153,12 +158,13 @@ impl RebuildDeps {
         gpu: &AwsmRendererWebGpu,
         logging: AwsmRendererLogging,
     ) -> std::result::Result<Self, crate::error::AwsmError> {
-        let bind_groups = buffer::bind_groups::BindGroups::new(gpu)?;
+        let bind_groups = bind_groups::BindGroups::new(gpu)?;
         let camera = camera::CameraBuffer::new()?;
         let meshes = Meshes::new(gpu)?;
         let transforms = Transforms::new()?;
         let skins = Skins::new();
         let instances = Instances::new(gpu)?;
+        let shaders = Shaders::new();
 
         Ok(Self {
             bind_groups,
@@ -168,6 +174,7 @@ impl RebuildDeps {
             skins,
             logging,
             instances,
+            shaders,
 
             #[cfg(feature = "gltf")]
             gltf: gltf::cache::GltfCache::default(),

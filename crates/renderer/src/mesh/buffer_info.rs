@@ -1,6 +1,6 @@
 use awsm_renderer_core::pipeline::{primitive::IndexFormat, vertex::VertexFormat};
 
-use crate::shaders::{ShaderKeyAttribute, ShaderKeyMorphs};
+use crate::shaders::{ShaderCacheKeyAttribute, ShaderCacheKeyMorphs};
 
 #[derive(Default, Debug, Clone)]
 pub struct MeshBufferInfo {
@@ -32,7 +32,7 @@ pub struct MeshBufferVertexAttribute {
     // the format of this attribute
     pub format: VertexFormat,
     // shader key kind
-    pub shader_key_kind: ShaderKeyAttribute,
+    pub shader_key_kind: ShaderCacheKeyAttribute,
 }
 
 #[derive(Debug, Clone)]
@@ -57,7 +57,7 @@ pub struct MeshBufferMorphInfo {
     // number of morph targets
     pub targets_len: usize,
     // contains info about the specific attribute targets
-    pub shader_key: ShaderKeyMorphs,
+    pub shader_key: ShaderCacheKeyMorphs,
     // the stride of all morph targets across the vertice, without padding
     pub vertex_stride_size: usize,
     // the size of the whole slice of data (all vertices and targets)

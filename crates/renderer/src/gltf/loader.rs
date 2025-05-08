@@ -1,4 +1,4 @@
-use awsm_renderer_core::image::ImageLoader;
+use awsm_renderer_core::image::ImageData;
 use futures::future::try_join_all;
 /// Loads a GltfResource, independently of the renderer
 /// the loaded resource can then be passed into renderer.populate_gltf()
@@ -6,9 +6,9 @@ use futures::future::try_join_all;
 /// This is merely a web-specific adaptation of https://github.com/gltf-rs/gltf/blob/master/src/import.rs
 /// Main differences:
 /// 1. Everything is async
-/// 2. No image_data_reference feature (hence no base64/image crate dependencies)
-/// 3. Some error checking is removed since the web api does it inherently (e.g. mime type)
-/// 4. Adds awsm as a dependency
+/// 2. Uses web api (by way of internal ImageData helper)
+/// 3. No image_data_reference feature (hence no base64/image crate dependencies)
+/// 4. Some error checking is removed since the web api does it inherently (e.g. mime type)
 ///
 use gltf::{buffer, image, Document, Error as GltfError, Gltf};
 use std::future::Future;
@@ -21,7 +21,7 @@ use super::error::AwsmGltfError;
 pub struct GltfLoader {
     pub doc: Document,
     pub buffers: Vec<Vec<u8>>,
-    pub images: Vec<ImageLoader>,
+    pub images: Vec<ImageData>,
 }
 
 pub enum GltfFileType {
@@ -165,7 +165,7 @@ async fn import_image_data<'a>(
     document: &'a Document,
     base: &'a str,
     buffer_data: &'a [Vec<u8>],
-) -> anyhow::Result<Vec<ImageLoader>> {
+) -> anyhow::Result<Vec<ImageData>> {
     let futures = get_image_futures(document, base, buffer_data);
 
     try_join_all(futures).await
@@ -175,7 +175,7 @@ fn get_image_futures<'a>(
     document: &'a Document,
     base: &str,
     buffer_data: &'a [Vec<u8>],
-) -> Vec<impl Future<Output = anyhow::Result<ImageLoader>> + 'a> {
+) -> Vec<impl Future<Output = anyhow::Result<ImageData>> + 'a> {
     //these need to be owned by each future simultaneously
     let base = Arc::new(base.to_owned());
 
@@ -187,7 +187,7 @@ fn get_image_futures<'a>(
                 match image.source() {
                     image::Source::Uri { uri, mime_type: _ } => {
                         let url = get_url(base.as_ref(), uri)?;
-                        Ok(ImageLoader::load_url(&url).await?)
+                        Ok(ImageData::load_url(&url).await?)
                     }
                     image::Source::View { view, mime_type } => {
                         let parent_buffer_data = &buffer_data[view.buffer().index()];
@@ -195,8 +195,8 @@ fn get_image_futures<'a>(
                         let end = begin + view.length();
                         let encoded_image = &parent_buffer_data[begin..end];
                         let image =
-                            crate::core::image::element::load_u8(&encoded_image, mime_type).await?;
-                        Ok(ImageLoader::HtmlImage(image))
+                            crate::core::image::bitmap::load_u8(&encoded_image, mime_type).await?;
+                        Ok(ImageData::Bitmap(image))
                     }
                 }
             }

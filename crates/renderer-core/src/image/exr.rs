@@ -1,5 +1,6 @@
-use std::io::Cursor;
+use std::{borrow::Cow, io::Cursor};
 
+use crate::error::{AwsmCoreError, Result};
 use exr::prelude::{ChannelDescription, ReadChannels, ReadLayers};
 
 #[derive(Clone, Debug)]
@@ -60,5 +61,11 @@ impl ExrImage {
             .from_buffered(cursor)?;
 
         Ok(result.layer_data.channel_data.pixels)
+    }
+
+    pub fn js_obj(&self) -> Result<Cow<'_, js_sys::Object>> {
+        Err(AwsmCoreError::ExrImageToJsValue(
+            "EXR to js value not implemented yet".to_string(),
+        ))
     }
 }

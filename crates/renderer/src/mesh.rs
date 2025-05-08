@@ -5,11 +5,10 @@ pub mod morphs;
 
 use awsm_renderer_core::pipeline::primitive::IndexFormat;
 
-use crate::bounds::Aabb;
-use crate::buffer::bind_groups::BindGroups;
 use crate::render::RenderContext;
 use crate::skin::SkinKey;
 use crate::transform::TransformKey;
+use crate::{bind_groups::material::MaterialKey, bounds::Aabb};
 
 pub use buffer_info::*;
 pub use error::AwsmMeshError;
@@ -26,6 +25,7 @@ pub struct Mesh {
     pub draw_count: usize, // indices or vertices
     pub aabb: Option<Aabb>,
     pub transform_key: TransformKey,
+    pub material_key: MaterialKey,
     pub morph_key: Option<MorphKey>,
     pub skin_key: Option<SkinKey>,
 }
@@ -51,11 +51,13 @@ impl Mesh {
         pipeline: web_sys::GpuRenderPipeline,
         draw_count: usize,
         transform_key: TransformKey,
+        material_key: MaterialKey,
     ) -> Self {
         Self {
             pipeline,
             draw_count,
             transform_key,
+            material_key,
             aabb: None,
             morph_key: None,
             skin_key: None,
@@ -82,9 +84,17 @@ impl Mesh {
 
         let transform_offset = ctx.transforms.buffer_offset(self.transform_key)? as u32;
         ctx.render_pass.set_bind_group(
-            BindGroups::MESH_ALL_INDEX,
-            ctx.bind_groups.gpu_mesh_all_bind_group(),
+            1,
+            ctx.bind_groups.buffers.gpu_mesh_all_bind_group(),
             Some(&[transform_offset]),
+        )?;
+
+        ctx.render_pass.set_bind_group(
+            2,
+            ctx.bind_groups
+                .materials
+                .gpu_material_bind_group(self.material_key)?,
+            None,
         )?;
 
         // if _any_ shapes are used, set the bind group
@@ -104,8 +114,8 @@ impl Mesh {
             };
 
             ctx.render_pass.set_bind_group(
-                BindGroups::MESH_SHAPE_INDEX,
-                ctx.bind_groups.gpu_mesh_shape_bind_group(),
+                3,
+                ctx.bind_groups.buffers.gpu_mesh_shape_bind_group(),
                 Some(&[morph_weights_offset, morph_values_offset, skin_offset]),
             )?;
         }

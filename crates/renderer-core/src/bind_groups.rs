@@ -118,6 +118,17 @@ pub struct SamplerBindingLayout {
     pub binding_type: Option<SamplerBindingType>,
 }
 
+impl SamplerBindingLayout {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_binding_type(mut self, binding_type: SamplerBindingType) -> Self {
+        self.binding_type = Some(binding_type);
+        self
+    }
+}
+
 pub type SamplerBindingType = web_sys::GpuSamplerBindingType;
 
 #[derive(Debug, Clone)]
@@ -148,6 +159,37 @@ pub struct TextureBindingLayout {
     pub multisampled: Option<bool>,
     pub view_dimension: Option<TextureViewDimension>,
     pub sample_type: Option<TextureSampleType>,
+}
+
+impl Default for TextureBindingLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TextureBindingLayout {
+    pub fn new() -> Self {
+        Self {
+            multisampled: None,
+            view_dimension: None,
+            sample_type: None,
+        }
+    }
+
+    pub fn with_multisampled(mut self, multisampled: bool) -> Self {
+        self.multisampled = Some(multisampled);
+        self
+    }
+
+    pub fn with_view_dimension(mut self, view_dimension: TextureViewDimension) -> Self {
+        self.view_dimension = Some(view_dimension);
+        self
+    }
+
+    pub fn with_sample_type(mut self, sample_type: TextureSampleType) -> Self {
+        self.sample_type = Some(sample_type);
+        self
+    }
 }
 
 #[derive(Debug, Clone)]

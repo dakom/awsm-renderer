@@ -1,7 +1,5 @@
 # Next up
 
-- Textures
-
 - fix "dev-release" mode (just base path?)
 
 - Initial allocation?
@@ -36,11 +34,6 @@ If it's supported here, corresponding core functionality is also supported
     - [x] morphing
     - [x] skinning
         - multiple sets (as many as fit in attribute slots)
-- Textures
-    - [ ] images and samplers
-    - [ ] texture arrays
-    - [ ] cubemaps
-    - [ ] 3D textures
 - Animation
     - [x] morph targets (keyable by MorphKey)
     - [x] transform targets (keyable by TransformKey)
@@ -55,7 +48,15 @@ If it's supported here, corresponding core functionality is also supported
         - [ ] Point
         - [ ] Spot
     - [ ]  more at https://github.com/KhronosGroup/glTF/blob/main/extensions/README.md#ratified-khronos-extensions 
-- Materials (TODO - fill this out as we go)
+- Materials
+    - [ ] PBR metallic-roughness
+        - [x] base color
+        - [ ] metallic
+        - [ ] roughness
+        - [ ] normal
+        - [ ] occlusion
+        - [ ] emissive
+    - [ ] mipmaps
 - Lighting (TODO - fill this out as we go)
 - Skybox (TODO - fill this out as we go)
 
@@ -84,6 +85,9 @@ If it's supported here, corresponding core functionality is also supported
     - One vertex buffer
     - One index buffer
     - Gpu gating on dirty flag
+- [x] Instancing
+    - One dynamic uniform bind group for transforms
+    - Gpu gating on dirty flag
 - Camera
     - [x] Single uniform buffer 
     - [ ] Frustum culling
@@ -95,6 +99,14 @@ If it's supported here, corresponding core functionality is also supported
 - [ ] Early z pre-pass
 - [ ] Opaque front to back
 - [ ] Transparent back to front
+
+## Textures
+- [x] 2D textures
+- [ ] 3D textures
+- [ ] Mipmaps (port https://github.com/JolifantoBambla/webgpu-spd)
+
+## Skybox
+- [ ] Cubemap
 
 ## Animation system 
 - [x] Players

@@ -1,6 +1,8 @@
 pub type TextureFormat = web_sys::GpuTextureFormat;
 pub type TextureAspect = web_sys::GpuTextureAspect;
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuTextureViewDimension.html
 pub type TextureViewDimension = web_sys::GpuTextureViewDimension;
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuTextureSampleType.html
 pub type TextureSampleType = web_sys::GpuTextureSampleType;
 pub type TextureDimension = web_sys::GpuTextureDimension;
 
@@ -35,6 +37,7 @@ impl TextureDescriptor<'_> {
 
 #[derive(Debug, Clone, Default)]
 pub struct TextureUsage {
+    // https://developer.mozilla.org/en-US/docs/Web/API/GPUTexture/usage
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/gpu_texture_usage/index.html
     pub copy_dst: bool,
     pub copy_src: bool,

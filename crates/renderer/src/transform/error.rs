@@ -1,4 +1,4 @@
-use crate::{buffer::bind_groups::AwsmBindGroupError, skin::AwsmSkinError};
+use crate::{bind_groups::AwsmBindGroupError, skin::AwsmSkinError};
 
 use super::transforms::TransformKey;
 use awsm_renderer_core::error::AwsmCoreError;

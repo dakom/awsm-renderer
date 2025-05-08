@@ -4,5 +4,6 @@ pub mod data;
 pub mod error;
 pub mod layout;
 pub mod loader;
+pub mod materials;
 pub mod pipelines;
 pub mod populate;
