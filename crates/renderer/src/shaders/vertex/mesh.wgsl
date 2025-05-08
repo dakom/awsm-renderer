@@ -29,9 +29,14 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-    {% if has_normals %}
-        @location(0) normal: vec3<f32>,
-    {% endif %}
+    {% for loc in vertex_output_locations %}
+        {%- match loc.interpolation %}
+            {% when Some with (interpolation) %}
+                @location({{ loc.location }}) @interpolate({{ interpolation }}) {{ loc.name }}: {{ loc.data_type }},
+            {% when _ %}
+                @location({{ loc.location }}) {{ loc.name }}: {{ loc.data_type }},
+        {% endmatch %}
+    {% endfor %}
 };
 
 //***** MAIN *****
@@ -66,13 +71,13 @@ fn vert_main(raw_input: VertexInput) -> VertexOutput {
     var pos = model_transform * vec4<f32>(input.position, 1.0);
     pos = camera.view_proj * pos;
 
+
     // Assign and return final output
-    let output = VertexOutput(
-        pos,
-        {% if has_normals %}
-            input.normal,
-        {% endif %}
-    );
+    var output: VertexOutput;
+    output.position = pos;
+    {% for assignment in vertex_to_fragment_assignments %}
+        output.{{ assignment.fragment_name }} = input.{{ assignment.vertex_name }};
+    {% endfor %}
 
     return output;
 }

@@ -3,8 +3,8 @@ use gltf::Semantic;
 use thiserror::Error;
 
 use crate::{
-    animation::AwsmAnimationError, mesh::AwsmMeshError, shaders::AwsmShaderError,
-    skin::AwsmSkinError, transform::AwsmTransformError,
+    animation::AwsmAnimationError, bind_groups::AwsmBindGroupError, mesh::AwsmMeshError,
+    shaders::AwsmShaderError, skin::AwsmSkinError, transform::AwsmTransformError,
 };
 
 #[derive(Error, Debug)]
@@ -105,6 +105,24 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] instancing extension: {0:?}")]
     ExtInstancing(anyhow::Error),
+
+    #[error("[gltf] create texture: {0:?}")]
+    CreateTexture(AwsmCoreError),
+
+    #[error("[gltf] missing texture index in doc: {0}")]
+    MissingTextureDocIndex(usize),
+
+    #[error("[gltf] missing texture index: {0}")]
+    MissingTextureIndex(usize),
+
+    #[error("[gltf] unable to create texture view: {0}")]
+    CreateTextureView(String),
+
+    #[error("[gltf] unable to create material bind group: {0:?}")]
+    MaterialBindGroup(AwsmBindGroupError),
+
+    #[error("[gltf] unable to create material bind group layout: {0:?}")]
+    MaterialBindGroupLayout(AwsmBindGroupError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

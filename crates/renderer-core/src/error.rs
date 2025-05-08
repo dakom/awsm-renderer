@@ -82,6 +82,14 @@ pub enum AwsmCoreError {
     #[error("[gpu] Failed to parse url: {0}")]
     UrlParse(String),
 
+    #[cfg(feature = "image")]
+    #[error("[gpu] Failed to copy external image to texture: {0}")]
+    CopyExternalImageToTexture(String),
+
+    #[cfg(feature = "exr")]
+    #[error("[gpu] Failed to create js value from exr image data: {0}")]
+    ExrImageToJsValue(String),
+
     #[error("[gpu] Failed to get Shader compilation info: {0}")]
     ShaderCompilationInfo(String),
 
@@ -90,6 +98,15 @@ pub enum AwsmCoreError {
 
     #[error("[gpu] Failed to set bind group: {0}")]
     SetBindGroup(String),
+
+    #[error("[gpu] Failed to fetch: {0:?}")]
+    Fetch(String),
+
+    #[error("[gpu] Failed to create image bitmap: {0:?}")]
+    CreateImageBitmap(String),
+
+    #[error("[gpu] Failed to create texture: {0:?}")]
+    CreateTexture(String),
 }
 
 impl AwsmCoreError {
@@ -203,12 +220,34 @@ impl AwsmCoreError {
         Self::UrlParse(format_err(err))
     }
 
+    #[cfg(feature = "image")]
+    pub fn copy_external_image_to_texture(err: JsValue) -> Self {
+        Self::CopyExternalImageToTexture(format_err(err))
+    }
+
+    #[cfg(feature = "exr")]
+    pub fn exr_image_to_js_value(err: JsValue) -> Self {
+        Self::ExrImageToJsValue(format_err(err))
+    }
+
     pub fn shader_compilation_info(err: JsValue) -> Self {
         Self::ShaderCompilationInfo(format_err(err))
     }
 
     pub fn set_bind_group(err: JsValue) -> Self {
         Self::SetBindGroup(format_err(err))
+    }
+
+    pub fn fetch(err: JsValue) -> Self {
+        Self::Fetch(format_err(err))
+    }
+
+    pub fn create_image_bitmap(err: JsValue) -> Self {
+        Self::CreateImageBitmap(format_err(err))
+    }
+
+    pub fn create_texture(err: JsValue) -> Self {
+        Self::CreateTexture(format_err(err))
     }
 }
 

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::buffer::helpers::{u8_to_i16_vec, u8_to_u16_vec};
 use crate::mesh::{MeshBufferVertexAttribute, MeshBufferVertexInfo};
-use crate::shaders::ShaderKeyAttribute;
+use crate::shaders::ShaderCacheKeyAttribute;
 
 use super::accessor::accessor_to_bytes;
 use super::Result;
@@ -166,13 +166,17 @@ impl GltfMeshBufferVertexInfo {
                         offset,
                         format,
                         shader_key_kind: match kind {
-                            TempAttributeKind::Positions => ShaderKeyAttribute::Positions,
-                            TempAttributeKind::Normals => ShaderKeyAttribute::Normals,
-                            TempAttributeKind::Tangents => ShaderKeyAttribute::Tangents,
-                            TempAttributeKind::Colors => ShaderKeyAttribute::Colors { count },
-                            TempAttributeKind::TexCoords => ShaderKeyAttribute::TexCoords { count },
-                            TempAttributeKind::Joints => ShaderKeyAttribute::Joints { count },
-                            TempAttributeKind::Weights => ShaderKeyAttribute::Weights { count },
+                            TempAttributeKind::Positions => ShaderCacheKeyAttribute::Positions,
+                            TempAttributeKind::Normals => ShaderCacheKeyAttribute::Normals,
+                            TempAttributeKind::Tangents => ShaderCacheKeyAttribute::Tangents,
+                            TempAttributeKind::Colors => ShaderCacheKeyAttribute::Colors { count },
+                            TempAttributeKind::TexCoords => {
+                                ShaderCacheKeyAttribute::TexCoords { count }
+                            }
+                            TempAttributeKind::Joints => ShaderCacheKeyAttribute::Joints { count },
+                            TempAttributeKind::Weights => {
+                                ShaderCacheKeyAttribute::Weights { count }
+                            }
                         },
                     },
                 ));
@@ -181,15 +185,15 @@ impl GltfMeshBufferVertexInfo {
             }
 
             attributes.sort_by(|(_, a), (_, b)| {
-                fn inner_num(x: &ShaderKeyAttribute) -> u32 {
+                fn inner_num(x: &ShaderCacheKeyAttribute) -> u32 {
                     match x {
-                        ShaderKeyAttribute::Positions => 0,
-                        ShaderKeyAttribute::Normals => 1,
-                        ShaderKeyAttribute::Tangents => 2,
-                        ShaderKeyAttribute::Colors { .. } => 3,
-                        ShaderKeyAttribute::TexCoords { .. } => 4,
-                        ShaderKeyAttribute::Joints { .. } => 5,
-                        ShaderKeyAttribute::Weights { .. } => 6,
+                        ShaderCacheKeyAttribute::Positions => 0,
+                        ShaderCacheKeyAttribute::Normals => 1,
+                        ShaderCacheKeyAttribute::Tangents => 2,
+                        ShaderCacheKeyAttribute::Colors { .. } => 3,
+                        ShaderCacheKeyAttribute::TexCoords { .. } => 4,
+                        ShaderCacheKeyAttribute::Joints { .. } => 5,
+                        ShaderCacheKeyAttribute::Weights { .. } => 6,
                     }
                 }
 

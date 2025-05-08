@@ -7,7 +7,8 @@ use slotmap::SecondaryMap;
 use thiserror::Error;
 
 use crate::{
-    buffer::{bind_groups::AwsmBindGroupError, dynamic_buddy::DynamicBuddyBuffer},
+    bind_groups::AwsmBindGroupError,
+    buffer::dynamic_buddy::DynamicBuddyBuffer,
     transform::{Transform, TransformKey, Transforms},
     AwsmRendererLogging,
 };

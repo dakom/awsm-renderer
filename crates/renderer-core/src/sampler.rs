@@ -1,6 +1,6 @@
 use crate::compare::CompareFunction;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SamplerDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createSampler#descriptor
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuSamplerDescriptor.html

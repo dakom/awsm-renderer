@@ -119,6 +119,19 @@ impl AwsmRendererWebGpu {
             .map_err(AwsmCoreError::texture_creation)
     }
 
+    // Typically this is called via ImageData.to_texture(&gpu)
+    pub fn copy_external_image_to_texture(
+        &self,
+        source: &web_sys::GpuCopyExternalImageSourceInfo,
+        dest: &web_sys::GpuCopyExternalImageDestInfo,
+        size: &web_sys::GpuExtent3dDict,
+    ) -> Result<()> {
+        self.device
+            .queue()
+            .copy_external_image_to_texture_with_gpu_extent_3d_dict(source, dest, size)
+            .map_err(AwsmCoreError::copy_external_image_to_texture)
+    }
+
     /// Example usage:
     /// let descriptor:BufferDescriptor = ...;
     /// renderer.create_buffer(&descriptor.into());

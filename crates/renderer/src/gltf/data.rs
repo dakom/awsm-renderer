@@ -1,4 +1,4 @@
-use awsm_renderer_core::image::ImageLoader;
+use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 
 use super::{
     buffers::GltfBuffers,
@@ -10,19 +10,27 @@ use super::{
 pub struct GltfData {
     pub doc: gltf::Document,
     pub buffers: GltfBuffers,
-    // TODO - create textures instead?
-    pub images: Vec<ImageLoader>,
+    pub textures: Vec<web_sys::GpuTexture>,
 }
 
-impl TryFrom<GltfLoader> for GltfData {
-    type Error = AwsmGltfError;
+impl GltfLoader {
+    pub async fn into_data(self, gpu: &AwsmRendererWebGpu) -> Result<GltfData> {
+        let buffers = GltfBuffers::new(&self.doc, self.buffers)?;
 
-    fn try_from(loader: GltfLoader) -> Result<Self> {
-        let buffers = GltfBuffers::new(&loader.doc, loader.buffers)?;
+        let mut textures = Vec::with_capacity(self.images.len());
 
-        Ok(Self {
-            doc: loader.doc,
-            images: loader.images,
+        for image in self.images {
+            // TODO: generate mipmaps, maybe depending on filter settings
+            // "from spec: To properly support mipmap modes, client implementations SHOULD generate mipmaps at runtime."
+            let texture = image
+                .create_texture(gpu, None, false)
+                .map_err(AwsmGltfError::CreateTexture)?;
+            textures.push(texture);
+        }
+
+        Ok(GltfData {
+            doc: self.doc,
+            textures,
             buffers,
         })
     }

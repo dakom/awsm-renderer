@@ -1,7 +1,7 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::{buffer::bind_groups::AwsmBindGroupError, transform::TransformKey};
+use crate::{bind_groups::AwsmBindGroupError, transform::TransformKey};
 
 use super::skins::SkinKey;
 

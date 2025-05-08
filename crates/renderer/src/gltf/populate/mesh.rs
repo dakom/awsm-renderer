@@ -5,10 +5,11 @@ use crate::{
     gltf::{
         error::{AwsmGltfError, Result},
         layout::{instance_transform_vertex_buffer_layout, primitive_vertex_buffer_layout},
-        pipelines::{PipelineLayoutKey, RenderPipelineKey},
+        materials::GltfMaterialKey,
+        pipelines::{GltfPipelineLayoutKey, GltfRenderPipelineKey},
     },
     mesh::{Mesh, MeshBufferInfo},
-    shaders::{ShaderConstantIds, ShaderKey, ShaderKeyInstancing},
+    shaders::{ShaderCacheKey, ShaderCacheKeyInstancing, ShaderConstantIds},
     skin::SkinKey,
     transform::{Transform, TransformKey},
     AwsmRenderer,
@@ -94,17 +95,20 @@ impl AwsmRenderer {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
-        let mut shader_key = ShaderKey::new(
+        let material_cache_key = GltfMaterialKey::new(gltf_primitive.material());
+
+        let mut shader_cache_key = ShaderCacheKey::new(
             primitive_buffer_info
                 .vertex
                 .attributes
                 .iter()
                 .map(|s| s.shader_key_kind)
                 .collect(),
-        );
+        )
+        .with_material(material_cache_key.into_shader_cache_key());
 
         if let Some(shader_morph_key) = primitive_buffer_info.morph.as_ref().map(|m| m.shader_key) {
-            shader_key = shader_key.with_morphs(shader_morph_key)
+            shader_cache_key = shader_cache_key.with_morphs(shader_morph_key)
         }
 
         if ctx
@@ -113,7 +117,8 @@ impl AwsmRenderer {
             .unwrap()
             .contains(&transform_key)
         {
-            shader_key = shader_key.with_instancing(ShaderKeyInstancing { transform: true });
+            shader_cache_key =
+                shader_cache_key.with_instancing(ShaderCacheKeyInstancing { transform: true });
         }
 
         let morph_key = match primitive_buffer_info.morph.clone() {
@@ -136,31 +141,21 @@ impl AwsmRenderer {
             }
         };
 
-        let pipeline_layout_key = PipelineLayoutKey::new(ctx, primitive_buffer_info);
+        let mut pipeline_layout_key = GltfPipelineLayoutKey::new(ctx, primitive_buffer_info);
+        pipeline_layout_key.has_morph_key = morph_key.is_some();
+        pipeline_layout_key.has_skin_key = skin_key.is_some();
 
-        let shader_module = match self.gltf.shaders.get(&shader_key) {
-            None => {
-                let shader_module = self.gpu.compile_shader(&shader_key.into_descriptor()?);
-                shader_module
-                    .validate_shader()
-                    .await
-                    .map_err(AwsmGltfError::MeshPrimitiveShader)?;
-
-                self.gltf
-                    .shaders
-                    .insert(shader_key.clone(), shader_module.clone());
-
-                shader_module
-            }
-            Some(shader_module) => shader_module.clone(),
-        };
+        let shader_module = self
+            .shaders
+            .get_or_create(&self.gpu, &shader_cache_key)
+            .await?;
 
         // we only need one vertex buffer per-mesh, because we've already constructed our buffers
         // to be one contiguous buffer of interleaved vertex data.
         // the attributes of this one vertex buffer layout contain all the info needed for the shader locations
         let (vertex_buffer_layout, shader_location) =
             primitive_vertex_buffer_layout(primitive_buffer_info)?;
-        let instance_transform_vertex_buffer_layout = match shader_key.instancing.transform {
+        let instance_transform_vertex_buffer_layout = match shader_cache_key.instancing.transform {
             true => Some(instance_transform_vertex_buffer_layout(shader_location)),
             false => None,
         };
@@ -197,7 +192,7 @@ impl AwsmRenderer {
                 false => CullMode::Back,
             });
 
-        let mut pipeline_key = RenderPipelineKey::new(shader_key, pipeline_layout_key)
+        let mut pipeline_key = GltfRenderPipelineKey::new(shader_cache_key, pipeline_layout_key)
             .with_primitive(primitive_state)
             .with_push_vertex_buffer_layout(vertex_buffer_layout)
             .with_push_fragment_target(ColorTargetState::new(self.gpu.current_context_format()));
@@ -216,14 +211,46 @@ impl AwsmRenderer {
             );
         }
 
+        let material_key = match self.gltf.materials.get(&material_cache_key).cloned() {
+            Some(material_key) => material_key,
+            None => {
+                let material_layout_cache_key = material_cache_key.into_layout_key();
+                let layout_key = match self.gltf.material_layouts.get(&material_layout_cache_key) {
+                    Some(layout_key) => layout_key.clone(),
+                    None => {
+                        let layout_entries = material_layout_cache_key.into_layout_entries();
+                        let layout_key = self
+                            .bind_groups
+                            .materials
+                            .insert_layout(&self.gpu, layout_entries)
+                            .map_err(AwsmGltfError::MaterialBindGroupLayout)?;
+                        self.gltf
+                            .material_layouts
+                            .insert(material_layout_cache_key, layout_key.clone());
+                        layout_key
+                    }
+                };
+
+                let entries = material_cache_key.into_entries(&self.gpu, ctx)?;
+                let material_key = self
+                    .bind_groups
+                    .materials
+                    .insert_material(&self.gpu, layout_key, &entries)
+                    .map_err(AwsmGltfError::MaterialBindGroup)?;
+                self.gltf
+                    .materials
+                    .insert(material_cache_key.clone(), material_key.clone());
+
+                material_key
+            }
+        };
+
         let render_pipeline = match self.gltf.render_pipelines.get(&pipeline_key).cloned() {
             None => {
-                let descriptor = pipeline_key.clone().into_descriptor(
-                    self,
-                    &shader_module,
-                    morph_key,
-                    skin_key,
-                )?;
+                let descriptor =
+                    pipeline_key
+                        .clone()
+                        .into_descriptor(self, &shader_module, material_key)?;
 
                 let render_pipeline = self
                     .gpu
@@ -245,6 +272,7 @@ impl AwsmRenderer {
             render_pipeline,
             native_primitive_buffer_info.draw_count(),
             transform_key,
+            material_key,
         );
 
         if let Some(aabb) = try_position_aabb(&gltf_primitive) {
