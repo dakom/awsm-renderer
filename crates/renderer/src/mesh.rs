@@ -83,17 +83,22 @@ impl Mesh {
         ctx.render_pass.set_pipeline(&self.pipeline);
 
         let transform_offset = ctx.transforms.buffer_offset(self.transform_key)? as u32;
+        let pbr_material_offset = ctx
+            .materials
+            .pbr_buffer_offset(self.material_key)
+            .unwrap_or_default() as u32;
+
         ctx.render_pass.set_bind_group(
             1,
-            ctx.bind_groups.buffers.gpu_mesh_all_bind_group(),
-            Some(&[transform_offset]),
+            ctx.bind_groups.uniform_storages.gpu_mesh_all_bind_group(),
+            Some(&[transform_offset, pbr_material_offset]),
         )?;
 
         ctx.render_pass.set_bind_group(
             2,
             ctx.bind_groups
-                .materials
-                .gpu_material_bind_group(self.material_key)?,
+                .material_textures
+                .gpu_bind_group(self.material_key)?,
             None,
         )?;
 
@@ -115,7 +120,7 @@ impl Mesh {
 
             ctx.render_pass.set_bind_group(
                 3,
-                ctx.bind_groups.buffers.gpu_mesh_shape_bind_group(),
+                ctx.bind_groups.uniform_storages.gpu_mesh_shape_bind_group(),
                 Some(&[morph_weights_offset, morph_values_offset, skin_offset]),
             )?;
         }

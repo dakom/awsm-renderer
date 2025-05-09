@@ -207,7 +207,7 @@ impl AwsmRenderer {
             );
         }
 
-        let material_key = self.materials.get_or_insert(
+        let material_key = self.materials.insert(
             &self.gpu,
             &mut self.bind_groups,
             &self.textures,

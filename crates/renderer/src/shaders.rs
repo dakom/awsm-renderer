@@ -261,35 +261,38 @@ impl ShaderCacheKey {
         let mut vertex_output_locations = Vec::new();
         let mut fragment_buffer_bindings = Vec::new();
 
-        match self.material {
+        let mut push_texture = |name: &str, uv_index: u32| {
+            fragment_buffer_bindings.push(DynamicBufferBinding {
+                group: 2,
+                index: fragment_buffer_bindings.len() as u32,
+                name: format!("{name}_tex"),
+                data_type: "texture_2d<f32>".to_string(),
+            });
+
+            fragment_buffer_bindings.push(DynamicBufferBinding {
+                group: 2,
+                index: fragment_buffer_bindings.len() as u32,
+                name: format!("{name}_sampler"),
+                data_type: "sampler".to_string(),
+            });
+
+            vertex_output_locations.push(VertexLocation {
+                location: vertex_output_locations.len() as u32,
+                interpolation: None,
+                name: format!("{name}_uv"),
+                data_type: "vec2<f32>".to_string(),
+            });
+
+            vertex_to_fragment_assignments.push(VertexToFragmentAssignment {
+                vertex_name: format!("uv_{uv_index}"),
+                fragment_name: format!("{name}_uv"),
+            });
+        };
+
+        let fragment_shader_kind = match self.material {
             ShaderCacheKeyMaterial::Pbr(material_key) => {
                 if let Some(uv_index) = material_key.base_color_uv_index {
-                    fragment_buffer_bindings.push(DynamicBufferBinding {
-                        group: 2,
-                        index: fragment_buffer_bindings.len() as u32,
-                        name: "base_color_tex".to_string(),
-                        data_type: "texture_2d<f32>".to_string(),
-                    });
-
-                    fragment_buffer_bindings.push(DynamicBufferBinding {
-                        group: 2,
-                        index: fragment_buffer_bindings.len() as u32,
-                        name: "base_color_sampler".to_string(),
-                        data_type: "sampler".to_string(),
-                    });
-
-                    vertex_output_locations.push(VertexLocation {
-                        location: vertex_output_locations.len() as u32,
-                        interpolation: None,
-                        name: "base_color_uv".to_string(),
-                        data_type: "vec2<f32>".to_string(),
-                    });
-
-                    vertex_to_fragment_assignments.push(VertexToFragmentAssignment {
-                        vertex_name: format!("uv_{uv_index}"),
-                        fragment_name: "base_color_uv".to_string(),
-                    });
-
+                    push_texture("base_color", uv_index);
                     material.has_base_color = true;
                 }
 
@@ -305,8 +308,10 @@ impl ShaderCacheKey {
                         fragment_name: "normal".to_string(),
                     });
                 }
+
+                FragmentShaderKind::Pbr
             }
-        }
+        };
 
         let tmpl = ShaderTemplate {
             vertex_input_locations,
@@ -315,13 +320,15 @@ impl ShaderCacheKey {
             morphs: self.morphs,
             skins: skins.unwrap_or_default(),
             has_instance_transform: self.instancing.transform,
-            fragment_shader_kind: FragmentShaderKind::Pbr,
+            fragment_shader_kind,
             //fragment_shader_kind: FragmentShaderKind::DebugNormals,
             fragment_buffer_bindings,
             material,
         };
 
         let source = tmpl.render().unwrap();
+
+        tracing::info!("{}", source);
 
         Ok(source)
     }

@@ -10,27 +10,27 @@ use awsm_renderer_core::{
 };
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
-pub struct MaterialBindGroups {
+pub struct MaterialTextureBindGroups {
     bind_groups: SecondaryMap<MaterialKey, web_sys::GpuBindGroup>,
     layouts: SlotMap<MaterialBindGroupLayoutKey, web_sys::GpuBindGroupLayout>,
     material_layout_mapping: SecondaryMap<MaterialKey, MaterialBindGroupLayoutKey>,
 }
-pub enum MaterialBindingLayoutEntry {
+pub enum MaterialTextureBindingLayoutEntry {
     Sampler(SamplerBindingLayout),
     Texture(TextureBindingLayout),
 }
 
-pub enum MaterialBindingEntry {
+pub enum MaterialTextureBindingEntry {
     Sampler(web_sys::GpuSampler),
     Texture(web_sys::GpuTextureView),
 }
-impl Default for MaterialBindGroups {
+impl Default for MaterialTextureBindGroups {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MaterialBindGroups {
+impl MaterialTextureBindGroups {
     pub fn new() -> Self {
         Self {
             bind_groups: SecondaryMap::new(),
@@ -39,7 +39,7 @@ impl MaterialBindGroups {
         }
     }
 
-    pub fn remove_material(&mut self, key: MaterialKey) -> Result<()> {
+    pub fn remove(&mut self, key: MaterialKey) -> Result<()> {
         if let Some(layout_key) = self.material_layout_mapping.remove(key) {
             self.layouts.remove(layout_key);
         }
@@ -47,7 +47,7 @@ impl MaterialBindGroups {
         Ok(())
     }
 
-    pub fn gpu_material_bind_group(&self, key: MaterialKey) -> Result<&web_sys::GpuBindGroup> {
+    pub fn gpu_bind_group(&self, key: MaterialKey) -> Result<&web_sys::GpuBindGroup> {
         let bind_group = self
             .bind_groups
             .get(key)
@@ -55,10 +55,7 @@ impl MaterialBindGroups {
         Ok(bind_group)
     }
 
-    pub fn gpu_material_bind_group_layout(
-        &self,
-        key: MaterialKey,
-    ) -> Result<&web_sys::GpuBindGroupLayout> {
+    pub fn gpu_bind_group_layout(&self, key: MaterialKey) -> Result<&web_sys::GpuBindGroupLayout> {
         let layout_key = *self
             .material_layout_mapping
             .get(key)
@@ -70,21 +67,21 @@ impl MaterialBindGroups {
         Ok(layout)
     }
 
-    pub fn insert_layout(
+    pub fn insert_bind_group_layout(
         &mut self,
         gpu: &AwsmRendererWebGpu,
-        layout_entries: Vec<MaterialBindingLayoutEntry>,
+        layout_entries: Vec<MaterialTextureBindingLayoutEntry>,
     ) -> Result<MaterialBindGroupLayoutKey> {
         let entries = layout_entries
             .into_iter()
             .enumerate()
             .map(|(index, entry)| match entry {
-                MaterialBindingLayoutEntry::Sampler(sampler) => BindGroupLayoutEntry::new(
+                MaterialTextureBindingLayoutEntry::Sampler(sampler) => BindGroupLayoutEntry::new(
                     index as u32,
                     BindGroupLayoutResource::Sampler(sampler),
                 )
                 .with_visibility_fragment(),
-                MaterialBindingLayoutEntry::Texture(texture) => BindGroupLayoutEntry::new(
+                MaterialTextureBindingLayoutEntry::Texture(texture) => BindGroupLayoutEntry::new(
                     index as u32,
                     BindGroupLayoutResource::Texture(texture),
                 )
@@ -99,12 +96,12 @@ impl MaterialBindGroups {
         Ok(key)
     }
 
-    pub fn insert_material(
+    pub fn insert_material_texture(
         &mut self,
         gpu: &AwsmRendererWebGpu,
         material_key: MaterialKey,
         layout_key: MaterialBindGroupLayoutKey,
-        entries: &[MaterialBindingEntry],
+        entries: &[MaterialTextureBindingEntry],
     ) -> Result<()> {
         let layout = self
             .layouts
@@ -115,10 +112,10 @@ impl MaterialBindGroups {
             .iter()
             .enumerate()
             .map(|(index, entry)| match entry {
-                MaterialBindingEntry::Sampler(sampler) => {
+                MaterialTextureBindingEntry::Sampler(sampler) => {
                     BindGroupEntry::new(index as u32, BindGroupResource::Sampler(sampler))
                 }
-                MaterialBindingEntry::Texture(texture_view) => {
+                MaterialTextureBindingEntry::Texture(texture_view) => {
                     BindGroupEntry::new(index as u32, BindGroupResource::TextureView(texture_view))
                 }
             })

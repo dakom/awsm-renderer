@@ -1,5 +1,7 @@
 # Next up
 
+- Material / lights
+
 - fix "dev-release" mode (just base path?)
 
 - Initial allocation?

@@ -5,7 +5,10 @@ use glam::Mat4;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
 use crate::{
-    bind_groups::{buffer::BufferBindGroupIndex, buffer::MeshShapeBindGroupBinding, BindGroups},
+    bind_groups::{
+        uniform_storage::MeshShapeBindGroupBinding, uniform_storage::UniformStorageBindGroupIndex,
+        BindGroups,
+    },
     buffer::dynamic_buddy::DynamicBuddyBuffer,
     transform::{TransformKey, Transforms},
     AwsmRenderer, AwsmRendererLogging,
@@ -152,15 +155,16 @@ impl Skins {
                 None
             };
 
-            let bind_group_index =
-                BufferBindGroupIndex::MeshShape(MeshShapeBindGroupBinding::SkinJointMatrices);
+            let bind_group_index = UniformStorageBindGroupIndex::MeshShape(
+                MeshShapeBindGroupBinding::SkinJointMatrices,
+            );
             if let Some(new_size) = self.skin_matrices.take_gpu_needs_resize() {
                 bind_groups
-                    .buffers
+                    .uniform_storages
                     .gpu_resize(gpu, bind_group_index, new_size)?;
             }
 
-            bind_groups.buffers.gpu_write(
+            bind_groups.uniform_storages.gpu_write(
                 gpu,
                 bind_group_index,
                 None,

@@ -4,7 +4,10 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::{
-    bind_groups::{buffer::BufferBindGroupIndex, buffer::MeshAllBindGroupBinding, BindGroups},
+    bind_groups::{
+        uniform_storage::MeshAllBindGroupBinding, uniform_storage::UniformStorageBindGroupIndex,
+        BindGroups,
+    },
     buffer::dynamic_fixed::DynamicFixedBuffer,
     AwsmRenderer, AwsmRendererLogging,
 };
@@ -188,13 +191,13 @@ impl Transforms {
             };
 
             let bind_group_index =
-                BufferBindGroupIndex::MeshAll(MeshAllBindGroupBinding::Transform);
+                UniformStorageBindGroupIndex::MeshAll(MeshAllBindGroupBinding::Transform);
             if let Some(new_size) = self.buffer.take_gpu_needs_resize() {
                 bind_groups
-                    .buffers
+                    .uniform_storages
                     .gpu_resize(gpu, bind_group_index, new_size)?;
             }
-            bind_groups.buffers.gpu_write(
+            bind_groups.uniform_storages.gpu_write(
                 gpu,
                 bind_group_index,
                 None,

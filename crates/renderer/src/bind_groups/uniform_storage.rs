@@ -8,15 +8,18 @@ use awsm_renderer_core::{
 };
 
 use super::{gpu_create_bind_group, gpu_create_layout, AwsmBindGroupError, Result};
-use crate::{camera::CameraBuffer, mesh::morphs::Morphs, skin::Skins, transform::Transforms};
+use crate::{
+    camera::CameraBuffer, materials::pbr::PbrMaterial, mesh::morphs::Morphs, skin::Skins,
+    transform::Transforms,
+};
 
-pub struct BufferBindGroups {
-    universal: BufferBindGroup,
-    mesh_all: BufferBindGroup,
-    mesh_shape: BufferBindGroup,
+pub struct UniformStorageBindGroups {
+    universal: UniformStorageBindGroup,
+    mesh_all: UniformStorageBindGroup,
+    mesh_shape: UniformStorageBindGroup,
 }
 
-impl BufferBindGroups {
+impl UniformStorageBindGroups {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let universal = create_universal_bind_group(gpu)?;
         let mesh_all = create_mesh_all_bind_group(gpu)?;
@@ -52,20 +55,20 @@ impl BufferBindGroups {
     pub fn gpu_write(
         &self,
         gpu: &AwsmRendererWebGpu,
-        index: BufferBindGroupIndex,
+        index: UniformStorageBindGroupIndex,
         buffer_offset: Option<usize>,
         data: &[u8],
         data_offset: Option<usize>,
         data_size: Option<usize>,
     ) -> Result<()> {
         let gpu_buffer = match index {
-            BufferBindGroupIndex::Universal(binding) => {
+            UniformStorageBindGroupIndex::Universal(binding) => {
                 &self.universal.buffers[binding as u32 as usize]
             }
-            BufferBindGroupIndex::MeshAll(binding) => {
+            UniformStorageBindGroupIndex::MeshAll(binding) => {
                 &self.mesh_all.buffers[binding as u32 as usize]
             }
-            BufferBindGroupIndex::MeshShape(binding) => {
+            UniformStorageBindGroupIndex::MeshShape(binding) => {
                 &self.mesh_shape.buffers[binding as u32 as usize]
             }
         };
@@ -80,13 +83,13 @@ impl BufferBindGroups {
     pub fn gpu_resize(
         &mut self,
         gpu: &AwsmRendererWebGpu,
-        index: BufferBindGroupIndex,
+        index: UniformStorageBindGroupIndex,
         new_size: usize,
     ) -> Result<()> {
         // we need to recreate the buffer and bind group
         // but *not* the layout
         match index {
-            BufferBindGroupIndex::Universal(binding) => {
+            UniformStorageBindGroupIndex::Universal(binding) => {
                 let buffer =
                     gpu_create_buffer(gpu, binding.label(), binding.buffer_usage(), new_size)?;
                 self.universal.buffers[binding as usize] = buffer;
@@ -102,7 +105,7 @@ impl BufferBindGroups {
                         .collect(),
                 );
             }
-            BufferBindGroupIndex::MeshAll(binding) => {
+            UniformStorageBindGroupIndex::MeshAll(binding) => {
                 let buffer =
                     gpu_create_buffer(gpu, binding.label(), binding.buffer_usage(), new_size)?;
                 self.mesh_all.buffers[binding as usize] = buffer;
@@ -118,7 +121,7 @@ impl BufferBindGroups {
                         .collect(),
                 );
             }
-            BufferBindGroupIndex::MeshShape(binding) => {
+            UniformStorageBindGroupIndex::MeshShape(binding) => {
                 let buffer =
                     gpu_create_buffer(gpu, binding.label(), binding.buffer_usage(), new_size)?;
                 self.mesh_shape.buffers[binding as usize] = buffer;
@@ -140,20 +143,20 @@ impl BufferBindGroups {
     }
 }
 
-pub(super) struct BufferBindGroup {
+pub(super) struct UniformStorageBindGroup {
     pub bind_group: web_sys::GpuBindGroup,
     pub layout: web_sys::GpuBindGroupLayout,
     pub buffers: Vec<web_sys::GpuBuffer>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum BufferBindGroupIndex {
+pub enum UniformStorageBindGroupIndex {
     Universal(UniversalBindGroupBinding),
     MeshAll(MeshAllBindGroupBinding),
     MeshShape(MeshShapeBindGroupBinding),
 }
 
-impl BufferBindGroupIndex {
+impl UniformStorageBindGroupIndex {
     pub fn label(self) -> &'static str {
         match self {
             Self::Universal(binding) => binding.label(),
@@ -206,28 +209,34 @@ impl UniversalBindGroupBinding {
 #[repr(u32)]
 pub enum MeshAllBindGroupBinding {
     Transform = 0,
+    PbrMaterial = 1,
 }
 
 impl MeshAllBindGroupBinding {
-    pub fn all() -> [Self; 1] {
-        [Self::Transform]
+    pub fn all() -> [Self; 2] {
+        [Self::Transform, Self::PbrMaterial]
     }
 
     pub fn initial_buffer_size(self) -> usize {
         match self {
             Self::Transform => Transforms::INITIAL_CAPACITY * Transforms::BYTE_ALIGNMENT,
+            Self::PbrMaterial => {
+                PbrMaterial::INITIAL_ELEMENTS * PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT
+            }
         }
     }
 
     pub fn label(self) -> &'static str {
         match self {
             Self::Transform => "Transform",
+            Self::PbrMaterial => "PbrMaterial",
         }
     }
 
     pub fn buffer_usage(self) -> BufferUsage {
         match self {
             Self::Transform => BufferUsage::new().with_uniform().with_copy_dst(),
+            Self::PbrMaterial => BufferUsage::new().with_uniform().with_copy_dst(),
         }
     }
 
@@ -237,6 +246,10 @@ impl MeshAllBindGroupBinding {
             match self {
                 Self::Transform => BindGroupResource::Buffer(
                     BufferBinding::new(buffer).with_size(Transforms::BYTE_ALIGNMENT),
+                ),
+                Self::PbrMaterial => BindGroupResource::Buffer(
+                    BufferBinding::new(buffer)
+                        .with_size(PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT),
                 ),
             },
         )
@@ -296,7 +309,9 @@ impl MeshShapeBindGroupBinding {
     }
 }
 
-pub(super) fn create_universal_bind_group(gpu: &AwsmRendererWebGpu) -> Result<BufferBindGroup> {
+pub(super) fn create_universal_bind_group(
+    gpu: &AwsmRendererWebGpu,
+) -> Result<UniformStorageBindGroup> {
     let buffers = UniversalBindGroupBinding::all()
         .into_iter()
         .map(|binding| {
@@ -332,14 +347,16 @@ pub(super) fn create_universal_bind_group(gpu: &AwsmRendererWebGpu) -> Result<Bu
             .collect(),
     );
 
-    Ok(BufferBindGroup {
+    Ok(UniformStorageBindGroup {
         bind_group,
         layout,
         buffers,
     })
 }
 
-pub(super) fn create_mesh_all_bind_group(gpu: &AwsmRendererWebGpu) -> Result<BufferBindGroup> {
+pub(super) fn create_mesh_all_bind_group(
+    gpu: &AwsmRendererWebGpu,
+) -> Result<UniformStorageBindGroup> {
     let buffers = MeshAllBindGroupBinding::all()
         .into_iter()
         .map(|binding| {
@@ -355,15 +372,26 @@ pub(super) fn create_mesh_all_bind_group(gpu: &AwsmRendererWebGpu) -> Result<Buf
     let layout = gpu_create_layout(
         gpu,
         "MeshAll",
-        vec![BindGroupLayoutEntry::new(
-            MeshAllBindGroupBinding::Transform as u32,
-            BindGroupLayoutResource::Buffer(
-                BufferBindingLayout::new()
-                    .with_binding_type(BufferBindingType::Uniform)
-                    .with_dynamic_offset(true),
-            ),
-        )
-        .with_visibility_vertex()],
+        vec![
+            BindGroupLayoutEntry::new(
+                MeshAllBindGroupBinding::Transform as u32,
+                BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::Uniform)
+                        .with_dynamic_offset(true),
+                ),
+            )
+            .with_visibility_vertex(),
+            BindGroupLayoutEntry::new(
+                MeshAllBindGroupBinding::PbrMaterial as u32,
+                BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::Uniform)
+                        .with_dynamic_offset(true),
+                ),
+            )
+            .with_visibility_fragment(),
+        ],
     )?;
 
     let bind_group = gpu_create_bind_group(
@@ -376,14 +404,16 @@ pub(super) fn create_mesh_all_bind_group(gpu: &AwsmRendererWebGpu) -> Result<Buf
             .collect(),
     );
 
-    Ok(BufferBindGroup {
+    Ok(UniformStorageBindGroup {
         bind_group,
         layout,
         buffers,
     })
 }
 
-pub(super) fn create_mesh_shape_bind_group(gpu: &AwsmRendererWebGpu) -> Result<BufferBindGroup> {
+pub(super) fn create_mesh_shape_bind_group(
+    gpu: &AwsmRendererWebGpu,
+) -> Result<UniformStorageBindGroup> {
     let buffers = MeshShapeBindGroupBinding::all()
         .into_iter()
         .map(|binding| {
@@ -440,7 +470,7 @@ pub(super) fn create_mesh_shape_bind_group(gpu: &AwsmRendererWebGpu) -> Result<B
             .collect(),
     );
 
-    Ok(BufferBindGroup {
+    Ok(UniformStorageBindGroup {
         bind_group,
         layout,
         buffers,
@@ -457,7 +487,7 @@ fn gpu_create_buffer(
         .map_err(|err| AwsmBindGroupError::CreateBuffer { label, err })
 }
 
-impl Drop for BufferBindGroup {
+impl Drop for UniformStorageBindGroup {
     fn drop(&mut self) {
         for buffer in &self.buffers {
             buffer.destroy();

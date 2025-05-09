@@ -9,20 +9,29 @@ use thiserror::Error;
 
 use crate::{
     bind_groups::{
-        material::{MaterialBindGroupLayoutKey, MaterialBindingEntry, MaterialBindingLayoutEntry},
+        material_textures::{
+            MaterialBindGroupLayoutKey, MaterialTextureBindingEntry,
+            MaterialTextureBindingLayoutEntry,
+        },
+        uniform_storage::{MeshAllBindGroupBinding, UniformStorageBindGroupIndex},
         AwsmBindGroupError, BindGroups,
     },
+    buffer::dynamic_fixed::DynamicFixedBuffer,
     shaders::ShaderCacheKeyMaterial,
     textures::{SamplerKey, TextureKey, Textures},
+    AwsmRendererLogging,
 };
 
 pub struct Materials {
     materials: SlotMap<MaterialKey, Material>,
     cache: HashMap<MaterialCacheKey, MaterialKey>,
     bind_group_layout_cache: HashMap<MaterialBindGroupLayoutCacheKey, MaterialBindGroupLayoutKey>,
+    pbr_uniform_buffer: DynamicFixedBuffer<MaterialKey>,
+    pbr_uniform_buffer_gpu_dirty: bool,
 }
 
-// The final material type with adjustable properties
+// The material type with adjustable properties
+#[derive(Debug, Clone)]
 pub enum Material {
     Pbr(PbrMaterial),
 }
@@ -45,6 +54,31 @@ enum MaterialCacheKey {
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 enum MaterialBindGroupLayoutCacheKey {
     Pbr(PbrMaterialBindGroupLayoutCacheKey),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MaterialAlphaMode {
+    Opaque,
+    Mask { cutoff: f32 },
+    Blend,
+}
+
+impl MaterialAlphaMode {
+    pub fn variant_as_u32(&self) -> u32 {
+        match self {
+            Self::Opaque => 0,
+            Self::Mask { .. } => 1,
+            Self::Blend => 2,
+        }
+    }
+
+    pub fn cutoff(&self) -> f32 {
+        match self {
+            Self::Opaque => 0.0,
+            Self::Mask { cutoff } => *cutoff,
+            Self::Blend => 0.0,
+        }
+    }
 }
 
 pub struct MaterialTextureDep {
@@ -95,13 +129,13 @@ impl MaterialDeps {
         }
     }
 
-    fn bind_group_layout_entries(&self) -> Vec<MaterialBindingLayoutEntry> {
+    fn bind_group_layout_entries(&self) -> Vec<MaterialTextureBindingLayoutEntry> {
         match self {
             Self::Pbr(deps) => deps.bind_group_layout_entries(),
         }
     }
 
-    fn bind_group_entries(&self, textures: &Textures) -> Result<Vec<MaterialBindingEntry>> {
+    fn bind_group_entries(&self, textures: &Textures) -> Result<Vec<MaterialTextureBindingEntry>> {
         match self {
             Self::Pbr(deps) => deps.bind_group_entries(textures),
         }
@@ -120,10 +154,22 @@ impl Materials {
             materials: SlotMap::with_key(),
             cache: HashMap::new(),
             bind_group_layout_cache: HashMap::new(),
+            pbr_uniform_buffer: DynamicFixedBuffer::new(
+                PbrMaterial::INITIAL_ELEMENTS,
+                PbrMaterial::BYTE_SIZE,
+                PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT,
+                Some("PbrUniformBuffer".to_string()),
+            ),
+            pbr_uniform_buffer_gpu_dirty: false,
         }
     }
 
-    pub fn get_or_insert(
+    pub fn pbr_buffer_offset(&self, key: MaterialKey) -> Option<usize> {
+        self.pbr_uniform_buffer.offset(key)
+    }
+
+    // will internally use a cache to re-use the same material and/or layout
+    pub fn insert(
         &mut self,
         gpu: &AwsmRendererWebGpu,
         bind_groups: &mut BindGroups,
@@ -148,8 +194,8 @@ impl Materials {
                 // nope, create the layout
                 let entries = deps.bind_group_layout_entries();
                 let bind_group_layout_key = bind_groups
-                    .materials
-                    .insert_layout(gpu, entries)
+                    .material_textures
+                    .insert_bind_group_layout(gpu, entries)
                     .map_err(AwsmMaterialError::MaterialBindGroupLayout)?;
 
                 self.bind_group_layout_cache
@@ -159,11 +205,13 @@ impl Materials {
             }
         };
 
-        let material_key = self.materials.insert(deps.material());
+        let material = deps.material();
+
+        let material_key = self.materials.insert(material.clone());
 
         bind_groups
-            .materials
-            .insert_material(
+            .material_textures
+            .insert_material_texture(
                 gpu,
                 material_key,
                 bind_group_layout_key,
@@ -171,7 +219,66 @@ impl Materials {
             )
             .map_err(AwsmMaterialError::MaterialBindGroup)?;
 
+        #[allow(irrefutable_let_patterns)]
+        if let Material::Pbr(pbr_material) = &material {
+            self.pbr_uniform_buffer
+                .update(material_key, &pbr_material.uniform_buffer_data());
+            self.pbr_uniform_buffer_gpu_dirty = true;
+        }
+
         Ok(material_key)
+    }
+
+    pub fn update(&mut self, key: MaterialKey, mut f: impl FnMut(&mut Material)) {
+        if let Some(material) = self.materials.get_mut(key) {
+            f(material);
+            match material {
+                Material::Pbr(pbr_material) => {
+                    self.pbr_uniform_buffer
+                        .update(key, &pbr_material.uniform_buffer_data());
+                    self.pbr_uniform_buffer_gpu_dirty = true;
+                }
+            }
+        }
+    }
+
+    pub fn write_gpu(
+        &mut self,
+        logging: &AwsmRendererLogging,
+        gpu: &AwsmRendererWebGpu,
+        bind_groups: &mut BindGroups,
+    ) -> Result<()> {
+        if self.pbr_uniform_buffer_gpu_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "PBR Uniform Buffer GPU write").entered())
+            } else {
+                None
+            };
+
+            let bind_group_index =
+                UniformStorageBindGroupIndex::MeshAll(MeshAllBindGroupBinding::PbrMaterial);
+            if let Some(new_size) = self.pbr_uniform_buffer.take_gpu_needs_resize() {
+                bind_groups
+                    .uniform_storages
+                    .gpu_resize(gpu, bind_group_index, new_size)
+                    .map_err(AwsmMaterialError::PbrMaterialBindGroupResize)?;
+            }
+
+            bind_groups
+                .uniform_storages
+                .gpu_write(
+                    gpu,
+                    bind_group_index,
+                    None,
+                    self.pbr_uniform_buffer.raw_slice(),
+                    None,
+                    None,
+                )
+                .map_err(AwsmMaterialError::PbrMaterialBindGroupWrite)?;
+
+            self.pbr_uniform_buffer_gpu_dirty = false;
+        }
+        Ok(())
     }
 }
 
@@ -197,4 +304,10 @@ pub enum AwsmMaterialError {
 
     #[error("[material] create texture view: {0}")]
     CreateTextureView(String),
+
+    #[error("[material] pbr unable to resize bind group: {0:?}")]
+    PbrMaterialBindGroupResize(AwsmBindGroupError),
+
+    #[error("[material] pbr unable to write bind group: {0:?}")]
+    PbrMaterialBindGroupWrite(AwsmBindGroupError),
 }
