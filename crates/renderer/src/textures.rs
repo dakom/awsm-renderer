@@ -5,6 +5,12 @@ pub struct Textures {
     samplers: SlotMap<SamplerKey, web_sys::GpuSampler>,
 }
 
+impl Default for Textures {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Textures {
     pub fn new() -> Self {
         Self {

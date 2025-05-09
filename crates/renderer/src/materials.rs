@@ -108,6 +108,12 @@ impl MaterialDeps {
     }
 }
 
+impl Default for Materials {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Materials {
     pub fn new() -> Self {
         Self {
@@ -143,7 +149,7 @@ impl Materials {
                 let entries = deps.bind_group_layout_entries();
                 let bind_group_layout_key = bind_groups
                     .materials
-                    .insert_layout(&gpu, entries)
+                    .insert_layout(gpu, entries)
                     .map_err(AwsmMaterialError::MaterialBindGroupLayout)?;
 
                 self.bind_group_layout_cache
@@ -158,7 +164,7 @@ impl Materials {
         bind_groups
             .materials
             .insert_material(
-                &gpu,
+                gpu,
                 material_key,
                 bind_group_layout_key,
                 &deps.bind_group_entries(textures)?,

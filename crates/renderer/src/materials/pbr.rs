@@ -30,16 +30,14 @@ pub struct PbrMaterialBindGroupLayoutCacheKey {
 
 impl PbrMaterialDeps {
     pub(super) fn cache_key(&self) -> PbrMaterialCacheKey {
-        let mut key = PbrMaterialCacheKey::default();
-        key.base_color = self.base_color.as_ref().map(MaterialTextureCacheKey::from);
-
-        key
+        PbrMaterialCacheKey {
+            base_color: self.base_color.as_ref().map(MaterialTextureCacheKey::from),
+        }
     }
     pub(super) fn bind_group_layout_cache_key(&self) -> PbrMaterialBindGroupLayoutCacheKey {
-        let mut key = PbrMaterialBindGroupLayoutCacheKey::default();
-        key.base_color = self.base_color.is_some();
-
-        key
+        PbrMaterialBindGroupLayoutCacheKey {
+            base_color: self.base_color.is_some(),
+        }
     }
 
     pub fn material(&self) -> PbrMaterial {

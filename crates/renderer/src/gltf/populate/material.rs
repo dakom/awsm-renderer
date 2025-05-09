@@ -54,14 +54,14 @@ impl GltfTextureInfo {
         };
 
         let (texture_key, sampler_key) = match dep {
-            Some((texture_key, sampler_key)) => (texture_key.clone(), sampler_key.clone()),
+            Some((texture_key, sampler_key)) => (texture_key, sampler_key),
             None => {
                 let texture_key = self.create_texture_key(renderer, ctx)?;
                 let sampler_key = self.create_sampler_key(renderer, ctx)?;
                 ctx.textures
                     .lock()
                     .unwrap()
-                    .insert(self.index, (texture_key.clone(), sampler_key.clone()));
+                    .insert(self.index, (texture_key, sampler_key));
                 (texture_key, sampler_key)
             }
         };
