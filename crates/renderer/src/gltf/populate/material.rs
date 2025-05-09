@@ -2,7 +2,7 @@ use awsm_renderer_core::sampler::{AddressMode, FilterMode, MipmapFilterMode, Sam
 
 use crate::{
     gltf::error::{AwsmGltfError, Result},
-    materials::{pbr::PbrMaterialDeps, MaterialDeps, MaterialTextureDep},
+    materials::{pbr::PbrMaterialDeps, MaterialAlphaMode, MaterialDeps, MaterialTextureDep},
     textures::{SamplerKey, TextureKey},
     AwsmRenderer,
 };
@@ -16,13 +16,56 @@ pub fn gltf_material_deps(
 ) -> Result<MaterialDeps> {
     let mut deps = PbrMaterialDeps::default();
 
-    if let Some(info) = material
-        .pbr_metallic_roughness()
-        .base_color_texture()
-        .map(GltfTextureInfo::from)
-    {
-        deps.base_color = Some(info.create_dep(renderer, ctx)?);
+    let pbr = material.pbr_metallic_roughness();
+
+    deps.base_color_factor = pbr.base_color_factor();
+
+    if let Some(tex) = pbr.base_color_texture().map(GltfTextureInfo::from) {
+        deps.base_color_tex = Some(tex.create_dep(renderer, ctx)?);
     }
+
+    deps.metallic_factor = pbr.metallic_factor();
+    deps.roughness_factor = pbr.roughness_factor();
+
+    if let Some(tex) = pbr.metallic_roughness_texture().map(GltfTextureInfo::from) {
+        deps.metallic_roughness_tex = Some(tex.create_dep(renderer, ctx)?);
+    }
+
+    if let Some(normal_tex) = material.normal_texture() {
+        let tex = GltfTextureInfo::from(GltfTextureInfo {
+            index: normal_tex.texture().index(),
+            tex_coord_index: normal_tex.tex_coord() as usize,
+        });
+        deps.normal_tex = Some(tex.create_dep(renderer, ctx)?);
+        deps.normal_scale = normal_tex.scale();
+    }
+
+    if let Some(occlusion_tex) = material.occlusion_texture() {
+        let tex = GltfTextureInfo::from(GltfTextureInfo {
+            index: occlusion_tex.texture().index(),
+            tex_coord_index: occlusion_tex.tex_coord() as usize,
+        });
+        deps.occlusion_tex = Some(tex.create_dep(renderer, ctx)?);
+        deps.occlusion_strength = occlusion_tex.strength();
+    }
+
+    if let Some(emissive_tex) = material.emissive_texture() {
+        let tex = GltfTextureInfo::from(GltfTextureInfo {
+            index: emissive_tex.texture().index(),
+            tex_coord_index: emissive_tex.tex_coord() as usize,
+        });
+        deps.emissive_tex = Some(tex.create_dep(renderer, ctx)?);
+    }
+
+    deps.emissive_factor = material.emissive_factor();
+    deps.alpha_mode = match material.alpha_mode() {
+        gltf::material::AlphaMode::Opaque => MaterialAlphaMode::Opaque,
+        gltf::material::AlphaMode::Mask => MaterialAlphaMode::Mask {
+            cutoff: material.alpha_cutoff().unwrap_or(0.5),
+        },
+        gltf::material::AlphaMode::Blend => MaterialAlphaMode::Blend,
+    };
+    deps.double_sided = material.double_sided();
 
     Ok(MaterialDeps::Pbr(deps))
 }

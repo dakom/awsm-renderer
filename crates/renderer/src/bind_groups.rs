@@ -1,5 +1,5 @@
-pub mod buffer;
-pub mod material;
+pub mod material_textures;
+pub mod uniform_storage;
 
 use awsm_renderer_core::{
     bind_groups::{
@@ -8,23 +8,26 @@ use awsm_renderer_core::{
     error::AwsmCoreError,
     renderer::AwsmRendererWebGpu,
 };
-use buffer::BufferBindGroups;
-use material::{MaterialBindGroupLayoutKey, MaterialBindGroups};
+use material_textures::{MaterialBindGroupLayoutKey, MaterialTextureBindGroups};
 use thiserror::Error;
+use uniform_storage::UniformStorageBindGroups;
 
 use crate::materials::MaterialKey;
 
 pub struct BindGroups {
-    pub buffers: BufferBindGroups,
-    pub materials: MaterialBindGroups,
+    pub uniform_storages: UniformStorageBindGroups,
+    pub material_textures: MaterialTextureBindGroups,
 }
 
 impl BindGroups {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let buffers = BufferBindGroups::new(gpu)?;
-        let materials = MaterialBindGroups::new();
+        let buffers = UniformStorageBindGroups::new(gpu)?;
+        let materials = MaterialTextureBindGroups::new();
 
-        Ok(Self { buffers, materials })
+        Ok(Self {
+            uniform_storages: buffers,
+            material_textures: materials,
+        })
     }
 }
 

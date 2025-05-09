@@ -58,18 +58,18 @@ impl GltfPipelineLayoutKey {
         let mut bind_group_layouts = vec![
             renderer
                 .bind_groups
-                .buffers
+                .uniform_storages
                 .gpu_universal_bind_group_layout()
                 .clone(),
             renderer
                 .bind_groups
-                .buffers
+                .uniform_storages
                 .gpu_mesh_all_bind_group_layout()
                 .clone(),
             renderer
                 .bind_groups
-                .materials
-                .gpu_material_bind_group_layout(material_key)
+                .material_textures
+                .gpu_bind_group_layout(material_key)
                 .map_err(AwsmGltfError::MaterialBindGroupLayout)?
                 .clone(),
         ];
@@ -78,7 +78,7 @@ impl GltfPipelineLayoutKey {
             bind_group_layouts.push(
                 renderer
                     .bind_groups
-                    .buffers
+                    .uniform_storages
                     .gpu_mesh_shape_bind_group_layout()
                     .clone(),
             );

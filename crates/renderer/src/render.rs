@@ -7,6 +7,7 @@ use crate::bind_groups::BindGroups;
 use crate::core::command::CommandEncoder;
 use crate::error::Result;
 use crate::instances::Instances;
+use crate::materials::Materials;
 use crate::mesh::Meshes;
 use crate::skin::Skins;
 use crate::transform::Transforms;
@@ -24,6 +25,8 @@ impl AwsmRenderer {
         };
 
         self.transforms
+            .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
+        self.materials
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
         self.instances.write_gpu(&self.logging, &self.gpu)?;
         self.skins
@@ -56,6 +59,7 @@ impl AwsmRenderer {
             render_pass,
             transforms: &self.transforms,
             meshes: &self.meshes,
+            materials: &self.materials,
             skins: &self.skins,
             instances: &self.instances,
             bind_groups: &self.bind_groups,
@@ -63,7 +67,7 @@ impl AwsmRenderer {
 
         ctx.render_pass.set_bind_group(
             0,
-            ctx.bind_groups.buffers.gpu_universal_bind_group(),
+            ctx.bind_groups.uniform_storages.gpu_universal_bind_group(),
             None,
         )?;
 
@@ -85,6 +89,7 @@ pub struct RenderContext<'a> {
     pub render_pass: RenderPassEncoder,
     pub transforms: &'a Transforms,
     pub meshes: &'a Meshes,
+    pub materials: &'a Materials,
     pub skins: &'a Skins,
     pub instances: &'a Instances,
     pub bind_groups: &'a BindGroups,

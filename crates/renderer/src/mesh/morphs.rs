@@ -4,7 +4,8 @@ use slotmap::{new_key_type, SlotMap};
 use super::error::{AwsmMeshError, Result};
 use super::MeshBufferMorphInfo;
 use crate::bind_groups::{
-    buffer::BufferBindGroupIndex, buffer::MeshShapeBindGroupBinding, BindGroups,
+    uniform_storage::MeshShapeBindGroupBinding, uniform_storage::UniformStorageBindGroupIndex,
+    BindGroups,
 };
 use crate::buffer::dynamic_buddy::DynamicBuddyBuffer;
 use crate::AwsmRendererLogging;
@@ -129,14 +130,15 @@ impl Morphs {
             } else {
                 None
             };
-            let bind_group_index =
-                BufferBindGroupIndex::MeshShape(MeshShapeBindGroupBinding::MorphTargetWeights);
+            let bind_group_index = UniformStorageBindGroupIndex::MeshShape(
+                MeshShapeBindGroupBinding::MorphTargetWeights,
+            );
             if let Some(new_size) = self.weights.take_gpu_needs_resize() {
                 bind_groups
-                    .buffers
+                    .uniform_storages
                     .gpu_resize(gpu, bind_group_index, new_size)?;
             }
-            bind_groups.buffers.gpu_write(
+            bind_groups.uniform_storages.gpu_write(
                 gpu,
                 bind_group_index,
                 None,
@@ -152,14 +154,15 @@ impl Morphs {
             } else {
                 None
             };
-            let bind_group_index =
-                BufferBindGroupIndex::MeshShape(MeshShapeBindGroupBinding::MorphTargetValues);
+            let bind_group_index = UniformStorageBindGroupIndex::MeshShape(
+                MeshShapeBindGroupBinding::MorphTargetValues,
+            );
             if let Some(new_size) = self.values.take_gpu_needs_resize() {
                 bind_groups
-                    .buffers
+                    .uniform_storages
                     .gpu_resize(gpu, bind_group_index, new_size)?;
             }
-            bind_groups.buffers.gpu_write(
+            bind_groups.uniform_storages.gpu_write(
                 gpu,
                 bind_group_index,
                 None,

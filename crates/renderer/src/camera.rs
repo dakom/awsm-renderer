@@ -4,7 +4,8 @@ use glam::{Mat4, Vec3};
 use thiserror::Error;
 
 use crate::bind_groups::{
-    buffer::BufferBindGroupIndex, buffer::UniversalBindGroupBinding, AwsmBindGroupError, BindGroups,
+    uniform_storage::UniformStorageBindGroupIndex, uniform_storage::UniversalBindGroupBinding,
+    AwsmBindGroupError, BindGroups,
 };
 use crate::{AwsmRenderer, AwsmRendererLogging};
 
@@ -95,10 +96,10 @@ impl CameraBuffer {
             };
 
             bind_groups
-                .buffers
+                .uniform_storages
                 .gpu_write(
                     gpu,
-                    BufferBindGroupIndex::Universal(UniversalBindGroupBinding::Camera),
+                    UniformStorageBindGroupIndex::Universal(UniversalBindGroupBinding::Camera),
                     None,
                     self.raw_data.as_slice(),
                     None,
