@@ -127,12 +127,12 @@ impl MaterialBindGroups {
         let bind_group = gpu_create_bind_group(gpu, "Material", layout, entries);
 
         self.bind_groups.insert(material_key, bind_group);
-        self.material_layout_mapping.insert(material_key, layout_key);
+        self.material_layout_mapping
+            .insert(material_key, layout_key);
 
         Ok(())
     }
 }
-
 
 new_key_type! {
     pub struct MaterialBindGroupLayoutKey;

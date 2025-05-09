@@ -1,7 +1,10 @@
 use awsm_renderer_core::sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor};
 
 use crate::{
-    gltf::error::{AwsmGltfError, Result}, materials::{pbr::PbrMaterialDeps, MaterialDeps, MaterialTextureDep}, textures::{SamplerKey, TextureKey}, AwsmRenderer
+    gltf::error::{AwsmGltfError, Result},
+    materials::{pbr::PbrMaterialDeps, MaterialDeps, MaterialTextureDep},
+    textures::{SamplerKey, TextureKey},
+    AwsmRenderer,
 };
 
 use super::GltfPopulateContext;
@@ -13,7 +16,11 @@ pub fn gltf_material_deps(
 ) -> Result<MaterialDeps> {
     let mut deps = PbrMaterialDeps::default();
 
-    if let Some(info) = material.pbr_metallic_roughness().base_color_texture().map(GltfTextureInfo::from) {
+    if let Some(info) = material
+        .pbr_metallic_roughness()
+        .base_color_texture()
+        .map(GltfTextureInfo::from)
+    {
         deps.base_color = Some(info.create_dep(renderer, ctx)?);
     }
 
@@ -26,7 +33,7 @@ pub(crate) struct GltfTextureInfo {
     pub tex_coord_index: usize,
 }
 
-impl <'a> From<gltf::texture::Info<'a>> for GltfTextureInfo {
+impl<'a> From<gltf::texture::Info<'a>> for GltfTextureInfo {
     fn from(info: gltf::texture::Info<'a>) -> Self {
         Self {
             index: info.texture().index(),
@@ -36,7 +43,11 @@ impl <'a> From<gltf::texture::Info<'a>> for GltfTextureInfo {
 }
 
 impl GltfTextureInfo {
-    pub fn create_dep(&self, renderer: &mut AwsmRenderer, ctx: &GltfPopulateContext) -> Result<MaterialTextureDep> {
+    pub fn create_dep(
+        &self,
+        renderer: &mut AwsmRenderer,
+        ctx: &GltfPopulateContext,
+    ) -> Result<MaterialTextureDep> {
         let dep = {
             let lock = ctx.textures.lock().unwrap();
             lock.get(&self.index).cloned()
@@ -47,7 +58,10 @@ impl GltfTextureInfo {
             None => {
                 let texture_key = self.create_texture_key(renderer, ctx)?;
                 let sampler_key = self.create_sampler_key(renderer, ctx)?;
-                ctx.textures.lock().unwrap().insert(self.index, (texture_key.clone(), sampler_key.clone()));
+                ctx.textures
+                    .lock()
+                    .unwrap()
+                    .insert(self.index, (texture_key.clone(), sampler_key.clone()));
                 (texture_key, sampler_key)
             }
         };

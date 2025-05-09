@@ -100,7 +100,7 @@ impl AwsmRenderer {
                 .iter()
                 .map(|s| s.shader_key_kind)
                 .collect(),
-            material_deps.shader_cache_key()
+            material_deps.shader_cache_key(),
         );
 
         if let Some(shader_morph_key) = primitive_buffer_info.morph.as_ref().map(|m| m.shader_key) {
@@ -207,7 +207,12 @@ impl AwsmRenderer {
             );
         }
 
-        let material_key = self.materials.get_or_insert(&self.gpu, &mut self.bind_groups, &self.textures, material_deps)?;
+        let material_key = self.materials.get_or_insert(
+            &self.gpu,
+            &mut self.bind_groups,
+            &self.textures,
+            material_deps,
+        )?;
 
         let render_pipeline = match self.gltf.render_pipelines.get(&pipeline_key).cloned() {
             None => {

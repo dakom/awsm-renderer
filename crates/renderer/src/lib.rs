@@ -15,14 +15,14 @@ pub mod buffer;
 pub mod camera;
 pub mod error;
 pub mod instances;
+pub mod materials;
 pub mod mesh;
 pub mod render;
 pub mod shaders;
 pub mod skin;
+pub mod textures;
 pub mod transform;
 pub mod update;
-pub mod materials;
-pub mod textures;
 pub mod core {
     pub use awsm_renderer_core::*;
 }
@@ -70,7 +70,6 @@ impl AwsmRenderer {
             gltf,
             #[cfg(feature = "animation")]
             animations,
-
         } = deps;
 
         self.bind_groups = bind_groups;

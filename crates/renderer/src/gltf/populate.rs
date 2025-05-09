@@ -3,16 +3,21 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{skin::SkinKey, textures::{SamplerKey, TextureKey}, transform::TransformKey, AwsmRenderer};
+use crate::{
+    skin::SkinKey,
+    textures::{SamplerKey, TextureKey},
+    transform::TransformKey,
+    AwsmRenderer,
+};
 
 use super::{data::GltfData, error::AwsmGltfError};
 
 mod animation;
 mod extensions;
+mod material;
 mod mesh;
 mod skin;
 mod transforms;
-mod material;
 
 pub(crate) struct GltfPopulateContext {
     pub data: Arc<GltfData>,

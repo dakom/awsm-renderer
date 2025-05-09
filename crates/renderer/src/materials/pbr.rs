@@ -1,11 +1,17 @@
-use awsm_renderer_core::{bind_groups::{SamplerBindingLayout, SamplerBindingType, TextureBindingLayout}, texture::{TextureSampleType, TextureViewDimension}};
+use awsm_renderer_core::{
+    bind_groups::{SamplerBindingLayout, SamplerBindingType, TextureBindingLayout},
+    texture::{TextureSampleType, TextureViewDimension},
+};
 
-use crate::{bind_groups::material::{MaterialBindingEntry, MaterialBindingLayoutEntry}, shaders::PbrShaderCacheKeyMaterial, textures::Textures};
+use crate::{
+    bind_groups::material::{MaterialBindingEntry, MaterialBindingLayoutEntry},
+    shaders::PbrShaderCacheKeyMaterial,
+    textures::Textures,
+};
 
-use super::{MaterialTextureCacheKey, MaterialTextureDep, Result, AwsmMaterialError};
+use super::{AwsmMaterialError, MaterialTextureCacheKey, MaterialTextureDep, Result};
 
-pub struct PbrMaterial {
-}
+pub struct PbrMaterial {}
 
 #[derive(Default)]
 pub struct PbrMaterialDeps {
@@ -37,13 +43,12 @@ impl PbrMaterialDeps {
     }
 
     pub fn material(&self) -> PbrMaterial {
-        PbrMaterial {
-        }
+        PbrMaterial {}
     }
 
     pub fn shader_cache_key(&self) -> PbrShaderCacheKeyMaterial {
         PbrShaderCacheKeyMaterial {
-            base_color_uv_index: self.base_color.as_ref().map(|dep| dep.uv_index as u32)
+            base_color_uv_index: self.base_color.as_ref().map(|dep| dep.uv_index as u32),
         }
     }
 
@@ -67,16 +72,25 @@ impl PbrMaterialDeps {
     }
 
     // make sure the order matches shader.rs!
-    pub(super) fn bind_group_entries(&self, textures: &Textures) -> Result<Vec<MaterialBindingEntry>> {
+    pub(super) fn bind_group_entries(
+        &self,
+        textures: &Textures,
+    ) -> Result<Vec<MaterialBindingEntry>> {
         let mut entries = Vec::new();
 
         let mut push_texture = |dep: &MaterialTextureDep| -> Result<()> {
-            let texture = textures.get_texture(dep.texture_key).ok_or(AwsmMaterialError::MissingTexture(dep.texture_key))?;
-            let texture_view = texture.create_view().map_err(|err| AwsmMaterialError::CreateTextureView(format!("{:?}: {:?}", dep.texture_key, err)))?;
+            let texture = textures
+                .get_texture(dep.texture_key)
+                .ok_or(AwsmMaterialError::MissingTexture(dep.texture_key))?;
+            let texture_view = texture.create_view().map_err(|err| {
+                AwsmMaterialError::CreateTextureView(format!("{:?}: {:?}", dep.texture_key, err))
+            })?;
             let entry = MaterialBindingEntry::Texture(texture_view);
             entries.push(entry);
 
-            let sampler = textures.get_sampler(dep.sampler_key).ok_or(AwsmMaterialError::MissingSampler(dep.sampler_key))?;
+            let sampler = textures
+                .get_sampler(dep.sampler_key)
+                .ok_or(AwsmMaterialError::MissingSampler(dep.sampler_key))?;
             let entry = MaterialBindingEntry::Sampler(sampler.clone());
             entries.push(entry);
 
