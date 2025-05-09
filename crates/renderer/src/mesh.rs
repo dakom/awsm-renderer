@@ -5,10 +5,10 @@ pub mod morphs;
 
 use awsm_renderer_core::pipeline::primitive::IndexFormat;
 
-use crate::render::RenderContext;
+use crate::{materials::MaterialKey, render::RenderContext};
 use crate::skin::SkinKey;
 use crate::transform::TransformKey;
-use crate::{bind_groups::material::MaterialKey, bounds::Aabb};
+use crate::bounds::Aabb;
 
 pub use buffer_info::*;
 pub use error::AwsmMeshError;

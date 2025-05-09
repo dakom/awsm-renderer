@@ -1,3 +1,5 @@
+use crate::materials::MaterialKey;
+
 use super::{gpu_create_bind_group, gpu_create_layout, AwsmBindGroupError, Result};
 use awsm_renderer_core::{
     bind_groups::{
@@ -9,9 +11,9 @@ use awsm_renderer_core::{
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 pub struct MaterialBindGroups {
-    bind_groups: SlotMap<MaterialKey, web_sys::GpuBindGroup>,
-    layouts: SlotMap<MaterialLayoutKey, web_sys::GpuBindGroupLayout>,
-    material_layout_mapping: SecondaryMap<MaterialKey, MaterialLayoutKey>,
+    bind_groups: SecondaryMap<MaterialKey, web_sys::GpuBindGroup>,
+    layouts: SlotMap<MaterialBindGroupLayoutKey, web_sys::GpuBindGroupLayout>,
+    material_layout_mapping: SecondaryMap<MaterialKey, MaterialBindGroupLayoutKey>,
 }
 pub enum MaterialBindingLayoutEntry {
     Sampler(SamplerBindingLayout),
@@ -31,7 +33,7 @@ impl Default for MaterialBindGroups {
 impl MaterialBindGroups {
     pub fn new() -> Self {
         Self {
-            bind_groups: SlotMap::with_key(),
+            bind_groups: SecondaryMap::new(),
             layouts: SlotMap::with_key(),
             material_layout_mapping: SecondaryMap::new(),
         }
@@ -72,7 +74,7 @@ impl MaterialBindGroups {
         &mut self,
         gpu: &AwsmRendererWebGpu,
         layout_entries: Vec<MaterialBindingLayoutEntry>,
-    ) -> Result<MaterialLayoutKey> {
+    ) -> Result<MaterialBindGroupLayoutKey> {
         let entries = layout_entries
             .into_iter()
             .enumerate()
@@ -100,9 +102,10 @@ impl MaterialBindGroups {
     pub fn insert_material(
         &mut self,
         gpu: &AwsmRendererWebGpu,
-        layout_key: MaterialLayoutKey,
+        material_key: MaterialKey,
+        layout_key: MaterialBindGroupLayoutKey,
         entries: &[MaterialBindingEntry],
-    ) -> Result<MaterialKey> {
+    ) -> Result<()> {
         let layout = self
             .layouts
             .get(layout_key)
@@ -123,17 +126,14 @@ impl MaterialBindGroups {
 
         let bind_group = gpu_create_bind_group(gpu, "Material", layout, entries);
 
-        let key = self.bind_groups.insert(bind_group);
-        self.material_layout_mapping.insert(key, layout_key);
+        self.bind_groups.insert(material_key, bind_group);
+        self.material_layout_mapping.insert(material_key, layout_key);
 
-        Ok(key)
+        Ok(())
     }
 }
 
-new_key_type! {
-    pub struct MaterialKey;
-}
 
 new_key_type! {
-    pub struct MaterialLayoutKey;
+    pub struct MaterialBindGroupLayoutKey;
 }

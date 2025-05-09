@@ -9,8 +9,10 @@ use awsm_renderer_core::{
     renderer::AwsmRendererWebGpu,
 };
 use buffer::BufferBindGroups;
-use material::{MaterialBindGroups, MaterialKey, MaterialLayoutKey};
+use material::{MaterialBindGroupLayoutKey, MaterialBindGroups};
 use thiserror::Error;
+
+use crate::materials::MaterialKey;
 
 pub struct BindGroups {
     pub buffers: BufferBindGroups,
@@ -76,7 +78,7 @@ pub enum AwsmBindGroupError {
     MissingMaterial(MaterialKey),
 
     #[error("[bind group] missing material layout for {0:?}")]
-    MissingMaterialLayout(MaterialLayoutKey),
+    MissingMaterialLayout(MaterialBindGroupLayoutKey),
 
     #[error("[bind group] missing material layout for material {0:?}")]
     MissingMaterialLayoutForMaterial(MaterialKey),

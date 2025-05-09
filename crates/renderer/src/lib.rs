@@ -2,9 +2,11 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use bind_groups::BindGroups;
 use camera::CameraBuffer;
 use instances::Instances;
+use materials::Materials;
 use mesh::Meshes;
 use shaders::Shaders;
 use skin::Skins;
+use textures::Textures;
 use transform::Transforms;
 
 pub mod bind_groups;
@@ -19,6 +21,8 @@ pub mod shaders;
 pub mod skin;
 pub mod transform;
 pub mod update;
+pub mod materials;
+pub mod textures;
 pub mod core {
     pub use awsm_renderer_core::*;
 }
@@ -37,6 +41,8 @@ pub struct AwsmRenderer {
     pub skins: Skins,
     pub instances: Instances,
     pub shaders: Shaders,
+    pub materials: Materials,
+    pub textures: Textures,
     pub logging: AwsmRendererLogging,
 
     #[cfg(feature = "gltf")]
@@ -55,7 +61,16 @@ impl AwsmRenderer {
             camera,
             transforms,
             skins,
-            ..
+            instances,
+            shaders,
+            materials,
+            textures,
+            logging,
+            #[cfg(feature = "gltf")]
+            gltf,
+            #[cfg(feature = "animation")]
+            animations,
+
         } = deps;
 
         self.bind_groups = bind_groups;
@@ -63,15 +78,20 @@ impl AwsmRenderer {
         self.meshes = meshes;
         self.transforms = transforms;
         self.skins = skins;
+        self.instances = instances;
+        self.shaders = shaders;
+        self.materials = materials;
+        self.textures = textures;
+        self.logging = logging;
 
         #[cfg(feature = "gltf")]
         {
-            self.gltf = deps.gltf;
+            self.gltf = gltf;
         }
 
         #[cfg(feature = "animation")]
         {
-            self.animations = deps.animations;
+            self.animations = animations;
         }
 
         Ok(())
@@ -126,6 +146,8 @@ impl AwsmRendererBuilder {
             shaders: deps.shaders,
             bind_groups: deps.bind_groups,
             logging: deps.logging,
+            materials: deps.materials,
+            textures: deps.textures,
 
             #[cfg(feature = "gltf")]
             gltf: deps.gltf,
@@ -144,6 +166,8 @@ struct RebuildDeps {
     pub skins: Skins,
     pub instances: Instances,
     pub shaders: Shaders,
+    pub materials: Materials,
+    pub textures: Textures,
     pub logging: AwsmRendererLogging,
 
     #[cfg(feature = "gltf")]
@@ -165,6 +189,8 @@ impl RebuildDeps {
         let skins = Skins::new();
         let instances = Instances::new(gpu)?;
         let shaders = Shaders::new();
+        let materials = Materials::new();
+        let textures = Textures::new();
 
         Ok(Self {
             bind_groups,
@@ -175,6 +201,8 @@ impl RebuildDeps {
             logging,
             instances,
             shaders,
+            materials,
+            textures,
 
             #[cfg(feature = "gltf")]
             gltf: gltf::cache::GltfCache::default(),

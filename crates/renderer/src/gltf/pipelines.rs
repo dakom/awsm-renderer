@@ -7,9 +7,9 @@ use awsm_renderer_core::pipeline::primitive::PrimitiveState;
 use awsm_renderer_core::pipeline::vertex::{VertexBufferLayout, VertexState};
 use awsm_renderer_core::pipeline::RenderPipelineDescriptor;
 
-use crate::bind_groups::material::MaterialKey;
 use crate::gltf::error::Result;
 
+use crate::materials::MaterialKey;
 use crate::shaders::ShaderCacheKey;
 use crate::AwsmRenderer;
 

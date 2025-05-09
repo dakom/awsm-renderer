@@ -1,23 +1,23 @@
-use awsm_renderer_core::{
-    bind_groups::{SamplerBindingLayout, SamplerBindingType, TextureBindingLayout},
-    renderer::AwsmRendererWebGpu,
-    sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor},
-    texture::{TextureSampleType, TextureViewDimension},
-};
+use awsm_renderer_core::sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor};
 
-use super::error::{AwsmGltfError, Result};
 use crate::{
-    bind_groups::material::{MaterialBindingEntry, MaterialBindingLayoutEntry},
-    shaders::ShaderCacheKeyMaterial,
+    gltf::error::{AwsmGltfError, Result}, materials::{pbr::PbrMaterialDeps, MaterialDeps, MaterialTextureDep}, textures::{SamplerKey, TextureKey}, AwsmRenderer
 };
 
-use super::populate::GltfPopulateContext;
+use super::GltfPopulateContext;
 
-// merely a key to hash ad-hoc material generation
-#[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
-pub(crate) struct GltfMaterialKey {
-    // gltf index of the texture to use
-    pub base_color: Option<GltfTextureInfo>,
+pub fn gltf_material_deps(
+    renderer: &mut AwsmRenderer,
+    ctx: &GltfPopulateContext,
+    material: gltf::Material,
+) -> Result<MaterialDeps> {
+    let mut deps = PbrMaterialDeps::default();
+
+    if let Some(info) = material.pbr_metallic_roughness().base_color_texture().map(GltfTextureInfo::from) {
+        deps.base_color = Some(info.create_dep(renderer, ctx)?);
+    }
+
+    Ok(MaterialDeps::Pbr(deps))
 }
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -26,11 +26,44 @@ pub(crate) struct GltfTextureInfo {
     pub tex_coord_index: usize,
 }
 
+impl <'a> From<gltf::texture::Info<'a>> for GltfTextureInfo {
+    fn from(info: gltf::texture::Info<'a>) -> Self {
+        Self {
+            index: info.texture().index(),
+            tex_coord_index: info.tex_coord() as usize,
+        }
+    }
+}
+
 impl GltfTextureInfo {
-    pub fn create_texture_view(
+    pub fn create_dep(&self, renderer: &mut AwsmRenderer, ctx: &GltfPopulateContext) -> Result<MaterialTextureDep> {
+        let dep = {
+            let lock = ctx.textures.lock().unwrap();
+            lock.get(&self.index).cloned()
+        };
+
+        let (texture_key, sampler_key) = match dep {
+            Some((texture_key, sampler_key)) => (texture_key.clone(), sampler_key.clone()),
+            None => {
+                let texture_key = self.create_texture_key(renderer, ctx)?;
+                let sampler_key = self.create_sampler_key(renderer, ctx)?;
+                ctx.textures.lock().unwrap().insert(self.index, (texture_key.clone(), sampler_key.clone()));
+                (texture_key, sampler_key)
+            }
+        };
+
+        Ok(MaterialTextureDep {
+            texture_key,
+            sampler_key,
+            uv_index: self.tex_coord_index,
+        })
+    }
+
+    fn create_texture_key(
         &self,
+        renderer: &mut AwsmRenderer,
         ctx: &GltfPopulateContext,
-    ) -> Result<web_sys::GpuTextureView> {
+    ) -> Result<TextureKey> {
         let gltf_texture = ctx
             .data
             .doc
@@ -38,24 +71,24 @@ impl GltfTextureInfo {
             .nth(self.index)
             .ok_or(AwsmGltfError::MissingTextureDocIndex(self.index))?;
         let texture_index = gltf_texture.source().index();
-        let texture = ctx
+        let image = ctx
             .data
-            .textures
+            .images
             .get(texture_index)
             .ok_or(AwsmGltfError::MissingTextureIndex(texture_index))?;
 
-        let texture_view = texture
-            .create_view()
-            .map_err(|e| AwsmGltfError::CreateTextureView(format!("{e:?}")))?;
+        let texture = image
+            .create_texture(&renderer.gpu, None, false)
+            .map_err(AwsmGltfError::CreateTexture)?;
 
-        Ok(texture_view)
+        Ok(renderer.textures.add_texture(texture))
     }
 
-    pub fn create_sampler(
+    fn create_sampler_key(
         &self,
-        gpu: &AwsmRendererWebGpu,
+        renderer: &mut AwsmRenderer,
         ctx: &GltfPopulateContext,
-    ) -> Result<web_sys::GpuSampler> {
+    ) -> Result<SamplerKey> {
         let gltf_texture = ctx
             .data
             .doc
@@ -128,87 +161,8 @@ impl GltfTextureInfo {
             }
         }
 
-        let sampler = gpu.create_sampler(Some(&descriptor.into()));
+        let sampler = renderer.gpu.create_sampler(Some(&descriptor.into()));
 
-        Ok(sampler)
-    }
-}
-
-// similar, but just for the layout (re-used for different textures but same material layout)
-#[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
-pub(crate) struct GltfMaterialLayoutKey {
-    pub base_color: bool,
-}
-
-impl GltfMaterialKey {
-    #[allow(private_interfaces)]
-    pub fn new(material: gltf::Material) -> Self {
-        let mut key = Self::default();
-
-        if let Some(info) = material.pbr_metallic_roughness().base_color_texture() {
-            let texture_index = info.texture().index();
-            let tex_coord_index = info.tex_coord();
-
-            key.base_color = Some(GltfTextureInfo {
-                index: texture_index,
-                tex_coord_index: tex_coord_index as usize,
-            });
-        }
-
-        key
-    }
-
-    pub fn layout_key(&self) -> GltfMaterialLayoutKey {
-        GltfMaterialLayoutKey {
-            base_color: self.base_color.is_some(),
-        }
-    }
-
-    pub fn shader_cache_key(&self) -> ShaderCacheKeyMaterial {
-        let mut key = ShaderCacheKeyMaterial::default();
-        if let Some(info) = self.base_color {
-            key.base_color_tex_coord_index = Some(info.tex_coord_index as u32);
-        }
-        key
-    }
-
-    pub fn entries(
-        &self,
-        gpu: &AwsmRendererWebGpu,
-        ctx: &GltfPopulateContext,
-    ) -> Result<Vec<MaterialBindingEntry>> {
-        let mut entries = Vec::new();
-
-        // make sure the order matches shader.rs!
-        if let Some(texture_info) = self.base_color {
-            let texture_view = texture_info.create_texture_view(ctx)?;
-            let entry = MaterialBindingEntry::Texture(texture_view);
-            entries.push(entry);
-
-            let sampler = texture_info.create_sampler(gpu, ctx)?;
-            let entry = MaterialBindingEntry::Sampler(sampler);
-            entries.push(entry);
-        }
-
-        Ok(entries)
-    }
-}
-
-impl GltfMaterialLayoutKey {
-    pub fn layout_entries(&self) -> Vec<MaterialBindingLayoutEntry> {
-        let mut entries = Vec::new();
-
-        if self.base_color {
-            let entry = TextureBindingLayout::new()
-                .with_view_dimension(TextureViewDimension::N2d)
-                .with_sample_type(TextureSampleType::Float);
-            entries.push(MaterialBindingLayoutEntry::Texture(entry));
-
-            let entry =
-                SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering);
-            entries.push(MaterialBindingLayoutEntry::Sampler(entry));
-        }
-
-        entries
+        Ok(renderer.textures.add_sampler(sampler))
     }
 }

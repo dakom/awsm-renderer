@@ -3,8 +3,7 @@ use gltf::Semantic;
 use thiserror::Error;
 
 use crate::{
-    animation::AwsmAnimationError, bind_groups::AwsmBindGroupError, mesh::AwsmMeshError,
-    shaders::AwsmShaderError, skin::AwsmSkinError, transform::AwsmTransformError,
+    animation::AwsmAnimationError, bind_groups::AwsmBindGroupError, materials::AwsmMaterialError, mesh::AwsmMeshError, shaders::AwsmShaderError, skin::AwsmSkinError, transform::AwsmTransformError
 };
 
 #[derive(Error, Debug)]
@@ -123,6 +122,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] unable to create material bind group layout: {0:?}")]
     MaterialBindGroupLayout(AwsmBindGroupError),
+
+    #[error("[gltf] material: {0:?}")]
+    Material(#[from] AwsmMaterialError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;
