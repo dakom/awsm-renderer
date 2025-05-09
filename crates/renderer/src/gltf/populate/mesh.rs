@@ -5,7 +5,6 @@ use crate::{
     gltf::{
         error::{AwsmGltfError, Result},
         layout::{instance_transform_vertex_buffer_layout, primitive_vertex_buffer_layout},
-        materials::GltfMaterialKey,
         pipelines::{GltfPipelineLayoutKey, GltfRenderPipelineKey},
     },
     mesh::{Mesh, MeshBufferInfo},
@@ -20,7 +19,7 @@ use awsm_renderer_core::pipeline::{
 };
 use glam::{Mat4, Vec3};
 
-use super::GltfPopulateContext;
+use super::{material::gltf_material_deps, GltfPopulateContext};
 
 impl AwsmRenderer {
     pub(super) fn populate_gltf_node_mesh<'a, 'b: 'a, 'c: 'a>(
@@ -92,7 +91,7 @@ impl AwsmRenderer {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
-        let material_cache_key = GltfMaterialKey::new(gltf_primitive.material());
+        let material_deps = gltf_material_deps(self, ctx, gltf_primitive.material())?;
 
         let mut shader_cache_key = ShaderCacheKey::new(
             primitive_buffer_info
@@ -101,8 +100,8 @@ impl AwsmRenderer {
                 .iter()
                 .map(|s| s.shader_key_kind)
                 .collect(),
-        )
-        .with_material(material_cache_key.shader_cache_key());
+            material_deps.shader_cache_key(),
+        );
 
         if let Some(shader_morph_key) = primitive_buffer_info.morph.as_ref().map(|m| m.shader_key) {
             shader_cache_key = shader_cache_key.with_morphs(shader_morph_key)
@@ -208,39 +207,12 @@ impl AwsmRenderer {
             );
         }
 
-        let material_key = match self.gltf.materials.get(&material_cache_key).cloned() {
-            Some(material_key) => material_key,
-            None => {
-                let material_layout_cache_key = material_cache_key.layout_key();
-                let layout_key = match self.gltf.material_layouts.get(&material_layout_cache_key) {
-                    Some(layout_key) => *layout_key,
-                    None => {
-                        let layout_entries = material_layout_cache_key.layout_entries();
-                        let layout_key = self
-                            .bind_groups
-                            .materials
-                            .insert_layout(&self.gpu, layout_entries)
-                            .map_err(AwsmGltfError::MaterialBindGroupLayout)?;
-                        self.gltf
-                            .material_layouts
-                            .insert(material_layout_cache_key, layout_key);
-                        layout_key
-                    }
-                };
-
-                let entries = material_cache_key.entries(&self.gpu, ctx)?;
-                let material_key = self
-                    .bind_groups
-                    .materials
-                    .insert_material(&self.gpu, layout_key, &entries)
-                    .map_err(AwsmGltfError::MaterialBindGroup)?;
-                self.gltf
-                    .materials
-                    .insert(material_cache_key.clone(), material_key);
-
-                material_key
-            }
-        };
+        let material_key = self.materials.get_or_insert(
+            &self.gpu,
+            &mut self.bind_groups,
+            &self.textures,
+            material_deps,
+        )?;
 
         let render_pipeline = match self.gltf.render_pipelines.get(&pipeline_key).cloned() {
             None => {

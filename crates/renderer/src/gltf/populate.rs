@@ -3,18 +3,25 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{skin::SkinKey, transform::TransformKey, AwsmRenderer};
+use crate::{
+    skin::SkinKey,
+    textures::{SamplerKey, TextureKey},
+    transform::TransformKey,
+    AwsmRenderer,
+};
 
 use super::{data::GltfData, error::AwsmGltfError};
 
 mod animation;
 mod extensions;
+mod material;
 mod mesh;
 mod skin;
 mod transforms;
 
 pub(crate) struct GltfPopulateContext {
     pub data: Arc<GltfData>,
+    pub textures: Mutex<HashMap<usize, (TextureKey, SamplerKey)>>,
     pub node_to_transform: Mutex<HashMap<usize, TransformKey>>,
     pub node_to_skin: Mutex<HashMap<usize, SkinKey>>,
     pub transform_is_joint: Mutex<HashSet<TransformKey>>,
@@ -33,6 +40,7 @@ impl AwsmRenderer {
 
         let ctx = GltfPopulateContext {
             data: gltf_data,
+            textures: Mutex::new(HashMap::new()),
             node_to_transform: Mutex::new(HashMap::new()),
             node_to_skin: Mutex::new(HashMap::new()),
             transform_is_joint: Mutex::new(HashSet::new()),

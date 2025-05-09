@@ -56,7 +56,7 @@ pub enum ShaderConstantIds {
 //
 // uniform and other runtime data for mesh
 // is controlled via various components as-needed
-#[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKey {
     pub attributes: Vec<ShaderCacheKeyAttribute>,
     pub morphs: ShaderCacheKeyMorphs,
@@ -65,12 +65,12 @@ pub struct ShaderCacheKey {
 }
 
 impl ShaderCacheKey {
-    pub fn new(attributes: Vec<ShaderCacheKeyAttribute>) -> Self {
+    pub fn new(attributes: Vec<ShaderCacheKeyAttribute>, material: ShaderCacheKeyMaterial) -> Self {
         Self {
             attributes,
             morphs: Default::default(),
             instancing: Default::default(),
-            material: Default::default(),
+            material,
         }
     }
 
@@ -133,9 +133,14 @@ pub struct ShaderCacheKeyInstancing {
     pub transform: bool,
 }
 
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShaderCacheKeyMaterial {
+    Pbr(PbrShaderCacheKeyMaterial),
+}
+
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct ShaderCacheKeyMaterial {
-    pub base_color_tex_coord_index: Option<u32>,
+pub struct PbrShaderCacheKeyMaterial {
+    pub base_color_uv_index: Option<u32>,
 }
 
 impl ShaderCacheKeyAttribute {
@@ -224,7 +229,7 @@ impl ShaderCacheKey {
                         ShaderCacheKeyAttribute::Normals => "normal".to_string(),
                         ShaderCacheKeyAttribute::Tangents => "tangent".to_string(),
                         ShaderCacheKeyAttribute::Colors { .. } => format!("color_{count}"),
-                        ShaderCacheKeyAttribute::TexCoords { .. } => format!("texcoord_{count}"),
+                        ShaderCacheKeyAttribute::TexCoords { .. } => format!("uv_{count}"),
                         ShaderCacheKeyAttribute::Joints { .. } => format!("skin_joint_{count}"),
                         ShaderCacheKeyAttribute::Weights { .. } => format!("skin_weight_{count}"),
                     },
@@ -256,47 +261,51 @@ impl ShaderCacheKey {
         let mut vertex_output_locations = Vec::new();
         let mut fragment_buffer_bindings = Vec::new();
 
-        if let Some(texcoord_index) = self.material.base_color_tex_coord_index {
-            fragment_buffer_bindings.push(DynamicBufferBinding {
-                group: 2,
-                index: fragment_buffer_bindings.len() as u32,
-                name: "base_color_tex".to_string(),
-                data_type: "texture_2d<f32>".to_string(),
-            });
+        match self.material {
+            ShaderCacheKeyMaterial::Pbr(material_key) => {
+                if let Some(uv_index) = material_key.base_color_uv_index {
+                    fragment_buffer_bindings.push(DynamicBufferBinding {
+                        group: 2,
+                        index: fragment_buffer_bindings.len() as u32,
+                        name: "base_color_tex".to_string(),
+                        data_type: "texture_2d<f32>".to_string(),
+                    });
 
-            fragment_buffer_bindings.push(DynamicBufferBinding {
-                group: 2,
-                index: fragment_buffer_bindings.len() as u32,
-                name: "base_color_sampler".to_string(),
-                data_type: "sampler".to_string(),
-            });
+                    fragment_buffer_bindings.push(DynamicBufferBinding {
+                        group: 2,
+                        index: fragment_buffer_bindings.len() as u32,
+                        name: "base_color_sampler".to_string(),
+                        data_type: "sampler".to_string(),
+                    });
 
-            vertex_output_locations.push(VertexLocation {
-                location: vertex_output_locations.len() as u32,
-                interpolation: None,
-                name: "base_color_uv".to_string(),
-                data_type: "vec2<f32>".to_string(),
-            });
+                    vertex_output_locations.push(VertexLocation {
+                        location: vertex_output_locations.len() as u32,
+                        interpolation: None,
+                        name: "base_color_uv".to_string(),
+                        data_type: "vec2<f32>".to_string(),
+                    });
 
-            vertex_to_fragment_assignments.push(VertexToFragmentAssignment {
-                vertex_name: format!("texcoord_{texcoord_index}"),
-                fragment_name: "base_color_uv".to_string(),
-            });
+                    vertex_to_fragment_assignments.push(VertexToFragmentAssignment {
+                        vertex_name: format!("uv_{uv_index}"),
+                        fragment_name: "base_color_uv".to_string(),
+                    });
 
-            material.has_base_color = true;
-        }
+                    material.has_base_color = true;
+                }
 
-        if material.has_normal {
-            vertex_output_locations.push(VertexLocation {
-                location: vertex_output_locations.len() as u32,
-                interpolation: None,
-                name: "normal".to_string(),
-                data_type: "vec3<f32>".to_string(),
-            });
-            vertex_to_fragment_assignments.push(VertexToFragmentAssignment {
-                vertex_name: "normal".to_string(),
-                fragment_name: "normal".to_string(),
-            });
+                if material.has_normal {
+                    vertex_output_locations.push(VertexLocation {
+                        location: vertex_output_locations.len() as u32,
+                        interpolation: None,
+                        name: "normal".to_string(),
+                        data_type: "vec3<f32>".to_string(),
+                    });
+                    vertex_to_fragment_assignments.push(VertexToFragmentAssignment {
+                        vertex_name: "normal".to_string(),
+                        fragment_name: "normal".to_string(),
+                    });
+                }
+            }
         }
 
         let tmpl = ShaderTemplate {

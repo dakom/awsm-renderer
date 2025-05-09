@@ -177,8 +177,7 @@ impl AppScene {
         gltf_id: GltfId,
         loader: GltfLoader,
     ) -> Result<GltfData> {
-        let renderer = self.renderer.lock().await;
-        Ok(loader.into_data(&renderer.gpu).await?)
+        Ok(loader.into_data()?)
     }
 
     pub async fn populate(self: &Arc<Self>, data: GltfData) -> Result<()> {
