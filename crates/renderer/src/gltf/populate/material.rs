@@ -32,28 +32,28 @@ pub fn gltf_material_deps(
     }
 
     if let Some(normal_tex) = material.normal_texture() {
-        let tex = GltfTextureInfo::from(GltfTextureInfo {
+        let tex = GltfTextureInfo {
             index: normal_tex.texture().index(),
             tex_coord_index: normal_tex.tex_coord() as usize,
-        });
+        };
         deps.normal_tex = Some(tex.create_dep(renderer, ctx)?);
         deps.normal_scale = normal_tex.scale();
     }
 
     if let Some(occlusion_tex) = material.occlusion_texture() {
-        let tex = GltfTextureInfo::from(GltfTextureInfo {
+        let tex = GltfTextureInfo {
             index: occlusion_tex.texture().index(),
             tex_coord_index: occlusion_tex.tex_coord() as usize,
-        });
+        };
         deps.occlusion_tex = Some(tex.create_dep(renderer, ctx)?);
         deps.occlusion_strength = occlusion_tex.strength();
     }
 
     if let Some(emissive_tex) = material.emissive_texture() {
-        let tex = GltfTextureInfo::from(GltfTextureInfo {
+        let tex = GltfTextureInfo {
             index: emissive_tex.texture().index(),
             tex_coord_index: emissive_tex.tex_coord() as usize,
-        });
+        };
         deps.emissive_tex = Some(tex.create_dep(renderer, ctx)?);
     }
 
