@@ -12,8 +12,7 @@ use slotmap::{Key, SecondaryMap};
 // • Ideal usage:
 //    Thousands of items with identical sizes, like:
 //      - Transforms
-//      - Morph weights
-//      - Skin matrices
+//      - PBR Materials
 //
 //----------------------------------------------------------------------------//
 
@@ -29,7 +28,7 @@ use slotmap::{Key, SecondaryMap};
 ///
 /// This also has the benefit of not needing complicated logic to avoid coalescing etc.
 #[derive(Debug)]
-pub struct DynamicFixedBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
+pub struct DynamicUniformBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
     /// Raw CPU‑side data for all items, organized in BYTE_SIZE slots.
     raw_data: Vec<u8>,
     /// The GPU buffer storing the raw data.
@@ -48,7 +47,7 @@ pub struct DynamicFixedBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
     aligned_slice_size: usize,
 }
 
-impl<K: Key, const ZERO_VALUE: u8> DynamicFixedBuffer<K, ZERO_VALUE> {
+impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         initial_capacity: usize,

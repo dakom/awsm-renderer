@@ -13,8 +13,8 @@ use slotmap::{Key, SecondaryMap};
 // • Ideal usage:
 //    Mixed-size uniform/storage buffer items where predictable performance
 //    matters more than perfect memory efficiency, like:
-//      - Heterogeneous UBO/SBO payloads
-//      - Variable-sized dynamic allocations
+//      - Heterogeneous UBO/SBO payloads (i.e. not all items are the same size)
+//      - Variable-sized dynamic allocations (i.e. varying number of items per draw call)
 //
 //----------------------------------------------------------------------------//
 
@@ -27,7 +27,7 @@ const MIN_BLOCK: usize = 256;
 /// `DynamicFixedBuffer`, but it allows for more flexible allocation sizes
 /// with still-excellent performance tradeoffs due to the buddy tree structure.
 #[derive(Debug)]
-pub struct DynamicBuddyBuffer<K: Key, const ZERO: u8 = 0> {
+pub struct DynamicStorageBuffer<K: Key, const ZERO: u8 = 0> {
     raw_data: Vec<u8>,
     /// Complete binary tree stored as an array where each node
     /// is the size of the *largest* free block in that subtree.
@@ -40,7 +40,7 @@ pub struct DynamicBuddyBuffer<K: Key, const ZERO: u8 = 0> {
     label: Option<String>,
 }
 
-impl<K: Key, const ZERO: u8> DynamicBuddyBuffer<K, ZERO> {
+impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
     pub fn new(mut initial_bytes: usize, label: Option<String>) -> Self {
         // round up to next power‑of‑two multiple of MIN_BLOCK
         initial_bytes = round_pow2(initial_bytes.max(MIN_BLOCK));

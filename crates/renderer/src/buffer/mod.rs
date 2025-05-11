@@ -1,3 +1,3 @@
-pub mod dynamic_buddy;
-pub mod dynamic_fixed;
+pub mod dynamic_storage;
+pub mod dynamic_uniform;
 pub mod helpers;

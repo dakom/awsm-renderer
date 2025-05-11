@@ -7,15 +7,15 @@ use crate::bind_groups::{
     uniform_storage::MeshShapeBindGroupBinding, uniform_storage::UniformStorageBindGroupIndex,
     BindGroups,
 };
-use crate::buffer::dynamic_buddy::DynamicBuddyBuffer;
+use crate::buffer::dynamic_storage::DynamicStorageBuffer;
 use crate::AwsmRendererLogging;
 
 // The weights are dynamic and updated on a per-mesh basis as frequently as needed
 // The values are essentially static, but may be sourced from different (large) buffers
 // e.g. they are loaded up front per-gltf file
 pub struct Morphs {
-    weights: DynamicBuddyBuffer<MorphKey>,
-    values: DynamicBuddyBuffer<MorphKey>,
+    weights: DynamicStorageBuffer<MorphKey>,
+    values: DynamicStorageBuffer<MorphKey>,
     weights_dirty: bool,
     values_dirty: bool,
     infos: SlotMap<MorphKey, MeshBufferMorphInfo>,
@@ -33,11 +33,11 @@ impl Morphs {
 
     pub fn new() -> Self {
         Self {
-            weights: DynamicBuddyBuffer::new(
+            weights: DynamicStorageBuffer::new(
                 Self::WEIGHTS_INITIAL_SIZE,
                 Some("MorphWeights".to_string()),
             ),
-            values: DynamicBuddyBuffer::new(
+            values: DynamicStorageBuffer::new(
                 Self::VALUES_INITIAL_SIZE,
                 Some("MorphValues".to_string()),
             ),
