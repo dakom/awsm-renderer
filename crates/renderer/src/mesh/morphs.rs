@@ -57,10 +57,10 @@ impl Morphs {
         weights: &[f32],
         value_bytes: &[u8],
     ) -> Result<MorphKey> {
-        if weights.len() != morph_buffer_info.targets_len {
+        if weights.len() != morph_buffer_info.shader_key.targets_len {
             return Err(AwsmMeshError::MorphWeightsTargetsMismatch {
                 weights: weights.len(),
-                targets: morph_buffer_info.targets_len,
+                targets: morph_buffer_info.shader_key.targets_len,
             });
         }
         let key = self.infos.insert(morph_buffer_info.clone());
@@ -102,7 +102,7 @@ impl Morphs {
         key: MorphKey,
         f: impl FnOnce(&mut [f32]),
     ) -> Result<()> {
-        let len = self.get_info(key).map(|info| info.targets_len)?;
+        let len = self.get_info(key).map(|info| info.shader_key.targets_len)?;
 
         self.weights.update_with_unchecked(key, |slice_u8| {
             let weights_f32 =

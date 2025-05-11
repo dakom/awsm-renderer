@@ -42,7 +42,7 @@ impl GltfPipelineLayoutKey {
         let mut key = Self::default();
 
         if let Some(morph) = buffer_info.morph.as_ref() {
-            key.morph_targets_len = Some(morph.targets_len);
+            key.morph_targets_len = Some(morph.shader_key.targets_len);
         }
 
         key

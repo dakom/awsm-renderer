@@ -115,11 +115,24 @@ pub enum ShaderCacheKeyAttribute {
     Weights { count: u32 },
 }
 
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ShaderCacheKeyMorphs {
     pub position: bool,
     pub normal: bool,
     pub tangent: bool,
+    // this is used a constant override in the shader
+    // so it does affect "different shaders", but not via template changes
+    // and so we exclude it from the hash
+    pub targets_len: usize,
+}
+
+impl std::hash::Hash for ShaderCacheKeyMorphs {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.position.hash(state);
+        self.normal.hash(state);
+        self.tangent.hash(state);
+        // we don't hash the targets_len, that will naturally be "different shaders" via constant override
+    }
 }
 
 impl ShaderCacheKeyMorphs {

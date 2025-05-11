@@ -203,7 +203,7 @@ impl AwsmRenderer {
         if let Some(morph) = &primitive_buffer_info.morph {
             pipeline_key = pipeline_key.with_vertex_constant(
                 (ShaderConstantIds::MorphTargetLen as u16).into(),
-                (morph.targets_len as u32).into(),
+                (morph.shader_key.targets_len as u32).into(),
             );
         }
 
