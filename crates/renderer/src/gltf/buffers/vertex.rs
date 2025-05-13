@@ -172,7 +172,7 @@ impl GltfMeshBufferVertexInfo {
                     .ok_or_else(|| {
                         AwsmGltfError::ConstructNormals("missing positions".to_string())
                     })?;
-                let normals_bytes = compute_normals(&positions, index)?;
+                let normals_bytes = compute_normals(positions, index)?;
 
                 buffers_by_attribute_kind.insert(
                     TempAttributeKind::Normals,

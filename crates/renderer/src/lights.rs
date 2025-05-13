@@ -88,7 +88,7 @@ impl Light {
             Value::Vec3(values) => {
                 let values_u8 =
                     unsafe { std::slice::from_raw_parts(values.as_ptr() as *const u8, 12) };
-                data[offset..offset + 12].copy_from_slice(&values_u8);
+                data[offset..offset + 12].copy_from_slice(values_u8);
                 offset += 12;
             }
             Value::SkipVec3 => {
@@ -167,6 +167,12 @@ impl Light {
         }
 
         data
+    }
+}
+
+impl Default for Lights {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

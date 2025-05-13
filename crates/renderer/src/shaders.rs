@@ -313,7 +313,7 @@ impl ShaderCacheKey {
             .into_iter()
             .map(|mut loc| {
                 const HARDCODED_LOCATION_LEN: u32 = 1; // account for hardcoded locations like world_position
-                loc.location = loc.location + HARDCODED_LOCATION_LEN;
+                loc.location += HARDCODED_LOCATION_LEN;
                 loc
             })
             .collect();
@@ -345,7 +345,7 @@ fn print_source(source: &str, with_line_numbers: bool) {
     let mut output = "\n".to_string();
     let mut lines = source.lines();
     let mut line_number = 1;
-    while let Some(line) = lines.next() {
+    for line in lines {
         let formatted_line = match with_line_numbers {
             true => format!("{:>4}: {}\n", line_number, line),
             false => format!("{}\n", line),
