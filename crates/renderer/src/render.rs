@@ -28,6 +28,8 @@ impl AwsmRenderer {
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
         self.materials
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
+        self.lights
+            .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
         self.instances.write_gpu(&self.logging, &self.gpu)?;
         self.skins
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;

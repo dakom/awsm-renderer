@@ -13,9 +13,7 @@ use crate::materials::MaterialKey;
 use crate::shaders::ShaderCacheKey;
 use crate::AwsmRenderer;
 
-use super::buffers::GltfMeshBufferInfo;
 use super::error::AwsmGltfError;
-use super::populate::GltfPopulateContext;
 
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
@@ -31,22 +29,8 @@ pub(crate) struct GltfRenderPipelineKey {
 // merely a key to hash ad-hoc pipeline generation
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
 pub(crate) struct GltfPipelineLayoutKey {
-    pub morph_targets_len: Option<usize>, // TODO - override constant in shader
     pub has_morph_key: bool,
     pub has_skin_key: bool,
-}
-
-impl GltfPipelineLayoutKey {
-    #[allow(private_interfaces)]
-    pub fn new(_ctx: &GltfPopulateContext, buffer_info: &GltfMeshBufferInfo) -> Self {
-        let mut key = Self::default();
-
-        if let Some(morph) = buffer_info.morph.as_ref() {
-            key.morph_targets_len = Some(morph.shader_key.targets_len);
-        }
-
-        key
-    }
 }
 
 impl GltfPipelineLayoutKey {
@@ -121,6 +105,7 @@ impl GltfRenderPipelineKey {
         self
     }
 
+    #[allow(dead_code)]
     pub fn with_vertex_constant(
         mut self,
         key: ConstantOverrideKey,

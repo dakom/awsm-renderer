@@ -1,6 +1,10 @@
 # Next up
 
-- Material / lights
+- fix arcball view controller
+
+- materials cont'd
+    - normal texture
+    - metal roughness texture
 
 - fix "dev-release" mode (just base path?)
 

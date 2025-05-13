@@ -57,15 +57,23 @@ impl Morphs {
         weights: &[f32],
         value_bytes: &[u8],
     ) -> Result<MorphKey> {
-        if weights.len() != morph_buffer_info.shader_key.targets_len {
+        if weights.len() != morph_buffer_info.targets_len {
             return Err(AwsmMeshError::MorphWeightsTargetsMismatch {
                 weights: weights.len(),
-                targets: morph_buffer_info.shader_key.targets_len,
+                targets: morph_buffer_info.targets_len,
             });
         }
+
+        let mut weights_and_count: Vec<f32> = Vec::with_capacity(weights.len() + 1);
+        weights_and_count.push(weights.len() as f32);
+        weights_and_count.extend_from_slice(weights);
         let key = self.infos.insert(morph_buffer_info.clone());
-        let weights_u8 =
-            unsafe { std::slice::from_raw_parts(weights.as_ptr() as *const u8, weights.len() * 4) };
+        let weights_u8 = unsafe {
+            std::slice::from_raw_parts(
+                weights_and_count.as_ptr() as *const u8,
+                4 + (weights.len() * 4),
+            )
+        };
         self.weights.update(key, weights_u8);
         self.values.update(key, value_bytes);
 
@@ -102,11 +110,14 @@ impl Morphs {
         key: MorphKey,
         f: impl FnOnce(&mut [f32]),
     ) -> Result<()> {
-        let len = self.get_info(key).map(|info| info.shader_key.targets_len)?;
+        let len = self.get_info(key).map(|info| info.targets_len)?;
 
         self.weights.update_with_unchecked(key, |slice_u8| {
             let weights_f32 =
-                unsafe { std::slice::from_raw_parts_mut(slice_u8.as_ptr() as *mut f32, len) };
+                unsafe { std::slice::from_raw_parts_mut(slice_u8.as_ptr() as *mut f32, len + 1) };
+
+            // The first value is the number of targets
+            let weights_f32 = &mut weights_f32[1..];
 
             f(weights_f32)
         });

@@ -7,6 +7,7 @@ use std::ops::Deref;
 use awsm_renderer::bounds::Aabb;
 use awsm_renderer::gltf::data::GltfData;
 use awsm_renderer::gltf::loader::GltfLoader;
+use awsm_renderer::lights::Light;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use awsm_web::dom::resize::ResizeObserver;
 use camera::{Camera, CameraId};
@@ -181,7 +182,15 @@ impl AppScene {
     }
 
     pub async fn populate(self: &Arc<Self>, data: GltfData) -> Result<()> {
-        self.renderer.lock().await.populate_gltf(data, None).await
+        let mut renderer = self.renderer.lock().await;
+        renderer.populate_gltf(data, None).await?;
+        renderer.lights.insert(Light::Directional {
+            color: [1.0, 1.0, 1.0],
+            intensity: 1.0,
+            direction: [-1.0, -1.0, -1.0],
+        });
+
+        Ok(())
     }
 
     pub async fn render(self: &Arc<Self>) -> Result<()> {

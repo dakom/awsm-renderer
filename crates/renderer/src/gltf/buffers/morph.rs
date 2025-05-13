@@ -11,6 +11,9 @@ pub struct GltfMeshBufferMorphInfo {
     // offset in morph_bytes where this primitive starts
     pub values_offset: usize,
 
+    // the number of morph targets for this primitive
+    pub targets_len: usize,
+
     // contains info about the specific attribute targets
     pub shader_key: ShaderCacheKeyMorphs,
 
@@ -24,6 +27,7 @@ impl From<GltfMeshBufferMorphInfo> for MeshBufferMorphInfo {
     fn from(info: GltfMeshBufferMorphInfo) -> Self {
         Self {
             shader_key: info.shader_key,
+            targets_len: info.targets_len,
             vertex_stride_size: info.vertex_stride_size,
             values_size: info.values_size,
         }
@@ -47,7 +51,6 @@ impl GltfMeshBufferMorphInfo {
             tangent: primitive
                 .morph_targets()
                 .any(|morph_target| morph_target.tangents().is_some()),
-            targets_len: primitive.morph_targets().len(),
         };
 
         if !shader_key.any() {
@@ -155,6 +158,7 @@ impl GltfMeshBufferMorphInfo {
             Ok(Some(Self {
                 values_offset,
                 shader_key,
+                targets_len: primitive.morph_targets().len(),
                 values_size: morph_bytes.len() - values_offset,
                 vertex_stride_size: vertex_morph_stride_size,
             }))

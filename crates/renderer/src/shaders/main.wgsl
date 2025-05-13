@@ -1,8 +1,8 @@
-{% include "util/math.wgsl" %}
+{% include "util/identity.wgsl" %}
 {% include "camera.wgsl" %}
 
 {% include "vertex/mesh.wgsl" %}
-{% include "fragment/fragment_input.wgsl" %}
+{% include "fragment/input/fragment_input.wgsl" %}
 
 {% match fragment_shader_kind %}
     {% when FragmentShaderKind::DebugNormals %}

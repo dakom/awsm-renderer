@@ -56,6 +56,8 @@ impl MeshBufferIndexInfo {
 pub struct MeshBufferMorphInfo {
     // contains info about the specific attribute targets
     pub shader_key: ShaderCacheKeyMorphs,
+    // the number of morph targets for this primitive
+    pub targets_len: usize,
     // the stride of all morph targets across the vertice, without padding
     pub vertex_stride_size: usize,
     // the size of the whole slice of data (all vertices and targets)

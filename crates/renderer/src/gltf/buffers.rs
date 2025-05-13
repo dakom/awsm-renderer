@@ -1,6 +1,7 @@
 pub mod accessor;
 pub mod index;
 pub mod morph;
+pub mod normals;
 pub mod vertex;
 
 use index::GltfMeshBufferIndexInfo;
@@ -69,8 +70,12 @@ impl GltfBuffers {
             for primitive in mesh.primitives() {
                 let index =
                     GltfMeshBufferIndexInfo::maybe_new(&primitive, &buffers, &mut index_bytes)?;
-                let vertex =
-                    GltfMeshBufferVertexInfo::new(&primitive, &buffers, &mut vertex_bytes)?;
+                let vertex = GltfMeshBufferVertexInfo::new(
+                    &primitive,
+                    &buffers,
+                    index.as_ref().map(|index| (index, index_bytes.as_slice())),
+                    &mut vertex_bytes,
+                )?;
                 let morph = GltfMeshBufferMorphInfo::maybe_new(
                     &primitive,
                     &buffers,

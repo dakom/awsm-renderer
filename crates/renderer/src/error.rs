@@ -3,8 +3,8 @@ use thiserror::Error;
 
 use crate::{
     bind_groups::AwsmBindGroupError, camera::AwsmCameraError, instances::AwsmInstanceError,
-    materials::AwsmMaterialError, mesh::AwsmMeshError, shaders::AwsmShaderError,
-    skin::AwsmSkinError, transform::AwsmTransformError,
+    lights::AwsmLightError, materials::AwsmMaterialError, mesh::AwsmMeshError,
+    shaders::AwsmShaderError, skin::AwsmSkinError, transform::AwsmTransformError,
 };
 
 #[derive(Error, Debug)]
@@ -39,6 +39,9 @@ pub enum AwsmError {
 
     #[error("{0}")]
     Material(#[from] AwsmMaterialError),
+
+    #[error("{0}")]
+    Light(#[from] AwsmLightError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;

@@ -1,4 +1,7 @@
 //***** MORPHS *****
+
+// The morph weights
+// but the first value is actually the morph_target count
 @group(3) @binding(0)
 var<storage, read> morph_weights: array<f32>;
 
@@ -9,11 +12,10 @@ var<storage, read> morph_weights: array<f32>;
 @group(3) @binding(1)
 var<storage, read> morph_values: array<f32>; 
 
-// This changes per-shader via constant overrides
-@id(1) override morph_target_len:u32;
-
 fn apply_morphs(input: VertexInput) -> VertexInput {
     var output = input;
+
+    let morph_target_len = u32(morph_weights[0]); // the first value is the morph_target count
 
     // target_size is the total number of floats for each morph_target (for a given vertex, not across all of them) 
     var target_size = 0u; // vec3 for position
@@ -42,7 +44,7 @@ fn apply_morphs(input: VertexInput) -> VertexInput {
         // 2d index into the array
         // 4 floats per vec4, so we need to divide by 4 to get "which vec4" we are in
         // and then mod by 4 to get the index into that vec4
-        var morph_weight = morph_weights[morph_target];
+        var morph_weight = morph_weights[morph_target + 1u]; // the first value is the morph_target count so we skip it
 
         // For each vertex, skip the "full" morph-target data for all targets
         // then, for reach morph target, skip the morph-target data up until this count

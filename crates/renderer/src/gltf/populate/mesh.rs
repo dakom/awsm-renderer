@@ -8,7 +8,7 @@ use crate::{
         pipelines::{GltfPipelineLayoutKey, GltfRenderPipelineKey},
     },
     mesh::{Mesh, MeshBufferInfo},
-    shaders::{ShaderCacheKey, ShaderCacheKeyInstancing, ShaderConstantIds},
+    shaders::{ShaderCacheKey, ShaderCacheKeyInstancing},
     skin::SkinKey,
     transform::{Transform, TransformKey},
     AwsmRenderer,
@@ -137,7 +137,7 @@ impl AwsmRenderer {
             }
         };
 
-        let mut pipeline_layout_key = GltfPipelineLayoutKey::new(ctx, primitive_buffer_info);
+        let mut pipeline_layout_key = GltfPipelineLayoutKey::default();
         pipeline_layout_key.has_morph_key = morph_key.is_some();
         pipeline_layout_key.has_skin_key = skin_key.is_some();
 
@@ -198,13 +198,6 @@ impl AwsmRenderer {
         {
             pipeline_key = pipeline_key
                 .with_push_vertex_buffer_layout(instance_transform_vertex_buffer_layout);
-        }
-
-        if let Some(morph) = &primitive_buffer_info.morph {
-            pipeline_key = pipeline_key.with_vertex_constant(
-                (ShaderConstantIds::MorphTargetLen as u16).into(),
-                (morph.shader_key.targets_len as u32).into(),
-            );
         }
 
         let material_key = self.materials.insert(

@@ -107,7 +107,7 @@ impl AwsmRenderer {
         let values = u8_to_f32_vec(&values);
 
         let values = values
-            .chunks(morph_info.shader_key.targets_len)
+            .chunks(morph_info.targets_len)
             .map(|chunk| AnimationData::Vertex(VertexAnimation::new(chunk.to_vec())))
             .collect();
 
