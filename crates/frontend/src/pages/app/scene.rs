@@ -73,8 +73,7 @@ impl AppScene {
                 "pointerdown",
                 clone!(state => move |event| {
                     if let Some(camera) = state.camera.lock().unwrap().as_mut() {
-                        let event = event.unchecked_ref::<web_sys::PointerEvent>();
-                        camera.on_pointer_down(event.client_x(), event.client_y());
+                        camera.on_pointer_down();
                     }
                 }),
             ),
@@ -84,7 +83,7 @@ impl AppScene {
                 clone!(state => move |event| {
                     if let Some(camera) = state.camera.lock().unwrap().as_mut() {
                         let event = event.unchecked_ref::<web_sys::PointerEvent>();
-                        camera.on_pointer_move(event.client_x(), event.client_y());
+                        camera.on_pointer_move(event.movement_x(), event.movement_y());
                     }
                 }),
             ),
@@ -93,8 +92,7 @@ impl AppScene {
                 "pointerup",
                 clone!(state => move |event| {
                     if let Some(camera) = state.camera.lock().unwrap().as_mut() {
-                        let event = event.unchecked_ref::<web_sys::PointerEvent>();
-                        camera.on_pointer_up(event.client_x(), event.client_y());
+                        camera.on_pointer_up();
                     }
                 }),
             ),
