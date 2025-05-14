@@ -6,7 +6,7 @@ use crate::prelude::*;
 pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::new(|| {
     let mut h = HashMap::new();
 
-    h.insert("Todo", vec![GltfId::SimpleMaterial]);
+    h.insert("Todo", vec![GltfId::AlphaBlendMode]);
 
     // h.insert(
     //     "Feature tests",
@@ -39,7 +39,7 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
             GltfId::SimpleMeshes,
             GltfId::SimpleTexture,
             GltfId::SimpleInstancing,
-            // GltfId::SimpleMaterial
+            GltfId::SimpleMaterial,
         ],
     );
 

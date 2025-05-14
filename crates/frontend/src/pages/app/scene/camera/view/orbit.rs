@@ -7,13 +7,12 @@ pub struct OrbitCamera {
     pub look_at: Vec3,
     /// Distance from look_at
     pub radius: f32,
+    pub sensitivity: f32,
 
     // internal state for yaw/pitch orbiting
     yaw: f32,
     pitch: f32,
     dragging: bool,
-    last_x: f32,
-    last_y: f32,
 }
 
 impl OrbitCamera {
@@ -34,17 +33,19 @@ impl OrbitCamera {
             yaw: 0.0,
             pitch: 0.0,
             dragging: false,
-            last_x: 0.0,
-            last_y: 0.0,
+            sensitivity: 0.005,
         }
     }
 
     /// Returns a right-handed look-at view matrix
     pub fn get_view_matrix(&self) -> Mat4 {
-        let rotation = Quat::from_rotation_y(self.yaw) * Quat::from_rotation_x(self.pitch);
+        let q_yaw = Quat::from_rotation_y(self.yaw);
+        let right = q_yaw * Vec3::X;
+        let q_pitch = Quat::from_axis_angle(right, self.pitch);
+        let rotation = q_pitch * q_yaw;
+
         let cam_pos = self.look_at + rotation * Vec3::new(0.0, 0.0, self.radius);
         let up_dir = rotation * Vec3::Y;
-
         Mat4::look_at_rh(cam_pos, self.look_at, up_dir)
     }
 
@@ -55,32 +56,24 @@ impl OrbitCamera {
         self.look_at + offset
     }
 
-    pub fn on_pointer_down(&mut self, x: f32, y: f32) {
+    pub fn on_pointer_down(&mut self) {
         self.dragging = true;
-        self.last_x = x;
-        self.last_y = y;
     }
 
-    pub fn on_pointer_move(&mut self, x: f32, y: f32) {
+    pub fn on_pointer_move(&mut self, delta_x: f32, delta_y: f32) {
         if !self.dragging {
             return;
         }
 
-        let dx = (x - self.last_x) * 0.005;
-        let dy = (y - self.last_y) * 0.005;
+        self.yaw -= delta_x * self.sensitivity;
+        self.pitch -= delta_y * self.sensitivity;
 
-        self.yaw += dx;
-        self.pitch += dy;
-
-        // Normalize pitch to [-PI, PI] to keep it stable and prevent overflow
-        self.pitch = (self.pitch + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
-            - std::f32::consts::PI;
-
-        self.last_x = x;
-        self.last_y = y;
+        // clamp pitch so you can’t flip over top
+        let limit = std::f32::consts::FRAC_PI_2 - 0.01;
+        self.pitch = self.pitch.clamp(-limit, limit);
     }
 
-    pub fn on_pointer_up(&mut self, _x: f32, _y: f32) {
+    pub fn on_pointer_up(&mut self) {
         self.dragging = false;
     }
 

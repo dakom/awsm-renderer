@@ -101,9 +101,9 @@ impl Camera {
         }
     }
 
-    pub fn on_pointer_down(&mut self, x: i32, y: i32) {
+    pub fn on_pointer_down(&mut self) {
         match &mut self.view {
-            CameraView::Orbit(orbit_view) => orbit_view.on_pointer_down(x as f32, y as f32),
+            CameraView::Orbit(orbit_view) => orbit_view.on_pointer_down(),
         }
     }
 
@@ -113,9 +113,9 @@ impl Camera {
         }
     }
 
-    pub fn on_pointer_up(&mut self, x: i32, y: i32) {
+    pub fn on_pointer_up(&mut self) {
         match &mut self.view {
-            CameraView::Orbit(orbit_view) => orbit_view.on_pointer_up(x as f32, y as f32),
+            CameraView::Orbit(orbit_view) => orbit_view.on_pointer_up(),
         }
     }
 
