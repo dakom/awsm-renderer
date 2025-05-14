@@ -8,13 +8,13 @@ use thiserror::Error;
 
 use crate::{
     bind_groups::AwsmBindGroupError,
-    buffer::dynamic_buddy::DynamicBuddyBuffer,
+    buffer::dynamic_storage::DynamicStorageBuffer,
     transform::{Transform, TransformKey, Transforms},
     AwsmRendererLogging,
 };
 
 pub struct Instances {
-    transform_buffer: DynamicBuddyBuffer<TransformKey>,
+    transform_buffer: DynamicStorageBuffer<TransformKey>,
     transform_count: SecondaryMap<TransformKey, usize>,
     gpu_transform_buffer: web_sys::GpuBuffer,
     transform_gpu_dirty: bool,
@@ -24,7 +24,7 @@ impl Instances {
     pub const TRANSFORM_INITIAL_SIZE: usize = Transforms::BYTE_SIZE * 32; // 32 elements is a good starting point
 
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let transform_buffer = DynamicBuddyBuffer::new(
+        let transform_buffer = DynamicStorageBuffer::new(
             Self::TRANSFORM_INITIAL_SIZE,
             Some("Instance Transforms".to_string()),
         );

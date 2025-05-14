@@ -9,8 +9,8 @@ use awsm_renderer_core::{
 
 use super::{gpu_create_bind_group, gpu_create_layout, AwsmBindGroupError, Result};
 use crate::{
-    camera::CameraBuffer, materials::pbr::PbrMaterial, mesh::morphs::Morphs, skin::Skins,
-    transform::Transforms,
+    camera::CameraBuffer, lights::Lights, materials::pbr::PbrMaterial, mesh::morphs::Morphs,
+    skin::Skins, transform::Transforms,
 };
 
 pub struct UniformStorageBindGroups {
@@ -170,28 +170,32 @@ impl UniformStorageBindGroupIndex {
 #[repr(u32)]
 pub enum UniversalBindGroupBinding {
     Camera = 0,
+    Lights = 1,
 }
 
 impl UniversalBindGroupBinding {
-    pub fn all() -> [Self; 1] {
-        [Self::Camera]
+    pub fn all() -> [Self; 2] {
+        [Self::Camera, Self::Lights]
     }
 
     pub fn initial_buffer_size(self) -> usize {
         match self {
             Self::Camera => CameraBuffer::BYTE_SIZE,
+            Self::Lights => Lights::INITIAL_ELEMENTS * Lights::BYTE_ALIGNMENT,
         }
     }
 
     pub fn label(self) -> &'static str {
         match self {
             Self::Camera => "Camera",
+            Self::Lights => "Lights",
         }
     }
 
     pub fn buffer_usage(self) -> BufferUsage {
         match self {
             Self::Camera => BufferUsage::new().with_uniform().with_copy_dst(),
+            Self::Lights => BufferUsage::new().with_storage().with_copy_dst(),
         }
     }
 
@@ -200,6 +204,7 @@ impl UniversalBindGroupBinding {
             self as u32,
             match self {
                 Self::Camera => BindGroupResource::Buffer(BufferBinding::new(buffer)),
+                Self::Lights => BindGroupResource::Buffer(BufferBinding::new(buffer)),
             },
         )
     }
@@ -327,14 +332,25 @@ pub(super) fn create_universal_bind_group(
     let layout = gpu_create_layout(
         gpu,
         "Universal",
-        vec![BindGroupLayoutEntry::new(
-            UniversalBindGroupBinding::Camera as u32,
-            BindGroupLayoutResource::Buffer(
-                BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
-            ),
-        )
-        .with_visibility_vertex()
-        .with_visibility_fragment()],
+        vec![
+            BindGroupLayoutEntry::new(
+                UniversalBindGroupBinding::Camera as u32,
+                BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
+                ),
+            )
+            .with_visibility_vertex()
+            .with_visibility_fragment(),
+            BindGroupLayoutEntry::new(
+                UniversalBindGroupBinding::Lights as u32,
+                BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                ),
+            )
+            .with_visibility_vertex()
+            .with_visibility_fragment(),
+        ],
     )?;
 
     let bind_group = gpu_create_bind_group(

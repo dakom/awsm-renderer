@@ -3,7 +3,7 @@ use awsm_renderer_core::pipeline::primitive::IndexFormat;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
-use crate::buffer::dynamic_buddy::DynamicBuddyBuffer;
+use crate::buffer::dynamic_storage::DynamicStorageBuffer;
 use crate::AwsmRendererLogging;
 
 use super::error::{AwsmMeshError, Result};
@@ -12,8 +12,8 @@ use super::{Mesh, MeshBufferIndexInfo, MeshBufferVertexInfo};
 
 pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
-    vertex_buffers: DynamicBuddyBuffer<MeshKey>,
-    index_buffers: DynamicBuddyBuffer<MeshKey>,
+    vertex_buffers: DynamicStorageBuffer<MeshKey>,
+    index_buffers: DynamicStorageBuffer<MeshKey>,
     vertex_infos: SecondaryMap<MeshKey, MeshBufferVertexInfo>,
     index_infos: SecondaryMap<MeshKey, MeshBufferIndexInfo>,
     gpu_vertex_buffer: web_sys::GpuBuffer,
@@ -29,11 +29,11 @@ impl Meshes {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Self {
             list: DenseSlotMap::with_key(),
-            index_buffers: DynamicBuddyBuffer::new(
+            index_buffers: DynamicStorageBuffer::new(
                 Self::INDICES_INITIAL_SIZE,
                 Some("MeshIndexBuffer".to_string()),
             ),
-            vertex_buffers: DynamicBuddyBuffer::new(
+            vertex_buffers: DynamicStorageBuffer::new(
                 Self::VERTICES_INITIAL_SIZE,
                 Some("MeshVertexBuffer".to_string()),
             ),

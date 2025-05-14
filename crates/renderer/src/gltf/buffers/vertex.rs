@@ -4,10 +4,13 @@ use gltf::Semantic;
 use std::collections::HashMap;
 
 use crate::buffer::helpers::{u8_to_i16_vec, u8_to_u16_vec};
+use crate::gltf::buffers::normals::compute_normals;
+use crate::gltf::error::AwsmGltfError;
 use crate::mesh::{MeshBufferVertexAttribute, MeshBufferVertexInfo};
 use crate::shaders::ShaderCacheKeyAttribute;
 
 use super::accessor::accessor_to_bytes;
+use super::index::GltfMeshBufferIndexInfo;
 use super::Result;
 
 #[derive(Default, Debug, Clone)]
@@ -31,11 +34,18 @@ impl From<GltfMeshBufferVertexInfo> for MeshBufferVertexInfo {
         }
     }
 }
+pub(super) struct BufferByAttributeKind {
+    pub attribute_bytes: Vec<u8>,
+    pub attribute_size: usize,
+    pub vertex_format: VertexFormat,
+    pub attribute_kind_count: u32,
+}
 
 impl GltfMeshBufferVertexInfo {
     pub fn new(
         primitive: &gltf::Primitive<'_>,
         buffers: &[Vec<u8>],
+        index: Option<(&GltfMeshBufferIndexInfo, &[u8])>,
         vertex_bytes: &mut Vec<u8>,
     ) -> Result<Self> {
         let offset = vertex_bytes.len();
@@ -85,17 +95,16 @@ impl GltfMeshBufferVertexInfo {
                 }
             }
 
-            // semantic -> (attribute_bytes, attribute_size, vertex_format, attribute_kind_count)
             let mut buffers_by_attribute_kind = HashMap::new();
 
             for (semantic, accessor) in gltf_attributes {
                 let entry = buffers_by_attribute_kind
                     .entry(TempAttributeKind::from(semantic))
                     .or_insert_with(|| {
-                        (
-                            Vec::new(),
-                            0usize,
-                            accessor_vertex_format(
+                        BufferByAttributeKind {
+                            attribute_bytes: Vec::new(),
+                            attribute_size: 0usize,
+                            vertex_format: accessor_vertex_format(
                                 // wgsl doesn't work with 16-bit, so we need to convert to 32-bit
                                 match accessor.data_type() {
                                     DataType::U16 => DataType::U32,
@@ -105,11 +114,11 @@ impl GltfMeshBufferVertexInfo {
                                 accessor.dimensions(),
                                 accessor.normalized(),
                             ),
-                            0u32,
-                        )
+                            attribute_kind_count: 0u32,
+                        }
                     });
 
-                entry.1 = match accessor.data_type() {
+                entry.attribute_size = match accessor.data_type() {
                     gltf::accessor::DataType::U16 | gltf::accessor::DataType::I16 => {
                         // 2 bytes per element
                         accessor.size() * 2
@@ -117,7 +126,7 @@ impl GltfMeshBufferVertexInfo {
                     _ => accessor.size(),
                 };
 
-                entry.3 += 1;
+                entry.attribute_kind_count += 1;
 
                 let bytes = accessor_to_bytes(&accessor, buffers)?;
                 // wgsl doesn't work with 16-bit, so we need to convert to 32-bit
@@ -135,7 +144,7 @@ impl GltfMeshBufferVertexInfo {
                             )
                         };
 
-                        entry.0.extend_from_slice(bytes);
+                        entry.attribute_bytes.extend_from_slice(bytes);
                     }
                     gltf::accessor::DataType::I16 => {
                         let values: Vec<i32> = u8_to_i16_vec(&bytes)
@@ -148,40 +157,70 @@ impl GltfMeshBufferVertexInfo {
                                 values.len() * std::mem::size_of::<i32>(),
                             )
                         };
-                        entry.0.extend_from_slice(bytes);
+                        entry.attribute_bytes.extend_from_slice(bytes);
                     }
                     _ => {
-                        entry.0.extend_from_slice(&bytes);
+                        entry.attribute_bytes.extend_from_slice(&bytes);
                     }
                 }
             }
 
+            // no built-in normals? compute them...
+            if !buffers_by_attribute_kind.contains_key(&TempAttributeKind::Normals) {
+                let positions = buffers_by_attribute_kind
+                    .get(&TempAttributeKind::Positions)
+                    .ok_or_else(|| {
+                        AwsmGltfError::ConstructNormals("missing positions".to_string())
+                    })?;
+                let normals_bytes = compute_normals(positions, index)?;
+
+                buffers_by_attribute_kind.insert(
+                    TempAttributeKind::Normals,
+                    BufferByAttributeKind {
+                        attribute_bytes: normals_bytes,
+                        attribute_size: positions.attribute_size,
+                        vertex_format: positions.vertex_format,
+                        attribute_kind_count: positions.attribute_kind_count,
+                    },
+                );
+            }
+
             let mut attributes: Vec<(Vec<u8>, MeshBufferVertexAttribute)> = Vec::new();
             let mut offset = 0;
-            for (kind, (bytes, size, format, count)) in buffers_by_attribute_kind.into_iter() {
+            for (kind, data) in buffers_by_attribute_kind.into_iter() {
+                let BufferByAttributeKind {
+                    attribute_bytes,
+                    attribute_size,
+                    vertex_format,
+                    attribute_kind_count,
+                } = data;
                 attributes.push((
-                    bytes,
+                    attribute_bytes,
                     MeshBufferVertexAttribute {
-                        size,
+                        size: attribute_size,
                         offset,
-                        format,
+                        format: vertex_format,
                         shader_key_kind: match kind {
                             TempAttributeKind::Positions => ShaderCacheKeyAttribute::Positions,
                             TempAttributeKind::Normals => ShaderCacheKeyAttribute::Normals,
                             TempAttributeKind::Tangents => ShaderCacheKeyAttribute::Tangents,
-                            TempAttributeKind::Colors => ShaderCacheKeyAttribute::Colors { count },
-                            TempAttributeKind::TexCoords => {
-                                ShaderCacheKeyAttribute::TexCoords { count }
-                            }
-                            TempAttributeKind::Joints => ShaderCacheKeyAttribute::Joints { count },
-                            TempAttributeKind::Weights => {
-                                ShaderCacheKeyAttribute::Weights { count }
-                            }
+                            TempAttributeKind::Colors => ShaderCacheKeyAttribute::Colors {
+                                count: attribute_kind_count,
+                            },
+                            TempAttributeKind::TexCoords => ShaderCacheKeyAttribute::TexCoords {
+                                count: attribute_kind_count,
+                            },
+                            TempAttributeKind::Joints => ShaderCacheKeyAttribute::Joints {
+                                count: attribute_kind_count,
+                            },
+                            TempAttributeKind::Weights => ShaderCacheKeyAttribute::Weights {
+                                count: attribute_kind_count,
+                            },
                         },
                     },
                 ));
 
-                offset += size;
+                offset += attribute_size;
             }
 
             attributes.sort_by(|(_, a), (_, b)| {

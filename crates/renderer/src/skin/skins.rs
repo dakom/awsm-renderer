@@ -9,7 +9,7 @@ use crate::{
         uniform_storage::MeshShapeBindGroupBinding, uniform_storage::UniformStorageBindGroupIndex,
         BindGroups,
     },
-    buffer::dynamic_buddy::DynamicBuddyBuffer,
+    buffer::dynamic_storage::DynamicStorageBuffer,
     transform::{TransformKey, Transforms},
     AwsmRenderer, AwsmRendererLogging,
 };
@@ -30,7 +30,7 @@ pub struct Skins {
     skeleton_transforms: DenseSlotMap<SkinKey, Vec<TransformKey>>,
     // may be None, in which case its virtually an identity matrix
     inverse_bind_matrices: SecondaryMap<TransformKey, Mat4>,
-    skin_matrices: DynamicBuddyBuffer<SkinKey>,
+    skin_matrices: DynamicStorageBuffer<SkinKey>,
     gpu_dirty: bool,
 }
 
@@ -47,7 +47,7 @@ impl Skins {
         Self {
             skeleton_transforms: DenseSlotMap::with_key(),
             inverse_bind_matrices: SecondaryMap::new(),
-            skin_matrices: DynamicBuddyBuffer::new(
+            skin_matrices: DynamicStorageBuffer::new(
                 Self::SKIN_MATRICES_INITIAL_SIZE,
                 Some("Skins".to_string()),
             ),

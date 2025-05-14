@@ -47,10 +47,6 @@ impl Shaders {
     }
 }
 
-#[repr(u16)]
-pub enum ShaderConstantIds {
-    MorphTargetLen = 1,
-}
 // merely a key to hash ad-hoc shader generation
 // is not stored on the mesh itself
 //
@@ -136,6 +132,7 @@ pub struct ShaderCacheKeyInstancing {
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShaderCacheKeyMaterial {
     Pbr(PbrShaderCacheKeyMaterial),
+    DebugNormals,
 }
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -194,6 +191,7 @@ impl ShaderCacheKey {
 
     pub fn into_source(&self) -> Result<String> {
         let mut material = ShaderTemplateMaterial::default();
+        let mut has_normals = false;
         let mut skins = None;
 
         let mut vertex_input_locations = Vec::new();
@@ -203,16 +201,19 @@ impl ShaderCacheKey {
                 panic!("Duplicate attribute found: {:?}", attribute);
             }
 
-            for count in 0..attribute.count() {
-                match attribute {
-                    ShaderCacheKeyAttribute::Normals => {
-                        material.has_normal = true;
-                    }
-                    ShaderCacheKeyAttribute::Joints { count } => {
-                        skins = Some(*count);
-                    }
-                    _ => {}
+            match attribute {
+                ShaderCacheKeyAttribute::Normals => {
+                    has_normals = true;
                 }
+                ShaderCacheKeyAttribute::Joints { count } => {
+                    // joints and weights must always be equal
+                    // each additional "count" allows up to 4 more vertex influences
+                    skins = Some(*count);
+                }
+                _ => {}
+            }
+
+            for count in 0..attribute.count() {
                 vertex_input_locations.push(VertexLocation {
                     location: vertex_input_locations.len() as u32,
                     interpolation: match attribute {
@@ -293,25 +294,40 @@ impl ShaderCacheKey {
             ShaderCacheKeyMaterial::Pbr(material_key) => {
                 if let Some(uv_index) = material_key.base_color_uv_index {
                     push_texture("base_color", uv_index);
-                    material.has_base_color = true;
+                    material.has_base_color_tex = true;
                 }
 
-                if material.has_normal {
+                if has_normals {
                     vertex_output_locations.push(VertexLocation {
                         location: vertex_output_locations.len() as u32,
                         interpolation: None,
-                        name: "normal".to_string(),
+                        name: "world_normal".to_string(),
                         data_type: "vec3<f32>".to_string(),
-                    });
-                    vertex_to_fragment_assignments.push(VertexToFragmentAssignment {
-                        vertex_name: "normal".to_string(),
-                        fragment_name: "normal".to_string(),
                     });
                 }
 
                 FragmentShaderKind::Pbr
             }
+
+            ShaderCacheKeyMaterial::DebugNormals => {
+                vertex_output_locations.push(VertexLocation {
+                    location: vertex_output_locations.len() as u32,
+                    interpolation: None,
+                    name: "world_normal".to_string(),
+                    data_type: "vec3<f32>".to_string(),
+                });
+                FragmentShaderKind::DebugNormals
+            }
         };
+
+        vertex_output_locations = vertex_output_locations
+            .into_iter()
+            .map(|mut loc| {
+                const HARDCODED_LOCATION_LEN: u32 = 1; // account for hardcoded locations like world_position
+                loc.location += HARDCODED_LOCATION_LEN;
+                loc
+            })
+            .collect();
 
         let tmpl = ShaderTemplate {
             vertex_input_locations,
@@ -324,14 +340,32 @@ impl ShaderCacheKey {
             //fragment_shader_kind: FragmentShaderKind::DebugNormals,
             fragment_buffer_bindings,
             material,
+            has_normals,
         };
 
         let source = tmpl.render().unwrap();
 
-        tracing::info!("{}", source);
+        //print_source(&source, false);
 
         Ok(source)
     }
+}
+
+#[allow(dead_code)]
+fn print_source(source: &str, with_line_numbers: bool) {
+    let mut output = "\n".to_string();
+    let lines = source.lines();
+    let mut line_number = 1;
+    for line in lines {
+        let formatted_line = match with_line_numbers {
+            true => format!("{:>4}: {}\n", line_number, line),
+            false => format!("{}\n", line),
+        };
+        output.push_str(&formatted_line);
+        line_number += 1;
+    }
+
+    web_sys::console::log_1(&web_sys::wasm_bindgen::JsValue::from(output.as_str()));
 }
 
 #[derive(Template, Debug)]
@@ -349,6 +383,7 @@ struct ShaderTemplate {
 
     // simpler ways of doing things
     pub has_instance_transform: bool,
+    pub has_normals: bool,
     pub fragment_shader_kind: FragmentShaderKind,
     pub material: ShaderTemplateMaterial,
     // pub skin_targets: Vec<SkinTarget>,
@@ -366,8 +401,11 @@ struct ShaderTemplate {
 pub struct ShaderTemplateMaterial {
     // the idea here is that with these gates, we can write normal shader code
     // since the variables are assigned (and from then on, we don't care about the location)
-    pub has_base_color: bool,
-    pub has_normal: bool,
+    pub has_base_color_tex: bool,
+    pub has_metallic_roughness_tex: bool,
+    pub has_emissive_tex: bool,
+    pub has_occlusion_tex: bool,
+    pub has_normal_tex: bool,
 }
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]

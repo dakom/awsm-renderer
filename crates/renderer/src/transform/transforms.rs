@@ -8,7 +8,7 @@ use crate::{
         uniform_storage::MeshAllBindGroupBinding, uniform_storage::UniformStorageBindGroupIndex,
         BindGroups,
     },
-    buffer::dynamic_fixed::DynamicFixedBuffer,
+    buffer::dynamic_uniform::DynamicUniformBuffer,
     AwsmRenderer, AwsmRendererLogging,
 };
 
@@ -37,7 +37,7 @@ pub struct Transforms {
     dirty_skin_joints: HashSet<TransformKey>,
     gpu_dirty: bool,
     root_node: TransformKey,
-    buffer: DynamicFixedBuffer<TransformKey>,
+    buffer: DynamicUniformBuffer<TransformKey>,
 }
 
 impl Transforms {
@@ -46,7 +46,7 @@ impl Transforms {
     pub const BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment
 
     pub fn new() -> Result<Self> {
-        let buffer = DynamicFixedBuffer::new(
+        let buffer = DynamicUniformBuffer::new(
             Self::INITIAL_CAPACITY,
             Self::BYTE_SIZE,
             Self::BYTE_ALIGNMENT,

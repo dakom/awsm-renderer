@@ -2,6 +2,7 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use bind_groups::BindGroups;
 use camera::CameraBuffer;
 use instances::Instances;
+use lights::Lights;
 use materials::Materials;
 use mesh::Meshes;
 use shaders::Shaders;
@@ -15,6 +16,7 @@ pub mod buffer;
 pub mod camera;
 pub mod error;
 pub mod instances;
+pub mod lights;
 pub mod materials;
 pub mod mesh;
 pub mod render;
@@ -42,6 +44,7 @@ pub struct AwsmRenderer {
     pub instances: Instances,
     pub shaders: Shaders,
     pub materials: Materials,
+    pub lights: Lights,
     pub textures: Textures,
     pub logging: AwsmRendererLogging,
 
@@ -66,6 +69,7 @@ impl AwsmRenderer {
             materials,
             textures,
             logging,
+            lights,
             #[cfg(feature = "gltf")]
             gltf,
             #[cfg(feature = "animation")]
@@ -80,6 +84,7 @@ impl AwsmRenderer {
         self.instances = instances;
         self.shaders = shaders;
         self.materials = materials;
+        self.lights = lights;
         self.textures = textures;
         self.logging = logging;
 
@@ -146,6 +151,7 @@ impl AwsmRendererBuilder {
             bind_groups: deps.bind_groups,
             logging: deps.logging,
             materials: deps.materials,
+            lights: deps.lights,
             textures: deps.textures,
 
             #[cfg(feature = "gltf")]
@@ -166,6 +172,7 @@ struct RebuildDeps {
     pub instances: Instances,
     pub shaders: Shaders,
     pub materials: Materials,
+    pub lights: Lights,
     pub textures: Textures,
     pub logging: AwsmRendererLogging,
 
@@ -189,6 +196,7 @@ impl RebuildDeps {
         let instances = Instances::new(gpu)?;
         let shaders = Shaders::new();
         let materials = Materials::new();
+        let lights = Lights::new();
         let textures = Textures::new();
 
         Ok(Self {
@@ -201,6 +209,7 @@ impl RebuildDeps {
             instances,
             shaders,
             materials,
+            lights,
             textures,
 
             #[cfg(feature = "gltf")]

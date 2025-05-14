@@ -16,7 +16,7 @@ use crate::{
         uniform_storage::{MeshAllBindGroupBinding, UniformStorageBindGroupIndex},
         AwsmBindGroupError, BindGroups,
     },
-    buffer::dynamic_fixed::DynamicFixedBuffer,
+    buffer::dynamic_uniform::DynamicUniformBuffer,
     shaders::ShaderCacheKeyMaterial,
     textures::{SamplerKey, TextureKey, Textures},
     AwsmRendererLogging,
@@ -26,7 +26,7 @@ pub struct Materials {
     materials: SlotMap<MaterialKey, Material>,
     cache: HashMap<MaterialCacheKey, MaterialKey>,
     bind_group_layout_cache: HashMap<MaterialBindGroupLayoutCacheKey, MaterialBindGroupLayoutKey>,
-    pbr_uniform_buffer: DynamicFixedBuffer<MaterialKey>,
+    pbr_uniform_buffer: DynamicUniformBuffer<MaterialKey>,
     pbr_uniform_buffer_gpu_dirty: bool,
 }
 
@@ -154,7 +154,7 @@ impl Materials {
             materials: SlotMap::with_key(),
             cache: HashMap::new(),
             bind_group_layout_cache: HashMap::new(),
-            pbr_uniform_buffer: DynamicFixedBuffer::new(
+            pbr_uniform_buffer: DynamicUniformBuffer::new(
                 PbrMaterial::INITIAL_ELEMENTS,
                 PbrMaterial::BYTE_SIZE,
                 PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT,

@@ -1,4 +1,4 @@
-use awsm_renderer_core::error::AwsmCoreError;
+use awsm_renderer_core::{error::AwsmCoreError, pipeline::primitive::IndexFormat};
 use gltf::Semantic;
 use thiserror::Error;
 
@@ -42,6 +42,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] Unsupported index data type: {0:?}")]
     UnsupportedIndexDataType(gltf::accessor::DataType),
+
+    #[error("[gltf] Unsupported index format: {0:?}")]
+    UnsupportedIndexFormat(IndexFormat),
 
     #[error("[gltf] Unsupported integer conversion: {0:?}")]
     UnsupportedIntConversion(#[from] std::num::TryFromIntError),
@@ -125,8 +128,14 @@ pub enum AwsmGltfError {
     #[error("[gltf] unable to create material bind group layout: {0:?}")]
     MaterialBindGroupLayout(AwsmBindGroupError),
 
+    #[error("[gltf] missing material bind group layout: {0:?}")]
+    MaterialMissingBindGroupLayout(AwsmBindGroupError),
+
     #[error("[gltf] material: {0:?}")]
     Material(#[from] AwsmMaterialError),
+
+    #[error("[gltf] unable to construct normals: {0}")]
+    ConstructNormals(String),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

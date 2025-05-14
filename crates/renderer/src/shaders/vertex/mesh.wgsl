@@ -27,21 +27,9 @@ struct VertexInput {
     {% endfor %}
 };
 
-struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    {% for loc in vertex_output_locations %}
-        {%- match loc.interpolation %}
-            {% when Some with (interpolation) %}
-                @location({{ loc.location }}) @interpolate({{ interpolation }}) {{ loc.name }}: {{ loc.data_type }},
-            {% when _ %}
-                @location({{ loc.location }}) {{ loc.name }}: {{ loc.data_type }},
-        {% endmatch %}
-    {% endfor %}
-};
-
 //***** MAIN *****
 @vertex
-fn vert_main(raw_input: VertexInput) -> VertexOutput {
+fn vert_main(raw_input: VertexInput) -> FragmentInput {
     var input = raw_input;
 
     // morphs first: https://github.com/KhronosGroup/glTF/issues/1646#issuecomment-542815692
@@ -68,13 +56,15 @@ fn vert_main(raw_input: VertexInput) -> VertexOutput {
         let model_transform = u_transform.model;
     {% endif %}
 
+    var output: FragmentInput;
+
     var pos = model_transform * vec4<f32>(input.position, 1.0);
-    pos = camera.view_proj * pos;
+    output.world_position = pos.xyz;
+    {% if has_normals %}
+        output.world_normal = normalize((model_transform * vec4<f32>(input.normal, 0.0)).xyz);
+    {% endif %}
+    output.clip_position = camera.view_proj * pos;
 
-
-    // Assign and return final output
-    var output: VertexOutput;
-    output.position = pos;
     {% for assignment in vertex_to_fragment_assignments %}
         output.{{ assignment.fragment_name }} = input.{{ assignment.vertex_name }};
     {% endfor %}

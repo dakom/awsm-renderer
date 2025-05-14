@@ -7,15 +7,15 @@ use crate::bind_groups::{
     uniform_storage::MeshShapeBindGroupBinding, uniform_storage::UniformStorageBindGroupIndex,
     BindGroups,
 };
-use crate::buffer::dynamic_buddy::DynamicBuddyBuffer;
+use crate::buffer::dynamic_storage::DynamicStorageBuffer;
 use crate::AwsmRendererLogging;
 
 // The weights are dynamic and updated on a per-mesh basis as frequently as needed
 // The values are essentially static, but may be sourced from different (large) buffers
 // e.g. they are loaded up front per-gltf file
 pub struct Morphs {
-    weights: DynamicBuddyBuffer<MorphKey>,
-    values: DynamicBuddyBuffer<MorphKey>,
+    weights: DynamicStorageBuffer<MorphKey>,
+    values: DynamicStorageBuffer<MorphKey>,
     weights_dirty: bool,
     values_dirty: bool,
     infos: SlotMap<MorphKey, MeshBufferMorphInfo>,
@@ -33,11 +33,11 @@ impl Morphs {
 
     pub fn new() -> Self {
         Self {
-            weights: DynamicBuddyBuffer::new(
+            weights: DynamicStorageBuffer::new(
                 Self::WEIGHTS_INITIAL_SIZE,
                 Some("MorphWeights".to_string()),
             ),
-            values: DynamicBuddyBuffer::new(
+            values: DynamicStorageBuffer::new(
                 Self::VALUES_INITIAL_SIZE,
                 Some("MorphValues".to_string()),
             ),
@@ -63,9 +63,17 @@ impl Morphs {
                 targets: morph_buffer_info.targets_len,
             });
         }
+
+        let mut weights_and_count: Vec<f32> = Vec::with_capacity(weights.len() + 1);
+        weights_and_count.push(weights.len() as f32);
+        weights_and_count.extend_from_slice(weights);
         let key = self.infos.insert(morph_buffer_info.clone());
-        let weights_u8 =
-            unsafe { std::slice::from_raw_parts(weights.as_ptr() as *const u8, weights.len() * 4) };
+        let weights_u8 = unsafe {
+            std::slice::from_raw_parts(
+                weights_and_count.as_ptr() as *const u8,
+                4 + (weights.len() * 4),
+            )
+        };
         self.weights.update(key, weights_u8);
         self.values.update(key, value_bytes);
 
@@ -106,7 +114,10 @@ impl Morphs {
 
         self.weights.update_with_unchecked(key, |slice_u8| {
             let weights_f32 =
-                unsafe { std::slice::from_raw_parts_mut(slice_u8.as_ptr() as *mut f32, len) };
+                unsafe { std::slice::from_raw_parts_mut(slice_u8.as_ptr() as *mut f32, len + 1) };
+
+            // The first value is the number of targets
+            let weights_f32 = &mut weights_f32[1..];
 
             f(weights_f32)
         });
