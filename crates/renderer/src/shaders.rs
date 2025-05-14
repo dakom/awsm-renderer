@@ -132,6 +132,7 @@ pub struct ShaderCacheKeyInstancing {
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShaderCacheKeyMaterial {
     Pbr(PbrShaderCacheKeyMaterial),
+    DebugNormals,
 }
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -307,6 +308,16 @@ impl ShaderCacheKey {
 
                 FragmentShaderKind::Pbr
             }
+
+            ShaderCacheKeyMaterial::DebugNormals => {
+                vertex_output_locations.push(VertexLocation {
+                    location: vertex_output_locations.len() as u32,
+                    interpolation: None,
+                    name: "world_normal".to_string(),
+                    data_type: "vec3<f32>".to_string(),
+                });
+                FragmentShaderKind::DebugNormals
+            }
         };
 
         vertex_output_locations = vertex_output_locations
@@ -343,7 +354,7 @@ impl ShaderCacheKey {
 #[allow(dead_code)]
 fn print_source(source: &str, with_line_numbers: bool) {
     let mut output = "\n".to_string();
-    let mut lines = source.lines();
+    let lines = source.lines();
     let mut line_number = 1;
     for line in lines {
         let formatted_line = match with_line_numbers {

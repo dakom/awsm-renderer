@@ -7,9 +7,9 @@ use awsm_renderer_core::pipeline::primitive::PrimitiveState;
 use awsm_renderer_core::pipeline::vertex::{VertexBufferLayout, VertexState};
 use awsm_renderer_core::pipeline::RenderPipelineDescriptor;
 
+use crate::bind_groups::material_textures::MaterialBindGroupLayoutKey;
 use crate::gltf::error::Result;
 
-use crate::materials::MaterialKey;
 use crate::shaders::ShaderCacheKey;
 use crate::AwsmRenderer;
 
@@ -31,14 +31,14 @@ pub(crate) struct GltfRenderPipelineKey {
 pub(crate) struct GltfPipelineLayoutKey {
     pub has_morph_key: bool,
     pub has_skin_key: bool,
+    pub material_layout_key: MaterialBindGroupLayoutKey,
 }
 
 impl GltfPipelineLayoutKey {
-    pub fn into_descriptor(
-        self,
-        renderer: &AwsmRenderer,
-        material_key: MaterialKey,
-    ) -> Result<PipelineLayoutDescriptor> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn into_descriptor(self, renderer: &AwsmRenderer) -> Result<PipelineLayoutDescriptor> {
         let mut bind_group_layouts = vec![
             renderer
                 .bind_groups
@@ -53,7 +53,7 @@ impl GltfPipelineLayoutKey {
             renderer
                 .bind_groups
                 .material_textures
-                .gpu_bind_group_layout(material_key)
+                .gpu_bind_group_layout(self.material_layout_key)
                 .map_err(AwsmGltfError::MaterialBindGroupLayout)?
                 .clone(),
         ];
@@ -119,7 +119,6 @@ impl GltfRenderPipelineKey {
         self,
         renderer: &mut AwsmRenderer,
         shader_module: &web_sys::GpuShaderModule,
-        material_key: MaterialKey,
     ) -> Result<web_sys::GpuRenderPipelineDescriptor> {
         let mut vertex = VertexState::new(shader_module, None);
         vertex.buffer_layouts = self.vertex_buffer_layouts;
@@ -130,11 +129,7 @@ impl GltfRenderPipelineKey {
         let layout = match renderer.gltf.pipeline_layouts.get(&self.layout_key) {
             None => {
                 let layout = renderer.gpu.create_pipeline_layout(
-                    &self
-                        .layout_key
-                        .clone()
-                        .into_descriptor(renderer, material_key)?
-                        .into(),
+                    &self.layout_key.clone().into_descriptor(renderer)?.into(),
                 );
 
                 renderer

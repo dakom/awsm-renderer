@@ -128,6 +128,9 @@ pub enum AwsmGltfError {
     #[error("[gltf] unable to create material bind group layout: {0:?}")]
     MaterialBindGroupLayout(AwsmBindGroupError),
 
+    #[error("[gltf] missing material bind group layout: {0:?}")]
+    MaterialMissingBindGroupLayout(AwsmBindGroupError),
+
     #[error("[gltf] material: {0:?}")]
     Material(#[from] AwsmMaterialError),
 

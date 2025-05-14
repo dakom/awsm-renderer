@@ -1,6 +1,13 @@
 # Next up
 
+- fix bug in interpolation test
+
 - fix arcball view controller
+
+- alpha mode support
+    - opaque
+    - mask
+    - blend
 
 - materials cont'd
     - normal texture

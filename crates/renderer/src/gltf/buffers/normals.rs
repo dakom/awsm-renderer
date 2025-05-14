@@ -38,7 +38,7 @@ pub(super) fn compute_normals(
             for i in 0..(index.count / 3) {
                 let offset = i * index.data_size;
                 let mut triangle = [0; 3];
-                for j in 0..3 {
+                for (j, vertex) in triangle.iter_mut().enumerate() {
                     let offset = offset + j * index.data_size;
                     let value = match index.format {
                         IndexFormat::Uint16 => u16::from_ne_bytes(
@@ -55,7 +55,7 @@ pub(super) fn compute_normals(
                             return Err(AwsmGltfError::UnsupportedIndexFormat(index.format));
                         }
                     };
-                    triangle[j] = value;
+                    *vertex = value;
                 }
 
                 triangles.push(triangle);

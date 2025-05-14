@@ -13,6 +13,7 @@
 @fragment
 fn frag_main(input: FragmentInput) -> @location(0) vec4<f32> {
     var material = toMaterial(u_material);
+    let brdf_samples = get_brdf_samples(input, material);
     let n_lights = arrayLength(&lights) / 16u;
 
     {% if has_normals %}
@@ -23,15 +24,17 @@ fn frag_main(input: FragmentInput) -> @location(0) vec4<f32> {
 
     let surface_to_camera = normalize(camera.position - input.world_position);
 
-    let ambient = vec3<f32>(0.5); // TODO - make this settable, or get from IBL
-    var color = vec3<f32>(0.0);
+    let ambient = vec3<f32>(0.1); // TODO - make this settable, or get from IBL
+    var color = vec3<f32>(0.1);
 
 
     for(var i = 0u; i < n_lights; i = i + 1u) {
         let light_brdf = light_to_brdf(get_light(i), normal, input.world_position);
 
         if (light_brdf.n_dot_l > 0.0001) {
-            color += brdf(material, light_brdf, ambient, surface_to_camera); 
+            color += brdf(input, material, light_brdf, brdf_samples, ambient, surface_to_camera); 
+        } else {
+            color += ambient * brdf_samples.base_color.rgb;
         }
     }
 

@@ -15,6 +15,8 @@ pub struct MaterialTextureBindGroups {
     layouts: SlotMap<MaterialBindGroupLayoutKey, web_sys::GpuBindGroupLayout>,
     material_layout_mapping: SecondaryMap<MaterialKey, MaterialBindGroupLayoutKey>,
 }
+
+#[derive(Debug, Clone)]
 pub enum MaterialTextureBindingLayoutEntry {
     Sampler(SamplerBindingLayout),
     Texture(TextureBindingLayout),
@@ -55,11 +57,18 @@ impl MaterialTextureBindGroups {
         Ok(bind_group)
     }
 
-    pub fn gpu_bind_group_layout(&self, key: MaterialKey) -> Result<&web_sys::GpuBindGroupLayout> {
+    pub fn get_layout_key(&self, key: MaterialKey) -> Result<MaterialBindGroupLayoutKey> {
         let layout_key = *self
             .material_layout_mapping
             .get(key)
             .ok_or(AwsmBindGroupError::MissingMaterialLayoutForMaterial(key))?;
+        Ok(layout_key)
+    }
+
+    pub fn gpu_bind_group_layout(
+        &self,
+        layout_key: MaterialBindGroupLayoutKey,
+    ) -> Result<&web_sys::GpuBindGroupLayout> {
         let layout = self
             .layouts
             .get(layout_key)
