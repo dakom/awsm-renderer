@@ -13,9 +13,13 @@ use crate::{
     transform::{Transform, TransformKey},
     AwsmRenderer,
 };
-use awsm_renderer_core::pipeline::{
-    fragment::ColorTargetState,
-    primitive::{CullMode, FrontFace, PrimitiveState, PrimitiveTopology},
+use awsm_renderer_core::{
+    compare::CompareFunction,
+    pipeline::{
+        depth_stencil::DepthStencilState,
+        fragment::ColorTargetState,
+        primitive::{CullMode, FrontFace, PrimitiveState, PrimitiveTopology},
+    },
 };
 use glam::{Mat4, Vec3};
 
@@ -204,6 +208,14 @@ impl AwsmRenderer {
             .with_primitive(primitive_state)
             .with_push_vertex_buffer_layout(vertex_buffer_layout)
             .with_push_fragment_target(ColorTargetState::new(self.gpu.current_context_format()));
+
+        if let Some(depth_texture) = self.depth_texture.as_ref() {
+            pipeline_key = pipeline_key.with_depth_stencil(
+                DepthStencilState::new(depth_texture.format())
+                    .with_depth_write_enabled(true)
+                    .with_depth_compare(CompareFunction::Less),
+            );
+        }
 
         if let Some(instance_transform_vertex_buffer_layout) =
             instance_transform_vertex_buffer_layout

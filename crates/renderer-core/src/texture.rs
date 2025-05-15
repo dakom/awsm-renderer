@@ -1,3 +1,4 @@
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuTextureFormat.html
 pub type TextureFormat = web_sys::GpuTextureFormat;
 pub type TextureAspect = web_sys::GpuTextureAspect;
 // https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuTextureViewDimension.html

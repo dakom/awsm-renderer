@@ -4,13 +4,13 @@ use crate::texture::TextureFormat;
 
 use crate::compare::CompareFunction;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DepthStencilState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#depthstencil_object_structure
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuDepthStencilState.html
     pub depth_bias: Option<i32>,
-    pub depth_bias_clamp: Option<f32>,
-    pub depth_bias_slope_scale: Option<f32>,
+    pub depth_bias_clamp: Option<OrderedFloat<f32>>,
+    pub depth_bias_slope_scale: Option<OrderedFloat<f32>>,
     pub depth_compare: Option<CompareFunction>,
     pub depth_write_enabled: Option<bool>,
     pub format: TextureFormat,
@@ -20,11 +20,68 @@ pub struct DepthStencilState {
     pub stencil_write_mask: Option<u32>,
 }
 
+impl DepthStencilState {
+    pub fn new(format: TextureFormat) -> Self {
+        Self {
+            format,
+            depth_bias: None,
+            depth_bias_clamp: None,
+            depth_bias_slope_scale: None,
+            depth_compare: None,
+            depth_write_enabled: None,
+            stencil_back: None,
+            stencil_front: None,
+            stencil_read_mask: None,
+            stencil_write_mask: None,
+        }
+    }
+
+    pub fn with_depth_bias(mut self, depth_bias: i32) -> Self {
+        self.depth_bias = Some(depth_bias);
+        self
+    }
+    pub fn with_depth_bias_clamp(mut self, depth_bias_clamp: impl Into<OrderedFloat<f32>>) -> Self {
+        self.depth_bias_clamp = Some(depth_bias_clamp.into());
+        self
+    }
+    pub fn with_depth_bias_slope_scale(
+        mut self,
+        depth_bias_slope_scale: impl Into<OrderedFloat<f32>>,
+    ) -> Self {
+        self.depth_bias_slope_scale = Some(depth_bias_slope_scale.into());
+        self
+    }
+    pub fn with_depth_compare(mut self, depth_compare: CompareFunction) -> Self {
+        self.depth_compare = Some(depth_compare);
+        self
+    }
+    pub fn with_depth_write_enabled(mut self, depth_write_enabled: bool) -> Self {
+        self.depth_write_enabled = Some(depth_write_enabled);
+        self
+    }
+    pub fn with_stencil_back(mut self, stencil_back: StencilFaceState) -> Self {
+        self.stencil_back = Some(stencil_back);
+        self
+    }
+    pub fn with_stencil_front(mut self, stencil_front: StencilFaceState) -> Self {
+        self.stencil_front = Some(stencil_front);
+        self
+    }
+    pub fn with_stencil_read_mask(mut self, stencil_read_mask: u32) -> Self {
+        self.stencil_read_mask = Some(stencil_read_mask);
+        self
+    }
+    pub fn with_stencil_write_mask(mut self, stencil_write_mask: u32) -> Self {
+        self.stencil_write_mask = Some(stencil_write_mask);
+        self
+    }
+}
+
 impl std::hash::Hash for DepthStencilState {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.depth_bias.hash(state);
-        self.depth_bias_clamp.map(OrderedFloat).hash(state);
-        self.depth_bias_slope_scale.map(OrderedFloat).hash(state);
+        self.depth_bias_clamp.hash(state);
+        self.depth_bias_slope_scale.hash(state);
         self.depth_compare.map(|x| x as u32).hash(state);
         self.depth_write_enabled.hash(state);
         (self.format as u32).hash(state);
@@ -56,23 +113,6 @@ impl std::hash::Hash for StencilFaceState {
 
 pub type StencilOperation = web_sys::GpuStencilOperation;
 
-impl DepthStencilState {
-    pub fn new(format: TextureFormat) -> Self {
-        Self {
-            depth_bias: None,
-            depth_bias_clamp: None,
-            depth_bias_slope_scale: None,
-            depth_compare: None,
-            depth_write_enabled: None,
-            format,
-            stencil_back: None,
-            stencil_front: None,
-            stencil_read_mask: None,
-            stencil_write_mask: None,
-        }
-    }
-}
-
 impl From<DepthStencilState> for web_sys::GpuDepthStencilState {
     fn from(state: DepthStencilState) -> web_sys::GpuDepthStencilState {
         let state_js = web_sys::GpuDepthStencilState::new(state.format);
@@ -80,10 +120,10 @@ impl From<DepthStencilState> for web_sys::GpuDepthStencilState {
             state_js.set_depth_bias(depth_bias);
         }
         if let Some(depth_bias_clamp) = state.depth_bias_clamp {
-            state_js.set_depth_bias_clamp(depth_bias_clamp);
+            state_js.set_depth_bias_clamp(*depth_bias_clamp);
         }
         if let Some(depth_bias_slope_scale) = state.depth_bias_slope_scale {
-            state_js.set_depth_bias_slope_scale(depth_bias_slope_scale);
+            state_js.set_depth_bias_slope_scale(*depth_bias_slope_scale);
         }
         if let Some(depth_compare) = state.depth_compare {
             state_js.set_depth_compare(depth_compare);

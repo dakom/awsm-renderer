@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{borrow::Cow, ops::Deref};
 
 use crate::{error::AwsmCoreError, pipeline::primitive::IndexFormat};
 
@@ -114,7 +114,7 @@ pub struct RenderPassDescriptor<'a> {
 pub struct ColorAttachment<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginRenderPass#color_attachment_object_structure
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuRenderPassColorAttachment.html
-    pub clear_value: Option<Color>,
+    pub clear_color: Option<Color>,
     pub depth_slice: Option<u32>,
     pub resolve_target: Option<&'a web_sys::GpuTextureView>,
     pub load_op: LoadOp,
@@ -128,10 +128,23 @@ impl<'a> ColorAttachment<'a> {
             view,
             load_op,
             store_op,
-            clear_value: None,
+            clear_color: None,
             depth_slice: None,
             resolve_target: None,
         }
+    }
+
+    pub fn with_clear_color(mut self, clear_color: Color) -> Self {
+        self.clear_color = Some(clear_color);
+        self
+    }
+    pub fn with_depth_slice(mut self, depth_slice: u32) -> Self {
+        self.depth_slice = Some(depth_slice);
+        self
+    }
+    pub fn with_resolve_target(mut self, resolve_target: &'a web_sys::GpuTextureView) -> Self {
+        self.resolve_target = Some(resolve_target);
+        self
     }
 }
 
@@ -139,7 +152,7 @@ impl<'a> ColorAttachment<'a> {
 pub struct DepthStencilAttachment<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginRenderPass#depthstencil_attachment_object_structure
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuRenderPassDepthStencilAttachment.html
-    pub view: &'a web_sys::GpuTextureView,
+    pub view: Cow<'a, web_sys::GpuTextureView>,
     pub depth_clear_value: Option<f32>,
     pub depth_load_op: Option<LoadOp>,
     pub depth_read_only: Option<bool>,
@@ -148,6 +161,56 @@ pub struct DepthStencilAttachment<'a> {
     pub stencil_load_op: Option<LoadOp>,
     pub stencil_read_only: Option<bool>,
     pub stencil_store_op: Option<StoreOp>,
+}
+
+impl<'a> DepthStencilAttachment<'a> {
+    pub fn new(view: Cow<'a, web_sys::GpuTextureView>) -> Self {
+        Self {
+            view,
+            depth_clear_value: None,
+            depth_load_op: None,
+            depth_read_only: None,
+            depth_store_op: None,
+            stencil_clear_value: None,
+            stencil_load_op: None,
+            stencil_read_only: None,
+            stencil_store_op: None,
+        }
+    }
+
+    pub fn with_depth_clear_value(mut self, clear_value: f32) -> Self {
+        self.depth_clear_value = Some(clear_value);
+        self
+    }
+
+    pub fn with_depth_load_op(mut self, load_op: LoadOp) -> Self {
+        self.depth_load_op = Some(load_op);
+        self
+    }
+    pub fn with_depth_read_only(mut self, read_only: bool) -> Self {
+        self.depth_read_only = Some(read_only);
+        self
+    }
+    pub fn with_depth_store_op(mut self, store_op: StoreOp) -> Self {
+        self.depth_store_op = Some(store_op);
+        self
+    }
+    pub fn with_stencil_clear_value(mut self, clear_value: u32) -> Self {
+        self.stencil_clear_value = Some(clear_value);
+        self
+    }
+    pub fn with_stencil_load_op(mut self, load_op: LoadOp) -> Self {
+        self.stencil_load_op = Some(load_op);
+        self
+    }
+    pub fn with_stencil_read_only(mut self, read_only: bool) -> Self {
+        self.stencil_read_only = Some(read_only);
+        self
+    }
+    pub fn with_stencil_store_op(mut self, store_op: StoreOp) -> Self {
+        self.stencil_store_op = Some(store_op);
+        self
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -204,8 +267,8 @@ impl From<ColorAttachment<'_>> for web_sys::GpuRenderPassColorAttachment {
             attachment.view,
         );
 
-        if let Some(clear_value) = attachment.clear_value {
-            attachment_js.set_clear_value(&clear_value.as_js_value());
+        if let Some(clear_color) = attachment.clear_color {
+            attachment_js.set_clear_value(&clear_color.as_js_value());
         }
         if let Some(depth_slice) = attachment.depth_slice {
             attachment_js.set_depth_slice(depth_slice);
@@ -220,7 +283,7 @@ impl From<ColorAttachment<'_>> for web_sys::GpuRenderPassColorAttachment {
 
 impl From<DepthStencilAttachment<'_>> for web_sys::GpuRenderPassDepthStencilAttachment {
     fn from(attachment: DepthStencilAttachment) -> web_sys::GpuRenderPassDepthStencilAttachment {
-        let attachment_js = web_sys::GpuRenderPassDepthStencilAttachment::new(attachment.view);
+        let attachment_js = web_sys::GpuRenderPassDepthStencilAttachment::new(&attachment.view);
 
         if let Some(depth_clear_value) = attachment.depth_clear_value {
             attachment_js.set_depth_clear_value(depth_clear_value);

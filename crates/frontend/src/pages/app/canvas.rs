@@ -66,7 +66,7 @@ impl AppCanvas {
                             .init_device()
                             .await
                             .unwrap()
-                            .init_context(canvas.clone())
+                            .init_context(canvas.clone(), None)
                             .unwrap()
                             .build()
                             .unwrap();
