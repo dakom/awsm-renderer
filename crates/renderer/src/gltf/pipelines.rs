@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use awsm_renderer_core::pipeline::constants::{ConstantOverrideKey, ConstantOverrideValue};
+use awsm_renderer_core::pipeline::depth_stencil::DepthStencilState;
 use awsm_renderer_core::pipeline::fragment::{ColorTargetState, FragmentState};
 use awsm_renderer_core::pipeline::layout::{PipelineLayoutDescriptor, PipelineLayoutKind};
 use awsm_renderer_core::pipeline::primitive::PrimitiveState;
@@ -21,6 +22,7 @@ pub(crate) struct GltfRenderPipelineKey {
     pub shader_key: ShaderCacheKey,
     pub layout_key: GltfPipelineLayoutKey,
     pub primitive: PrimitiveState,
+    pub depth_stencil: Option<DepthStencilState>,
     pub fragment_targets: Vec<ColorTargetState>,
     pub vertex_buffer_layouts: Vec<VertexBufferLayout>,
     pub vertex_constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
@@ -81,6 +83,7 @@ impl GltfRenderPipelineKey {
             shader_key,
             layout_key,
             primitive: PrimitiveState::default(),
+            depth_stencil: None,
             fragment_targets: Vec::new(),
             vertex_buffer_layouts: Vec::new(),
             vertex_constants: BTreeMap::new(),
@@ -102,6 +105,11 @@ impl GltfRenderPipelineKey {
 
     pub fn with_primitive(mut self, primitive: PrimitiveState) -> Self {
         self.primitive = primitive;
+        self
+    }
+
+    pub fn with_depth_stencil(mut self, depth_stencil: DepthStencilState) -> Self {
+        self.depth_stencil = Some(depth_stencil);
         self
     }
 
@@ -144,12 +152,16 @@ impl GltfRenderPipelineKey {
 
         let layout = PipelineLayoutKind::Custom(layout);
 
-        Ok(
+        let mut descriptor =
             RenderPipelineDescriptor::new(vertex, Some("Mesh (from gltf primitive)"))
                 .with_primitive(self.primitive)
                 .with_layout(layout)
-                .with_fragment(fragment)
-                .into(),
-        )
+                .with_fragment(fragment);
+
+        if let Some(depth_stencil) = self.depth_stencil {
+            descriptor = descriptor.with_depth_stencil(depth_stencil);
+        }
+
+        Ok(descriptor.into())
     }
 }

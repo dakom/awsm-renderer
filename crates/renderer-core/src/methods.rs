@@ -1,4 +1,4 @@
-use crate::data::JsData;
+use crate::{configuration::CanvasConfiguration, data::JsData};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
@@ -12,6 +12,18 @@ use crate::{
 impl AwsmRendererWebGpu {
     pub fn canvas(&self) -> web_sys::HtmlCanvasElement {
         self.context.canvas().unchecked_into()
+    }
+
+    pub fn canvas_size(&self) -> (f64, f64) {
+        thread_local! {
+            static WINDOW: web_sys::Window = web_sys::window().unwrap();
+        }
+
+        let device_pixel_ratio = WINDOW.with(|window| window.device_pixel_ratio());
+        (
+            self.canvas().width() as f64 * device_pixel_ratio,
+            self.canvas().height() as f64 * device_pixel_ratio,
+        )
     }
 
     pub fn current_context_format(&self) -> TextureFormat {
@@ -355,5 +367,17 @@ impl AwsmRendererWebGpu {
                 ),
         }
         .map_err(AwsmCoreError::texture_write)
+    }
+
+    pub fn configure(&mut self, configuration: Option<CanvasConfiguration>) -> Result<()> {
+        let configuration = match configuration {
+            Some(config) => config,
+            None => CanvasConfiguration::new(&self.device, self.gpu.get_preferred_canvas_format()),
+        };
+
+        self.context
+            .configure(&configuration.into())
+            .map_err(AwsmCoreError::context_configuration)?;
+        Ok(())
     }
 }

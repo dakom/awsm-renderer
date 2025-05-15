@@ -1,7 +1,10 @@
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
-use crate::error::{AwsmCoreError, Result};
+use crate::{
+    configuration::CanvasConfiguration,
+    error::{AwsmCoreError, Result},
+};
 
 // relatively cheap to clone
 #[derive(Clone)]
@@ -55,7 +58,11 @@ impl AwsmRendererWebGpuBuilder {
         Ok(self)
     }
 
-    pub fn init_context(mut self, canvas: web_sys::HtmlCanvasElement) -> Result<Self> {
+    pub fn init_context(
+        mut self,
+        canvas: web_sys::HtmlCanvasElement,
+        configuration: Option<CanvasConfiguration>,
+    ) -> Result<Self> {
         let device = self.device.as_ref().ok_or(AwsmCoreError::GpuDevice(
             "Device not initialized".to_string(),
         ))?;
@@ -66,13 +73,12 @@ impl AwsmRendererWebGpuBuilder {
             Ok(None) => Err(AwsmCoreError::CanvasContext("No context found".to_string())),
         }?;
 
-        let presentation_format: web_sys::GpuTextureFormat = self.gpu.get_preferred_canvas_format();
+        let configuration = match configuration {
+            Some(config) => config,
+            None => CanvasConfiguration::new(device, self.gpu.get_preferred_canvas_format()),
+        };
 
-        // https://developer.mozilla.org/en-US/docs/Web/API/GPUCanvasContext/configure
-
-        let configuration = web_sys::GpuCanvasConfiguration::new(device, presentation_format);
-
-        ctx.configure(&configuration)
+        ctx.configure(&configuration.into())
             .map_err(AwsmCoreError::context_configuration)?;
 
         self.context = Some(ctx);

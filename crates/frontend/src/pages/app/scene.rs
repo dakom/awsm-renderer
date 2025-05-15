@@ -5,6 +5,8 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use awsm_renderer::bounds::Aabb;
+use awsm_renderer::core::command::color::Color;
+use awsm_renderer::core::texture::TextureFormat;
 use awsm_renderer::gltf::data::GltfData;
 use awsm_renderer::gltf::loader::GltfLoader;
 use awsm_renderer::lights::Light;
@@ -123,12 +125,6 @@ impl AppScene {
         let state = self;
 
         spawn_local(clone!(state => async move {
-            let aspect = {
-                let renderer = state.renderer.lock().await;
-                let canvas = renderer.gpu.canvas();
-                canvas.width() as f32 / canvas.height() as f32
-            };
-
             if let Err(err) = state.setup().await {
                 tracing::error!("Failed to setup scene after canvas resize: {:?}", err);
             }
@@ -202,6 +198,16 @@ impl AppScene {
     pub async fn setup(self: &Arc<Self>) -> Result<()> {
         let mut renderer = self.renderer.lock().await;
 
+        renderer.clear_color = Color::MID_GREY;
+        renderer.gpu.configure(None)?;
+
+        let (canvas_width, canvas_height) = renderer.gpu.canvas_size();
+        renderer.set_depth_texture(
+            TextureFormat::Depth24plus,
+            canvas_width as u32,
+            canvas_height as u32,
+        )?;
+
         // call these first so we can get the extents
         renderer.update_animations(0.0)?;
         renderer.update_transforms();
@@ -221,16 +227,15 @@ impl AppScene {
             }
         }
 
-        let aspect = renderer.gpu.canvas().width() as f32 / renderer.gpu.canvas().height() as f32;
-
         let mut camera = self.camera.lock().unwrap();
+        let camera_aspect = canvas_width as f32 / canvas_height as f32;
         if let Some(scene_aabb) = scene_aabb.clone() {
             match self.ctx.camera_id.get() {
                 CameraId::Orthographic => {
-                    *camera = Some(Camera::new_orthographic(scene_aabb, aspect));
+                    *camera = Some(Camera::new_orthographic(scene_aabb, camera_aspect));
                 }
                 CameraId::Perspective => {
-                    *camera = Some(Camera::new_perspective(scene_aabb, aspect));
+                    *camera = Some(Camera::new_perspective(scene_aabb, camera_aspect));
                 }
             }
         }

@@ -42,6 +42,9 @@ pub enum AwsmError {
 
     #[error("{0}")]
     Light(#[from] AwsmLightError),
+
+    #[error("Depth texture create view: {0}")]
+    DepthTextureCreateView(String),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;

@@ -1,11 +1,13 @@
+use std::borrow::Cow;
+
 use awsm_renderer_core::command::render_pass::{
-    ColorAttachment, RenderPassDescriptor, RenderPassEncoder,
+    ColorAttachment, DepthStencilAttachment, RenderPassDescriptor, RenderPassEncoder,
 };
 use awsm_renderer_core::command::{LoadOp, StoreOp};
 
 use crate::bind_groups::BindGroups;
 use crate::core::command::CommandEncoder;
-use crate::error::Result;
+use crate::error::{AwsmError, Result};
 use crate::instances::Instances;
 use crate::materials::Materials;
 use crate::mesh::Meshes;
@@ -43,13 +45,30 @@ impl AwsmRenderer {
         let current_texture_view = self.gpu.current_context_texture_view()?;
         let command_encoder = self.gpu.create_command_encoder(Some("Render pass"));
 
+        let depth_stencil_attachment = match self.depth_texture.as_ref() {
+            None => None,
+            Some(depth_texture) => {
+                let view = depth_texture.create_view().map_err(|e| {
+                    AwsmError::DepthTextureCreateView(e.as_string().unwrap_or_default())
+                })?;
+                Some(
+                    DepthStencilAttachment::new(Cow::Owned(view))
+                        .with_depth_load_op(LoadOp::Clear)
+                        .with_depth_store_op(StoreOp::Store)
+                        .with_depth_clear_value(1.0),
+                )
+            }
+        };
+
         let render_pass = command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 color_attachments: vec![ColorAttachment::new(
                     &current_texture_view,
                     LoadOp::Clear,
                     StoreOp::Store,
-                )],
+                )
+                .with_clear_color(self.clear_color.clone())],
+                depth_stencil_attachment,
                 ..Default::default()
             }
             .into(),

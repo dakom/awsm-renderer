@@ -3,6 +3,7 @@ pub mod bind_groups;
 pub mod buffers;
 pub mod command;
 pub mod compare;
+pub mod configuration;
 pub mod data;
 pub mod error;
 pub mod image;

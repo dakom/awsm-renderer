@@ -21,7 +21,7 @@ impl ColorBackground {
     pub fn value(self) -> &'static str {
         match self {
             Self::SidebarSelected => ColorRaw::GreyAlt1.value(),
-            Self::Sidebar => ColorRaw::Darkest.value(),
+            Self::Sidebar => ColorRaw::Darkish.value(),
             Self::GltfContent => ColorRaw::Darkish.value(),
             Self::ModalContent => ColorRaw::Whiteish.value(),
             Self::UnderlinePrimary => ColorRaw::Accent.value(),

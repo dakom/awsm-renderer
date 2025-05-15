@@ -215,4 +215,7 @@ features = [
     "gpu_buffer_usage",
     "gpu_texture_usage",
     "gpu_shader_stage",
+    "GpuCanvasAlphaMode",
+    "GpuCanvasToneMappingMode",
+    "GpuCanvasToneMapping"
 ]
