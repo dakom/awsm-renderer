@@ -43,6 +43,7 @@ impl AwsmRenderer {
             .write_gpu(&self.logging, &self.gpu, &self.bind_groups)?;
 
         let current_texture_view = self.gpu.current_context_texture_view()?;
+
         let command_encoder = self.gpu.create_command_encoder(Some("Render pass"));
 
         let depth_stencil_attachment = match self.depth_texture.as_ref() {

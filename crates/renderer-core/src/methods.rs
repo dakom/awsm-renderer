@@ -18,12 +18,16 @@ impl AwsmRendererWebGpu {
         thread_local! {
             static WINDOW: web_sys::Window = web_sys::window().unwrap();
         }
-
-        let device_pixel_ratio = WINDOW.with(|window| window.device_pixel_ratio());
         (
-            self.canvas().width() as f64 * device_pixel_ratio,
-            self.canvas().height() as f64 * device_pixel_ratio,
+            self.canvas().width() as f64,
+            self.canvas().height() as f64,
         )
+
+        // let device_pixel_ratio = WINDOW.with(|window| window.device_pixel_ratio());
+        // (
+        //     self.canvas().width() as f64 * device_pixel_ratio,
+        //     self.canvas().height() as f64 * device_pixel_ratio,
+        // )
     }
 
     pub fn current_context_format(&self) -> TextureFormat {
@@ -41,8 +45,9 @@ impl AwsmRendererWebGpu {
     }
 
     pub fn current_context_texture_view(&self) -> Result<web_sys::GpuTextureView> {
-        self.current_context_texture()?
-            .create_view()
+        let texture = self.current_context_texture()?;
+
+        texture.create_view()
             .map_err(AwsmCoreError::current_context_texture_view)
     }
 
