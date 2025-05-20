@@ -1,9 +1,6 @@
 # Next up
 
-- alpha mode support
-    - opaque
-    - mask
-    - blend
+- get opaque alpha to pass test
 
 - Filtering
     - TAA for temporal and edge aliasing

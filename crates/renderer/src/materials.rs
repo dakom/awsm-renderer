@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use pbr::{PbrMaterial, PbrMaterialBindGroupLayoutCacheKey, PbrMaterialCacheKey, PbrMaterialDeps};
-use slotmap::{new_key_type, SlotMap};
+use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use thiserror::Error;
 
 use crate::{
@@ -24,6 +24,7 @@ use crate::{
 
 pub struct Materials {
     materials: SlotMap<MaterialKey, Material>,
+    material_alpha: SecondaryMap<MaterialKey, bool>,
     cache: HashMap<MaterialCacheKey, MaterialKey>,
     bind_group_layout_cache: HashMap<MaterialBindGroupLayoutCacheKey, MaterialBindGroupLayoutKey>,
     pbr_uniform_buffer: DynamicUniformBuffer<MaterialKey>,
@@ -34,6 +35,14 @@ pub struct Materials {
 #[derive(Debug, Clone)]
 pub enum Material {
     Pbr(PbrMaterial),
+}
+
+impl Material {
+    pub fn has_alpha(&self) -> bool {
+        match self {
+            Self::Pbr(pbr_material) => pbr_material.alpha_mode == MaterialAlphaMode::Blend,
+        }
+    }
 }
 
 // The original dependencies, with textures etc.
@@ -152,6 +161,7 @@ impl Materials {
     pub fn new() -> Self {
         Self {
             materials: SlotMap::with_key(),
+            material_alpha: SecondaryMap::new(),
             cache: HashMap::new(),
             bind_group_layout_cache: HashMap::new(),
             pbr_uniform_buffer: DynamicUniformBuffer::new(
@@ -209,6 +219,9 @@ impl Materials {
 
         let material_key = self.materials.insert(material.clone());
 
+        self.material_alpha
+            .insert(material_key, material.has_alpha());
+
         bind_groups
             .material_textures
             .insert_material_texture(
@@ -231,7 +244,12 @@ impl Materials {
 
     pub fn update(&mut self, key: MaterialKey, mut f: impl FnMut(&mut Material)) {
         if let Some(material) = self.materials.get_mut(key) {
+            let old_has_alpha = material.has_alpha();
             f(material);
+            let new_has_alpha = material.has_alpha();
+            if old_has_alpha != new_has_alpha {
+                self.material_alpha.insert(key, new_has_alpha);
+            }
             match material {
                 Material::Pbr(pbr_material) => {
                     self.pbr_uniform_buffer
@@ -240,6 +258,10 @@ impl Materials {
                 }
             }
         }
+    }
+
+    pub fn has_alpha(&self, key: MaterialKey) -> Option<bool> {
+        self.material_alpha.get(key).copied()
     }
 
     pub fn write_gpu(

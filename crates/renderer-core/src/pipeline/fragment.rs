@@ -41,8 +41,8 @@ pub struct BlendState {
 }
 
 impl BlendState {
-    pub fn new(alpha: BlendComponent, color: BlendComponent) -> Self {
-        Self { alpha, color }
+    pub fn new(color: BlendComponent, alpha: BlendComponent) -> Self {
+        Self { color, alpha }
     }
 }
 
@@ -54,6 +54,25 @@ pub struct BlendComponent {
     pub dst_factor: Option<BlendFactor>,
 }
 
+impl BlendComponent {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_operation(mut self, operation: BlendOperation) -> Self {
+        self.operation = Some(operation);
+        self
+    }
+    pub fn with_src_factor(mut self, src_factor: BlendFactor) -> Self {
+        self.src_factor = Some(src_factor);
+        self
+    }
+    pub fn with_dst_factor(mut self, dst_factor: BlendFactor) -> Self {
+        self.dst_factor = Some(dst_factor);
+        self
+    }
+}
+
 impl std::hash::Hash for BlendComponent {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.operation.map(|x| x as u32).hash(state);
@@ -62,7 +81,9 @@ impl std::hash::Hash for BlendComponent {
     }
 }
 
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuBlendFactor.html
 pub type BlendFactor = web_sys::GpuBlendFactor;
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuBlendOperation.html
 pub type BlendOperation = web_sys::GpuBlendOperation;
 
 // js conversions
@@ -150,6 +171,8 @@ impl From<ColorTargetState> for web_sys::GpuColorTargetState {
 impl From<BlendState> for web_sys::GpuBlendState {
     fn from(state: BlendState) -> web_sys::GpuBlendState {
         web_sys::GpuBlendState::new(
+            // not sure why these are reversed, but they are:
+            // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBlendState.html#method.new
             &web_sys::GpuBlendComponent::from(state.alpha),
             &web_sys::GpuBlendComponent::from(state.color),
         )

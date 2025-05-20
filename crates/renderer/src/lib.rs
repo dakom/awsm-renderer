@@ -10,6 +10,7 @@ use instances::Instances;
 use lights::Lights;
 use materials::Materials;
 use mesh::Meshes;
+use pipeline::Pipelines;
 use shaders::Shaders;
 use skin::Skins;
 use textures::Textures;
@@ -24,7 +25,9 @@ pub mod instances;
 pub mod lights;
 pub mod materials;
 pub mod mesh;
+pub mod pipeline;
 pub mod render;
+pub mod renderable;
 pub mod shaders;
 pub mod skin;
 pub mod textures;
@@ -49,6 +52,7 @@ pub struct AwsmRenderer {
     pub instances: Instances,
     pub shaders: Shaders,
     pub materials: Materials,
+    pub pipelines: Pipelines,
     pub lights: Lights,
     pub textures: Textures,
     pub logging: AwsmRendererLogging,
@@ -74,6 +78,7 @@ impl AwsmRenderer {
             instances,
             shaders,
             materials,
+            pipelines,
             textures,
             lights,
             #[cfg(feature = "gltf")]
@@ -90,6 +95,7 @@ impl AwsmRenderer {
         self.instances = instances;
         self.shaders = shaders;
         self.materials = materials;
+        self.pipelines = pipelines;
         self.lights = lights;
         self.textures = textures;
         // nah... keep this, application logic can reset it
@@ -194,6 +200,7 @@ impl AwsmRendererBuilder {
             shaders: deps.shaders,
             bind_groups: deps.bind_groups,
             materials: deps.materials,
+            pipelines: deps.pipelines,
             lights: deps.lights,
             textures: deps.textures,
             clear_color: Color::BLACK,
@@ -218,6 +225,7 @@ struct RebuildDeps {
     pub instances: Instances,
     pub shaders: Shaders,
     pub materials: Materials,
+    pub pipelines: Pipelines,
     pub lights: Lights,
     pub textures: Textures,
 
@@ -238,6 +246,7 @@ impl RebuildDeps {
         let instances = Instances::new(gpu)?;
         let shaders = Shaders::new();
         let materials = Materials::new();
+        let pipelines = Pipelines::new();
         let lights = Lights::new();
         let textures = Textures::new();
 
@@ -250,6 +259,7 @@ impl RebuildDeps {
             instances,
             shaders,
             materials,
+            pipelines,
             lights,
             textures,
 

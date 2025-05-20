@@ -6,6 +6,7 @@ pub mod morphs;
 use awsm_renderer_core::pipeline::primitive::IndexFormat;
 
 use crate::bounds::Aabb;
+use crate::pipeline::RenderPipelineKey;
 use crate::skin::SkinKey;
 use crate::transform::TransformKey;
 use crate::{materials::MaterialKey, render::RenderContext};
@@ -21,7 +22,7 @@ use super::error::Result;
 // because for non-gltf naming, "mesh" makes more sense
 #[derive(Debug)]
 pub struct Mesh {
-    pub pipeline: web_sys::GpuRenderPipeline,
+    pub render_pipeline_key: RenderPipelineKey,
     pub draw_count: usize, // indices or vertices
     pub aabb: Option<Aabb>,
     pub transform_key: TransformKey,
@@ -48,13 +49,13 @@ pub struct MeshIndexBuffer {
 
 impl Mesh {
     pub fn new(
-        pipeline: web_sys::GpuRenderPipeline,
+        render_pipeline_key: RenderPipelineKey,
         draw_count: usize,
         transform_key: TransformKey,
         material_key: MaterialKey,
     ) -> Self {
         Self {
-            pipeline,
+            render_pipeline_key,
             draw_count,
             transform_key,
             material_key,
@@ -80,8 +81,6 @@ impl Mesh {
     }
 
     pub fn push_commands(&self, ctx: &mut RenderContext, mesh_key: MeshKey) -> Result<()> {
-        ctx.render_pass.set_pipeline(&self.pipeline);
-
         let transform_offset = ctx.transforms.buffer_offset(self.transform_key)? as u32;
         let pbr_material_offset = ctx
             .materials

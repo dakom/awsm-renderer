@@ -4,8 +4,8 @@ use thiserror::Error;
 
 use crate::{
     animation::AwsmAnimationError, bind_groups::AwsmBindGroupError, materials::AwsmMaterialError,
-    mesh::AwsmMeshError, shaders::AwsmShaderError, skin::AwsmSkinError,
-    transform::AwsmTransformError,
+    mesh::AwsmMeshError, pipeline::AwsmPipelineError, shaders::AwsmShaderError,
+    skin::AwsmSkinError, transform::AwsmTransformError,
 };
 
 #[derive(Error, Debug)]
@@ -63,6 +63,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] {0:?}")]
     Mesh(#[from] AwsmMeshError),
+
+    #[error("[gltf] {0:?}")]
+    Pipeline(#[from] AwsmPipelineError),
 
     #[error("[gltf] mesh primitive shader: {0:?}")]
     MeshPrimitiveShader(AwsmCoreError),
@@ -136,6 +139,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] unable to construct normals: {0}")]
     ConstructNormals(String),
+
+    #[error("[gltf] missing depth texture in renderer")]
+    MissingDepthTexture,
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

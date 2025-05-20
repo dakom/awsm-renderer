@@ -5,9 +5,9 @@ use crate::{
     gltf::{
         error::{AwsmGltfError, Result},
         layout::{instance_transform_vertex_buffer_layout, primitive_vertex_buffer_layout},
-        pipelines::{GltfPipelineLayoutKey, GltfRenderPipelineKey},
     },
     mesh::{Mesh, MeshBufferInfo},
+    pipeline::{PipelineLayoutCacheKey, RenderPipelineCacheKey},
     shaders::{ShaderCacheKey, ShaderCacheKeyInstancing},
     skin::SkinKey,
     transform::{Transform, TransformKey},
@@ -17,7 +17,7 @@ use awsm_renderer_core::{
     compare::CompareFunction,
     pipeline::{
         depth_stencil::DepthStencilState,
-        fragment::ColorTargetState,
+        fragment::{BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState},
         primitive::{CullMode, FrontFace, PrimitiveState, PrimitiveTopology},
     },
 };
@@ -97,6 +97,8 @@ impl AwsmRenderer {
 
         let material_deps = gltf_material_deps(self, ctx, gltf_primitive.material())?;
 
+        let has_alpha = material_deps.material().has_alpha();
+
         let mut shader_cache_key = ShaderCacheKey::new(
             primitive_buffer_info
                 .vertex
@@ -148,19 +150,14 @@ impl AwsmRenderer {
             material_deps,
         )?;
 
-        let mut pipeline_layout_key = GltfPipelineLayoutKey::new();
-        pipeline_layout_key.has_morph_key = morph_key.is_some();
-        pipeline_layout_key.has_skin_key = skin_key.is_some();
-        pipeline_layout_key.material_layout_key = self
+        let mut pipeline_layout_cache_key = PipelineLayoutCacheKey::new();
+        pipeline_layout_cache_key.has_morph_key = morph_key.is_some();
+        pipeline_layout_cache_key.has_skin_key = skin_key.is_some();
+        pipeline_layout_cache_key.material_layout_key = self
             .bind_groups
             .material_textures
             .get_layout_key(material_key)
             .map_err(AwsmGltfError::MaterialMissingBindGroupLayout)?;
-
-        let shader_module = self
-            .shaders
-            .get_or_create(&self.gpu, &shader_cache_key)
-            .await?;
 
         // we only need one vertex buffer per-mesh, because we've already constructed our buffers
         // to be one contiguous buffer of interleaved vertex data.
@@ -204,48 +201,74 @@ impl AwsmRenderer {
                 false => CullMode::Back,
             });
 
-        let mut pipeline_key = GltfRenderPipelineKey::new(shader_cache_key, pipeline_layout_key)
+        let mut color_target_state = ColorTargetState::new(self.gpu.current_context_format());
+        let mut depth_stencil_state = DepthStencilState::new(
+            self.depth_texture
+                .as_ref()
+                .ok_or(AwsmGltfError::MissingDepthTexture)?
+                .format(),
+        );
+        if has_alpha {
+            color_target_state.blend = Some(BlendState::new(
+                BlendComponent::new()
+                    .with_operation(BlendOperation::Add)
+                    .with_src_factor(BlendFactor::SrcAlpha) // Changed from BlendFactor::One for standard alpha blending
+                    .with_dst_factor(BlendFactor::OneMinusSrcAlpha),
+                BlendComponent::new()
+                    .with_operation(BlendOperation::Add)
+                    .with_src_factor(BlendFactor::One)
+                    .with_dst_factor(BlendFactor::One),
+            ));
+
+            depth_stencil_state = depth_stencil_state
+                .with_depth_write_enabled(false)
+                .with_depth_compare(CompareFunction::Less);
+        } else {
+            color_target_state.blend = None;
+
+            depth_stencil_state = depth_stencil_state
+                .with_depth_write_enabled(true)
+                .with_depth_compare(CompareFunction::Less);
+        }
+
+        let shader_key = self
+            .shaders
+            .add_shader(&self.gpu, shader_cache_key.clone())
+            .await?;
+
+        let pipeline_layout_key = self.pipelines.add_pipeline_layout(
+            &self.gpu,
+            &self.bind_groups,
+            Some("gltf mesh primitive"),
+            pipeline_layout_cache_key,
+        )?;
+
+        let mut pipeline_cache_key = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
             .with_primitive(primitive_state)
             .with_push_vertex_buffer_layout(vertex_buffer_layout)
-            .with_push_fragment_target(ColorTargetState::new(self.gpu.current_context_format()));
-
-        if let Some(depth_texture) = self.depth_texture.as_ref() {
-            pipeline_key = pipeline_key.with_depth_stencil(
-                DepthStencilState::new(depth_texture.format())
-                    .with_depth_write_enabled(true)
-                    .with_depth_compare(CompareFunction::Less),
-            );
-        }
+            .with_push_fragment_target(color_target_state)
+            .with_depth_stencil(depth_stencil_state);
 
         if let Some(instance_transform_vertex_buffer_layout) =
             instance_transform_vertex_buffer_layout
         {
-            pipeline_key = pipeline_key
+            pipeline_cache_key = pipeline_cache_key
                 .with_push_vertex_buffer_layout(instance_transform_vertex_buffer_layout);
         }
 
-        let render_pipeline = match self.gltf.render_pipelines.get(&pipeline_key).cloned() {
-            None => {
-                let descriptor = pipeline_key.clone().into_descriptor(self, &shader_module)?;
-
-                let render_pipeline = self
-                    .gpu
-                    .create_render_pipeline(&descriptor)
-                    .await
-                    .map_err(AwsmGltfError::MeshPrimitiveRenderPipeline)?;
-
-                self.gltf
-                    .render_pipelines
-                    .insert(pipeline_key, render_pipeline.clone());
-
-                render_pipeline
-            }
-            Some(pipeline) => pipeline,
-        };
+        let render_pipeline_key = self
+            .pipelines
+            .add_render_pipeline(
+                &self.gpu,
+                &self.shaders,
+                Some("gltf mesh primitive"),
+                pipeline_cache_key,
+            )
+            .await?;
 
         let native_primitive_buffer_info = MeshBufferInfo::from(primitive_buffer_info.clone());
         let mut mesh = Mesh::new(
-            render_pipeline,
+            render_pipeline_key,
             native_primitive_buffer_info.draw_count(),
             transform_key,
             material_key,

@@ -18,10 +18,7 @@ impl AwsmRendererWebGpu {
         thread_local! {
             static WINDOW: web_sys::Window = web_sys::window().unwrap();
         }
-        (
-            self.canvas().width() as f64,
-            self.canvas().height() as f64,
-        )
+        (self.canvas().width() as f64, self.canvas().height() as f64)
 
         // let device_pixel_ratio = WINDOW.with(|window| window.device_pixel_ratio());
         // (
@@ -47,7 +44,8 @@ impl AwsmRendererWebGpu {
     pub fn current_context_texture_view(&self) -> Result<web_sys::GpuTextureView> {
         let texture = self.current_context_texture()?;
 
-        texture.create_view()
+        texture
+            .create_view()
             .map_err(AwsmCoreError::current_context_texture_view)
     }
 

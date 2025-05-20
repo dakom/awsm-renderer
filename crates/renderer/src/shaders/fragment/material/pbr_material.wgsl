@@ -64,31 +64,20 @@ fn getMaterial(input: FragmentInput) -> PbrMaterial {
 
 
     let base_color = sample_base_color(u_material.base_color_factor, base_color_uv);
+    {% if material.has_alpha_mask %}
+        // early discard as soon as possible, to avoid expensive calculations
+        if base_color.a < u_material.alpha_cutoff {
+            discard;
+        }
+    {% endif %}
     let metallic_roughness = sample_metal_rough(u_material.metallic_factor, u_material.roughness_factor, metallic_roughness_uv);
     let normal = sample_normal(input.world_normal, u_material.normal_scale, normal_uv);
     let occlusion = sample_occlusion(u_material.occlusion_strength, occlusion_uv);
     let emissive = sample_emissive(u_material.emissive_factor, emissive_uv);
 
-
-    var alpha: f32;
-    switch u_material.alpha_mode {
-        // Opaque
-        case 0u: {
-            alpha = 1.0;
-        }
-        // Mask
-        case 1u: {
-            alpha = select(0.0, 1.0, base_color.a >= u_material.alpha_cutoff);
-        }
-        // Blend
-        case 2u: {
-            alpha = base_color.a;
-        }
-        // Default fallback (shouldn't happen with proper enum values)
-        default: {
-            alpha = base_color.a;
-        }
-    }
+    // alpha_mode: 0=opaque, 1=mask, 2=blend
+    // select returns the first argument if condition is false, the second if true
+    let alpha = select(base_color.a, 1.0, u_material.alpha_mode == 0u);
 
     return PbrMaterial(
         base_color,
