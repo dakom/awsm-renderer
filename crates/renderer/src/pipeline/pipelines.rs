@@ -18,6 +18,12 @@ pub struct Pipelines {
     layout_cache: HashMap<PipelineLayoutCacheKey, PipelineLayoutKey>,
 }
 
+impl Default for Pipelines {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Pipelines {
     pub fn new() -> Self {
         Self {
@@ -81,22 +87,16 @@ impl Pipelines {
             return Ok(pipeline_key);
         }
 
-        let layout = self
-            .layout
-            .get(cache_key.layout_key)
-            .ok_or_else(|| AwsmPipelineError::MissingPipelineLayout(cache_key.layout_key))?;
+        let layout = self.layout.get(cache_key.layout_key).ok_or(
+            AwsmPipelineError::MissingPipelineLayout(cache_key.layout_key),
+        )?;
 
         let shader = shaders
             .get_shader(cache_key.shader_key)
-            .ok_or_else(|| AwsmPipelineError::MissingShader(cache_key.shader_key))?;
+            .ok_or(AwsmPipelineError::MissingShader(cache_key.shader_key))?;
 
         let pipeline = gpu
-            .create_render_pipeline(
-                &cache_key
-                    .clone()
-                    .into_descriptor(shader, layout, label)?
-                    .into(),
-            )
+            .create_render_pipeline(&cache_key.clone().into_descriptor(shader, layout, label)?)
             .await?;
 
         let pipeline_key = self.render_pipeline.insert(pipeline);

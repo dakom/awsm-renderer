@@ -53,7 +53,7 @@ impl Shaders {
 
         let shader_key = self.lookup.insert(shader_module.clone());
 
-        self.cache.insert(cache_key, shader_key.clone());
+        self.cache.insert(cache_key, shader_key);
 
         Ok(shader_key)
     }
