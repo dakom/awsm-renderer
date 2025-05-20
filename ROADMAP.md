@@ -5,6 +5,10 @@
     - mask
     - blend
 
+- Filtering
+    - TAA for temporal and edge aliasing
+    - Mipmaps for texture filtering (spacial aliasing)
+
 - materials cont'd
     - normal texture
     - metal roughness texture
@@ -131,7 +135,7 @@ If it's supported here, corresponding core functionality is also supported
 ## Post-processing
 - [ ] SSAO
 - [ ] Bloom
-- [ ] FXAA
+- [ ] TAA 
 - [ ] DOF
 - [ ] Tonemapping
 
