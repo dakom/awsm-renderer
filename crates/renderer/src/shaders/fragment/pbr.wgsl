@@ -12,8 +12,7 @@
 
 @fragment
 fn frag_main(input: FragmentInput) -> @location(0) vec4<f32> {
-    var material = toMaterial(u_material);
-    let brdf_samples = get_brdf_samples(input, material);
+    var material = getMaterial(input);
     let n_lights = arrayLength(&lights) / 16u;
 
     {% if has_normals %}
@@ -32,15 +31,16 @@ fn frag_main(input: FragmentInput) -> @location(0) vec4<f32> {
         let light_brdf = light_to_brdf(get_light(i), normal, input.world_position);
 
         if (light_brdf.n_dot_l > 0.0001) {
-            color += brdf(input, material, light_brdf, brdf_samples, ambient, surface_to_camera); 
+            color += brdf(input, material, light_brdf, ambient, surface_to_camera); 
         } else {
-            color += ambient * brdf_samples.base_color.rgb;
+            color += ambient * material.base_color.rgb;
         }
     }
+
 
     // tone map
     color = aces_tonemap(color);
     //color = gamma_correct(color, 2.2); // gamma correct for sRGB displays
 
-    return vec4<f32>(color, 1.0);
+    return vec4<f32>(color, material.alpha);
 }

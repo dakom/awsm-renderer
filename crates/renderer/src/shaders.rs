@@ -6,10 +6,12 @@ use awsm_renderer_core::{
     renderer::AwsmRendererWebGpu,
     shaders::{ShaderModuleDescriptor, ShaderModuleExt},
 };
+use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
 pub struct Shaders {
-    cache: HashMap<ShaderCacheKey, web_sys::GpuShaderModule>,
+    lookup: SlotMap<ShaderKey, web_sys::GpuShaderModule>,
+    cache: HashMap<ShaderCacheKey, ShaderKey>,
 }
 
 impl Default for Shaders {
@@ -21,29 +23,39 @@ impl Default for Shaders {
 impl Shaders {
     pub fn new() -> Self {
         Self {
+            lookup: SlotMap::with_key(),
             cache: HashMap::new(),
         }
     }
 
-    pub async fn get_or_create(
+    pub fn get_shader(&self, shader_key: ShaderKey) -> Option<&web_sys::GpuShaderModule> {
+        self.lookup.get(shader_key)
+    }
+
+    pub fn get_shader_key_from_cache(&self, cache_key: &ShaderCacheKey) -> Option<ShaderKey> {
+        self.cache.get(cache_key).cloned()
+    }
+
+    pub async fn add_shader(
         &mut self,
         gpu: &AwsmRendererWebGpu,
-        key: &ShaderCacheKey,
-    ) -> Result<web_sys::GpuShaderModule> {
-        match self.cache.get(key) {
-            None => {
-                let shader_module = gpu.compile_shader(&key.into_descriptor()?);
-                shader_module
-                    .validate_shader()
-                    .await
-                    .map_err(AwsmShaderError::Compilation)?;
-
-                self.cache.insert(key.clone(), shader_module.clone());
-
-                Ok(shader_module)
-            }
-            Some(shader_module) => Ok(shader_module.clone()),
+        cache_key: ShaderCacheKey,
+    ) -> Result<ShaderKey> {
+        if let Some(shader_key) = self.get_shader_key_from_cache(&cache_key) {
+            return Ok(shader_key);
         }
+
+        let shader_module = gpu.compile_shader(&cache_key.into_descriptor()?);
+        shader_module
+            .validate_shader()
+            .await
+            .map_err(AwsmShaderError::Compilation)?;
+
+        let shader_key = self.lookup.insert(shader_module.clone());
+
+        self.cache.insert(cache_key, shader_key);
+
+        Ok(shader_key)
     }
 }
 
@@ -135,9 +147,19 @@ pub enum ShaderCacheKeyMaterial {
     DebugNormals,
 }
 
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
+impl ShaderCacheKeyMaterial {
+    pub fn has_alpha_mask(&self) -> bool {
+        match self {
+            ShaderCacheKeyMaterial::Pbr(material_key) => material_key.has_alpha_mask,
+            ShaderCacheKeyMaterial::DebugNormals => false,
+        }
+    }
+}
+
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PbrShaderCacheKeyMaterial {
     pub base_color_uv_index: Option<u32>,
+    pub has_alpha_mask: bool,
 }
 
 impl ShaderCacheKeyAttribute {
@@ -190,7 +212,9 @@ impl ShaderCacheKey {
     }
 
     pub fn into_source(&self) -> Result<String> {
-        let mut material = ShaderTemplateMaterial::default();
+        tracing::info!("Generating shader source for {:?}", self);
+
+        let mut material = ShaderTemplateMaterial::new(self.material.has_alpha_mask());
         let mut has_normals = false;
         let mut skins = None;
 
@@ -397,8 +421,9 @@ struct ShaderTemplate {
     // pub alpha_mode: ShaderKeyAlphaMode,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ShaderTemplateMaterial {
+    pub has_alpha_mask: bool,
     // the idea here is that with these gates, we can write normal shader code
     // since the variables are assigned (and from then on, we don't care about the location)
     pub has_base_color_tex: bool,
@@ -406,6 +431,19 @@ pub struct ShaderTemplateMaterial {
     pub has_emissive_tex: bool,
     pub has_occlusion_tex: bool,
     pub has_normal_tex: bool,
+}
+
+impl ShaderTemplateMaterial {
+    pub fn new(has_alpha_mask: bool) -> Self {
+        Self {
+            has_alpha_mask,
+            has_base_color_tex: false,
+            has_metallic_roughness_tex: false,
+            has_emissive_tex: false,
+            has_occlusion_tex: false,
+            has_normal_tex: false,
+        }
+    }
 }
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
@@ -434,6 +472,10 @@ struct DynamicBufferBinding {
 struct VertexToFragmentAssignment {
     vertex_name: String,
     fragment_name: String,
+}
+
+new_key_type! {
+    pub struct ShaderKey;
 }
 
 type Result<T> = std::result::Result<T, AwsmShaderError>;

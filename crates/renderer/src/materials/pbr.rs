@@ -201,6 +201,7 @@ impl PbrMaterialDeps {
     pub fn shader_cache_key(&self) -> PbrShaderCacheKeyMaterial {
         PbrShaderCacheKeyMaterial {
             base_color_uv_index: self.base_color_tex.as_ref().map(|dep| dep.uv_index as u32),
+            has_alpha_mask: matches!(self.alpha_mode, MaterialAlphaMode::Mask { .. }),
         }
     }
 

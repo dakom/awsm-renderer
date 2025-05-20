@@ -1,9 +1,10 @@
 # Next up
 
-- alpha mode support
-    - opaque
-    - mask
-    - blend
+- get opaque alpha to pass test
+
+- Filtering
+    - TAA for temporal and edge aliasing
+    - Mipmaps for texture filtering (spacial aliasing)
 
 - materials cont'd
     - normal texture
@@ -131,7 +132,7 @@ If it's supported here, corresponding core functionality is also supported
 ## Post-processing
 - [ ] SSAO
 - [ ] Bloom
-- [ ] FXAA
+- [ ] TAA 
 - [ ] DOF
 - [ ] Tonemapping
 

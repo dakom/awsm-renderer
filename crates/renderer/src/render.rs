@@ -11,6 +11,8 @@ use crate::error::{AwsmError, Result};
 use crate::instances::Instances;
 use crate::materials::Materials;
 use crate::mesh::Meshes;
+use crate::pipeline::{Pipelines, RenderPipelineKey};
+use crate::renderable::Renderable;
 use crate::skin::Skins;
 use crate::transform::Transforms;
 use crate::AwsmRenderer;
@@ -42,8 +44,9 @@ impl AwsmRenderer {
         self.camera
             .write_gpu(&self.logging, &self.gpu, &self.bind_groups)?;
 
+        let renderables = self.collect_renderables();
+
         let current_texture_view = self.gpu.current_context_texture_view()?;
-        let command_encoder = self.gpu.create_command_encoder(Some("Render pass"));
 
         let depth_stencil_attachment = match self.depth_texture.as_ref() {
             None => None,
@@ -59,6 +62,8 @@ impl AwsmRenderer {
                 )
             }
         };
+
+        let command_encoder = self.gpu.create_command_encoder(Some("Render pass"));
 
         let render_pass = command_encoder.begin_render_pass(
             &RenderPassDescriptor {
@@ -81,6 +86,7 @@ impl AwsmRenderer {
             transforms: &self.transforms,
             meshes: &self.meshes,
             materials: &self.materials,
+            pipelines: &self.pipelines,
             skins: &self.skins,
             instances: &self.instances,
             bind_groups: &self.bind_groups,
@@ -92,8 +98,17 @@ impl AwsmRenderer {
             None,
         )?;
 
-        for (key, mesh) in self.meshes.iter() {
-            mesh.push_commands(&mut ctx, key)?;
+        let mut last_pipeline_key: Option<RenderPipelineKey> = None;
+
+        for renderable in renderables {
+            let render_pipeline_key = renderable.render_pipeline_key();
+            if last_pipeline_key != Some(render_pipeline_key) {
+                ctx.render_pass
+                    .set_pipeline(ctx.pipelines.get_render_pipeline(render_pipeline_key)?);
+                last_pipeline_key = Some(render_pipeline_key);
+            }
+
+            renderable.push_commands(&mut ctx)?;
         }
 
         ctx.render_pass.end();
@@ -101,6 +116,60 @@ impl AwsmRenderer {
         self.gpu.submit_commands(&ctx.command_encoder.finish());
 
         Ok(())
+    }
+
+    fn collect_renderables(&self) -> Vec<Renderable<'_>> {
+        let mut renderables = Vec::new();
+        for (key, mesh) in self.meshes.iter() {
+            let has_alpha = self.materials.has_alpha(mesh.material_key).unwrap_or(false);
+            renderables.push(Renderable::Mesh {
+                key,
+                mesh,
+                has_alpha,
+            });
+        }
+
+        renderables.sort_by(|a, b| {
+            // Criterion 1 & 2: Group by has_alpha. Non-alpha (false) comes before alpha (true).
+            let alpha_ordering = a.has_alpha().cmp(&b.has_alpha());
+            if alpha_ordering != std::cmp::Ordering::Equal {
+                return alpha_ordering;
+            }
+
+            // Criterion 3: Within alpha groups, group by render_pipeline_key.
+            let pipeline_ordering = a.render_pipeline_key().cmp(&b.render_pipeline_key());
+            if pipeline_ordering != std::cmp::Ordering::Equal {
+                return pipeline_ordering;
+            }
+
+            // Criterion 4: Within alpha->pipeline_key groups, sort by depth.
+            match (a.transform_key(), b.transform_key()) {
+                (Some(a_key), Some(b_key)) => {
+                    let a_world_mat = self.transforms.get_world(a_key).unwrap();
+                    let b_world_mat = self.transforms.get_world(b_key).unwrap();
+
+                    // w_axis is the translation vector in the world matrix
+                    // We use the z component for depth sorting.
+                    let a_depth = a_world_mat.w_axis.z;
+                    let b_depth = b_world_mat.w_axis.z;
+
+                    if a.has_alpha() {
+                        // Sort back-to-front for transparent objects.
+                        b_depth
+                            .partial_cmp(&a_depth)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    } else {
+                        // Sort front-to-back for opaque objects.
+                        a_depth
+                            .partial_cmp(&b_depth)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    }
+                }
+                _ => std::cmp::Ordering::Equal,
+            }
+        });
+
+        renderables
     }
 }
 
@@ -110,6 +179,7 @@ pub struct RenderContext<'a> {
     pub render_pass: RenderPassEncoder,
     pub transforms: &'a Transforms,
     pub meshes: &'a Meshes,
+    pub pipelines: &'a Pipelines,
     pub materials: &'a Materials,
     pub skins: &'a Skins,
     pub instances: &'a Instances,
