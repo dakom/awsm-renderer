@@ -41,8 +41,8 @@ pub struct BlendState {
 }
 
 impl BlendState {
-    pub fn new(color: BlendComponent, alpha: BlendComponent) -> Self {
-        Self { color, alpha }
+    pub fn new(alpha: BlendComponent, color: BlendComponent) -> Self {
+        Self { alpha, color }
     }
 }
 
@@ -171,8 +171,9 @@ impl From<ColorTargetState> for web_sys::GpuColorTargetState {
 impl From<BlendState> for web_sys::GpuBlendState {
     fn from(state: BlendState) -> web_sys::GpuBlendState {
         web_sys::GpuBlendState::new(
-            // not sure why these are reversed, but they are:
+            // not sure why these are reversed compared to opengl, but they are:
             // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBlendState.html#method.new
+            // vs. opengl's https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBlendFuncSeparate.xhtml
             &web_sys::GpuBlendComponent::from(state.alpha),
             &web_sys::GpuBlendComponent::from(state.color),
         )

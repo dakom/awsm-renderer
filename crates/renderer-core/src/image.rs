@@ -1,7 +1,7 @@
 use crate::command::copy_texture::Origin3d;
 use crate::error::Result;
 use crate::renderer::AwsmRendererWebGpu;
-use crate::texture::{Extent3d, TextureAspect, TextureDescriptor, TextureUsage};
+use crate::texture::{Extent3d, TextureAspect, TextureDescriptor, TextureFormat, TextureUsage};
 use std::borrow::Cow;
 use wasm_bindgen::prelude::*;
 
@@ -66,74 +66,51 @@ impl ImageData {
                 }
             }
 
-            pub fn format(&self) -> web_sys::GpuTextureFormat {
-                match self {
-                    // TODO - is this right?
-                    Self::Exr(_) => web_sys::GpuTextureFormat::Rgba32float,
-                    Self::Bitmap(_) => web_sys::GpuTextureFormat::Rgba8unorm,
-                }
-            }
 
-            pub fn size(&self) -> Extent3d {
-                match self {
-                    Self::Exr(exr) => Extent3d {
-                        width: exr.width as u32,
-                        height: Some(exr.height as u32),
-                        depth_or_array_layers: None,
-                    },
-                    Self::Bitmap(img) => Extent3d {
-                        width: img.width(),
-                        height: Some(img.height()),
-                        depth_or_array_layers: None,
-                    },
-                }
-            }
-
-            pub fn js_obj(&self) -> Result<Cow<'_, js_sys::Object>> {
-                match self {
-                    Self::Exr(exr) => exr.js_obj(),
-                    Self::Bitmap(img) => {
-                        let js_value = img.unchecked_ref();
-                        Ok(Cow::Borrowed(js_value))
-                    }
-                }
-            }
 
         } else {
             pub async fn load_url(url:&str) -> Result<Self> {
                 let image = bitmap::load(url.to_string()).await?;
                 Ok(Self::Bitmap(image))
             }
+        }
+    }
 
-            pub fn size(&self) -> Extent3d {
-                match self {
-                    Self::Bitmap(img) => Extent3d {
-                        width: img.width() as u32,
-                        height: Some(img.height() as u32),
-                        depth_or_array_layers: None,
-                    },
-                }
-            }
+    pub fn format(&self) -> TextureFormat {
+        match self {
+            // TODO - is this right?
+            #[cfg(feature = "exr")]
+            Self::Exr(_) => TextureFormat::Rgba32float,
 
-            pub fn size(&self) -> (usize, usize) {
-                match self {
-                    Self::Bitmap(img) => (img.width() as usize, img.height() as usize)
-                }
-            }
+            Self::Bitmap(_) => TextureFormat::Rgba8unorm,
+        }
+    }
 
-            pub fn format(&self) -> web_sys::GpuTextureFormat {
-                match self {
-                    Self::Bitmap(_) => web_sys::GpuTextureFormat::Rgba8unorm,
-                }
-            }
+    pub fn size(&self) -> Extent3d {
+        match self {
+            #[cfg(feature = "exr")]
+            Self::Exr(exr) => Extent3d {
+                width: exr.width as u32,
+                height: Some(exr.height as u32),
+                depth_or_array_layers: None,
+            },
 
-            pub fn js_obj(&self) -> Result<Cow<'_, js_sys::Object>> {
-                match self {
-                    Self::Bitmap(img) => {
-                        let js_value = img.unchecked_ref();
-                        Ok(Cow::Borrowed(js_value))
-                    }
-                }
+            Self::Bitmap(img) => Extent3d {
+                width: img.width(),
+                height: Some(img.height()),
+                depth_or_array_layers: None,
+            },
+        }
+    }
+
+    pub fn js_obj(&self) -> Result<Cow<'_, js_sys::Object>> {
+        match self {
+            #[cfg(feature = "exr")]
+            Self::Exr(exr) => exr.js_obj(),
+
+            Self::Bitmap(img) => {
+                let js_value = img.unchecked_ref();
+                Ok(Cow::Borrowed(js_value))
             }
         }
     }

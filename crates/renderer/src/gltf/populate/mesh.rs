@@ -208,24 +208,25 @@ impl AwsmRenderer {
                 .ok_or(AwsmGltfError::MissingDepthTexture)?
                 .format(),
         );
+        // https://www.khronos.org/opengl/wiki/Blending#Blend_Equations
         if has_alpha {
-            color_target_state.blend = Some(BlendState::new(
-                BlendComponent::new()
+            color_target_state.blend = Some(BlendState {
+                color: BlendComponent::new()
                     .with_operation(BlendOperation::Add)
-                    .with_src_factor(BlendFactor::SrcAlpha) // Changed from BlendFactor::One for standard alpha blending
+                    .with_src_factor(BlendFactor::SrcAlpha)
                     .with_dst_factor(BlendFactor::OneMinusSrcAlpha),
-                BlendComponent::new()
+                alpha: BlendComponent::new()
                     .with_operation(BlendOperation::Add)
                     .with_src_factor(BlendFactor::One)
-                    .with_dst_factor(BlendFactor::One),
-            ));
-
+                    .with_dst_factor(BlendFactor::OneMinusSrcAlpha),
+            });
             depth_stencil_state = depth_stencil_state
                 .with_depth_write_enabled(false)
                 .with_depth_compare(CompareFunction::Less);
         } else {
+            // This is also for cutoff materials, which are not alpha blended
+            // but rather discarded if the alpha is below a threshold
             color_target_state.blend = None;
-
             depth_stencil_state = depth_stencil_state
                 .with_depth_write_enabled(true)
                 .with_depth_compare(CompareFunction::Less);
