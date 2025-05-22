@@ -5,13 +5,14 @@
 - Mipmaps for texture filtering (spacial aliasing)
 - TAA for temporal and edge aliasing
 
-- Is it right that specular isn't moving across sphere test when camera moves?
-
 - materials cont'd
     - normal texture
     - metal roughness texture
 
 - IBL
+
+- Is it right that specular isn't moving across sphere test when camera moves?
+
 
 - fix "dev-release" mode (just base path?)
 

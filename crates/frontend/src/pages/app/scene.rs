@@ -181,8 +181,8 @@ impl AppScene {
 
         renderer.lights.insert(Light::Directional {
             color: [1.0, 1.0, 1.0],
-            intensity: 1.0,
-            direction: [-1.0, -1.0, -1.0],
+            intensity: 3.0,
+            direction: [-0.5, -0.25, -0.75],
         });
 
         Ok(())
