@@ -1,13 +1,17 @@
 # Next up
 
-- double-check that depth-texture pipeline is right... what happens on resize? don't need to recreate pipelines?
+- allow switching shaders at runtime (helps to debug)
 
 - Mipmaps for texture filtering (spacial aliasing)
 - TAA for temporal and edge aliasing
 
+- Is it right that specular isn't moving across sphere test when camera moves?
+
 - materials cont'd
     - normal texture
     - metal roughness texture
+
+- IBL
 
 - fix "dev-release" mode (just base path?)
 

@@ -58,6 +58,10 @@ pub struct AwsmRenderer {
     pub textures: Textures,
     pub logging: AwsmRendererLogging,
     pub clear_color: Color,
+    // the texture itself is only held so we can get the format and destroy upon resize
+    // no bindings depend on it existing, rather the view is used on each tick.
+    // Theoretically bugs can creep in if the format is changed after mesh creation
+    // so stick to one format on creation and use throughout, e.g. Depth24plus on resize too
     pub depth_texture: Option<(web_sys::GpuTexture, web_sys::GpuTextureView)>,
 
     #[cfg(feature = "gltf")]

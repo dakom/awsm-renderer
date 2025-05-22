@@ -6,7 +6,14 @@ use crate::prelude::*;
 pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::new(|| {
     let mut h = HashMap::new();
 
-    h.insert("Todo", vec![GltfId::AlphaBlendMode]);
+    h.insert(
+        "Todo",
+        vec![
+            GltfId::AlphaBlendMode,
+            GltfId::MetalRoughSpheresTextureless,
+            GltfId::MetalRoughSpheres,
+        ],
+    );
 
     // h.insert(
     //     "Feature tests",
@@ -108,7 +115,6 @@ pub enum GltfId {
     SimpleMorph,
     AnimatedTriangle,
     AnimatedMorphCube,
-    AnimatedMorphSphere,
     SimpleSkin,
     SimpleInstancing,
     SimpleTexture,
@@ -199,7 +205,6 @@ impl GltfId {
             Self::SimpleMaterial => "SimpleMaterial/glTF/SimpleMaterial.gltf",
             Self::AnimatedTriangle => "AnimatedTriangle/glTF/AnimatedTriangle.gltf",
             Self::AnimatedMorphCube => "AnimatedMorphCube/glTF/AnimatedMorphCube.gltf",
-            Self::AnimatedMorphSphere => "AnimatedMorphSphere/glTF/AnimatedMorphSphere.gltf",
             Self::SimpleSkin => "SimpleSkin/glTF/SimpleSkin.gltf",
             Self::InterpolationTest => "InterpolationTest/glTF/InterpolationTest.gltf",
 
@@ -249,7 +254,6 @@ impl GltfId {
             Self::SimpleMaterial => "Simple Material",
             Self::AnimatedTriangle => "Animated Triangle",
             Self::AnimatedMorphCube => "Animated Morph Cube",
-            Self::AnimatedMorphSphere => "Animated Morph Sphere",
             Self::SimpleSkin => "Simple Skin",
             Self::InterpolationTest => "Interpolation Test",
 
