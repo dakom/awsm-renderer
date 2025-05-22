@@ -97,6 +97,10 @@ features = [
     "HtmlInputElement",
     "ImageBitmap",
     "ImageBitmapOptions",
+    "PremultiplyAlpha",
+    "ColorSpaceConversion",
+    "ImageOrientation",
+    "ResizeQuality",
     "FileList",
     "File",
     "Window",
@@ -217,5 +221,6 @@ features = [
     "gpu_shader_stage",
     "GpuCanvasAlphaMode",
     "GpuCanvasToneMappingMode",
-    "GpuCanvasToneMapping"
+    "GpuCanvasToneMapping",
+    "gpu_color_write"
 ]

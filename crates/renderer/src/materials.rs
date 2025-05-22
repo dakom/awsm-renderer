@@ -174,6 +174,10 @@ impl Materials {
         }
     }
 
+    pub fn get(&self, key: MaterialKey) -> Option<&Material> {
+        self.materials.get(key)
+    }
+
     pub fn pbr_buffer_offset(&self, key: MaterialKey) -> Option<usize> {
         self.pbr_uniform_buffer.offset(key)
     }

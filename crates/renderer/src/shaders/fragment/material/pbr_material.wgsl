@@ -27,7 +27,6 @@ struct PbrMaterial {
     normal: vec3<f32>,
     occlusion: f32,
     emissive: vec3<f32>,
-    alpha: f32,
     double_sided : bool,
 };
 
@@ -75,9 +74,6 @@ fn getMaterial(input: FragmentInput) -> PbrMaterial {
     let occlusion = sample_occlusion(u_material.occlusion_strength, occlusion_uv);
     let emissive = sample_emissive(u_material.emissive_factor, emissive_uv);
 
-    // alpha_mode: 0=opaque, 1=mask, 2=blend
-    // select returns the first argument if condition is false, the second if true
-    let alpha = select(base_color.a, 1.0, u_material.alpha_mode == 0u);
 
     return PbrMaterial(
         base_color,
@@ -85,7 +81,6 @@ fn getMaterial(input: FragmentInput) -> PbrMaterial {
         normal,
         occlusion,
         emissive,
-        alpha,
         u_material.double_sided != 0u
     );
 }
@@ -97,10 +92,18 @@ fn getMaterial(input: FragmentInput) -> PbrMaterial {
 fn sample_base_color(base_color_factor: vec4<f32>, uv: vec2<f32>) -> vec4<f32> {
     {% if material.has_base_color_tex %}
         let tex = textureSample(base_color_tex, base_color_sampler, uv);
-        return tex * base_color_factor;
+        var color = tex * base_color_factor;
     {% else %}
-        return base_color_factor;
+        var color = base_color_factor;
     {% endif %}
+
+    // alpha_mode: 0=opaque, 1=mask, 2=blend
+    if u_material.alpha_mode == 0u {
+        color.a = 1.0;
+    }
+
+
+    return color;
 }
 
 fn sample_metal_rough(metallic_factor: f32, roughness_factor: f32, uv: vec2<f32>) -> vec2<f32> { // x=metallic y=roughness

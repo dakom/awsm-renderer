@@ -1,10 +1,9 @@
 # Next up
 
-- get opaque alpha to pass test
+- double-check that depth-texture pipeline is right... what happens on resize? don't need to recreate pipelines?
 
-- Filtering
-    - TAA for temporal and edge aliasing
-    - Mipmaps for texture filtering (spacial aliasing)
+- Mipmaps for texture filtering (spacial aliasing)
+- TAA for temporal and edge aliasing
 
 - materials cont'd
     - normal texture

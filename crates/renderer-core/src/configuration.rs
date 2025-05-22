@@ -50,7 +50,9 @@ impl CanvasToneMapping {
     }
 }
 
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuCanvasAlphaMode.html
 pub type CanvasAlphaMode = web_sys::GpuCanvasAlphaMode;
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuCanvasToneMappingMode.html
 pub type CanvasToneMappingMode = web_sys::GpuCanvasToneMappingMode;
 
 impl From<CanvasConfiguration<'_>> for web_sys::GpuCanvasConfiguration {

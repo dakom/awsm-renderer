@@ -212,8 +212,6 @@ impl ShaderCacheKey {
     }
 
     pub fn into_source(&self) -> Result<String> {
-        tracing::info!("Generating shader source for {:?}", self);
-
         let mut material = ShaderTemplateMaterial::new(self.material.has_alpha_mask());
         let mut has_normals = false;
         let mut skins = None;

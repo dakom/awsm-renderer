@@ -43,7 +43,7 @@ fn brdf(input: FragmentInput, material: PbrMaterial, light_brdf: LightBrdf, ambi
     let l = light_brdf.light_dir;
     let radiance = light_brdf.radiance;
 
-    let base_color   = material.base_color;
+    let base_color_rgb   = material.base_color.rgb;
     let mr           = material.metallic_roughness;
     let metallic     = mr.x;
     let roughness    = saturate(mr.y);
@@ -56,7 +56,7 @@ fn brdf(input: FragmentInput, material: PbrMaterial, light_brdf: LightBrdf, ambi
     let v_dot_h      = saturate(dot(v, h));
 
     // fresnel base reflectance
-    let f0 = mix(vec3<f32>(0.04), base_color.rgb, metallic);
+    let f0 = mix(vec3<f32>(0.04), base_color_rgb, metallic);
 
     // specular
     let f     = fresnel_schlick(v_dot_h, f0);
@@ -68,7 +68,7 @@ fn brdf(input: FragmentInput, material: PbrMaterial, light_brdf: LightBrdf, ambi
     // diffuse
     let k_s   = f;
     let k_d   = (1.0 - k_s) * (1.0 - metallic);
-    let diff_col = k_d * base_color.rgb * (1.0 / pi);
+    let diff_col = k_d * base_color_rgb * (1.0 / pi);
 
     // light contribution
     let lo = (diff_col + spec_col) * radiance * n_dot_l;
