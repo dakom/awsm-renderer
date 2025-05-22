@@ -7,7 +7,7 @@ use awsm_renderer_core::command::{LoadOp, StoreOp};
 
 use crate::bind_groups::BindGroups;
 use crate::core::command::CommandEncoder;
-use crate::error::{AwsmError, Result};
+use crate::error::Result;
 use crate::instances::Instances;
 use crate::materials::Materials;
 use crate::mesh::Meshes;
@@ -48,20 +48,12 @@ impl AwsmRenderer {
 
         let current_texture_view = self.gpu.current_context_texture_view()?;
 
-        let depth_stencil_attachment = match self.depth_texture.as_ref() {
-            None => None,
-            Some(depth_texture) => {
-                let view = depth_texture.create_view().map_err(|e| {
-                    AwsmError::DepthTextureCreateView(e.as_string().unwrap_or_default())
-                })?;
-                Some(
-                    DepthStencilAttachment::new(Cow::Owned(view))
-                        .with_depth_load_op(LoadOp::Clear)
-                        .with_depth_store_op(StoreOp::Store)
-                        .with_depth_clear_value(1.0),
-                )
-            }
-        };
+        let depth_stencil_attachment = self.depth_texture.as_ref().map(|(_, view)| {
+            DepthStencilAttachment::new(Cow::Borrowed(view))
+                .with_depth_load_op(LoadOp::Clear)
+                .with_depth_store_op(StoreOp::Store)
+                .with_depth_clear_value(1.0)
+        });
 
         let command_encoder = self.gpu.create_command_encoder(Some("Render pass"));
 

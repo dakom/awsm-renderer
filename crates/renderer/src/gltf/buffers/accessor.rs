@@ -101,8 +101,6 @@ fn sparse_to_indices(
     indices
 }
 
-// currently just a helper, not used anywhere
-#[allow(dead_code)]
 pub fn accessor_to_vec(accessor: &gltf::Accessor<'_>, buffers: &[Vec<u8>]) -> Result<AccessorVec> {
     let bytes = accessor_to_bytes(accessor, buffers)?;
 

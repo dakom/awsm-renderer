@@ -41,5 +41,5 @@ fn frag_main(input: FragmentInput) -> @location(0) vec4<f32> {
     //color = aces_tonemap(color);
     //color = gamma_correct(color, 2.2); // gamma correct for sRGB displays
 
-    return vec4<f32>(color, material.alpha);
+    return vec4<f32>(color, material.base_color.a);
 }

@@ -6,11 +6,18 @@ use web_sys::{Blob, BlobPropertyBag, ImageBitmap};
 
 use crate::error::{AwsmCoreError, Result};
 
+use super::ImageBitmapOptions;
+
 thread_local! {
     static WINDOW: LazyLock<web_sys::Window> = LazyLock::new(|| web_sys::window().unwrap_throw());
 }
 
-pub async fn load(url: String) -> Result<web_sys::ImageBitmap> {
+// let options = web_sys::ImageBitmapOptions::new();
+// options.set_premultiply_alpha(web_sys::PremultiplyAlpha::None);
+pub async fn load(
+    url: String,
+    options: Option<ImageBitmapOptions>,
+) -> Result<web_sys::ImageBitmap> {
     let resp: web_sys::Response = gloo_net::http::Request::get(&url)
         .send()
         .await
@@ -21,12 +28,20 @@ pub async fn load(url: String) -> Result<web_sys::ImageBitmap> {
         .map_err(AwsmCoreError::fetch)?;
     let blob: Blob = js_value.unchecked_into();
 
-    load_blob(&blob).await
+    load_blob(&blob, options).await
 }
 
-pub async fn load_blob(blob: &Blob) -> Result<web_sys::ImageBitmap> {
+pub async fn load_blob(
+    blob: &Blob,
+    options: Option<ImageBitmapOptions>,
+) -> Result<web_sys::ImageBitmap> {
     let promise = WINDOW
-        .with(|window| window.create_image_bitmap_with_blob(blob))
+        .with(|window| match options {
+            Some(options) => {
+                window.create_image_bitmap_with_blob_and_image_bitmap_options(blob, &options.into())
+            }
+            None => window.create_image_bitmap_with_blob(blob),
+        })
         .map_err(AwsmCoreError::create_image_bitmap)?;
     let js_value = JsFuture::from(promise)
         .await
@@ -34,7 +49,11 @@ pub async fn load_blob(blob: &Blob) -> Result<web_sys::ImageBitmap> {
     Ok(js_value.unchecked_into())
 }
 
-pub async fn load_js_value(data: &JsValue, mime_type: &str) -> Result<ImageBitmap> {
+pub async fn load_js_value(
+    data: &JsValue,
+    mime_type: &str,
+    options: Option<ImageBitmapOptions>,
+) -> Result<ImageBitmap> {
     let blob_opts = BlobPropertyBag::new();
     blob_opts.set_type(mime_type);
 
@@ -44,77 +63,117 @@ pub async fn load_js_value(data: &JsValue, mime_type: &str) -> Result<ImageBitma
     )
     .map_err(AwsmCoreError::url_parse)?;
 
-    load_blob(&blob).await
+    load_blob(&blob, options).await
 }
 
-pub async fn load_u8<T: AsRef<[u8]>>(data: T, mime_type: &str) -> Result<ImageBitmap> {
+pub async fn load_u8<T: AsRef<[u8]>>(
+    data: T,
+    mime_type: &str,
+    options: Option<ImageBitmapOptions>,
+) -> Result<ImageBitmap> {
     load_js_value(
         // should be fine, load_js_value is just getting a blob with a new url string
         unsafe { &js_sys::Uint8Array::view(data.as_ref()).into() },
         mime_type,
+        options,
     )
     .await
 }
 
-pub async fn load_u16<T: AsRef<[u16]>>(data: T, mime_type: &str) -> Result<ImageBitmap> {
+pub async fn load_u16<T: AsRef<[u16]>>(
+    data: T,
+    mime_type: &str,
+    options: Option<ImageBitmapOptions>,
+) -> Result<ImageBitmap> {
     load_js_value(
         // should be fine, load_js_value is just getting a blob with a new url string
         unsafe { &js_sys::Uint16Array::view(data.as_ref()).into() },
         mime_type,
+        options,
     )
     .await
 }
 
-pub async fn load_u32<T: AsRef<[u32]>>(data: T, mime_type: &str) -> Result<ImageBitmap> {
+pub async fn load_u32<T: AsRef<[u32]>>(
+    data: T,
+    mime_type: &str,
+    options: Option<ImageBitmapOptions>,
+) -> Result<ImageBitmap> {
     load_js_value(
         // should be fine, load_js_value is just getting a blob with a new url string
         unsafe { &js_sys::Uint32Array::view(data.as_ref()).into() },
         mime_type,
+        options,
     )
     .await
 }
 
-pub async fn load_i8<T: AsRef<[i8]>>(data: T, mime_type: &str) -> Result<ImageBitmap> {
+pub async fn load_i8<T: AsRef<[i8]>>(
+    data: T,
+    mime_type: &str,
+    options: Option<ImageBitmapOptions>,
+) -> Result<ImageBitmap> {
     load_js_value(
         // should be fine, load_js_value is just getting a blob with a new url string
         unsafe { &js_sys::Int8Array::view(data.as_ref()).into() },
         mime_type,
+        options,
     )
     .await
 }
 
-pub async fn load_i16<T: AsRef<[i16]>>(data: T, mime_type: &str) -> Result<ImageBitmap> {
+pub async fn load_i16<T: AsRef<[i16]>>(
+    data: T,
+    mime_type: &str,
+    options: Option<ImageBitmapOptions>,
+) -> Result<ImageBitmap> {
     load_js_value(
         // should be fine, load_js_value is just getting a blob with a new url string
         unsafe { &js_sys::Int16Array::view(data.as_ref()).into() },
         mime_type,
+        options,
     )
     .await
 }
 
-pub async fn load_i32<T: AsRef<[i32]>>(data: T, mime_type: &str) -> Result<ImageBitmap> {
+pub async fn load_i32<T: AsRef<[i32]>>(
+    data: T,
+    mime_type: &str,
+    options: Option<ImageBitmapOptions>,
+) -> Result<ImageBitmap> {
     load_js_value(
         // should be fine, load_js_value is just getting a blob with a new url string
         unsafe { &js_sys::Int32Array::view(data.as_ref()).into() },
         mime_type,
+        options,
     )
     .await
 }
 
-pub async fn load_f32<T: AsRef<[f32]>>(data: T, mime_type: &str) -> Result<ImageBitmap> {
+pub async fn load_f32<T: AsRef<[f32]>>(
+    data: T,
+    mime_type: &str,
+    options: Option<ImageBitmapOptions>,
+) -> Result<ImageBitmap> {
     load_js_value(
         // should be fine, load_js_value is just getting a blob with a new url string
         unsafe { &js_sys::Float32Array::view(data.as_ref()).into() },
         mime_type,
+        options,
     )
     .await
 }
 
-pub async fn load_f64<T: AsRef<[f64]>>(data: T, mime_type: &str) -> Result<ImageBitmap> {
+pub async fn load_f64<T: AsRef<[f64]>>(
+    data: T,
+    mime_type: &str,
+    options: Option<ImageBitmapOptions>,
+) -> Result<ImageBitmap> {
     load_js_value(
         // should be fine, load_js_value is just getting a blob with a new url string
         unsafe { &js_sys::Float64Array::view(data.as_ref()).into() },
         mime_type,
+        options,
     )
     .await
 }

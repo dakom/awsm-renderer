@@ -1,4 +1,4 @@
-use awsm_renderer_core::image::ImageData;
+use awsm_renderer_core::image::{ImageBitmapOptions, ImageData, PremultiplyAlpha};
 use futures::future::try_join_all;
 /// Loads a GltfResource, independently of the renderer
 /// the loaded resource can then be passed into renderer.populate_gltf()
@@ -183,11 +183,13 @@ fn get_image_futures<'a>(
         .images()
         .map(|image| {
             let base = Arc::clone(&base);
+            let options =
+                Some(ImageBitmapOptions::new().with_premultiply_alpha(PremultiplyAlpha::None));
             async move {
                 match image.source() {
                     image::Source::Uri { uri, mime_type: _ } => {
                         let url = get_url(base.as_ref(), uri)?;
-                        Ok(ImageData::load_url(&url).await?)
+                        Ok(ImageData::load_url(&url, options).await?)
                     }
                     image::Source::View { view, mime_type } => {
                         let parent_buffer_data = &buffer_data[view.buffer().index()];
@@ -195,7 +197,8 @@ fn get_image_futures<'a>(
                         let end = begin + view.length();
                         let encoded_image = &parent_buffer_data[begin..end];
                         let image =
-                            crate::core::image::bitmap::load_u8(&encoded_image, mime_type).await?;
+                            crate::core::image::bitmap::load_u8(&encoded_image, mime_type, options)
+                                .await?;
                         Ok(ImageData::Bitmap(image))
                     }
                 }

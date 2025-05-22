@@ -6,6 +6,7 @@ use awsm_renderer_core::{
 };
 use bind_groups::BindGroups;
 use camera::CameraBuffer;
+use error::AwsmError;
 use instances::Instances;
 use lights::Lights;
 use materials::Materials;
@@ -57,7 +58,7 @@ pub struct AwsmRenderer {
     pub textures: Textures,
     pub logging: AwsmRendererLogging,
     pub clear_color: Color,
-    pub depth_texture: Option<web_sys::GpuTexture>,
+    pub depth_texture: Option<(web_sys::GpuTexture, web_sys::GpuTextureView)>,
 
     #[cfg(feature = "gltf")]
     gltf: gltf::cache::GltfCache,
@@ -129,13 +130,17 @@ impl AwsmRenderer {
             .into(),
         )?;
 
-        self.depth_texture = Some(depth_texture);
+        let depth_texture_view = depth_texture
+            .create_view()
+            .map_err(|e| AwsmError::DepthTextureCreateView(e.as_string().unwrap_or_default()))?;
+
+        self.depth_texture = Some((depth_texture, depth_texture_view));
 
         Ok(())
     }
     pub fn clear_depth_texture(&mut self) -> crate::error::Result<()> {
         if let Some(texture) = self.depth_texture.take() {
-            texture.destroy();
+            texture.0.destroy();
         }
         Ok(())
     }
@@ -144,7 +149,7 @@ impl AwsmRenderer {
 pub struct AwsmRendererBuilder {
     gpu: core::renderer::AwsmRendererWebGpuBuilder,
     logging: AwsmRendererLogging,
-    depth_texture: Option<web_sys::GpuTexture>,
+    depth_texture: Option<(web_sys::GpuTexture, web_sys::GpuTextureView)>,
 }
 
 impl AwsmRendererBuilder {
@@ -161,8 +166,12 @@ impl AwsmRendererBuilder {
         self
     }
 
-    pub fn with_depth_texture(mut self, texture: web_sys::GpuTexture) -> Self {
-        self.depth_texture = Some(texture);
+    pub fn with_depth_texture(
+        mut self,
+        texture: web_sys::GpuTexture,
+        texture_view: web_sys::GpuTextureView,
+    ) -> Self {
+        self.depth_texture = Some((texture, texture_view));
         self
     }
 

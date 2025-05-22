@@ -205,8 +205,8 @@ impl AwsmRenderer {
         let mut depth_stencil_state = DepthStencilState::new(
             self.depth_texture
                 .as_ref()
-                .ok_or(AwsmGltfError::MissingDepthTexture)?
-                .format(),
+                .map(|(texture, _)| texture.format())
+                .ok_or(AwsmGltfError::MissingDepthTexture)?,
         );
         // https://www.khronos.org/opengl/wiki/Blending#Blend_Equations
         if has_alpha {
@@ -222,14 +222,14 @@ impl AwsmRenderer {
             });
             depth_stencil_state = depth_stencil_state
                 .with_depth_write_enabled(false)
-                .with_depth_compare(CompareFunction::Less);
+                .with_depth_compare(CompareFunction::LessEqual);
         } else {
             // This is also for cutoff materials, which are not alpha blended
             // but rather discarded if the alpha is below a threshold
             color_target_state.blend = None;
             depth_stencil_state = depth_stencil_state
                 .with_depth_write_enabled(true)
-                .with_depth_compare(CompareFunction::Less);
+                .with_depth_compare(CompareFunction::LessEqual);
         }
 
         let shader_key = self

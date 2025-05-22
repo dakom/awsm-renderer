@@ -16,6 +16,65 @@ pub enum ImageData {
     Bitmap(web_sys::ImageBitmap),
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct ImageBitmapOptions {
+    // https://docs.rs/web-sys/latest/web_sys/struct.ImageBitmapOptions.html
+    pub color_space_conversion: Option<ColorSpaceConversion>,
+    pub image_orientation: Option<ImageOrientation>,
+    pub premultiply_alpha: Option<PremultiplyAlpha>,
+    pub resize_height: Option<u32>,
+    pub resize_width: Option<u32>,
+    pub resize_quality: Option<ResizeQuality>,
+}
+
+impl ImageBitmapOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_color_space_conversion(
+        mut self,
+        color_space_conversion: ColorSpaceConversion,
+    ) -> Self {
+        self.color_space_conversion = Some(color_space_conversion);
+        self
+    }
+
+    pub fn with_image_orientation(mut self, image_orientation: ImageOrientation) -> Self {
+        self.image_orientation = Some(image_orientation);
+        self
+    }
+
+    pub fn with_premultiply_alpha(mut self, premultiply_alpha: PremultiplyAlpha) -> Self {
+        self.premultiply_alpha = Some(premultiply_alpha);
+        self
+    }
+
+    pub fn with_resize_height(mut self, resize_height: u32) -> Self {
+        self.resize_height = Some(resize_height);
+        self
+    }
+
+    pub fn with_resize_width(mut self, resize_width: u32) -> Self {
+        self.resize_width = Some(resize_width);
+        self
+    }
+
+    pub fn with_resize_quality(mut self, resize_quality: ResizeQuality) -> Self {
+        self.resize_quality = Some(resize_quality);
+        self
+    }
+}
+
+// https://docs.rs/web-sys/latest/web_sys/enum.ColorSpaceConversion.html
+pub type ColorSpaceConversion = web_sys::ColorSpaceConversion;
+// https://docs.rs/web-sys/latest/web_sys/enum.ImageOrientation.html
+pub type ImageOrientation = web_sys::ImageOrientation;
+// https://docs.rs/web-sys/latest/web_sys/enum.PremultiplyAlpha.html
+pub type PremultiplyAlpha = web_sys::PremultiplyAlpha;
+// https://docs.rs/web-sys/latest/web_sys/enum.ResizeQuality.html
+pub type ResizeQuality = web_sys::ResizeQuality;
+
 // Can create this from ImageData.source_info()
 pub struct CopyExternalImageSourceInfo<'a> {
     pub flip_y: Option<bool>,
@@ -56,21 +115,18 @@ impl<'a> CopyExternalImageDestInfo<'a> {
 impl ImageData {
     cfg_if::cfg_if! {
         if #[cfg(feature = "exr")] {
-            pub async fn load_url(url:&str) -> anyhow::Result<Self> {
+            pub async fn load_url(url:&str, options: Option<ImageBitmapOptions>) -> anyhow::Result<Self> {
                 if url.contains(".exr") {
                     let exr_image = exr::ExrImage::load_url(url).await?;
                     Ok(Self::Exr(Box::new(exr_image)))
                 } else {
-                    let image = bitmap::load(url.to_string()).await?;
+                    let image = bitmap::load(url.to_string(), options).await?;
                     Ok(Self::Bitmap(image))
                 }
             }
-
-
-
         } else {
-            pub async fn load_url(url:&str) -> Result<Self> {
-                let image = bitmap::load(url.to_string()).await?;
+            pub async fn load_url(url:&str, options: Option<ImageBitmapOptions>) -> Result<Self> {
+                let image = bitmap::load(url.to_string(), options).await?;
                 Ok(Self::Bitmap(image))
             }
         }
@@ -213,5 +269,37 @@ impl From<CopyExternalImageDestInfo<'_>> for web_sys::GpuCopyExternalImageDestIn
         }
 
         info_js
+    }
+}
+
+impl From<ImageBitmapOptions> for web_sys::ImageBitmapOptions {
+    fn from(options: ImageBitmapOptions) -> web_sys::ImageBitmapOptions {
+        let js_options = web_sys::ImageBitmapOptions::new();
+
+        if let Some(color_space_conversion) = options.color_space_conversion {
+            js_options.set_color_space_conversion(color_space_conversion);
+        }
+
+        if let Some(image_orientation) = options.image_orientation {
+            js_options.set_image_orientation(image_orientation);
+        }
+
+        if let Some(premultiply_alpha) = options.premultiply_alpha {
+            js_options.set_premultiply_alpha(premultiply_alpha);
+        }
+
+        if let Some(resize_height) = options.resize_height {
+            js_options.set_resize_height(resize_height);
+        }
+
+        if let Some(resize_width) = options.resize_width {
+            js_options.set_resize_width(resize_width);
+        }
+
+        if let Some(resize_quality) = options.resize_quality {
+            js_options.set_resize_quality(resize_quality);
+        }
+
+        js_options
     }
 }

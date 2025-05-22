@@ -21,14 +21,44 @@ pub struct ColorTargetState {
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuColorTargetState.html
     pub blend: Option<BlendState>,
     pub format: TextureFormat,
-    pub write_mask: Option<u32>,
+    pub write_mask_all: bool,
+    pub write_mask_alpha: bool,
+    pub write_mask_red: bool,
+    pub write_mask_green: bool,
+    pub write_mask_blue: bool,
+}
+
+impl ColorTargetState {
+    pub fn write_mask_u32(&self) -> u32 {
+        let mut mask = 0;
+        if self.write_mask_all {
+            mask |= web_sys::gpu_color_write::ALL;
+        }
+
+        if self.write_mask_alpha {
+            mask |= web_sys::gpu_color_write::ALPHA;
+        }
+
+        if self.write_mask_red {
+            mask |= web_sys::gpu_color_write::RED;
+        }
+
+        if self.write_mask_green {
+            mask |= web_sys::gpu_color_write::GREEN;
+        }
+        if self.write_mask_blue {
+            mask |= web_sys::gpu_color_write::BLUE;
+        }
+
+        mask
+    }
 }
 
 impl std::hash::Hash for ColorTargetState {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.blend.hash(state);
         (self.format as u32).hash(state);
-        self.write_mask.hash(state);
+        self.write_mask_u32().hash(state);
     }
 }
 
@@ -147,7 +177,11 @@ impl ColorTargetState {
         Self {
             blend: None,
             format,
-            write_mask: None,
+            write_mask_all: true,
+            write_mask_alpha: false,
+            write_mask_red: false,
+            write_mask_green: false,
+            write_mask_blue: false,
         }
     }
 }
@@ -156,12 +190,13 @@ impl From<ColorTargetState> for web_sys::GpuColorTargetState {
     fn from(state: ColorTargetState) -> web_sys::GpuColorTargetState {
         let state_js = web_sys::GpuColorTargetState::new(state.format);
 
-        if let Some(blend) = state.blend {
-            state_js.set_blend(&web_sys::GpuBlendState::from(blend));
+        let write_mask = state.write_mask_u32();
+        if write_mask != 0 {
+            state_js.set_write_mask(write_mask);
         }
 
-        if let Some(write_mask) = state.write_mask {
-            state_js.set_write_mask(write_mask);
+        if let Some(blend) = state.blend {
+            state_js.set_blend(&web_sys::GpuBlendState::from(blend));
         }
 
         state_js
