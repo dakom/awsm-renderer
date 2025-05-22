@@ -24,7 +24,7 @@ fn frag_main(input: FragmentInput) -> @location(0) vec4<f32> {
     let surface_to_camera = normalize(camera.position - input.world_position);
 
     let ambient = vec3<f32>(0.1); // TODO - make this settable, or get from IBL
-    var color = vec3<f32>(0.1);
+    var color = vec3<f32>(0.0);
 
 
     for(var i = 0u; i < n_lights; i = i + 1u) {

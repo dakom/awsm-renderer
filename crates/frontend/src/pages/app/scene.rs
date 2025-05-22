@@ -178,10 +178,11 @@ impl AppScene {
     pub async fn populate(self: &Arc<Self>, data: GltfData) -> Result<()> {
         let mut renderer = self.renderer.lock().await;
         renderer.populate_gltf(data, None).await?;
+
         renderer.lights.insert(Light::Directional {
             color: [1.0, 1.0, 1.0],
-            intensity: 1.0,
-            direction: [-1.0, -1.0, -1.0],
+            intensity: 3.0,
+            direction: [-0.5, -0.25, -0.75],
         });
 
         Ok(())
