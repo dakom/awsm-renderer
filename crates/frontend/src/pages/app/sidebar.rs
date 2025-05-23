@@ -1,8 +1,10 @@
 mod camera;
 mod gltf;
+mod material;
 
 use camera::SidebarCamera;
 use gltf::SidebarGltf;
+use material::SidebarMaterial;
 
 use crate::{
     models::collections::{GltfId, GLTF_SETS},
@@ -19,6 +21,7 @@ pub struct AppSidebar {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Section {
     Gltf,
+    Material,
     Animation,
     Lighting,
     Environment,
@@ -49,6 +52,7 @@ impl AppSidebar {
             .class([&*SIDEBAR, &*USER_SELECT_NONE])
             .children([
                 self.render_section(Section::Gltf),
+                self.render_section(Section::Material),
                 self.render_section(Section::Animation),
                 self.render_section(Section::Lighting),
                 self.render_section(Section::Environment),
@@ -71,6 +75,7 @@ impl AppSidebar {
                                 .style("margin-bottom", "1rem")
                                 .child(match section {
                                     Section::Gltf => SidebarGltf::new().render(),
+                                    Section::Material => SidebarMaterial::new(state.ctx.clone()).render(),
                                     Section::Animation => html!("div", {
                                         .class([FontSize::Lg.class(), ColorText::SidebarHeader.class()])
                                         .text("TODO")
@@ -148,6 +153,11 @@ impl AppSidebar {
                                     .attr("d", "M12 2l8 4.5v9L12 22l-8-6.5v-9L12 2zm0 2.2L6 7v8l6 4.8 6-4.8V7l-6-2.8z")
                                 })]
                             },
+                            Section::Material => {
+                                vec![svg!("path", {
+                                    .attr("d", "M12 2 L4 7 L12 12 L20 7 Z M4 7 L4 17 L12 22 L12 12 Z M12 12 L12 22 L20 17 L20 7 Z")
+                                })]
+                            },
                             Section::Animation => {
                                 vec![svg!("path", {
                                     .attr("d", "M8 5v14l11-7-11-7z")
@@ -187,6 +197,7 @@ impl AppSidebar {
                 html!("span", {
                     .text(match section {
                         Section::Gltf => "Pick GLTF Model",
+                        Section::Material => "Material Settings",
                         Section::Animation => "Animation Settings",
                         Section::Lighting => "Lighting Settings",
                         Section::Environment => "Environment Settings",

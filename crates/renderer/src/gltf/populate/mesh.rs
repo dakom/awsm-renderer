@@ -232,17 +232,10 @@ impl AwsmRenderer {
                 .with_depth_compare(CompareFunction::LessEqual);
         }
 
-        let shader_key = self
-            .shaders
-            .add_shader(&self.gpu, shader_cache_key.clone())
-            .await?;
+        let shader_key = self.add_shader(shader_cache_key.clone()).await?;
 
-        let pipeline_layout_key = self.pipelines.add_pipeline_layout(
-            &self.gpu,
-            &self.bind_groups,
-            Some("gltf mesh primitive"),
-            pipeline_layout_cache_key,
-        )?;
+        let pipeline_layout_key =
+            self.add_pipeline_layout(Some("gltf mesh primitive"), pipeline_layout_cache_key)?;
 
         let mut pipeline_cache_key = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
             .with_primitive(primitive_state)
@@ -258,13 +251,7 @@ impl AwsmRenderer {
         }
 
         let render_pipeline_key = self
-            .pipelines
-            .add_render_pipeline(
-                &self.gpu,
-                &self.shaders,
-                Some("gltf mesh primitive"),
-                pipeline_cache_key,
-            )
+            .add_render_pipeline(Some("gltf mesh primitive"), pipeline_cache_key)
             .await?;
 
         let native_primitive_buffer_info = MeshBufferInfo::from(primitive_buffer_info.clone());

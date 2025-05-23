@@ -3,15 +3,17 @@ use std::collections::{HashMap, HashSet};
 use askama::Template;
 use awsm_renderer_core::{
     error::AwsmCoreError,
-    renderer::AwsmRendererWebGpu,
     shaders::{ShaderModuleDescriptor, ShaderModuleExt},
 };
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
+use crate::AwsmRenderer;
+
 pub struct Shaders {
     lookup: SlotMap<ShaderKey, web_sys::GpuShaderModule>,
     cache: HashMap<ShaderCacheKey, ShaderKey>,
+    reverse_cache: HashMap<ShaderKey, ShaderCacheKey>,
 }
 
 impl Default for Shaders {
@@ -25,6 +27,7 @@ impl Shaders {
         Self {
             lookup: SlotMap::with_key(),
             cache: HashMap::new(),
+            reverse_cache: HashMap::new(),
         }
     }
 
@@ -36,24 +39,27 @@ impl Shaders {
         self.cache.get(cache_key).cloned()
     }
 
-    pub async fn add_shader(
-        &mut self,
-        gpu: &AwsmRendererWebGpu,
-        cache_key: ShaderCacheKey,
-    ) -> Result<ShaderKey> {
-        if let Some(shader_key) = self.get_shader_key_from_cache(&cache_key) {
+    pub fn get_shader_cache_from_key(&self, key: &ShaderKey) -> Option<ShaderCacheKey> {
+        self.reverse_cache.get(key).cloned()
+    }
+}
+
+impl AwsmRenderer {
+    pub async fn add_shader(&mut self, cache_key: ShaderCacheKey) -> Result<ShaderKey> {
+        if let Some(shader_key) = self.shaders.get_shader_key_from_cache(&cache_key) {
             return Ok(shader_key);
         }
 
-        let shader_module = gpu.compile_shader(&cache_key.into_descriptor()?);
+        let shader_module = self.gpu.compile_shader(&cache_key.into_descriptor()?);
         shader_module
             .validate_shader()
             .await
             .map_err(AwsmShaderError::Compilation)?;
 
-        let shader_key = self.lookup.insert(shader_module.clone());
+        let shader_key = self.shaders.lookup.insert(shader_module.clone());
 
-        self.cache.insert(cache_key, shader_key);
+        self.shaders.cache.insert(cache_key.clone(), shader_key);
+        self.shaders.reverse_cache.insert(shader_key, cache_key);
 
         Ok(shader_key)
     }
@@ -152,6 +158,13 @@ impl ShaderCacheKeyMaterial {
         match self {
             ShaderCacheKeyMaterial::Pbr(material_key) => material_key.has_alpha_mask,
             ShaderCacheKeyMaterial::DebugNormals => false,
+        }
+    }
+
+    pub fn fragment_shader_kind(&self) -> FragmentShaderKind {
+        match self {
+            ShaderCacheKeyMaterial::Pbr(_) => FragmentShaderKind::Pbr,
+            ShaderCacheKeyMaterial::DebugNormals => FragmentShaderKind::DebugNormals,
         }
     }
 }
@@ -312,7 +325,7 @@ impl ShaderCacheKey {
             });
         };
 
-        let fragment_shader_kind = match self.material {
+        match self.material {
             ShaderCacheKeyMaterial::Pbr(material_key) => {
                 if let Some(uv_index) = material_key.base_color_uv_index {
                     push_texture("base_color", uv_index);
@@ -327,8 +340,6 @@ impl ShaderCacheKey {
                         data_type: "vec3<f32>".to_string(),
                     });
                 }
-
-                FragmentShaderKind::Pbr
             }
 
             ShaderCacheKeyMaterial::DebugNormals => {
@@ -338,7 +349,6 @@ impl ShaderCacheKey {
                     name: "world_normal".to_string(),
                     data_type: "vec3<f32>".to_string(),
                 });
-                FragmentShaderKind::DebugNormals
             }
         };
 
@@ -358,8 +368,7 @@ impl ShaderCacheKey {
             morphs: self.morphs,
             skins: skins.unwrap_or_default(),
             has_instance_transform: self.instancing.transform,
-            fragment_shader_kind,
-            //fragment_shader_kind: FragmentShaderKind::DebugNormals,
+            fragment_shader_kind: self.material.fragment_shader_kind(),
             fragment_buffer_bindings,
             material,
             has_normals,

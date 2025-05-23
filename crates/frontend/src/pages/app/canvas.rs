@@ -121,7 +121,7 @@ impl AppCanvas {
 
                         state.display_text.set(format!("Setting up scene: {}", gltf_id));
 
-                        scene.setup().await;
+                        scene.setup_all().await;
 
                         if let Err(err) = scene.render().await {
                             tracing::error!("{:?}", err);

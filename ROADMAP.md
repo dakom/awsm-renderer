@@ -1,7 +1,5 @@
 # Next up
 
-- allow switching shaders at runtime (helps to debug)
-
 - Mipmaps for texture filtering (spacial aliasing)
 - TAA for temporal and edge aliasing
 
