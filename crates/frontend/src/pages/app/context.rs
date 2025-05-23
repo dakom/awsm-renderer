@@ -1,9 +1,22 @@
+use awsm_renderer::shaders::FragmentShaderKind;
+
 use crate::prelude::*;
 
 use super::scene::{camera::CameraId, AppScene};
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct AppContext {
     pub camera_id: Mutable<CameraId>,
+    pub shader: Mutable<FragmentShaderKind>,
     pub scene: Mutable<Option<Arc<AppScene>>>,
+}
+
+impl Default for AppContext {
+    fn default() -> Self {
+        Self {
+            camera_id: Mutable::new(CameraId::default()),
+            shader: Mutable::new(FragmentShaderKind::Pbr),
+            scene: Mutable::new(None),
+        }
+    }
 }

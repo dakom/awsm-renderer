@@ -174,6 +174,10 @@ impl Materials {
         }
     }
 
+    pub fn keys(&self) -> impl Iterator<Item = MaterialKey> + '_ {
+        self.materials.keys()
+    }
+
     pub fn get(&self, key: MaterialKey) -> Option<&Material> {
         self.materials.get(key)
     }

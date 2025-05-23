@@ -69,6 +69,10 @@ impl Meshes {
         key
     }
 
+    pub fn keys(&self) -> impl Iterator<Item = MeshKey> + '_ {
+        self.list.keys()
+    }
+
     pub fn gpu_vertex_buffer(&self) -> &web_sys::GpuBuffer {
         &self.gpu_vertex_buffer
     }
@@ -100,6 +104,12 @@ impl Meshes {
 
     pub fn iter(&self) -> impl Iterator<Item = (MeshKey, &Mesh)> {
         self.list.iter()
+    }
+
+    pub fn get(&self, mesh_key: MeshKey) -> Result<&Mesh> {
+        self.list
+            .get(mesh_key)
+            .ok_or(AwsmMeshError::MeshNotFound(mesh_key))
     }
 
     pub fn get_mut(&mut self, mesh_key: MeshKey) -> Result<&mut Mesh> {
