@@ -133,6 +133,7 @@ impl SamplerBindingLayout {
     }
 }
 
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuSamplerBindingType.html
 pub type SamplerBindingType = web_sys::GpuSamplerBindingType;
 
 #[derive(Debug, Clone)]

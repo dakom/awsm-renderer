@@ -157,10 +157,10 @@ impl GltfTextureInfo {
 
         let mut descriptor = SamplerDescriptor::default();
 
-        // defaults for mipmapped textures
-        descriptor.min_filter = Some(FilterMode::Nearest);
-        descriptor.mag_filter = Some(FilterMode::Nearest);
-        descriptor.mipmap_filter = Some(MipmapFilterMode::Nearest);
+        // descriptor.min_filter = Some(FilterMode::Linear);
+        // descriptor.mag_filter = Some(FilterMode::Linear);
+        // descriptor.mipmap_filter = Some(MipmapFilterMode::Linear);
+
 
         if let Some(mag_filter) = gltf_sampler.mag_filter() {
             match mag_filter {

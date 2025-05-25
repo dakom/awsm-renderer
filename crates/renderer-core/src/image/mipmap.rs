@@ -1,12 +1,13 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use crate::bind_groups::{BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindGroupLayoutResource, StorageTextureAccess, StorageTextureBindingLayout, TextureBindingLayout};
+use crate::bind_groups::{BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindGroupLayoutResource, SamplerBindingLayout, SamplerBindingType, StorageTextureAccess, StorageTextureBindingLayout, TextureBindingLayout};
 use crate::pipeline::layout::{PipelineLayoutDescriptor, PipelineLayoutKind};
 use crate::pipeline::{ComputePipelineDescriptor, ProgrammableStage};
 use crate::shaders::ShaderModuleExt;
 
 use crate::texture::{TextureFormat, TextureSampleType};
+use crate::sampler::{FilterMode, SamplerDescriptor};
 use crate::{bind_groups::{BindGroupDescriptor, BindGroupEntry, BindGroupResource}, command::compute_pass::ComputePassDescriptor, error::AwsmCoreError, renderer::AwsmRendererWebGpu, shaders::ShaderModuleDescriptor, texture::{TextureViewDescriptor, TextureViewDimension}};
 use crate::error::Result;
 
@@ -30,6 +31,14 @@ pub async fn generate_mipmaps(
 ) -> Result<()> {
     let MipmapPipeline {compute_pipeline, bind_group_layout} = get_mipmap_pipeline(gpu, texture.format()).await?;
     
+    // Create a linear sampler for mipmap generation
+    let sampler_descriptor = SamplerDescriptor {
+        min_filter: Some(FilterMode::Linear),
+        mag_filter: Some(FilterMode::Linear),
+        ..Default::default()
+    };
+    let sampler = gpu.create_sampler(Some(&sampler_descriptor.into()));
+    
     let command_encoder = gpu.create_command_encoder(Some("Generate Mipmaps"));
     
     for mip_level in 1..mip_levels {
@@ -52,13 +61,16 @@ pub async fn generate_mipmaps(
         // Input texture binding
         let input_binding = BindGroupEntry::new(0, BindGroupResource::TextureView(&input_view));
         
+        // Sampler binding
+        let sampler_binding = BindGroupEntry::new(1, BindGroupResource::Sampler(&sampler));
+        
         // Output texture binding
-        let output_binding = BindGroupEntry::new(1, BindGroupResource::TextureView(&output_view)); 
+        let output_binding = BindGroupEntry::new(2, BindGroupResource::TextureView(&output_view)); 
         
         let bind_group = gpu.create_bind_group(&BindGroupDescriptor::new(
             &bind_group_layout,
             Some("Mipmap Bind Group"),
-            vec![input_binding, output_binding],
+            vec![input_binding, sampler_binding, output_binding],
         ).into());
         
         // Dispatch compute shader
@@ -102,7 +114,6 @@ async fn get_mipmap_pipeline(gpu: &AwsmRendererWebGpu, format: TextureFormat) ->
 
     let bind_group_layout = gpu.create_bind_group_layout(&BindGroupLayoutDescriptor::new(Some("Mipmap Bind Group Layout"))
             .with_entries(vec![
-                //TODO - fix this and continue from here!
                 BindGroupLayoutEntry::new(0, 
                     BindGroupLayoutResource::Texture(TextureBindingLayout::new()
                         .with_sample_type(TextureSampleType::Float)
@@ -111,7 +122,14 @@ async fn get_mipmap_pipeline(gpu: &AwsmRendererWebGpu, format: TextureFormat) ->
                     )
                 )
                 .with_visibility_compute(),
-                BindGroupLayoutEntry::new(1, 
+                BindGroupLayoutEntry::new(1,
+                    BindGroupLayoutResource::Sampler(
+                        SamplerBindingLayout::new()
+                            .with_binding_type(SamplerBindingType::Filtering)
+                    )
+                )
+                .with_visibility_compute(),
+                BindGroupLayoutEntry::new(2, 
                     BindGroupLayoutResource::StorageTexture(StorageTextureBindingLayout::new(format)
                         .with_view_dimension(TextureViewDimension::N2d)
                         .with_access(StorageTextureAccess::WriteOnly))
