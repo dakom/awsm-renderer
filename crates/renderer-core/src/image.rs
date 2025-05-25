@@ -3,8 +3,10 @@ use crate::error::Result;
 use crate::renderer::AwsmRendererWebGpu;
 use crate::texture::{Extent3d, TextureAspect, TextureDescriptor, TextureFormat, TextureUsage};
 use std::borrow::Cow;
+use mipmap::generate_mipmaps;
 use wasm_bindgen::prelude::*;
 
+pub mod mipmap;
 pub mod bitmap;
 #[cfg(feature = "exr")]
 pub mod exr;
@@ -13,7 +15,152 @@ pub mod exr;
 pub enum ImageData {
     #[cfg(feature = "exr")]
     Exr(Box<exr::ExrImage>),
-    Bitmap(web_sys::ImageBitmap),
+    Bitmap {
+        image: web_sys::ImageBitmap,
+        options: Option<ImageBitmapOptions>,
+    }
+}
+
+impl ImageData {
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "exr")] {
+            pub async fn load_url(url:&str, options: Option<ImageBitmapOptions>) -> anyhow::Result<Self> {
+                if url.contains(".exr") {
+                    let exr_image = exr::ExrImage::load_url(url).await?;
+                    Ok(Self::Exr(Box::new(exr_image)))
+                } else {
+                    let image = bitmap::load(url.to_string(), options.clone()).await?;
+                    Ok(Self::Bitmap{image, options})
+                }
+            }
+        } else {
+            pub async fn load_url(url:&str, options: Option<ImageBitmapOptions>) -> Result<Self> {
+                let image = bitmap::load(url.to_string(), options.clone()).await?;
+                Ok(Self::Bitmap{image, options})
+            }
+        }
+    }
+
+    pub fn format(&self) -> TextureFormat {
+        match self {
+            // TODO - is this right?
+            #[cfg(feature = "exr")]
+            Self::Exr(_) => TextureFormat::Rgba32float,
+
+            Self::Bitmap{..} => TextureFormat::Rgba8unorm,
+        }
+    }
+
+    pub fn premultiplied_alpha(&self) -> bool {
+        match self {
+            // TODO - is this right?
+            #[cfg(feature = "exr")]
+            Self::Exr(_) => true, // EXR images are typically premultiplied
+
+            Self::Bitmap{options, ..} => options
+                .as_ref()
+                .map(|opts| matches!(opts.premultiply_alpha, Some(PremultiplyAlpha::Premultiply)))
+                .unwrap_or(false),
+        }
+    }
+
+    pub fn size(&self) -> Extent3d {
+        match self {
+            #[cfg(feature = "exr")]
+            Self::Exr(exr) => Extent3d {
+                width: exr.width as u32,
+                height: Some(exr.height as u32),
+                depth_or_array_layers: None,
+            },
+
+            Self::Bitmap{image, ..} => Extent3d {
+                width: image.width(),
+                height: Some(image.height()),
+                depth_or_array_layers: None,
+            },
+        }
+    }
+
+    pub fn js_obj(&self) -> Result<Cow<'_, js_sys::Object>> {
+        match self {
+            #[cfg(feature = "exr")]
+            Self::Exr(exr) => exr.js_obj(),
+
+            Self::Bitmap{image, ..} => {
+                let js_value = image.unchecked_ref();
+                Ok(Cow::Borrowed(js_value))
+            }
+        }
+    }
+
+    pub fn source_info(
+        &self,
+        origin: Option<[f32; 2]>,
+        flip_y: Option<bool>,
+    ) -> Result<CopyExternalImageSourceInfo> {
+        Ok(CopyExternalImageSourceInfo {
+            flip_y,
+            origin,
+            source: self.js_obj()?,
+        })
+    }
+
+    pub async fn create_texture<'a>(
+        &self,
+        gpu: &AwsmRendererWebGpu,
+        source_info: Option<CopyExternalImageSourceInfo<'a>>,
+        generate_mipmap: bool,
+    ) -> Result<web_sys::GpuTexture> {
+        let mut usage = TextureUsage::new()
+            .with_texture_binding()
+            // needed because `copy_external_image_to_texture` renders to the texture internally, part of browser WebGPU implementation
+            .with_render_attachment()
+            .with_copy_dst();
+
+        if generate_mipmap {
+            usage = usage.with_storage_binding();
+        }
+
+        let source = match source_info {
+            Some(info) => info,
+            None => CopyExternalImageSourceInfo {
+                flip_y: None,
+                origin: None,
+                source: self.js_obj()?,
+            },
+        };
+
+        let mut descriptor = TextureDescriptor::new(self.format(), self.size(), usage);
+        let mipmap_levels = if generate_mipmap {
+            let mipmap_levels = mipmap::calculate_mipmap_levels(
+                self.size().width,
+                self.size().height.unwrap_or(1),
+            );
+
+            descriptor = descriptor
+                .with_mip_level_count(mipmap_levels);
+
+            Some(mipmap_levels)
+        } else {
+            None
+        };
+
+        let texture = gpu.create_texture(&descriptor.into())?;
+
+        let mut dest = CopyExternalImageDestInfo::new(&texture)
+            .with_premultiplied_alpha(self.premultiplied_alpha());
+
+        if generate_mipmap {
+            dest = dest.with_mip_level(0);
+        }
+        gpu.copy_external_image_to_texture(&source.into(), &dest.into(), &self.size().into())?;
+
+        if let Some(mipmap_levels) = mipmap_levels {
+            generate_mipmaps(gpu, &texture, self.size().width, self.size().height.unwrap_or(1), mipmap_levels).await?;
+        }
+
+        Ok(texture)
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -93,11 +240,11 @@ impl<'a> CopyExternalImageSourceInfo<'a> {
 }
 
 pub struct CopyExternalImageDestInfo<'a> {
+    pub texture: &'a web_sys::GpuTexture,
     pub aspect: Option<TextureAspect>,
     pub mip_level: Option<u32>,
     pub origin: Option<Origin3d>,
     pub premultiplied_alpha: Option<bool>,
-    pub texture: &'a web_sys::GpuTexture,
 }
 
 impl<'a> CopyExternalImageDestInfo<'a> {
@@ -110,113 +257,25 @@ impl<'a> CopyExternalImageDestInfo<'a> {
             texture,
         }
     }
-}
 
-impl ImageData {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "exr")] {
-            pub async fn load_url(url:&str, options: Option<ImageBitmapOptions>) -> anyhow::Result<Self> {
-                if url.contains(".exr") {
-                    let exr_image = exr::ExrImage::load_url(url).await?;
-                    Ok(Self::Exr(Box::new(exr_image)))
-                } else {
-                    let image = bitmap::load(url.to_string(), options).await?;
-                    Ok(Self::Bitmap(image))
-                }
-            }
-        } else {
-            pub async fn load_url(url:&str, options: Option<ImageBitmapOptions>) -> Result<Self> {
-                let image = bitmap::load(url.to_string(), options).await?;
-                Ok(Self::Bitmap(image))
-            }
-        }
+    pub fn with_aspect(mut self, aspect: TextureAspect) -> Self {
+        self.aspect = Some(aspect);
+        self
     }
-
-    pub fn format(&self) -> TextureFormat {
-        match self {
-            // TODO - is this right?
-            #[cfg(feature = "exr")]
-            Self::Exr(_) => TextureFormat::Rgba32float,
-
-            Self::Bitmap(_) => TextureFormat::Rgba8unorm,
-        }
+    pub fn with_mip_level(mut self, mip_level: u32) -> Self {
+        self.mip_level = Some(mip_level);
+        self
     }
-
-    pub fn size(&self) -> Extent3d {
-        match self {
-            #[cfg(feature = "exr")]
-            Self::Exr(exr) => Extent3d {
-                width: exr.width as u32,
-                height: Some(exr.height as u32),
-                depth_or_array_layers: None,
-            },
-
-            Self::Bitmap(img) => Extent3d {
-                width: img.width(),
-                height: Some(img.height()),
-                depth_or_array_layers: None,
-            },
-        }
+    pub fn with_origin(mut self, origin: Origin3d) -> Self {
+        self.origin = Some(origin);
+        self
     }
-
-    pub fn js_obj(&self) -> Result<Cow<'_, js_sys::Object>> {
-        match self {
-            #[cfg(feature = "exr")]
-            Self::Exr(exr) => exr.js_obj(),
-
-            Self::Bitmap(img) => {
-                let js_value = img.unchecked_ref();
-                Ok(Cow::Borrowed(js_value))
-            }
-        }
-    }
-
-    pub fn source_info(
-        &self,
-        origin: Option<[f32; 2]>,
-        flip_y: Option<bool>,
-    ) -> Result<CopyExternalImageSourceInfo> {
-        Ok(CopyExternalImageSourceInfo {
-            flip_y,
-            origin,
-            source: self.js_obj()?,
-        })
-    }
-
-    pub fn create_texture(
-        &self,
-        gpu: &AwsmRendererWebGpu,
-        source_info: Option<CopyExternalImageSourceInfo>,
-        generate_mipmap: bool,
-    ) -> Result<web_sys::GpuTexture> {
-        let usage = TextureUsage::new()
-            .with_texture_binding()
-            .with_copy_dst()
-            .with_render_attachment();
-
-        let source = match source_info {
-            Some(info) => info,
-            None => CopyExternalImageSourceInfo {
-                flip_y: None,
-                origin: None,
-                source: self.js_obj()?,
-            },
-        };
-
-        let descriptor = TextureDescriptor::new(self.format(), self.size(), usage);
-        if generate_mipmap {
-            // TODO
-            //descriptor = descriptor.with_mip_level_count(12);
-        }
-        let texture = gpu.create_texture(&descriptor.into())?;
-
-        // this should be per-mipmap level
-        let dest = CopyExternalImageDestInfo::new(&texture);
-        gpu.copy_external_image_to_texture(&source.into(), &dest.into(), &self.size().into())?;
-
-        Ok(texture)
+    pub fn with_premultiplied_alpha(mut self, premultiplied_alpha: bool) -> Self {
+        self.premultiplied_alpha = Some(premultiplied_alpha);
+        self
     }
 }
+
 
 impl From<CopyExternalImageSourceInfo<'_>> for web_sys::GpuCopyExternalImageSourceInfo {
     fn from(info: CopyExternalImageSourceInfo) -> Self {

@@ -6,12 +6,16 @@ pub mod multisample;
 pub mod primitive;
 pub mod vertex;
 
+use std::collections::BTreeMap;
+
+use constants::{ConstantOverrideKey, ConstantOverrideValue};
 use depth_stencil::DepthStencilState;
 use fragment::FragmentState;
 use layout::PipelineLayoutKind;
 use multisample::MultisampleState;
 use primitive::PrimitiveState;
 use vertex::VertexState;
+use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct RenderPipelineDescriptor<'a> {
@@ -63,6 +67,47 @@ impl<'a> RenderPipelineDescriptor<'a> {
     }
 }
 
+pub struct ComputePipelineDescriptor<'a, 'b> {
+    // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createComputePipeline#descriptor
+    label: Option<&'a str>,
+    layout: PipelineLayoutKind,
+    compute: ProgrammableStage<'b>,
+}
+
+impl <'a, 'b> ComputePipelineDescriptor<'a, 'b> {
+    pub fn new(compute: ProgrammableStage<'b>, layout: PipelineLayoutKind, label: Option<&'a str>) -> Self {
+        Self {
+            label,
+            layout,
+            compute,
+        }
+    }
+}
+
+pub struct ProgrammableStage<'a> {
+    // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createComputePipeline#descriptor
+    module: web_sys::GpuShaderModule,
+    entry_point: Option<&'a str>,
+    constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
+}
+
+impl <'a> ProgrammableStage<'a> {
+    pub fn new(module: web_sys::GpuShaderModule, entry_point: Option<&'a str>) -> Self {
+        Self {
+            module,
+            entry_point,
+            constants: BTreeMap::new(),
+        }
+    }
+
+    pub fn with_push_constant(mut self, key: ConstantOverrideKey, value: ConstantOverrideValue) -> Self {
+        self.constants.insert(key, value);
+        self
+    }
+}
+
+
+// js conversions
 impl From<RenderPipelineDescriptor<'_>> for web_sys::GpuRenderPipelineDescriptor {
     fn from(pipeline: RenderPipelineDescriptor) -> web_sys::GpuRenderPipelineDescriptor {
         let RenderPipelineDescriptor {
@@ -101,5 +146,44 @@ impl From<RenderPipelineDescriptor<'_>> for web_sys::GpuRenderPipelineDescriptor
         }
 
         pipeline_js
+    }
+}
+
+impl <'a, 'b> From<ComputePipelineDescriptor<'a, 'b>> for web_sys::GpuComputePipelineDescriptor {
+    fn from(pipeline: ComputePipelineDescriptor) -> web_sys::GpuComputePipelineDescriptor {
+        let ComputePipelineDescriptor {
+            label,
+            layout,
+            compute,
+        } = pipeline;
+
+        let pipeline_js = web_sys::GpuComputePipelineDescriptor::new(&layout.into(), &compute.into());
+
+        if let Some(label) = label {
+            pipeline_js.set_label(label);
+        }
+
+        pipeline_js
+    }
+}
+
+impl From<ProgrammableStage<'_>> for web_sys::GpuProgrammableStage {
+    fn from(compute: ProgrammableStage) -> web_sys::GpuProgrammableStage {
+        let compute_js = web_sys::GpuProgrammableStage::new(&compute.module);
+
+        if let Some(entry_point) = compute.entry_point {
+            compute_js.set_entry_point(entry_point);
+        }
+
+        if !compute.constants.is_empty() {
+            let obj = js_sys::Object::new();
+            for (binding, constant) in compute.constants {
+                js_sys::Reflect::set(&obj, &JsValue::from(binding), &JsValue::from(constant))
+                    .unwrap_throw();
+            }
+            compute_js.set_constants(&obj);
+        }
+
+        compute_js
     }
 }

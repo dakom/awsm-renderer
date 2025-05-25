@@ -5,23 +5,26 @@ pub type TextureAspect = web_sys::GpuTextureAspect;
 pub type TextureViewDimension = web_sys::GpuTextureViewDimension;
 // https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuTextureSampleType.html
 pub type TextureSampleType = web_sys::GpuTextureSampleType;
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuTextureDimension.html
 pub type TextureDimension = web_sys::GpuTextureDimension;
+
+
 
 #[derive(Debug, Clone)]
 pub struct TextureDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createTexture#descriptor
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuTextureDescriptor.html
-    pub dimension: Option<TextureDimension>,
     pub format: TextureFormat,
+    pub size: Extent3d,
+    pub usage: TextureUsage,
+    pub dimension: Option<TextureDimension>,
     pub label: Option<&'a str>,
     pub mip_level_count: Option<u32>,
     pub sample_count: Option<u32>,
-    pub size: Extent3d,
-    pub usage: TextureUsage,
     pub view_formats: Vec<TextureFormat>,
 }
 
-impl TextureDescriptor<'_> {
+impl <'a> TextureDescriptor<'a> {
     pub fn new(format: TextureFormat, size: Extent3d, usage: TextureUsage) -> Self {
         Self {
             dimension: None,
@@ -33,6 +36,27 @@ impl TextureDescriptor<'_> {
             usage,
             view_formats: Vec::new(),
         }
+    }
+
+    pub fn with_label(mut self, label: &'a str) -> Self {
+        self.label = Some(label);
+        self
+    }
+    pub fn with_mip_level_count(mut self, mip_level_count: u32) -> Self {
+        self.mip_level_count = Some(mip_level_count);
+        self
+    }
+    pub fn with_sample_count(mut self, sample_count: u32) -> Self {
+        self.sample_count = Some(sample_count);
+        self
+    }
+    pub fn with_dimension(mut self, dimension: TextureDimension) -> Self {
+        self.dimension = Some(dimension);
+        self
+    }
+    pub fn with_push_view_format(mut self, view_format: TextureFormat) -> Self {
+        self.view_formats.push(view_format);
+        self
     }
 }
 
@@ -145,6 +169,43 @@ impl<'a> TextureViewDescriptor<'a> {
             label,
             ..Default::default()
         }
+    }
+
+    pub fn with_array_layer_count(mut self, array_layer_count: u32) -> Self {
+        self.array_layer_count = Some(array_layer_count);
+        self
+    }
+    pub fn with_aspect(mut self, aspect: TextureAspect) -> Self {
+        self.aspect = Some(aspect);
+        self
+    }
+    pub fn with_base_array_layer(mut self, base_array_layer: u32) -> Self {
+        self.base_array_layer = Some(base_array_layer);
+        self
+    }
+    pub fn with_base_mip_level(mut self, base_mip_level: u32) -> Self {
+        self.base_mip_level = Some(base_mip_level);
+        self
+    }
+    pub fn with_dimension(mut self, dimension: TextureViewDimension) -> Self {
+        self.dimension = Some(dimension);
+        self
+    }
+    pub fn with_format(mut self, format: TextureFormat) -> Self {
+        self.format = Some(format);
+        self
+    }
+    pub fn with_mip_level_count(mut self, mip_level_count: u32) -> Self {
+        self.mip_level_count = Some(mip_level_count);
+        self
+    }
+    pub fn with_usage(mut self, usage: TextureUsage) -> Self {
+        self.usage = Some(usage);
+        self
+    }
+    pub fn with_label(mut self, label: &'a str) -> Self {
+        self.label = Some(label);
+        self
     }
 }
 

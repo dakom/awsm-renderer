@@ -17,6 +17,10 @@ impl<'a> BindGroupLayoutDescriptor<'a> {
             entries: Vec::new(),
         }
     }
+    pub fn with_push_entry(mut self, entry: BindGroupLayoutEntry) -> Self {
+        self.entries.push(entry);
+        self
+    }
 
     pub fn with_entries(mut self, entries: Vec<BindGroupLayoutEntry>) -> Self {
         self.entries = entries;
@@ -148,8 +152,18 @@ impl StorageTextureBindingLayout {
             view_dimension: None,
         }
     }
+
+    pub fn with_access(mut self, access: StorageTextureAccess) -> Self {
+        self.access = Some(access);
+        self
+    }
+    pub fn with_view_dimension(mut self, view_dimension: TextureViewDimension) -> Self {
+        self.view_dimension = Some(view_dimension);
+        self
+    }
 }
 
+// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuStorageTextureAccess.html
 pub type StorageTextureAccess = web_sys::GpuStorageTextureAccess;
 
 #[derive(Debug, Clone)]
