@@ -156,7 +156,7 @@ impl From<RenderPipelineDescriptor<'_>> for web_sys::GpuRenderPipelineDescriptor
     }
 }
 
-impl<'a, 'b> From<ComputePipelineDescriptor<'a, 'b>> for web_sys::GpuComputePipelineDescriptor {
+impl From<ComputePipelineDescriptor<'_, '_>> for web_sys::GpuComputePipelineDescriptor {
     fn from(pipeline: ComputePipelineDescriptor) -> web_sys::GpuComputePipelineDescriptor {
         let ComputePipelineDescriptor {
             label,

@@ -105,10 +105,10 @@ impl ImageData {
         })
     }
 
-    pub async fn create_texture<'a>(
+    pub async fn create_texture(
         &self,
         gpu: &AwsmRendererWebGpu,
-        source_info: Option<CopyExternalImageSourceInfo<'a>>,
+        source_info: Option<CopyExternalImageSourceInfo<'_>>,
         generate_mipmap: bool,
     ) -> Result<web_sys::GpuTexture> {
         let mut usage = TextureUsage::new()

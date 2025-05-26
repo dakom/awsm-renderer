@@ -9,10 +9,10 @@ use crate::{
 
 use super::GltfPopulateContext;
 
-pub async fn gltf_material_deps<'a>(
+pub async fn gltf_material_deps(
     renderer: &mut AwsmRenderer,
     ctx: &GltfPopulateContext,
-    material: gltf::Material<'a>,
+    material: gltf::Material<'_>,
 ) -> Result<MaterialDeps> {
     let mut deps = PbrMaterialDeps::default();
 
