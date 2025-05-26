@@ -75,7 +75,21 @@ impl AwsmRendererWebGpu {
         Ok(pipeline)
     }
 
-    // TODO - create_compute_pipeline
+    /// Example usage:
+    /// let descriptor:ComputePipelineDescriptor = ...;
+    /// renderer.create_compute_pipeline(&descriptor.into());
+    pub async fn create_compute_pipeline(
+        &self,
+        descriptor: &web_sys::GpuComputePipelineDescriptor,
+    ) -> Result<web_sys::GpuComputePipeline> {
+        let pipeline: web_sys::GpuComputePipeline =
+            JsFuture::from(self.device.create_compute_pipeline_async(descriptor))
+                .await
+                .map_err(AwsmCoreError::pipeline_creation)?
+                .unchecked_into();
+
+        Ok(pipeline)
+    }
 
     /// Example usage:
     /// let descriptor:PipelineLayoutDescriptor = ...;

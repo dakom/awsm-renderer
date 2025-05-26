@@ -107,6 +107,9 @@ pub enum AwsmCoreError {
 
     #[error("[gpu] Failed to create texture: {0:?}")]
     CreateTexture(String),
+
+    #[error("[gpu] Failed to create texture view: {0:?}")]
+    CreateTextureView(String),
 }
 
 impl AwsmCoreError {
@@ -248,6 +251,10 @@ impl AwsmCoreError {
 
     pub fn create_texture(err: JsValue) -> Self {
         Self::CreateTexture(format_err(err))
+    }
+
+    pub fn create_texture_view(err: JsValue) -> Self {
+        Self::CreateTextureView(format_err(err))
     }
 }
 
