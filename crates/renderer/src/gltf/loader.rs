@@ -196,10 +196,13 @@ fn get_image_futures<'a>(
                         let begin = view.offset();
                         let end = begin + view.length();
                         let encoded_image = &parent_buffer_data[begin..end];
-                        let image =
-                            crate::core::image::bitmap::load_u8(&encoded_image, mime_type, options.clone())
-                                .await?;
-                        Ok(ImageData::Bitmap{image, options})
+                        let image = crate::core::image::bitmap::load_u8(
+                            &encoded_image,
+                            mime_type,
+                            options.clone(),
+                        )
+                        .await?;
+                        Ok(ImageData::Bitmap { image, options })
                     }
                 }
             }

@@ -74,8 +74,12 @@ pub struct ComputePipelineDescriptor<'a, 'b> {
     compute: ProgrammableStage<'b>,
 }
 
-impl <'a, 'b> ComputePipelineDescriptor<'a, 'b> {
-    pub fn new(compute: ProgrammableStage<'b>, layout: PipelineLayoutKind, label: Option<&'a str>) -> Self {
+impl<'a, 'b> ComputePipelineDescriptor<'a, 'b> {
+    pub fn new(
+        compute: ProgrammableStage<'b>,
+        layout: PipelineLayoutKind,
+        label: Option<&'a str>,
+    ) -> Self {
         Self {
             label,
             layout,
@@ -91,7 +95,7 @@ pub struct ProgrammableStage<'a> {
     constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
 }
 
-impl <'a> ProgrammableStage<'a> {
+impl<'a> ProgrammableStage<'a> {
     pub fn new(module: web_sys::GpuShaderModule, entry_point: Option<&'a str>) -> Self {
         Self {
             module,
@@ -100,12 +104,15 @@ impl <'a> ProgrammableStage<'a> {
         }
     }
 
-    pub fn with_push_constant(mut self, key: ConstantOverrideKey, value: ConstantOverrideValue) -> Self {
+    pub fn with_push_constant(
+        mut self,
+        key: ConstantOverrideKey,
+        value: ConstantOverrideValue,
+    ) -> Self {
         self.constants.insert(key, value);
         self
     }
 }
-
 
 // js conversions
 impl From<RenderPipelineDescriptor<'_>> for web_sys::GpuRenderPipelineDescriptor {
@@ -149,7 +156,7 @@ impl From<RenderPipelineDescriptor<'_>> for web_sys::GpuRenderPipelineDescriptor
     }
 }
 
-impl <'a, 'b> From<ComputePipelineDescriptor<'a, 'b>> for web_sys::GpuComputePipelineDescriptor {
+impl<'a, 'b> From<ComputePipelineDescriptor<'a, 'b>> for web_sys::GpuComputePipelineDescriptor {
     fn from(pipeline: ComputePipelineDescriptor) -> web_sys::GpuComputePipelineDescriptor {
         let ComputePipelineDescriptor {
             label,
@@ -157,7 +164,8 @@ impl <'a, 'b> From<ComputePipelineDescriptor<'a, 'b>> for web_sys::GpuComputePip
             compute,
         } = pipeline;
 
-        let pipeline_js = web_sys::GpuComputePipelineDescriptor::new(&layout.into(), &compute.into());
+        let pipeline_js =
+            web_sys::GpuComputePipelineDescriptor::new(&layout.into(), &compute.into());
 
         if let Some(label) = label {
             pipeline_js.set_label(label);

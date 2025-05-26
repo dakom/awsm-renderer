@@ -1,5 +1,5 @@
-use std::ops::Deref;
 use crate::error::{AwsmCoreError, Result};
+use std::ops::Deref;
 
 #[derive(Debug, Clone)]
 pub struct ComputePassEncoder {
@@ -20,32 +20,26 @@ impl ComputePassEncoder {
         match (workgroup_count_y, workgroup_count_z) {
             (Some(y), Some(z)) => {
                 self.inner
-                .dispatch_workgroups_with_workgroup_count_y_and_workgroup_count_z(
-                    workgroup_count_x,
-                    y,
-                    z,
-                );
+                    .dispatch_workgroups_with_workgroup_count_y_and_workgroup_count_z(
+                        workgroup_count_x,
+                        y,
+                        z,
+                    );
             }
             (Some(y), None) => {
                 self.inner
-                .dispatch_workgroups_with_workgroup_count_y(
-                    workgroup_count_x,
-                    y,
-                );
+                    .dispatch_workgroups_with_workgroup_count_y(workgroup_count_x, y);
             }
             (None, Some(z)) => {
                 self.inner
-                .dispatch_workgroups_with_workgroup_count_y_and_workgroup_count_z(
-                    workgroup_count_x,
-                    1,
-                    z,
-                );
+                    .dispatch_workgroups_with_workgroup_count_y_and_workgroup_count_z(
+                        workgroup_count_x,
+                        1,
+                        z,
+                    );
             }
             (None, None) => {
-                self.inner
-                .dispatch_workgroups(
-                    workgroup_count_x,
-                );
+                self.inner.dispatch_workgroups(workgroup_count_x);
             }
         }
     }
@@ -80,7 +74,6 @@ impl Deref for ComputePassEncoder {
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
-
 }
 
 #[derive(Debug, Clone, Default)]
@@ -89,9 +82,9 @@ pub struct ComputePassDescriptor<'a> {
     pub timestamp_writes: Option<ComputeTimestampWrites<'a>>,
 }
 
-impl <'a> ComputePassDescriptor<'a>  {
+impl<'a> ComputePassDescriptor<'a> {
     pub fn new(label: Option<&'a str>) -> Self {
-        Self{
+        Self {
             label,
             timestamp_writes: None,
         }

@@ -10,11 +10,27 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
     
-    // Calculate normalized coordinates for sampling
-    let uv = (vec2<f32>(global_id.xy) + 0.5) / vec2<f32>(output_size);
+    let input_size = textureDimensions(input_texture);
     
-    // Sample with linear filtering for better quality
-    let result = textureSampleLevel(input_texture, input_sampler, uv, 0.0);
+    // Calculate the pixel coordinates in the input texture that correspond to this output pixel
+    // Each output pixel should sample from a 2x2 region in the input texture
+    let input_coord = vec2<f32>(global_id.xy) * 2.0 + 0.5;
+    
+    // Convert to UV coordinates for sampling
+    let base_uv = input_coord / vec2<f32>(input_size);
+    
+    // Calculate texel size for offsetting
+    let texel_size = 1.0 / vec2<f32>(input_size);
+    
+    // Sample a 2x2 box filter region
+    // Sample at the corners of a 2x2 pixel region
+    let sample_00 = textureSampleLevel(input_texture, input_sampler, base_uv + vec2<f32>(-0.5, -0.5) * texel_size, 0.0);
+    let sample_01 = textureSampleLevel(input_texture, input_sampler, base_uv + vec2<f32>(0.5, -0.5) * texel_size, 0.0);
+    let sample_10 = textureSampleLevel(input_texture, input_sampler, base_uv + vec2<f32>(-0.5, 0.5) * texel_size, 0.0);
+    let sample_11 = textureSampleLevel(input_texture, input_sampler, base_uv + vec2<f32>(0.5, 0.5) * texel_size, 0.0);
+    
+    // Average the samples (simple box filter)
+    let result = (sample_00 + sample_01 + sample_10 + sample_11) * 0.25;
     
     textureStore(output_texture, vec2<i32>(global_id.xy), result);
 }

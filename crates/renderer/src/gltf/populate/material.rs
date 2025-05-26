@@ -161,7 +161,6 @@ impl GltfTextureInfo {
         // descriptor.mag_filter = Some(FilterMode::Linear);
         // descriptor.mipmap_filter = Some(MipmapFilterMode::Linear);
 
-
         if let Some(mag_filter) = gltf_sampler.mag_filter() {
             match mag_filter {
                 gltf::texture::MagFilter::Linear => {

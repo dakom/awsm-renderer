@@ -2,14 +2,14 @@ use crate::command::copy_texture::Origin3d;
 use crate::error::Result;
 use crate::renderer::AwsmRendererWebGpu;
 use crate::texture::{Extent3d, TextureAspect, TextureDescriptor, TextureFormat, TextureUsage};
-use std::borrow::Cow;
 use mipmap::generate_mipmaps;
+use std::borrow::Cow;
 use wasm_bindgen::prelude::*;
 
-pub mod mipmap;
 pub mod bitmap;
 #[cfg(feature = "exr")]
 pub mod exr;
+pub mod mipmap;
 
 #[derive(Clone, Debug)]
 pub enum ImageData {
@@ -18,7 +18,7 @@ pub enum ImageData {
     Bitmap {
         image: web_sys::ImageBitmap,
         options: Option<ImageBitmapOptions>,
-    }
+    },
 }
 
 impl ImageData {
@@ -47,7 +47,7 @@ impl ImageData {
             #[cfg(feature = "exr")]
             Self::Exr(_) => TextureFormat::Rgba32float,
 
-            Self::Bitmap{..} => TextureFormat::Rgba8unorm,
+            Self::Bitmap { .. } => TextureFormat::Rgba8unorm,
         }
     }
 
@@ -57,7 +57,7 @@ impl ImageData {
             #[cfg(feature = "exr")]
             Self::Exr(_) => true, // EXR images are typically premultiplied
 
-            Self::Bitmap{options, ..} => options
+            Self::Bitmap { options, .. } => options
                 .as_ref()
                 .map(|opts| matches!(opts.premultiply_alpha, Some(PremultiplyAlpha::Premultiply)))
                 .unwrap_or(false),
@@ -73,7 +73,7 @@ impl ImageData {
                 depth_or_array_layers: None,
             },
 
-            Self::Bitmap{image, ..} => Extent3d {
+            Self::Bitmap { image, .. } => Extent3d {
                 width: image.width(),
                 height: Some(image.height()),
                 depth_or_array_layers: None,
@@ -86,7 +86,7 @@ impl ImageData {
             #[cfg(feature = "exr")]
             Self::Exr(exr) => exr.js_obj(),
 
-            Self::Bitmap{image, ..} => {
+            Self::Bitmap { image, .. } => {
                 let js_value = image.unchecked_ref();
                 Ok(Cow::Borrowed(js_value))
             }
@@ -132,13 +132,10 @@ impl ImageData {
 
         let mut descriptor = TextureDescriptor::new(self.format(), self.size(), usage);
         let mipmap_levels = if generate_mipmap {
-            let mipmap_levels = mipmap::calculate_mipmap_levels(
-                self.size().width,
-                self.size().height.unwrap_or(1),
-            );
+            let mipmap_levels =
+                mipmap::calculate_mipmap_levels(self.size().width, self.size().height.unwrap_or(1));
 
-            descriptor = descriptor
-                .with_mip_level_count(mipmap_levels);
+            descriptor = descriptor.with_mip_level_count(mipmap_levels);
 
             Some(mipmap_levels)
         } else {
@@ -156,7 +153,14 @@ impl ImageData {
         gpu.copy_external_image_to_texture(&source.into(), &dest.into(), &self.size().into())?;
 
         if let Some(mipmap_levels) = mipmap_levels {
-            generate_mipmaps(gpu, &texture, self.size().width, self.size().height.unwrap_or(1), mipmap_levels).await?;
+            generate_mipmaps(
+                gpu,
+                &texture,
+                self.size().width,
+                self.size().height.unwrap_or(1),
+                mipmap_levels,
+            )
+            .await?;
         }
 
         Ok(texture)
@@ -275,7 +279,6 @@ impl<'a> CopyExternalImageDestInfo<'a> {
         self
     }
 }
-
 
 impl From<CopyExternalImageSourceInfo<'_>> for web_sys::GpuCopyExternalImageSourceInfo {
     fn from(info: CopyExternalImageSourceInfo) -> Self {

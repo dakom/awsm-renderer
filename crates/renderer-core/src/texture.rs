@@ -8,8 +8,6 @@ pub type TextureSampleType = web_sys::GpuTextureSampleType;
 // https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuTextureDimension.html
 pub type TextureDimension = web_sys::GpuTextureDimension;
 
-
-
 #[derive(Debug, Clone)]
 pub struct TextureDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createTexture#descriptor
@@ -24,7 +22,7 @@ pub struct TextureDescriptor<'a> {
     pub view_formats: Vec<TextureFormat>,
 }
 
-impl <'a> TextureDescriptor<'a> {
+impl<'a> TextureDescriptor<'a> {
     pub fn new(format: TextureFormat, size: Extent3d, usage: TextureUsage) -> Self {
         Self {
             dimension: None,
