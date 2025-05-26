@@ -1,6 +1,5 @@
 # Next up
 
-- Mipmaps for texture filtering (spacial aliasing)
 - Make tonemaping a post-processing step
 - TAA for temporal and edge aliasing
 

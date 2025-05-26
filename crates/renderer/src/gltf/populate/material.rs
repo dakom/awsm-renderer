@@ -155,11 +155,15 @@ impl GltfTextureInfo {
             .ok_or(AwsmGltfError::MissingTextureDocIndex(self.index))?;
         let gltf_sampler = gltf_texture.sampler();
 
-        let mut descriptor = SamplerDescriptor::default();
-
-        // descriptor.min_filter = Some(FilterMode::Linear);
-        // descriptor.mag_filter = Some(FilterMode::Linear);
-        // descriptor.mipmap_filter = Some(MipmapFilterMode::Linear);
+        let mut descriptor = SamplerDescriptor {
+            // This looks better with our mipmap generation...
+            // if it's overridden by the glTF sampler, fine.
+            // but otherwise, let's just do what looks best.
+            min_filter: Some(FilterMode::Linear),
+            mag_filter: Some(FilterMode::Linear),
+            mipmap_filter: Some(MipmapFilterMode::Linear),
+            ..SamplerDescriptor::default()
+        };
 
         if let Some(mag_filter) = gltf_sampler.mag_filter() {
             match mag_filter {
