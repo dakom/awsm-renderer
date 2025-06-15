@@ -95,7 +95,7 @@ impl AwsmRenderer {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
-        let material_deps = gltf_material_deps(self, ctx, gltf_primitive.material())?;
+        let material_deps = gltf_material_deps(self, ctx, gltf_primitive.material()).await?;
 
         let has_alpha = material_deps.material().has_alpha();
 

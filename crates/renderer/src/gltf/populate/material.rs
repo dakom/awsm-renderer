@@ -9,10 +9,10 @@ use crate::{
 
 use super::GltfPopulateContext;
 
-pub fn gltf_material_deps(
+pub async fn gltf_material_deps(
     renderer: &mut AwsmRenderer,
     ctx: &GltfPopulateContext,
-    material: gltf::Material,
+    material: gltf::Material<'_>,
 ) -> Result<MaterialDeps> {
     let mut deps = PbrMaterialDeps::default();
 
@@ -21,14 +21,14 @@ pub fn gltf_material_deps(
     deps.base_color_factor = pbr.base_color_factor();
 
     if let Some(tex) = pbr.base_color_texture().map(GltfTextureInfo::from) {
-        deps.base_color_tex = Some(tex.create_dep(renderer, ctx)?);
+        deps.base_color_tex = Some(tex.create_dep(renderer, ctx).await?);
     }
 
     deps.metallic_factor = pbr.metallic_factor();
     deps.roughness_factor = pbr.roughness_factor();
 
     if let Some(tex) = pbr.metallic_roughness_texture().map(GltfTextureInfo::from) {
-        deps.metallic_roughness_tex = Some(tex.create_dep(renderer, ctx)?);
+        deps.metallic_roughness_tex = Some(tex.create_dep(renderer, ctx).await?);
     }
 
     if let Some(normal_tex) = material.normal_texture() {
@@ -36,7 +36,7 @@ pub fn gltf_material_deps(
             index: normal_tex.texture().index(),
             tex_coord_index: normal_tex.tex_coord() as usize,
         };
-        deps.normal_tex = Some(tex.create_dep(renderer, ctx)?);
+        deps.normal_tex = Some(tex.create_dep(renderer, ctx).await?);
         deps.normal_scale = normal_tex.scale();
     }
 
@@ -45,7 +45,7 @@ pub fn gltf_material_deps(
             index: occlusion_tex.texture().index(),
             tex_coord_index: occlusion_tex.tex_coord() as usize,
         };
-        deps.occlusion_tex = Some(tex.create_dep(renderer, ctx)?);
+        deps.occlusion_tex = Some(tex.create_dep(renderer, ctx).await?);
         deps.occlusion_strength = occlusion_tex.strength();
     }
 
@@ -54,7 +54,7 @@ pub fn gltf_material_deps(
             index: emissive_tex.texture().index(),
             tex_coord_index: emissive_tex.tex_coord() as usize,
         };
-        deps.emissive_tex = Some(tex.create_dep(renderer, ctx)?);
+        deps.emissive_tex = Some(tex.create_dep(renderer, ctx).await?);
     }
 
     deps.emissive_factor = material.emissive_factor();
@@ -86,7 +86,7 @@ impl<'a> From<gltf::texture::Info<'a>> for GltfTextureInfo {
 }
 
 impl GltfTextureInfo {
-    pub fn create_dep(
+    pub async fn create_dep(
         &self,
         renderer: &mut AwsmRenderer,
         ctx: &GltfPopulateContext,
@@ -99,7 +99,7 @@ impl GltfTextureInfo {
         let (texture_key, sampler_key) = match dep {
             Some((texture_key, sampler_key)) => (texture_key, sampler_key),
             None => {
-                let texture_key = self.create_texture_key(renderer, ctx)?;
+                let texture_key = self.create_texture_key(renderer, ctx).await?;
                 let sampler_key = self.create_sampler_key(renderer, ctx)?;
                 ctx.textures
                     .lock()
@@ -116,7 +116,7 @@ impl GltfTextureInfo {
         })
     }
 
-    fn create_texture_key(
+    async fn create_texture_key(
         &self,
         renderer: &mut AwsmRenderer,
         ctx: &GltfPopulateContext,
@@ -135,7 +135,8 @@ impl GltfTextureInfo {
             .ok_or(AwsmGltfError::MissingTextureIndex(texture_index))?;
 
         let texture = image
-            .create_texture(&renderer.gpu, None, false)
+            .create_texture(&renderer.gpu, None, ctx.generate_mipmaps)
+            .await
             .map_err(AwsmGltfError::CreateTexture)?;
 
         Ok(renderer.textures.add_texture(texture))
@@ -154,7 +155,15 @@ impl GltfTextureInfo {
             .ok_or(AwsmGltfError::MissingTextureDocIndex(self.index))?;
         let gltf_sampler = gltf_texture.sampler();
 
-        let mut descriptor = SamplerDescriptor::default();
+        let mut descriptor = SamplerDescriptor {
+            // This looks better with our mipmap generation...
+            // if it's overridden by the glTF sampler, fine.
+            // but otherwise, let's just do what looks best.
+            min_filter: Some(FilterMode::Linear),
+            mag_filter: Some(FilterMode::Linear),
+            mipmap_filter: Some(MipmapFilterMode::Linear),
+            ..SamplerDescriptor::default()
+        };
 
         if let Some(mag_filter) = gltf_sampler.mag_filter() {
             match mag_filter {

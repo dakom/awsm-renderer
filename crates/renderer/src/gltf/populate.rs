@@ -26,6 +26,7 @@ pub(crate) struct GltfPopulateContext {
     pub node_to_skin: Mutex<HashMap<usize, SkinKey>>,
     pub transform_is_joint: Mutex<HashSet<TransformKey>>,
     pub transform_is_instanced: Mutex<HashSet<TransformKey>>,
+    pub generate_mipmaps: bool,
 }
 
 impl AwsmRenderer {
@@ -33,6 +34,7 @@ impl AwsmRenderer {
         &mut self,
         gltf_data: GltfData,
         scene: Option<usize>,
+        generate_mipmaps: bool,
     ) -> anyhow::Result<()> {
         #[allow(clippy::arc_with_non_send_sync)]
         let gltf_data = Arc::new(gltf_data);
@@ -45,6 +47,7 @@ impl AwsmRenderer {
             node_to_skin: Mutex::new(HashMap::new()),
             transform_is_joint: Mutex::new(HashSet::new()),
             transform_is_instanced: Mutex::new(HashSet::new()),
+            generate_mipmaps,
         };
 
         let scene = match scene {
