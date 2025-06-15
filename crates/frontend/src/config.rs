@@ -18,6 +18,7 @@ pub struct Config {
     pub debug: ConfigDebug,
     pub media_baseurl: String,
     pub gltf_url: String,
+    pub generate_mipmaps: bool,
 }
 
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
@@ -44,6 +45,8 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         } else {
             "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/refs/heads/main/Models".to_string()
         },
+
+        generate_mipmaps: true,
     };
 
     config

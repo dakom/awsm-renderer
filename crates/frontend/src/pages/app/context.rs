@@ -9,6 +9,7 @@ pub struct AppContext {
     pub camera_id: Mutable<CameraId>,
     pub shader: Mutable<FragmentShaderKind>,
     pub scene: Mutable<Option<Arc<AppScene>>>,
+    pub generate_mipmaps: Mutable<bool>,
 }
 
 impl Default for AppContext {
@@ -17,6 +18,7 @@ impl Default for AppContext {
             camera_id: Mutable::new(CameraId::default()),
             shader: Mutable::new(FragmentShaderKind::Pbr),
             scene: Mutable::new(None),
+            generate_mipmaps: Mutable::new(CONFIG.generate_mipmaps),
         }
     }
 }

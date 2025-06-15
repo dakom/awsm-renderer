@@ -100,8 +100,8 @@ pub async fn generate_mipmaps(
         compute_pass.set_pipeline(&compute_pipeline);
         compute_pass.set_bind_group(0, &bind_group, None)?;
 
-        let workgroup_size_x = (next_width + 7) / 8; // Ceiling division
-        let workgroup_size_y = (next_height + 7) / 8;
+        let workgroup_size_x = next_width.div_ceil(8);
+        let workgroup_size_y = next_height.div_ceil(8);
         compute_pass.dispatch_workgroups(workgroup_size_x, Some(workgroup_size_y), Some(1));
         compute_pass.end();
 

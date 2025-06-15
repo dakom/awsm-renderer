@@ -135,7 +135,7 @@ impl GltfTextureInfo {
             .ok_or(AwsmGltfError::MissingTextureIndex(texture_index))?;
 
         let texture = image
-            .create_texture(&renderer.gpu, None, true)
+            .create_texture(&renderer.gpu, None, ctx.generate_mipmaps)
             .await
             .map_err(AwsmGltfError::CreateTexture)?;
 
