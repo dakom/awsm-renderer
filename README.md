@@ -12,6 +12,10 @@ Nothing much to see here yet, early days, slow-moving hobby and learning in prog
 
 See [ROADMAP](ROADMAP.md) for details.
 
+# DEV
+
+* `just frontend-dev`
+
 # CRATES
 
 * [awsm-renderer](crates/renderer): The renderer in all its glory 
