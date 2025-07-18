@@ -235,7 +235,7 @@ impl ShaderCacheKey {
         let mut sanity_check = HashSet::new();
         for attribute in &self.attributes {
             if !sanity_check.insert(std::mem::discriminant(attribute)) {
-                panic!("Duplicate attribute found: {:?}", attribute);
+                panic!("Duplicate attribute found: {attribute:?}");
             }
 
             match attribute {
@@ -395,8 +395,8 @@ fn print_source(source: &str, with_line_numbers: bool) {
     let mut line_number = 1;
     for line in lines {
         let formatted_line = match with_line_numbers {
-            true => format!("{:>4}: {}\n", line_number, line),
-            false => format!("{}\n", line),
+            true => format!("{line_number:>4}: {line}\n"),
+            false => format!("{line}\n"),
         };
         output.push_str(&formatted_line);
         line_number += 1;

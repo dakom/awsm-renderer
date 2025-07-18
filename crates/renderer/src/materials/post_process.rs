@@ -17,6 +17,12 @@ pub struct PostProcessMaterials {
     cached_bind_group_layout_key: Option<MaterialBindGroupLayoutKey>,
 }
 
+impl Default for PostProcessMaterials {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PostProcessMaterials {
     pub fn new() -> Self {
         PostProcessMaterials {
@@ -81,10 +87,8 @@ impl AwsmRenderer {
             .insert_bind_group(
                 &self.gpu,
                 layout_key,
-                &vec![
-                    MaterialTextureBindingEntry::Texture(scene_texture_view),
-                    MaterialTextureBindingEntry::Sampler(scene_texture_sampler),
-                ],
+                &[MaterialTextureBindingEntry::Texture(scene_texture_view),
+                    MaterialTextureBindingEntry::Sampler(scene_texture_sampler)],
             )
             .map_err(AwsmMaterialError::MaterialBindGroup)?;
 
@@ -98,6 +102,12 @@ impl AwsmRenderer {
 
 #[derive(Debug, Clone)]
 pub struct PostProcessMaterial {}
+
+impl Default for PostProcessMaterial {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl PostProcessMaterial {
     pub fn new() -> Self {

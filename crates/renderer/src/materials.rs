@@ -23,6 +23,12 @@ pub struct Materials {
     pub post_process: PostProcessMaterials,
 }
 
+impl Default for Materials {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Materials {
     pub fn new() -> Self {
         Materials {

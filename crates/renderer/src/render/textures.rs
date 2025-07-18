@@ -56,7 +56,7 @@ impl RenderTextures {
         )?;
         self.inner = Some(inner);
 
-        f(&self.inner.as_ref().unwrap()).map(|result| (result, true))
+        f(self.inner.as_ref().unwrap()).map(|result| (result, true))
     }
 }
 

@@ -29,6 +29,12 @@ pub struct PbrMaterials {
     uniform_buffer_gpu_dirty: bool,
 }
 
+impl Default for PbrMaterials {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PbrMaterials {
     pub fn new() -> Self {
         Self {
