@@ -139,9 +139,6 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] unable to construct normals: {0}")]
     ConstructNormals(String),
-
-    #[error("[gltf] missing depth texture in renderer")]
-    MissingDepthTexture,
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

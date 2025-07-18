@@ -150,6 +150,7 @@ pub struct ShaderCacheKeyInstancing {
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShaderCacheKeyMaterial {
     Pbr(PbrShaderCacheKeyMaterial),
+    FullScreenQuad,
     DebugNormals,
 }
 
@@ -158,6 +159,7 @@ impl ShaderCacheKeyMaterial {
         match self {
             ShaderCacheKeyMaterial::Pbr(material_key) => material_key.has_alpha_mask,
             ShaderCacheKeyMaterial::DebugNormals => false,
+            ShaderCacheKeyMaterial::FullScreenQuad => false,
         }
     }
 
@@ -165,13 +167,26 @@ impl ShaderCacheKeyMaterial {
         match self {
             ShaderCacheKeyMaterial::Pbr(_) => FragmentShaderKind::Pbr,
             ShaderCacheKeyMaterial::DebugNormals => FragmentShaderKind::DebugNormals,
+            ShaderCacheKeyMaterial::FullScreenQuad => FragmentShaderKind::FullScreenQuad,
+        }
+    }
+
+    pub fn vertex_shader_kind(&self) -> VertexShaderKind {
+        match self {
+            ShaderCacheKeyMaterial::Pbr(_) => VertexShaderKind::Mesh,
+            ShaderCacheKeyMaterial::DebugNormals => VertexShaderKind::Mesh,
+            ShaderCacheKeyMaterial::FullScreenQuad => VertexShaderKind::Quad,
         }
     }
 }
 
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PbrShaderCacheKeyMaterial {
     pub base_color_uv_index: Option<u32>,
+    pub metallic_roughness_uv_index: Option<u32>,
+    pub normal_uv_index: Option<u32>,
+    pub occlusion_uv_index: Option<u32>,
+    pub emissive_uv_index: Option<u32>,
     pub has_alpha_mask: bool,
 }
 
@@ -204,19 +219,6 @@ pub struct VertexColor {
 pub enum VertexColorSize {
     Vec3,
     Vec4,
-}
-
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ShaderKeyAlphaMode {
-    Opaque,
-    Blend,
-    Mask,
-}
-
-impl Default for ShaderKeyAlphaMode {
-    fn default() -> Self {
-        Self::Opaque
-    }
 }
 
 impl ShaderCacheKey {
@@ -350,6 +352,9 @@ impl ShaderCacheKey {
                     data_type: "vec3<f32>".to_string(),
                 });
             }
+
+            ShaderCacheKeyMaterial::FullScreenQuad => {
+            }
         };
 
         vertex_output_locations = vertex_output_locations
@@ -368,6 +373,7 @@ impl ShaderCacheKey {
             morphs: self.morphs,
             skins: skins.unwrap_or_default(),
             has_instance_transform: self.instancing.transform,
+            vertex_shader_kind: self.material.vertex_shader_kind(),
             fragment_shader_kind: self.material.fragment_shader_kind(),
             fragment_buffer_bindings,
             material,
@@ -376,7 +382,8 @@ impl ShaderCacheKey {
 
         let source = tmpl.render().unwrap();
 
-        //print_source(&source, false);
+        // tracing::info!("{:#?}", tmpl);
+        // print_source(&source, false);
 
         Ok(source)
     }
@@ -415,6 +422,7 @@ struct ShaderTemplate {
     // simpler ways of doing things
     pub has_instance_transform: bool,
     pub has_normals: bool,
+    pub vertex_shader_kind: VertexShaderKind,
     pub fragment_shader_kind: FragmentShaderKind,
     pub material: ShaderTemplateMaterial,
     // pub skin_targets: Vec<SkinTarget>,
@@ -454,9 +462,16 @@ impl ShaderTemplateMaterial {
 }
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VertexShaderKind {
+    Mesh,
+    Quad,
+}
+
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FragmentShaderKind {
     DebugNormals,
     Pbr,
+    FullScreenQuad,
 }
 
 #[derive(Debug)]

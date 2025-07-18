@@ -1,73 +1,109 @@
 use awsm_renderer_core::sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor};
 
 use crate::{
-    gltf::error::{AwsmGltfError, Result},
-    materials::{pbr::PbrMaterialDeps, MaterialAlphaMode, MaterialDeps, MaterialTextureDep},
-    textures::{SamplerKey, TextureKey},
-    AwsmRenderer,
+    gltf::error::{AwsmGltfError, Result}, materials::{pbr::{PbrMaterial, PbrMaterialBindGroupCacheKey, PbrMaterialBindGroupLayoutCacheKey, PbrMaterialTextureCacheKey}, MaterialAlphaMode}, shaders::{PbrShaderCacheKeyMaterial}, textures::{SamplerKey, TextureKey}, AwsmRenderer
 };
 
 use super::GltfPopulateContext;
 
-pub async fn gltf_material_deps(
-    renderer: &mut AwsmRenderer,
-    ctx: &GltfPopulateContext,
-    material: gltf::Material<'_>,
-) -> Result<MaterialDeps> {
-    let mut deps = PbrMaterialDeps::default();
+pub struct GltfMaterialInfo {
+    pub bind_group_cache_key: PbrMaterialBindGroupCacheKey,
+    pub bind_group_layout_cache_key: PbrMaterialBindGroupLayoutCacheKey,
+    pub shader_cache_key: PbrShaderCacheKeyMaterial,
+    pub material: PbrMaterial,
+}
 
-    let pbr = material.pbr_metallic_roughness();
+impl GltfMaterialInfo {
+    pub async fn new(
+        renderer: &mut AwsmRenderer,
+        ctx: &GltfPopulateContext,
+        gltf_material: gltf::Material<'_>,
+    ) -> Result<Self> {
+        let mut bind_group_cache_key = PbrMaterialBindGroupCacheKey::default();
+        let mut shader_cache_key = PbrShaderCacheKeyMaterial::default();
 
-    deps.base_color_factor = pbr.base_color_factor();
+        let pbr = gltf_material.pbr_metallic_roughness();
 
-    if let Some(tex) = pbr.base_color_texture().map(GltfTextureInfo::from) {
-        deps.base_color_tex = Some(tex.create_dep(renderer, ctx).await?);
-    }
+        if let Some(tex) = pbr.base_color_texture().map(GltfTextureInfo::from) {
+            let (uv_index, texture_cache_key) =
+                tex.create_material_cache_key(renderer, ctx).await?;
+            bind_group_cache_key.base_color_tex = Some(texture_cache_key);
+            shader_cache_key.base_color_uv_index = Some(uv_index as u32);
+        }
 
-    deps.metallic_factor = pbr.metallic_factor();
-    deps.roughness_factor = pbr.roughness_factor();
 
-    if let Some(tex) = pbr.metallic_roughness_texture().map(GltfTextureInfo::from) {
-        deps.metallic_roughness_tex = Some(tex.create_dep(renderer, ctx).await?);
-    }
+        if let Some(tex) = pbr.metallic_roughness_texture().map(GltfTextureInfo::from) {
+            let (uv_index, texture_cache_key) =
+                tex.create_material_cache_key(renderer, ctx).await?;
+            bind_group_cache_key.metallic_roughness_tex = Some(texture_cache_key);
+            shader_cache_key.metallic_roughness_uv_index = Some(uv_index as u32);
+        }
 
-    if let Some(normal_tex) = material.normal_texture() {
-        let tex = GltfTextureInfo {
-            index: normal_tex.texture().index(),
-            tex_coord_index: normal_tex.tex_coord() as usize,
+        if let Some(normal_tex) = gltf_material.normal_texture() {
+            let tex = GltfTextureInfo {
+                index: normal_tex.texture().index(),
+                tex_coord_index: normal_tex.tex_coord() as usize,
+            };
+            let (uv_index, tex) = tex.create_material_cache_key(renderer, ctx).await?;
+            bind_group_cache_key.normal_tex = Some(tex);
+            shader_cache_key.normal_uv_index = Some(uv_index as u32);
+        }
+
+        if let Some(occlusion_tex) = gltf_material.occlusion_texture() {
+            let tex = GltfTextureInfo {
+                index: occlusion_tex.texture().index(),
+                tex_coord_index: occlusion_tex.tex_coord() as usize,
+            };
+            let (uv_index, tex) = tex.create_material_cache_key(renderer, ctx).await?;
+            bind_group_cache_key.occlusion_tex = Some(tex);
+            shader_cache_key.occlusion_uv_index = Some(uv_index as u32);
+        }
+
+        if let Some(emissive_tex) = gltf_material.emissive_texture() {
+            let tex = GltfTextureInfo {
+                index: emissive_tex.texture().index(),
+                tex_coord_index: emissive_tex.tex_coord() as usize,
+            };
+            let (uv_index, tex) = tex.create_material_cache_key(renderer, ctx).await?;
+            bind_group_cache_key.emissive_tex = Some(tex);
+            shader_cache_key.emissive_uv_index = Some(uv_index as u32);
+        }
+
+        shader_cache_key.has_alpha_mask = matches!(gltf_material.alpha_mode(), gltf::material::AlphaMode::Mask);
+
+        let alpha_mode = match gltf_material.alpha_mode() {
+            gltf::material::AlphaMode::Opaque => MaterialAlphaMode::Opaque,
+            gltf::material::AlphaMode::Mask => MaterialAlphaMode::Mask {
+                cutoff: gltf_material.alpha_cutoff().unwrap_or(0.5),
+            },
+            gltf::material::AlphaMode::Blend => MaterialAlphaMode::Blend,
         };
-        deps.normal_tex = Some(tex.create_dep(renderer, ctx).await?);
-        deps.normal_scale = normal_tex.scale();
+        let mut material = PbrMaterial::new(alpha_mode, gltf_material.double_sided());
+        let bind_group_layout_cache_key = (&bind_group_cache_key).into();
+
+        if let Some(normal_tex) = gltf_material.normal_texture() {
+            material.normal_scale = normal_tex.scale();
+        }
+
+        if let Some(occlusion_tex) = gltf_material.occlusion_texture() {
+            material.occlusion_strength = occlusion_tex.strength();
+        }
+        material.emissive_factor = gltf_material.emissive_factor();
+
+
+        let pbr = gltf_material.pbr_metallic_roughness();
+        material.base_color_factor = pbr.base_color_factor();
+        material.metallic_factor = pbr.metallic_factor();
+        material.roughness_factor = pbr.roughness_factor();
+
+
+        Ok(Self {
+            bind_group_cache_key,
+            bind_group_layout_cache_key,
+            shader_cache_key,
+            material,
+        })
     }
-
-    if let Some(occlusion_tex) = material.occlusion_texture() {
-        let tex = GltfTextureInfo {
-            index: occlusion_tex.texture().index(),
-            tex_coord_index: occlusion_tex.tex_coord() as usize,
-        };
-        deps.occlusion_tex = Some(tex.create_dep(renderer, ctx).await?);
-        deps.occlusion_strength = occlusion_tex.strength();
-    }
-
-    if let Some(emissive_tex) = material.emissive_texture() {
-        let tex = GltfTextureInfo {
-            index: emissive_tex.texture().index(),
-            tex_coord_index: emissive_tex.tex_coord() as usize,
-        };
-        deps.emissive_tex = Some(tex.create_dep(renderer, ctx).await?);
-    }
-
-    deps.emissive_factor = material.emissive_factor();
-    deps.alpha_mode = match material.alpha_mode() {
-        gltf::material::AlphaMode::Opaque => MaterialAlphaMode::Opaque,
-        gltf::material::AlphaMode::Mask => MaterialAlphaMode::Mask {
-            cutoff: material.alpha_cutoff().unwrap_or(0.5),
-        },
-        gltf::material::AlphaMode::Blend => MaterialAlphaMode::Blend,
-    };
-    deps.double_sided = material.double_sided();
-
-    Ok(MaterialDeps::Pbr(deps))
 }
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -85,18 +121,19 @@ impl<'a> From<gltf::texture::Info<'a>> for GltfTextureInfo {
     }
 }
 
+type UvIndex = usize;
 impl GltfTextureInfo {
-    pub async fn create_dep(
+    pub async fn create_material_cache_key(
         &self,
         renderer: &mut AwsmRenderer,
         ctx: &GltfPopulateContext,
-    ) -> Result<MaterialTextureDep> {
-        let dep = {
+    ) -> Result<(UvIndex, PbrMaterialTextureCacheKey)> {
+        let texture_cache_key = {
             let lock = ctx.textures.lock().unwrap();
             lock.get(&self.index).cloned()
         };
 
-        let (texture_key, sampler_key) = match dep {
+        let (texture_key, sampler_key) = match texture_cache_key {
             Some((texture_key, sampler_key)) => (texture_key, sampler_key),
             None => {
                 let texture_key = self.create_texture_key(renderer, ctx).await?;
@@ -109,11 +146,7 @@ impl GltfTextureInfo {
             }
         };
 
-        Ok(MaterialTextureDep {
-            texture_key,
-            sampler_key,
-            uv_index: self.tex_coord_index,
-        })
+        Ok((self.tex_coord_index, PbrMaterialTextureCacheKey { texture_key, sampler_key}))
     }
 
     async fn create_texture_key(

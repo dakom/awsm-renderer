@@ -30,7 +30,7 @@ pub struct RenderPipelineCacheKey {
 }
 
 // merely a key to hash ad-hoc pipeline generation
-#[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct PipelineLayoutCacheKey {
     pub has_morph_key: bool,
     pub has_skin_key: bool,
@@ -38,8 +38,12 @@ pub struct PipelineLayoutCacheKey {
 }
 
 impl PipelineLayoutCacheKey {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(material_layout_key: MaterialBindGroupLayoutKey) -> Self {
+        Self {
+            has_morph_key: false,
+            has_skin_key: false,
+            material_layout_key,
+        }
     }
 }
 

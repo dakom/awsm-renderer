@@ -1,17 +1,10 @@
 use std::{future::Future, pin::Pin};
 
 use crate::{
-    bounds::Aabb,
-    gltf::{
+    bounds::Aabb, gltf::{
         error::{AwsmGltfError, Result},
-        layout::{instance_transform_vertex_buffer_layout, primitive_vertex_buffer_layout},
-    },
-    mesh::{Mesh, MeshBufferInfo},
-    pipeline::{PipelineLayoutCacheKey, RenderPipelineCacheKey},
-    shaders::{ShaderCacheKey, ShaderCacheKeyInstancing},
-    skin::SkinKey,
-    transform::{Transform, TransformKey},
-    AwsmRenderer,
+        layout::{instance_transform_vertex_buffer_layout, primitive_vertex_buffer_layout}, populate::material::GltfMaterialInfo,
+    }, materials::Material, mesh::{Mesh, MeshBufferInfo}, pipeline::{PipelineLayoutCacheKey, RenderPipelineCacheKey}, shaders::{ShaderCacheKey, ShaderCacheKeyInstancing, ShaderCacheKeyMaterial}, skin::SkinKey, transform::{Transform, TransformKey}, AwsmRenderer
 };
 use awsm_renderer_core::{
     compare::CompareFunction,
@@ -23,7 +16,7 @@ use awsm_renderer_core::{
 };
 use glam::{Mat4, Vec3};
 
-use super::{material::gltf_material_deps, GltfPopulateContext};
+use super::GltfPopulateContext;
 
 impl AwsmRenderer {
     pub(super) fn populate_gltf_node_mesh<'a, 'b: 'a, 'c: 'a>(
@@ -95,9 +88,8 @@ impl AwsmRenderer {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
-        let material_deps = gltf_material_deps(self, ctx, gltf_primitive.material()).await?;
+        let material_info = GltfMaterialInfo::new(self, ctx, gltf_primitive.material()).await?;
 
-        let has_alpha = material_deps.material().has_alpha();
 
         let mut shader_cache_key = ShaderCacheKey::new(
             primitive_buffer_info
@@ -106,7 +98,7 @@ impl AwsmRenderer {
                 .iter()
                 .map(|s| s.shader_key_kind)
                 .collect(),
-            material_deps.shader_cache_key(),
+            ShaderCacheKeyMaterial::Pbr(material_info.shader_cache_key),
         );
 
         if let Some(shader_morph_key) = primitive_buffer_info.morph.as_ref().map(|m| m.shader_key) {
@@ -144,20 +136,14 @@ impl AwsmRenderer {
         };
 
         let material_key = self.materials.insert(
-            &self.gpu,
-            &mut self.bind_groups,
-            &self.textures,
-            material_deps,
-        )?;
+            Material::Pbr(material_info.material.clone())
+        );
+        let material_bind_group_layout_key = self.add_material_pbr_bind_group_layout(material_key, &material_info.bind_group_layout_cache_key)?;
+        self.add_material_pbr_bind_group(material_key, material_bind_group_layout_key, &material_info.bind_group_cache_key)?;
 
-        let mut pipeline_layout_cache_key = PipelineLayoutCacheKey::new();
+        let mut pipeline_layout_cache_key = PipelineLayoutCacheKey::new(material_bind_group_layout_key);
         pipeline_layout_cache_key.has_morph_key = morph_key.is_some();
         pipeline_layout_cache_key.has_skin_key = skin_key.is_some();
-        pipeline_layout_cache_key.material_layout_key = self
-            .bind_groups
-            .material_textures
-            .get_layout_key(material_key)
-            .map_err(AwsmGltfError::MaterialMissingBindGroupLayout)?;
 
         // we only need one vertex buffer per-mesh, because we've already constructed our buffers
         // to be one contiguous buffer of interleaved vertex data.
@@ -201,15 +187,10 @@ impl AwsmRenderer {
                 false => CullMode::Back,
             });
 
-        let mut color_target_state = ColorTargetState::new(self.gpu.current_context_format());
-        let mut depth_stencil_state = DepthStencilState::new(
-            self.depth_texture
-                .as_ref()
-                .map(|(texture, _)| texture.format())
-                .ok_or(AwsmGltfError::MissingDepthTexture)?,
-        );
+        let mut color_target_state = ColorTargetState::new(self.scene_target_texture_format());
+        let mut depth_stencil_state = DepthStencilState::new(self.scene_target_depth_texture_format());
         // https://www.khronos.org/opengl/wiki/Blending#Blend_Equations
-        if has_alpha {
+        if material_info.material.has_alpha_blend() {
             color_target_state.blend = Some(BlendState {
                 color: BlendComponent::new()
                     .with_operation(BlendOperation::Add)

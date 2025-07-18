@@ -15,87 +15,76 @@ pub struct AwsmRendererWebGpu {
     pub context: web_sys::GpuCanvasContext,
 }
 
-pub struct AwsmRendererWebGpuBuilder {
+pub struct AwsmRendererWebGpuBuilder <'a> {
     pub gpu: web_sys::Gpu,
+    pub canvas: web_sys::HtmlCanvasElement,
+    pub configuration: Option<CanvasConfiguration<'a>>,
     pub adapter: Option<web_sys::GpuAdapter>,
     pub device: Option<web_sys::GpuDevice>,
     pub context: Option<web_sys::GpuCanvasContext>,
 }
 
-impl AwsmRendererWebGpuBuilder {
-    pub fn new(gpu: web_sys::Gpu) -> Self {
+impl <'a> AwsmRendererWebGpuBuilder<'a> {
+    pub fn new(gpu: web_sys::Gpu, canvas: web_sys::HtmlCanvasElement) -> Self {
         Self {
             gpu,
+            canvas,
+            configuration: None,
             adapter: None,
             device: None,
             context: None,
         }
     }
 
-    pub async fn init_adapter(mut self) -> Result<Self> {
-        let adapter: web_sys::GpuAdapter = JsFuture::from(self.gpu.request_adapter())
-            .await
-            .map_err(AwsmCoreError::gpu_adapter)?
-            .unchecked_into();
+    pub fn with_configuration(mut self, configuration: CanvasConfiguration<'a>) -> Self {
+        self.configuration = Some(configuration);
+        self
+    }
 
+    pub fn with_adapter(mut self, adapter: web_sys::GpuAdapter) -> Self {
         self.adapter = Some(adapter);
-
-        Ok(self)
+        self
     }
 
-    pub async fn init_device(mut self) -> Result<Self> {
-        let adapter = self.adapter.as_ref().ok_or(AwsmCoreError::GpuAdapter(
-            "Adapter not initialized".to_string(),
-        ))?;
-
-        let device: web_sys::GpuDevice = JsFuture::from(adapter.request_device())
-            .await
-            .map_err(AwsmCoreError::gpu_device)?
-            .unchecked_into();
-
+    pub fn with_device(mut self, device: web_sys::GpuDevice) -> Self {
         self.device = Some(device);
-
-        Ok(self)
+        self
     }
 
-    pub fn init_context(
-        mut self,
-        canvas: web_sys::HtmlCanvasElement,
-        configuration: Option<CanvasConfiguration>,
-    ) -> Result<Self> {
-        let device = self.device.as_ref().ok_or(AwsmCoreError::GpuDevice(
-            "Device not initialized".to_string(),
-        ))?;
+    pub async fn build(self) -> Result<AwsmRendererWebGpu> {
+        let adapter: web_sys::GpuAdapter = match self.adapter {
+            Some(adapter) => adapter,
+            None => {
+                JsFuture::from(self.gpu.request_adapter())
+                .await
+                .map_err(AwsmCoreError::gpu_adapter)?
+                .unchecked_into()
+            }
+        };
 
-        let ctx: web_sys::GpuCanvasContext = match canvas.get_context("webgpu") {
+        let device:web_sys::GpuDevice = match self.device {
+            Some(device) => device,
+            None => {
+                JsFuture::from(adapter.request_device())
+                    .await
+                    .map_err(AwsmCoreError::gpu_device)?
+                    .unchecked_into()
+            }
+        };
+
+        let context: web_sys::GpuCanvasContext = match self.canvas.get_context("webgpu") {
             Ok(Some(ctx)) => Ok(ctx.unchecked_into()),
             Err(err) => Err(AwsmCoreError::canvas_context(err)),
             Ok(None) => Err(AwsmCoreError::CanvasContext("No context found".to_string())),
         }?;
 
-        let configuration = match configuration {
+        let configuration = match self.configuration {
             Some(config) => config,
-            None => CanvasConfiguration::new(device, self.gpu.get_preferred_canvas_format()),
+            None => CanvasConfiguration::new(&device, self.gpu.get_preferred_canvas_format()),
         };
 
-        ctx.configure(&configuration.into())
+        context.configure(&configuration.into())
             .map_err(AwsmCoreError::context_configuration)?;
-
-        self.context = Some(ctx);
-
-        Ok(self)
-    }
-
-    pub fn build(self) -> Result<AwsmRendererWebGpu> {
-        let adapter = self.adapter.ok_or(AwsmCoreError::GpuAdapter(
-            "Adapter not initialized".to_string(),
-        ))?;
-        let device = self.device.ok_or(AwsmCoreError::GpuDevice(
-            "Device not initialized".to_string(),
-        ))?;
-        let context = self.context.ok_or(AwsmCoreError::CanvasContext(
-            "Context not initialized".to_string(),
-        ))?;
 
         Ok(AwsmRendererWebGpu {
             gpu: self.gpu,

@@ -47,6 +47,8 @@ pub enum AwsmError {
     #[error("{0}")]
     Light(#[from] AwsmLightError),
 
+    #[error("Scene texture create view: {0}")]
+    SceneTextureCreateView(String),
     #[error("Depth texture create view: {0}")]
     DepthTextureCreateView(String),
 }
