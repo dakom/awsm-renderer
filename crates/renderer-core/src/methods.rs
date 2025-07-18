@@ -36,9 +36,17 @@ impl AwsmRendererWebGpu {
     }
 
     pub fn current_context_texture(&self) -> Result<web_sys::GpuTexture> {
+        // fine to call this often, from spec https://gpuweb.github.io/gpuweb/#dom-gpucanvascontext-getcurrenttexture
+        // "Note: The same GPUTexture object will be returned by every call to getCurrentTexture()
+        // until 'Expire the current texture' runs [...]"
         self.context
             .get_current_texture()
             .map_err(AwsmCoreError::current_context_texture)
+    }
+
+    pub fn current_context_texture_size(&self) -> Result<(u32, u32)> {
+        let texture = self.current_context_texture()?;
+        Ok((texture.width(), texture.height()))
     }
 
     pub fn current_context_texture_view(&self) -> Result<web_sys::GpuTextureView> {

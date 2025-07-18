@@ -220,6 +220,6 @@ fn get_url(base: &str, uri: &str) -> anyhow::Result<String> {
         }
     } else {
         //relative
-        Ok(format!("{}{}", base, uri))
+        Ok(format!("{base}{uri}"))
     }
 }

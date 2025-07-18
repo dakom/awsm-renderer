@@ -1,12 +1,10 @@
 use awsm_renderer_core::{
     command::color::Color,
-    configuration::CanvasConfiguration,
-    renderer::AwsmRendererWebGpu,
-    texture::{Extent3d, TextureDescriptor, TextureFormat, TextureUsage},
+    renderer::{AwsmRendererWebGpu, AwsmRendererWebGpuBuilder},
+    texture::TextureFormat,
 };
 use bind_groups::BindGroups;
 use camera::CameraBuffer;
-use error::AwsmError;
 use instances::Instances;
 use lights::Lights;
 use materials::Materials;
@@ -16,6 +14,11 @@ use shaders::Shaders;
 use skin::Skins;
 use textures::Textures;
 use transform::Transforms;
+
+use crate::render::{
+    post_process::{PostProcess, PostProcessSettings},
+    textures::RenderTextures,
+};
 
 pub mod bind_groups;
 pub mod bounds;
@@ -58,11 +61,8 @@ pub struct AwsmRenderer {
     pub textures: Textures,
     pub logging: AwsmRendererLogging,
     pub clear_color: Color,
-    // the texture itself is only held so we can get the format and destroy upon resize
-    // no bindings depend on it existing, rather the view is used on each tick.
-    // Theoretically bugs can creep in if the format is changed after mesh creation
-    // so stick to one format on creation and use throughout, e.g. Depth24plus on resize too
-    pub depth_texture: Option<(web_sys::GpuTexture, web_sys::GpuTextureView)>,
+    pub render_textures: RenderTextures,
+    pub post_process: PostProcess,
 
     #[cfg(feature = "gltf")]
     gltf: gltf::cache::GltfCache,
@@ -72,96 +72,60 @@ pub struct AwsmRenderer {
 }
 
 impl AwsmRenderer {
-    pub fn remove_all(&mut self) -> crate::error::Result<()> {
-        let deps = RebuildDeps::new(&self.gpu)?;
-        let RebuildDeps {
-            bind_groups,
-            meshes,
-            camera,
-            transforms,
-            skins,
-            instances,
-            shaders,
-            materials,
-            pipelines,
-            textures,
-            lights,
-            #[cfg(feature = "gltf")]
-            gltf,
-            #[cfg(feature = "animation")]
-            animations,
-        } = deps;
+    pub async fn remove_all(&mut self) -> crate::error::Result<()> {
+        // meh, just recreate the renderer, it's fine
+        let renderer = AwsmRendererBuilder::new(self.gpu.clone())
+            .with_logging(self.logging.clone())
+            .with_clear_color(self.clear_color.clone())
+            .with_scene_texture_format(self.render_textures.scene_texture_format)
+            .with_depth_texture_format(self.render_textures.depth_texture_format)
+            .build()
+            .await?;
 
-        self.bind_groups = bind_groups;
-        self.camera = camera;
-        self.meshes = meshes;
-        self.transforms = transforms;
-        self.skins = skins;
-        self.instances = instances;
-        self.shaders = shaders;
-        self.materials = materials;
-        self.pipelines = pipelines;
-        self.lights = lights;
-        self.textures = textures;
-        // nah... keep this, application logic can reset it
-        // self.depth_texture = None;
-
-        #[cfg(feature = "gltf")]
-        {
-            self.gltf = gltf;
-        }
-
-        #[cfg(feature = "animation")]
-        {
-            self.animations = animations;
-        }
-
-        Ok(())
-    }
-
-    pub fn set_depth_texture(
-        &mut self,
-        format: TextureFormat,
-        width: u32,
-        height: u32,
-    ) -> crate::error::Result<()> {
-        let depth_texture = self.gpu.create_texture(
-            &TextureDescriptor::new(
-                format,
-                Extent3d::new(width, Some(height), Some(1)),
-                TextureUsage::new().with_render_attachment(),
-            )
-            .into(),
-        )?;
-
-        let depth_texture_view = depth_texture
-            .create_view()
-            .map_err(|e| AwsmError::DepthTextureCreateView(e.as_string().unwrap_or_default()))?;
-
-        self.depth_texture = Some((depth_texture, depth_texture_view));
-
-        Ok(())
-    }
-    pub fn clear_depth_texture(&mut self) -> crate::error::Result<()> {
-        if let Some(texture) = self.depth_texture.take() {
-            texture.0.destroy();
-        }
+        *self = renderer;
         Ok(())
     }
 }
 
-pub struct AwsmRendererBuilder {
-    gpu: core::renderer::AwsmRendererWebGpuBuilder,
+pub struct AwsmRendererBuilder<'a> {
+    gpu: AwsmRendererGpuBuilderKind<'a>,
     logging: AwsmRendererLogging,
-    depth_texture: Option<(web_sys::GpuTexture, web_sys::GpuTextureView)>,
+    scene_texture_format: TextureFormat,
+    depth_texture_format: TextureFormat,
+    clear_color: Color,
 }
 
-impl AwsmRendererBuilder {
-    pub fn new(gpu: web_sys::Gpu) -> Self {
+pub enum AwsmRendererGpuBuilderKind<'a> {
+    WebGpuBuilder(AwsmRendererWebGpuBuilder<'a>),
+    WebGpuBuilt(AwsmRendererWebGpu),
+}
+
+impl<'a> From<AwsmRendererWebGpuBuilder<'a>> for AwsmRendererGpuBuilderKind<'a> {
+    fn from(builder: AwsmRendererWebGpuBuilder<'a>) -> Self {
+        AwsmRendererGpuBuilderKind::WebGpuBuilder(builder)
+    }
+}
+
+impl From<AwsmRendererWebGpu> for AwsmRendererGpuBuilderKind<'_> {
+    fn from(gpu: AwsmRendererWebGpu) -> Self {
+        AwsmRendererGpuBuilderKind::WebGpuBuilt(gpu)
+    }
+}
+
+impl From<(web_sys::Gpu, web_sys::HtmlCanvasElement)> for AwsmRendererGpuBuilderKind<'_> {
+    fn from((gpu, canvas): (web_sys::Gpu, web_sys::HtmlCanvasElement)) -> Self {
+        AwsmRendererGpuBuilderKind::WebGpuBuilder(AwsmRendererWebGpuBuilder::new(gpu, canvas))
+    }
+}
+
+impl<'a> AwsmRendererBuilder<'a> {
+    pub fn new(gpu: impl Into<AwsmRendererGpuBuilderKind<'a>>) -> Self {
         Self {
-            gpu: core::renderer::AwsmRendererWebGpuBuilder::new(gpu),
+            gpu: gpu.into(),
             logging: AwsmRendererLogging::default(),
-            depth_texture: None,
+            scene_texture_format: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
+            depth_texture_format: TextureFormat::Depth24plus,
+            clear_color: Color::BLACK,
         }
     }
 
@@ -170,117 +134,79 @@ impl AwsmRendererBuilder {
         self
     }
 
-    pub fn with_depth_texture(
-        mut self,
-        texture: web_sys::GpuTexture,
-        texture_view: web_sys::GpuTextureView,
-    ) -> Self {
-        self.depth_texture = Some((texture, texture_view));
+    pub fn with_scene_texture_format(mut self, format: TextureFormat) -> Self {
+        self.scene_texture_format = format;
         self
     }
 
-    pub async fn init_adapter(mut self) -> core::error::Result<Self> {
-        self.gpu = self.gpu.init_adapter().await?;
-        Ok(self)
+    pub fn with_depth_texture_format(mut self, format: TextureFormat) -> Self {
+        self.depth_texture_format = format;
+        self
     }
 
-    pub async fn init_device(mut self) -> core::error::Result<Self> {
-        self.gpu = self.gpu.init_device().await?;
-        Ok(self)
+    pub fn with_clear_color(mut self, color: Color) -> Self {
+        self.clear_color = color;
+        self
     }
 
-    pub fn init_context(
-        mut self,
-        canvas: web_sys::HtmlCanvasElement,
-        configuration: Option<CanvasConfiguration>,
-    ) -> core::error::Result<Self> {
-        self.gpu = self.gpu.init_context(canvas, configuration)?;
-        Ok(self)
-    }
-
-    pub fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
-        let gpu = self.gpu.build()?;
-
-        let deps = RebuildDeps::new(&gpu)?;
-
-        Ok(AwsmRenderer {
+    pub async fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
+        let Self {
             gpu,
-            meshes: deps.meshes,
-            camera: deps.camera,
-            transforms: deps.transforms,
-            skins: deps.skins,
-            instances: deps.instances,
-            shaders: deps.shaders,
-            bind_groups: deps.bind_groups,
-            materials: deps.materials,
-            pipelines: deps.pipelines,
-            lights: deps.lights,
-            textures: deps.textures,
-            clear_color: Color::BLACK,
-            logging: self.logging,
-            depth_texture: self.depth_texture,
+            logging,
+            scene_texture_format,
+            depth_texture_format,
+            clear_color,
+        } = self;
 
-            #[cfg(feature = "gltf")]
-            gltf: deps.gltf,
-
-            #[cfg(feature = "animation")]
-            animations: deps.animations,
-        })
-    }
-}
-
-struct RebuildDeps {
-    pub bind_groups: BindGroups,
-    pub meshes: Meshes,
-    pub camera: CameraBuffer,
-    pub transforms: Transforms,
-    pub skins: Skins,
-    pub instances: Instances,
-    pub shaders: Shaders,
-    pub materials: Materials,
-    pub pipelines: Pipelines,
-    pub lights: Lights,
-    pub textures: Textures,
-
-    #[cfg(feature = "gltf")]
-    pub gltf: gltf::cache::GltfCache,
-
-    #[cfg(feature = "animation")]
-    pub animations: animation::Animations,
-}
-
-impl RebuildDeps {
-    pub fn new(gpu: &AwsmRendererWebGpu) -> std::result::Result<Self, crate::error::AwsmError> {
-        let bind_groups = bind_groups::BindGroups::new(gpu)?;
+        let gpu = match gpu {
+            AwsmRendererGpuBuilderKind::WebGpuBuilder(builder) => builder.build().await?,
+            AwsmRendererGpuBuilderKind::WebGpuBuilt(gpu) => gpu,
+        };
+        let bind_groups = bind_groups::BindGroups::new(&gpu)?;
         let camera = camera::CameraBuffer::new()?;
-        let meshes = Meshes::new(gpu)?;
+        let meshes = Meshes::new(&gpu)?;
         let transforms = Transforms::new()?;
         let skins = Skins::new();
-        let instances = Instances::new(gpu)?;
+        let instances = Instances::new(&gpu)?;
         let shaders = Shaders::new();
         let materials = Materials::new();
         let pipelines = Pipelines::new();
         let lights = Lights::new();
         let textures = Textures::new();
+        let post_process_settings = PostProcessSettings::default();
+        let render_textures = RenderTextures::new(scene_texture_format, depth_texture_format);
+        let post_process = PostProcess::new(post_process_settings);
+        #[cfg(feature = "gltf")]
+        let gltf = gltf::cache::GltfCache::default();
+        #[cfg(feature = "animation")]
+        let animations = animation::Animations::default();
 
-        Ok(Self {
-            bind_groups,
+        let mut _self = AwsmRenderer {
+            gpu,
             meshes,
             camera,
             transforms,
             skins,
             instances,
             shaders,
+            bind_groups,
             materials,
             pipelines,
             lights,
             textures,
-
+            clear_color,
+            logging,
+            render_textures,
+            post_process,
             #[cfg(feature = "gltf")]
-            gltf: gltf::cache::GltfCache::default(),
+            gltf,
             #[cfg(feature = "animation")]
-            animations: animation::Animations::default(),
-        })
+            animations,
+        };
+
+        _self.post_process_init().await?;
+
+        Ok(_self)
     }
 }
 

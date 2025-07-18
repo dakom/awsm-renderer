@@ -150,6 +150,7 @@ pub struct ShaderCacheKeyInstancing {
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShaderCacheKeyMaterial {
     Pbr(PbrShaderCacheKeyMaterial),
+    PostProcess,
     DebugNormals,
 }
 
@@ -158,6 +159,7 @@ impl ShaderCacheKeyMaterial {
         match self {
             ShaderCacheKeyMaterial::Pbr(material_key) => material_key.has_alpha_mask,
             ShaderCacheKeyMaterial::DebugNormals => false,
+            ShaderCacheKeyMaterial::PostProcess => false,
         }
     }
 
@@ -165,13 +167,26 @@ impl ShaderCacheKeyMaterial {
         match self {
             ShaderCacheKeyMaterial::Pbr(_) => FragmentShaderKind::Pbr,
             ShaderCacheKeyMaterial::DebugNormals => FragmentShaderKind::DebugNormals,
+            ShaderCacheKeyMaterial::PostProcess => FragmentShaderKind::PostProcess,
+        }
+    }
+
+    pub fn vertex_shader_kind(&self) -> VertexShaderKind {
+        match self {
+            ShaderCacheKeyMaterial::Pbr(_) => VertexShaderKind::Mesh,
+            ShaderCacheKeyMaterial::DebugNormals => VertexShaderKind::Mesh,
+            ShaderCacheKeyMaterial::PostProcess => VertexShaderKind::Quad,
         }
     }
 }
 
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PbrShaderCacheKeyMaterial {
     pub base_color_uv_index: Option<u32>,
+    pub metallic_roughness_uv_index: Option<u32>,
+    pub normal_uv_index: Option<u32>,
+    pub occlusion_uv_index: Option<u32>,
+    pub emissive_uv_index: Option<u32>,
     pub has_alpha_mask: bool,
 }
 
@@ -206,19 +221,6 @@ pub enum VertexColorSize {
     Vec4,
 }
 
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ShaderKeyAlphaMode {
-    Opaque,
-    Blend,
-    Mask,
-}
-
-impl Default for ShaderKeyAlphaMode {
-    fn default() -> Self {
-        Self::Opaque
-    }
-}
-
 impl ShaderCacheKey {
     pub fn into_descriptor(&self) -> Result<web_sys::GpuShaderModuleDescriptor> {
         Ok(ShaderModuleDescriptor::new(&self.into_source()?, None).into())
@@ -233,7 +235,7 @@ impl ShaderCacheKey {
         let mut sanity_check = HashSet::new();
         for attribute in &self.attributes {
             if !sanity_check.insert(std::mem::discriminant(attribute)) {
-                panic!("Duplicate attribute found: {:?}", attribute);
+                panic!("Duplicate attribute found: {attribute:?}");
             }
 
             match attribute {
@@ -350,6 +352,8 @@ impl ShaderCacheKey {
                     data_type: "vec3<f32>".to_string(),
                 });
             }
+
+            ShaderCacheKeyMaterial::PostProcess => {}
         };
 
         vertex_output_locations = vertex_output_locations
@@ -368,6 +372,7 @@ impl ShaderCacheKey {
             morphs: self.morphs,
             skins: skins.unwrap_or_default(),
             has_instance_transform: self.instancing.transform,
+            vertex_shader_kind: self.material.vertex_shader_kind(),
             fragment_shader_kind: self.material.fragment_shader_kind(),
             fragment_buffer_bindings,
             material,
@@ -376,7 +381,8 @@ impl ShaderCacheKey {
 
         let source = tmpl.render().unwrap();
 
-        //print_source(&source, false);
+        // tracing::info!("{:#?}", tmpl);
+        // print_source(&source, false);
 
         Ok(source)
     }
@@ -389,8 +395,8 @@ fn print_source(source: &str, with_line_numbers: bool) {
     let mut line_number = 1;
     for line in lines {
         let formatted_line = match with_line_numbers {
-            true => format!("{:>4}: {}\n", line_number, line),
-            false => format!("{}\n", line),
+            true => format!("{line_number:>4}: {line}\n"),
+            false => format!("{line}\n"),
         };
         output.push_str(&formatted_line);
         line_number += 1;
@@ -415,6 +421,7 @@ struct ShaderTemplate {
     // simpler ways of doing things
     pub has_instance_transform: bool,
     pub has_normals: bool,
+    pub vertex_shader_kind: VertexShaderKind,
     pub fragment_shader_kind: FragmentShaderKind,
     pub material: ShaderTemplateMaterial,
     // pub skin_targets: Vec<SkinTarget>,
@@ -454,9 +461,16 @@ impl ShaderTemplateMaterial {
 }
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VertexShaderKind {
+    Mesh,
+    Quad,
+}
+
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FragmentShaderKind {
     DebugNormals,
     Pbr,
+    PostProcess,
 }
 
 #[derive(Debug)]

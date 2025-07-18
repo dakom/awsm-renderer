@@ -1,4 +1,6 @@
-use awsm_renderer::{AwsmRendererBuilder, AwsmRendererLogging};
+use awsm_renderer::{
+    core::renderer::AwsmRendererWebGpuBuilder, AwsmRendererBuilder, AwsmRendererLogging,
+};
 use awsm_web::dom::resize::{self, ResizeObserver};
 use wasm_bindgen_futures::spawn_local;
 
@@ -58,17 +60,11 @@ impl AppCanvas {
                 .class(&*FULL_AREA)
                 .after_inserted(clone!(state => move |canvas| {
                     spawn_local(clone!(state => async move {
-                        let renderer = AwsmRendererBuilder::new(web_sys::window().unwrap().navigator().gpu())
+                        let gpu = web_sys::window().unwrap().navigator().gpu();
+                        let renderer = AwsmRendererBuilder::new((gpu, canvas))
                             .with_logging(AwsmRendererLogging { render_timings: true })
-                            .init_adapter()
-                            .await
-                            .unwrap()
-                            .init_device()
-                            .await
-                            .unwrap()
-                            .init_context(canvas.clone(), None)
-                            .unwrap()
                             .build()
+                            .await
                             .unwrap();
 
                         state.ctx.scene.set(Some(AppScene::new(state.ctx.clone(), renderer)));

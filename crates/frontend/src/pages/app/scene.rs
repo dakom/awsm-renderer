@@ -188,7 +188,7 @@ impl AppScene {
         let mut renderer = state.renderer.lock().await;
 
         state.stop_animation_loop();
-        if let Err(err) = renderer.remove_all() {
+        if let Err(err) = renderer.remove_all().await {
             tracing::error!("Failed to clear renderer: {:?}", err);
         }
         renderer.render();
@@ -267,11 +267,6 @@ impl AppScene {
         let mut renderer = self.renderer.lock().await;
 
         let (canvas_width, canvas_height) = renderer.gpu.canvas_size();
-        renderer.set_depth_texture(
-            TextureFormat::Depth24plus,
-            canvas_width as u32,
-            canvas_height as u32,
-        )?;
 
         // call these first so we can get the extents
         renderer.update_animations(0.0)?;
@@ -365,6 +360,10 @@ impl AppScene {
                         .clone();
 
                     shader_cache_key.material = material;
+                }
+                FragmentShaderKind::PostProcess => {
+                    // this shouldn't be reachable, but just in case
+                    shader_cache_key.material = ShaderCacheKeyMaterial::PostProcess;
                 }
             }
 

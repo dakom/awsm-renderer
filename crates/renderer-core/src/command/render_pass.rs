@@ -1,4 +1,4 @@
-use std::{borrow::Cow, ops::Deref};
+use std::ops::Deref;
 
 use crate::{error::AwsmCoreError, pipeline::primitive::IndexFormat};
 
@@ -152,7 +152,7 @@ impl<'a> ColorAttachment<'a> {
 pub struct DepthStencilAttachment<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginRenderPass#depthstencil_attachment_object_structure
     // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuRenderPassDepthStencilAttachment.html
-    pub view: Cow<'a, web_sys::GpuTextureView>,
+    pub view: &'a web_sys::GpuTextureView,
     pub depth_clear_value: Option<f32>,
     pub depth_load_op: Option<LoadOp>,
     pub depth_read_only: Option<bool>,
@@ -164,7 +164,7 @@ pub struct DepthStencilAttachment<'a> {
 }
 
 impl<'a> DepthStencilAttachment<'a> {
-    pub fn new(view: Cow<'a, web_sys::GpuTextureView>) -> Self {
+    pub fn new(view: &'a web_sys::GpuTextureView) -> Self {
         Self {
             view,
             depth_clear_value: None,
@@ -283,7 +283,7 @@ impl From<ColorAttachment<'_>> for web_sys::GpuRenderPassColorAttachment {
 
 impl From<DepthStencilAttachment<'_>> for web_sys::GpuRenderPassDepthStencilAttachment {
     fn from(attachment: DepthStencilAttachment) -> web_sys::GpuRenderPassDepthStencilAttachment {
-        let attachment_js = web_sys::GpuRenderPassDepthStencilAttachment::new(&attachment.view);
+        let attachment_js = web_sys::GpuRenderPassDepthStencilAttachment::new(attachment.view);
 
         if let Some(depth_clear_value) = attachment.depth_clear_value {
             attachment_js.set_depth_clear_value(depth_clear_value);

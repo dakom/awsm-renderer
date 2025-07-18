@@ -117,7 +117,7 @@ impl TextureUsage {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Extent3d {
     pub width: u32,
     pub height: Option<u32>,

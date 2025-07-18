@@ -12,7 +12,7 @@ use material_textures::{MaterialBindGroupLayoutKey, MaterialTextureBindGroups};
 use thiserror::Error;
 use uniform_storage::UniformStorageBindGroups;
 
-use crate::materials::MaterialKey;
+use crate::{bind_groups::material_textures::MaterialBindGroupKey, materials::MaterialKey};
 
 pub struct BindGroups {
     pub uniform_storages: UniformStorageBindGroups,
@@ -78,11 +78,14 @@ pub enum AwsmBindGroupError {
     },
 
     #[error("[bind group] missing material for {0:?}")]
-    MissingMaterial(MaterialKey),
+    MissingMaterialBindGroup(MaterialBindGroupKey),
 
     #[error("[bind group] missing material layout for {0:?}")]
     MissingMaterialLayout(MaterialBindGroupLayoutKey),
 
     #[error("[bind group] missing material layout for material {0:?}")]
     MissingMaterialLayoutForMaterial(MaterialKey),
+
+    #[error("[bind group] missing material bind group for material {0:?}")]
+    MissingMaterialBindGroupForMaterial(MaterialKey),
 }

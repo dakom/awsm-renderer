@@ -30,16 +30,35 @@ pub struct RenderPipelineCacheKey {
 }
 
 // merely a key to hash ad-hoc pipeline generation
-#[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
-pub struct PipelineLayoutCacheKey {
-    pub has_morph_key: bool,
-    pub has_skin_key: bool,
-    pub material_layout_key: MaterialBindGroupLayoutKey,
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
+pub enum PipelineLayoutCacheKey {
+    Mesh {
+        has_morph_key: bool,
+        has_skin_key: bool,
+        material_layout_key: MaterialBindGroupLayoutKey,
+    },
+    PostProcess {
+        material_layout_key: MaterialBindGroupLayoutKey,
+    },
 }
 
 impl PipelineLayoutCacheKey {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new_mesh(
+        material_layout_key: MaterialBindGroupLayoutKey,
+        has_morph_key: bool,
+        has_skin_key: bool,
+    ) -> Self {
+        Self::Mesh {
+            has_morph_key,
+            has_skin_key,
+            material_layout_key,
+        }
+    }
+
+    pub fn new_post_process(material_layout_key: MaterialBindGroupLayoutKey) -> Self {
+        Self::PostProcess {
+            material_layout_key,
+        }
     }
 }
 
@@ -122,31 +141,48 @@ impl PipelineLayoutCacheKey {
         bind_groups: &BindGroups,
         label: Option<&'a str>,
     ) -> Result<PipelineLayoutDescriptor<'a>> {
-        let mut bind_group_layouts = vec![
-            bind_groups
-                .uniform_storages
-                .gpu_universal_bind_group_layout()
-                .clone(),
-            bind_groups
-                .uniform_storages
-                .gpu_mesh_all_bind_group_layout()
-                .clone(),
-            bind_groups
-                .material_textures
-                .gpu_bind_group_layout(self.material_layout_key)?
-                .clone(),
-        ];
+        match self {
+            PipelineLayoutCacheKey::Mesh {
+                has_morph_key,
+                has_skin_key,
+                material_layout_key,
+            } => {
+                let mut bind_group_layouts = vec![
+                    bind_groups
+                        .uniform_storages
+                        .gpu_universal_bind_group_layout()
+                        .clone(),
+                    bind_groups
+                        .uniform_storages
+                        .gpu_mesh_all_bind_group_layout()
+                        .clone(),
+                    bind_groups
+                        .material_textures
+                        .gpu_bind_group_layout(material_layout_key)?
+                        .clone(),
+                ];
 
-        if self.has_morph_key || self.has_skin_key {
-            bind_group_layouts.push(
-                bind_groups
-                    .uniform_storages
-                    .gpu_mesh_shape_bind_group_layout()
-                    .clone(),
-            );
+                if has_morph_key || has_skin_key {
+                    bind_group_layouts.push(
+                        bind_groups
+                            .uniform_storages
+                            .gpu_mesh_shape_bind_group_layout()
+                            .clone(),
+                    );
+                }
+
+                Ok(PipelineLayoutDescriptor::new(label, bind_group_layouts))
+            }
+            PipelineLayoutCacheKey::PostProcess {
+                material_layout_key,
+            } => {
+                let bind_group_layouts = vec![bind_groups
+                    .material_textures
+                    .gpu_bind_group_layout(material_layout_key)?
+                    .clone()];
+                Ok(PipelineLayoutDescriptor::new(label, bind_group_layouts))
+            }
         }
-
-        Ok(PipelineLayoutDescriptor::new(label, bind_group_layouts))
     }
 }
 

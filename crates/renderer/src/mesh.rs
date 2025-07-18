@@ -84,7 +84,8 @@ impl Mesh {
         let transform_offset = ctx.transforms.buffer_offset(self.transform_key)? as u32;
         let pbr_material_offset = ctx
             .materials
-            .pbr_buffer_offset(self.material_key)
+            .pbr
+            .buffer_offset(self.material_key)
             .unwrap_or_default() as u32;
 
         ctx.render_pass.set_bind_group(
@@ -97,7 +98,7 @@ impl Mesh {
             2,
             ctx.bind_groups
                 .material_textures
-                .gpu_bind_group(self.material_key)?,
+                .gpu_bind_group_by_material(self.material_key)?,
             None,
         )?;
 

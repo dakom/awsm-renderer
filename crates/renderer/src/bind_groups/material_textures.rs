@@ -11,9 +11,11 @@ use awsm_renderer_core::{
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 pub struct MaterialTextureBindGroups {
-    bind_groups: SecondaryMap<MaterialKey, web_sys::GpuBindGroup>,
     layouts: SlotMap<MaterialBindGroupLayoutKey, web_sys::GpuBindGroupLayout>,
+    bind_groups: SlotMap<MaterialBindGroupKey, web_sys::GpuBindGroup>,
+    // optimizations so we don't have to load the whole material to get the keys
     material_layout_mapping: SecondaryMap<MaterialKey, MaterialBindGroupLayoutKey>,
+    material_bind_group_mapping: SecondaryMap<MaterialKey, MaterialBindGroupKey>,
 }
 
 #[derive(Debug, Clone)]
@@ -35,34 +37,24 @@ impl Default for MaterialTextureBindGroups {
 impl MaterialTextureBindGroups {
     pub fn new() -> Self {
         Self {
-            bind_groups: SecondaryMap::new(),
             layouts: SlotMap::with_key(),
+            bind_groups: SlotMap::with_key(),
             material_layout_mapping: SecondaryMap::new(),
+            material_bind_group_mapping: SecondaryMap::new(),
         }
     }
 
-    pub fn remove(&mut self, key: MaterialKey) -> Result<()> {
-        if let Some(layout_key) = self.material_layout_mapping.remove(key) {
-            self.layouts.remove(layout_key);
-        }
-        self.bind_groups.remove(key);
-        Ok(())
-    }
-
-    pub fn gpu_bind_group(&self, key: MaterialKey) -> Result<&web_sys::GpuBindGroup> {
+    pub fn gpu_bind_group(&self, key: MaterialBindGroupKey) -> Result<&web_sys::GpuBindGroup> {
         let bind_group = self
             .bind_groups
             .get(key)
-            .ok_or(AwsmBindGroupError::MissingMaterial(key))?;
+            .ok_or(AwsmBindGroupError::MissingMaterialBindGroup(key))?;
         Ok(bind_group)
     }
 
-    pub fn get_layout_key(&self, key: MaterialKey) -> Result<MaterialBindGroupLayoutKey> {
-        let layout_key = *self
-            .material_layout_mapping
-            .get(key)
-            .ok_or(AwsmBindGroupError::MissingMaterialLayoutForMaterial(key))?;
-        Ok(layout_key)
+    pub fn gpu_bind_group_by_material(&self, key: MaterialKey) -> Result<&web_sys::GpuBindGroup> {
+        let key = self.get_bind_group_key(key)?;
+        self.gpu_bind_group(key)
     }
 
     pub fn gpu_bind_group_layout(
@@ -74,6 +66,30 @@ impl MaterialTextureBindGroups {
             .get(layout_key)
             .ok_or(AwsmBindGroupError::MissingMaterialLayout(layout_key))?;
         Ok(layout)
+    }
+
+    pub fn gpu_bind_group_layout_by_material(
+        &self,
+        key: MaterialKey,
+    ) -> Result<&web_sys::GpuBindGroupLayout> {
+        let layout_key = self.get_layout_key(key)?;
+        self.gpu_bind_group_layout(layout_key)
+    }
+
+    pub fn get_layout_key(&self, key: MaterialKey) -> Result<MaterialBindGroupLayoutKey> {
+        let layout_key = *self
+            .material_layout_mapping
+            .get(key)
+            .ok_or(AwsmBindGroupError::MissingMaterialLayoutForMaterial(key))?;
+        Ok(layout_key)
+    }
+
+    pub fn get_bind_group_key(&self, key: MaterialKey) -> Result<MaterialBindGroupKey> {
+        let bind_group_key = *self
+            .material_bind_group_mapping
+            .get(key)
+            .ok_or(AwsmBindGroupError::MissingMaterialBindGroupForMaterial(key))?;
+        Ok(bind_group_key)
     }
 
     pub fn insert_bind_group_layout(
@@ -105,13 +121,12 @@ impl MaterialTextureBindGroups {
         Ok(key)
     }
 
-    pub fn insert_material_texture(
+    pub fn insert_bind_group(
         &mut self,
         gpu: &AwsmRendererWebGpu,
-        material_key: MaterialKey,
         layout_key: MaterialBindGroupLayoutKey,
         entries: &[MaterialTextureBindingEntry],
-    ) -> Result<()> {
+    ) -> Result<MaterialBindGroupKey> {
         let layout = self
             .layouts
             .get(layout_key)
@@ -132,14 +147,34 @@ impl MaterialTextureBindGroups {
 
         let bind_group = gpu_create_bind_group(gpu, "Material", layout, entries);
 
-        self.bind_groups.insert(material_key, bind_group);
-        self.material_layout_mapping
-            .insert(material_key, layout_key);
+        let key = self.bind_groups.insert(bind_group);
 
-        Ok(())
+        Ok(key)
+    }
+
+    pub fn insert_material_bind_group_layout_lookup(
+        &mut self,
+        material_key: MaterialKey,
+        bind_group_layout_key: MaterialBindGroupLayoutKey,
+    ) {
+        self.material_layout_mapping
+            .insert(material_key, bind_group_layout_key);
+    }
+
+    pub fn insert_material_bind_group_lookup(
+        &mut self,
+        material_key: MaterialKey,
+        bind_group_key: MaterialBindGroupKey,
+    ) {
+        self.material_bind_group_mapping
+            .insert(material_key, bind_group_key);
     }
 }
 
 new_key_type! {
     pub struct MaterialBindGroupLayoutKey;
+}
+
+new_key_type! {
+    pub struct MaterialBindGroupKey;
 }

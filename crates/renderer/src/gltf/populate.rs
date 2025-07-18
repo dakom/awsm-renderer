@@ -21,13 +21,15 @@ mod transforms;
 
 pub(crate) struct GltfPopulateContext {
     pub data: Arc<GltfData>,
-    pub textures: Mutex<HashMap<usize, (TextureKey, SamplerKey)>>,
-    pub node_to_transform: Mutex<HashMap<usize, TransformKey>>,
-    pub node_to_skin: Mutex<HashMap<usize, SkinKey>>,
+    pub textures: Mutex<HashMap<GltfIndex, (TextureKey, SamplerKey)>>,
+    pub node_to_transform: Mutex<HashMap<GltfIndex, TransformKey>>,
+    pub node_to_skin: Mutex<HashMap<GltfIndex, SkinKey>>,
     pub transform_is_joint: Mutex<HashSet<TransformKey>>,
     pub transform_is_instanced: Mutex<HashSet<TransformKey>>,
     pub generate_mipmaps: bool,
 }
+
+type GltfIndex = usize;
 
 impl AwsmRenderer {
     pub async fn populate_gltf(
