@@ -66,7 +66,7 @@ pub struct RenderTextureViews {
 }
 
 struct RenderTexturesInner {
-    pub scene_texture: web_sys::GpuTexture,
+    pub _scene_texture: web_sys::GpuTexture,
     pub scene_texture_view: web_sys::GpuTextureView,
     pub depth_texture: web_sys::GpuTexture,
     pub depth_texture_view: web_sys::GpuTextureView,
@@ -112,7 +112,7 @@ impl RenderTexturesInner {
             .map_err(|e| AwsmError::DepthTextureCreateView(e.as_string().unwrap_or_default()))?;
 
         Ok(Self {
-            scene_texture,
+            _scene_texture: scene_texture,
             scene_texture_view,
             depth_texture,
             depth_texture_view,

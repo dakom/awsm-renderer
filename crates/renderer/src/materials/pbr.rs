@@ -201,10 +201,11 @@ impl PbrMaterial {
     pub const BYTE_SIZE: usize = 64;
 
     pub fn new(alpha_mode: MaterialAlphaMode, double_sided: bool) -> Self {
-        let mut _self = Self::default();
-        _self.alpha_mode = alpha_mode;
-        _self.double_sided = double_sided;
-        _self
+        Self {
+            alpha_mode,
+            double_sided,
+            ..Default::default()
+        }
     }
 
     pub fn set_alpha_cutoff(&mut self, cutoff: f32) -> Result<()> {
@@ -306,13 +307,13 @@ pub struct PbrMaterialBindGroupLayoutCacheKey {
 
 impl From<&PbrMaterialBindGroupCacheKey> for PbrMaterialBindGroupLayoutCacheKey {
     fn from(cache_key: &PbrMaterialBindGroupCacheKey) -> Self {
-        let mut key = PbrMaterialBindGroupLayoutCacheKey::default();
-        key.has_base_color_tex = cache_key.base_color_tex.is_some();
-        key.has_metallic_roughness_tex = cache_key.metallic_roughness_tex.is_some();
-        key.has_normal_tex = cache_key.normal_tex.is_some();
-        key.has_occlusion_tex = cache_key.occlusion_tex.is_some();
-        key.has_emissive_tex = cache_key.emissive_tex.is_some();
-        key
+        PbrMaterialBindGroupLayoutCacheKey{
+            has_base_color_tex: cache_key.base_color_tex.is_some(),
+            has_metallic_roughness_tex: cache_key.metallic_roughness_tex.is_some(),
+            has_normal_tex: cache_key.normal_tex.is_some(),
+            has_occlusion_tex: cache_key.occlusion_tex.is_some(),
+            has_emissive_tex: cache_key.emissive_tex.is_some(),
+        }
     }
 }
 

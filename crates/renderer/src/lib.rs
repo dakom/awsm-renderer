@@ -1,3 +1,4 @@
+#[allow(clippy::uninlined_format_args)]
 use awsm_renderer_core::{
     command::color::Color,
     renderer::{AwsmRendererWebGpu, AwsmRendererWebGpuBuilder},
