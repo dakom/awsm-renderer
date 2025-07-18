@@ -259,5 +259,5 @@ impl AwsmCoreError {
 }
 
 fn format_err(err: JsValue) -> String {
-    err.as_string().unwrap_or_else(|| format!("{:#?}", err))
+    err.as_string().unwrap_or_else(|| format!("{err:#?}"))
 }

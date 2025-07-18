@@ -283,7 +283,7 @@ impl From<ColorAttachment<'_>> for web_sys::GpuRenderPassColorAttachment {
 
 impl From<DepthStencilAttachment<'_>> for web_sys::GpuRenderPassDepthStencilAttachment {
     fn from(attachment: DepthStencilAttachment) -> web_sys::GpuRenderPassDepthStencilAttachment {
-        let attachment_js = web_sys::GpuRenderPassDepthStencilAttachment::new(&attachment.view);
+        let attachment_js = web_sys::GpuRenderPassDepthStencilAttachment::new(attachment.view);
 
         if let Some(depth_clear_value) = attachment.depth_clear_value {
             attachment_js.set_depth_clear_value(depth_clear_value);

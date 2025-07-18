@@ -307,7 +307,7 @@ pub struct PbrMaterialBindGroupLayoutCacheKey {
 
 impl From<&PbrMaterialBindGroupCacheKey> for PbrMaterialBindGroupLayoutCacheKey {
     fn from(cache_key: &PbrMaterialBindGroupCacheKey) -> Self {
-        PbrMaterialBindGroupLayoutCacheKey{
+        PbrMaterialBindGroupLayoutCacheKey {
             has_base_color_tex: cache_key.base_color_tex.is_some(),
             has_metallic_roughness_tex: cache_key.metallic_roughness_tex.is_some(),
             has_normal_tex: cache_key.normal_tex.is_some(),
