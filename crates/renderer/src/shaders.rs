@@ -150,7 +150,7 @@ pub struct ShaderCacheKeyInstancing {
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShaderCacheKeyMaterial {
     Pbr(PbrShaderCacheKeyMaterial),
-    FullScreenQuad,
+    PostProcess,
     DebugNormals,
 }
 
@@ -159,7 +159,7 @@ impl ShaderCacheKeyMaterial {
         match self {
             ShaderCacheKeyMaterial::Pbr(material_key) => material_key.has_alpha_mask,
             ShaderCacheKeyMaterial::DebugNormals => false,
-            ShaderCacheKeyMaterial::FullScreenQuad => false,
+            ShaderCacheKeyMaterial::PostProcess => false,
         }
     }
 
@@ -167,7 +167,7 @@ impl ShaderCacheKeyMaterial {
         match self {
             ShaderCacheKeyMaterial::Pbr(_) => FragmentShaderKind::Pbr,
             ShaderCacheKeyMaterial::DebugNormals => FragmentShaderKind::DebugNormals,
-            ShaderCacheKeyMaterial::FullScreenQuad => FragmentShaderKind::FullScreenQuad,
+            ShaderCacheKeyMaterial::PostProcess => FragmentShaderKind::PostProcess,
         }
     }
 
@@ -175,7 +175,7 @@ impl ShaderCacheKeyMaterial {
         match self {
             ShaderCacheKeyMaterial::Pbr(_) => VertexShaderKind::Mesh,
             ShaderCacheKeyMaterial::DebugNormals => VertexShaderKind::Mesh,
-            ShaderCacheKeyMaterial::FullScreenQuad => VertexShaderKind::Quad,
+            ShaderCacheKeyMaterial::PostProcess => VertexShaderKind::Quad,
         }
     }
 }
@@ -353,8 +353,7 @@ impl ShaderCacheKey {
                 });
             }
 
-            ShaderCacheKeyMaterial::FullScreenQuad => {
-            }
+            ShaderCacheKeyMaterial::PostProcess => {}
         };
 
         vertex_output_locations = vertex_output_locations
@@ -471,7 +470,7 @@ pub enum VertexShaderKind {
 pub enum FragmentShaderKind {
     DebugNormals,
     Pbr,
-    FullScreenQuad,
+    PostProcess,
 }
 
 #[derive(Debug)]

@@ -1,4 +1,6 @@
-use awsm_renderer::{core::renderer::AwsmRendererWebGpuBuilder, AwsmRendererBuilder, AwsmRendererLogging};
+use awsm_renderer::{
+    core::renderer::AwsmRendererWebGpuBuilder, AwsmRendererBuilder, AwsmRendererLogging,
+};
 use awsm_web::dom::resize::{self, ResizeObserver};
 use wasm_bindgen_futures::spawn_local;
 

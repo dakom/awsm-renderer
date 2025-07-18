@@ -15,7 +15,10 @@ use skin::Skins;
 use textures::Textures;
 use transform::Transforms;
 
-use crate::render::{post_process::{PostProcess, PostProcessSettings}, textures::RenderTextures};
+use crate::render::{
+    post_process::{PostProcess, PostProcessSettings},
+    textures::RenderTextures,
+};
 
 pub mod bind_groups;
 pub mod bounds;
@@ -82,7 +85,6 @@ impl AwsmRenderer {
         *self = renderer;
         Ok(())
     }
-
 }
 
 pub struct AwsmRendererBuilder<'a> {
@@ -98,7 +100,7 @@ pub enum AwsmRendererGpuBuilderKind<'a> {
     WebGpuBuilt(AwsmRendererWebGpu),
 }
 
-impl <'a> From<AwsmRendererWebGpuBuilder<'a>> for AwsmRendererGpuBuilderKind<'a> {
+impl<'a> From<AwsmRendererWebGpuBuilder<'a>> for AwsmRendererGpuBuilderKind<'a> {
     fn from(builder: AwsmRendererWebGpuBuilder<'a>) -> Self {
         AwsmRendererGpuBuilderKind::WebGpuBuilder(builder)
     }
@@ -116,7 +118,7 @@ impl From<(web_sys::Gpu, web_sys::HtmlCanvasElement)> for AwsmRendererGpuBuilder
     }
 }
 
-impl <'a> AwsmRendererBuilder <'a> {
+impl<'a> AwsmRendererBuilder<'a> {
     pub fn new(gpu: impl Into<AwsmRendererGpuBuilderKind<'a>>) -> Self {
         Self {
             gpu: gpu.into(),
@@ -148,7 +150,13 @@ impl <'a> AwsmRendererBuilder <'a> {
     }
 
     pub async fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
-        let Self { gpu, logging, scene_texture_format, depth_texture_format, clear_color } = self;
+        let Self {
+            gpu,
+            logging,
+            scene_texture_format,
+            depth_texture_format,
+            clear_color,
+        } = self;
 
         let gpu = match gpu {
             AwsmRendererGpuBuilderKind::WebGpuBuilder(builder) => builder.build().await?,

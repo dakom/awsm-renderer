@@ -1,7 +1,17 @@
 use awsm_renderer_core::sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor};
 
 use crate::{
-    gltf::error::{AwsmGltfError, Result}, materials::{pbr::{PbrMaterial, PbrMaterialBindGroupCacheKey, PbrMaterialBindGroupLayoutCacheKey, PbrMaterialTextureCacheKey}, MaterialAlphaMode}, shaders::{PbrShaderCacheKeyMaterial}, textures::{SamplerKey, TextureKey}, AwsmRenderer
+    gltf::error::{AwsmGltfError, Result},
+    materials::{
+        pbr::{
+            PbrMaterial, PbrMaterialBindGroupCacheKey, PbrMaterialBindGroupLayoutCacheKey,
+            PbrMaterialTextureCacheKey,
+        },
+        MaterialAlphaMode,
+    },
+    shaders::PbrShaderCacheKeyMaterial,
+    textures::{SamplerKey, TextureKey},
+    AwsmRenderer,
 };
 
 use super::GltfPopulateContext;
@@ -30,7 +40,6 @@ impl GltfMaterialInfo {
             bind_group_cache_key.base_color_tex = Some(texture_cache_key);
             shader_cache_key.base_color_uv_index = Some(uv_index as u32);
         }
-
 
         if let Some(tex) = pbr.metallic_roughness_texture().map(GltfTextureInfo::from) {
             let (uv_index, texture_cache_key) =
@@ -69,7 +78,8 @@ impl GltfMaterialInfo {
             shader_cache_key.emissive_uv_index = Some(uv_index as u32);
         }
 
-        shader_cache_key.has_alpha_mask = matches!(gltf_material.alpha_mode(), gltf::material::AlphaMode::Mask);
+        shader_cache_key.has_alpha_mask =
+            matches!(gltf_material.alpha_mode(), gltf::material::AlphaMode::Mask);
 
         let alpha_mode = match gltf_material.alpha_mode() {
             gltf::material::AlphaMode::Opaque => MaterialAlphaMode::Opaque,
@@ -90,12 +100,10 @@ impl GltfMaterialInfo {
         }
         material.emissive_factor = gltf_material.emissive_factor();
 
-
         let pbr = gltf_material.pbr_metallic_roughness();
         material.base_color_factor = pbr.base_color_factor();
         material.metallic_factor = pbr.metallic_factor();
         material.roughness_factor = pbr.roughness_factor();
-
 
         Ok(Self {
             bind_group_cache_key,
@@ -146,7 +154,13 @@ impl GltfTextureInfo {
             }
         };
 
-        Ok((self.tex_coord_index, PbrMaterialTextureCacheKey { texture_key, sampler_key}))
+        Ok((
+            self.tex_coord_index,
+            PbrMaterialTextureCacheKey {
+                texture_key,
+                sampler_key,
+            },
+        ))
     }
 
     async fn create_texture_key(

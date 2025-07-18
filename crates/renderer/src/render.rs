@@ -1,5 +1,5 @@
-pub mod textures;
 pub mod post_process;
+pub mod textures;
 
 use awsm_renderer_core::command::color::Color;
 use awsm_renderer_core::command::render_pass::{
@@ -47,15 +47,24 @@ impl AwsmRenderer {
         self.camera
             .write_gpu(&self.logging, &self.gpu, &self.bind_groups)?;
 
-        let texture_views = self.render_textures.views(&self.gpu)?;
+        let (texture_views, views_changed) = self.render_textures.views(&self.gpu)?;
+        if views_changed {
+            self.post_process_update_view(texture_views.scene.clone())?;
+        }
 
         let renderables = self.collect_renderables();
 
         let command_encoder = self.gpu.create_command_encoder(Some("Render pass"));
 
         let scene_render_texture_view = match self.post_process.settings.enabled {
-            false => &self.gpu.current_context_texture_view()?,
-            true => &texture_views.scene,
+            false => {
+                //tracing::info!("Rendering to current context texture view");
+                &self.gpu.current_context_texture_view()?
+            }
+            true => {
+                //tracing::info!("Rendering to textures_views scene view");
+                &texture_views.scene
+            }
         };
         let scene_render_pass = command_encoder.begin_render_pass(
             &RenderPassDescriptor {
@@ -65,11 +74,11 @@ impl AwsmRenderer {
                     StoreOp::Store,
                 )
                 .with_clear_color(self.clear_color.clone())],
-                depth_stencil_attachment: Some( 
+                depth_stencil_attachment: Some(
                     DepthStencilAttachment::new(&texture_views.depth)
                         .with_depth_load_op(LoadOp::Clear)
                         .with_depth_store_op(StoreOp::Store)
-                        .with_depth_clear_value(1.0)
+                        .with_depth_clear_value(1.0),
                 ),
                 ..Default::default()
             }
@@ -110,41 +119,37 @@ impl AwsmRenderer {
         ctx.render_pass.end();
 
         if self.post_process.settings.enabled {
+            let current_texture_view = self.gpu.current_context_texture_view()?;
 
-            // If post-processing is enabled, we need to set up a new render pass
+            let post_process_pass = ctx.command_encoder.begin_render_pass(
+                &RenderPassDescriptor {
+                    color_attachments: vec![ColorAttachment::new(
+                        &current_texture_view,
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    )
+                    .with_clear_color(Color::BLACK)],
+                    depth_stencil_attachment: None,
+                    ..Default::default()
+                }
+                .into(),
+            )?;
+            ctx.render_pass = post_process_pass;
 
-            // finished main render pass, now we can do post-processing
-            // let current_texture_view = self.gpu.current_context_texture_view()?;
+            if last_pipeline_key != Some(self.post_process.render_pipeline_key()) {
+                ctx.render_pass.set_pipeline(
+                    self.pipelines
+                        .get_render_pipeline(self.post_process.render_pipeline_key())?,
+                );
+                #[allow(unused_assignments)]
+                {
+                    last_pipeline_key = Some(self.post_process.render_pipeline_key());
+                }
+            }
 
-            // let post_process_pass = ctx.command_encoder.begin_render_pass(
-            //     &RenderPassDescriptor {
-            //         color_attachments: vec![ColorAttachment::new(
-            //             &current_texture_view,
-            //             LoadOp::Clear,
-            //             StoreOp::Store,
-            //         )
-            //         .with_clear_color(Color::BLACK)
-            //         ],
-            //         depth_stencil_attachment: None,
-            //         ..Default::default()
-            //     }
-            //     .into(),
-            // )?;
-            // ctx.render_pass = post_process_pass;
-
-            // if last_pipeline_key != Some(self.post_process.render_pipeline_key()) {
-            //     ctx.render_pass.set_pipeline(
-            //         self.pipelines
-            //             .get_render_pipeline(self.post_process.render_pipeline_key())?,
-            //     );
-            //     #[allow(unused_assignments)]
-            //     {
-            //         last_pipeline_key = Some(self.post_process.render_pipeline_key());
-            //     }
-            // }
-
-            // self.post_process.push_commands(&mut ctx, &texture_views.scene)?;
-            // ctx.render_pass.end();
+            self.post_process
+                .push_commands(&mut ctx, &texture_views.scene)?;
+            ctx.render_pass.end();
         }
 
         self.gpu.submit_commands(&ctx.command_encoder.finish());
@@ -155,7 +160,7 @@ impl AwsmRenderer {
     pub fn scene_target_texture_format(&self) -> TextureFormat {
         match self.post_process.settings.enabled {
             true => self.render_textures.scene_texture_format,
-            false => self.gpu.current_context_format()
+            false => self.gpu.current_context_format(),
         }
     }
 
@@ -166,7 +171,10 @@ impl AwsmRenderer {
     fn collect_renderables(&self) -> Vec<Renderable<'_>> {
         let mut renderables = Vec::new();
         for (key, mesh) in self.meshes.iter() {
-            let has_alpha = self.materials.has_alpha_blend(mesh.material_key).unwrap_or(false);
+            let has_alpha = self
+                .materials
+                .has_alpha_blend(mesh.material_key)
+                .unwrap_or(false);
             renderables.push(Renderable::Mesh {
                 key,
                 mesh,

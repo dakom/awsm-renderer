@@ -360,9 +360,10 @@ impl AppScene {
                         .clone();
 
                     shader_cache_key.material = material;
-                },
-                FragmentShaderKind::FullScreenQuad => {
-                    // NOOP, we don't change this shader kind
+                }
+                FragmentShaderKind::PostProcess => {
+                    // this shouldn't be reachable, but just in case
+                    shader_cache_key.material = ShaderCacheKeyMaterial::PostProcess;
                 }
             }
 

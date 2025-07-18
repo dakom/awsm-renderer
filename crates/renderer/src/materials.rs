@@ -2,15 +2,25 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use thiserror::Error;
 
-use crate::{bind_groups::{AwsmBindGroupError, BindGroups}, materials::pbr::{PbrMaterial, PbrMaterials}, textures::{SamplerKey, TextureKey}, AwsmRendererLogging};
+use crate::{
+    bind_groups::{AwsmBindGroupError, BindGroups},
+    materials::{
+        pbr::{PbrMaterial, PbrMaterials},
+        post_process::{PostProcessMaterial, PostProcessMaterials},
+    },
+    textures::{SamplerKey, TextureKey},
+    AwsmRendererLogging,
+};
 
 pub mod pbr;
+pub mod post_process;
 
 pub struct Materials {
     lookup: SlotMap<MaterialKey, Material>,
     // optimization to avoid loading whole material to check if it has alpha blend
     alpha_blend: SecondaryMap<MaterialKey, bool>,
     pub pbr: PbrMaterials,
+    pub post_process: PostProcessMaterials,
 }
 
 impl Materials {
@@ -19,6 +29,7 @@ impl Materials {
             lookup: SlotMap::with_key(),
             alpha_blend: SecondaryMap::new(),
             pbr: PbrMaterials::new(),
+            post_process: PostProcessMaterials::new(),
         }
     }
 
@@ -46,6 +57,9 @@ impl Materials {
                 Material::Pbr(pbr_material) => {
                     self.pbr.update(key, pbr_material);
                 }
+                Material::PostProcess(post_process_material) => {
+                    self.post_process.update(key, post_process_material);
+                }
             }
         }
     }
@@ -69,10 +83,10 @@ impl Materials {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub enum Material {
     Pbr(PbrMaterial),
+    PostProcess(PostProcessMaterial),
 }
 
 impl Material {
@@ -80,7 +94,7 @@ impl Material {
     pub fn has_alpha_blend(&self) -> bool {
         match self {
             Material::Pbr(pbr_material) => pbr_material.has_alpha_blend(),
-            // Add other material types here if needed
+            Material::PostProcess(_) => false,
         }
     }
 }
@@ -89,7 +103,9 @@ impl Material {
 pub enum MaterialAlphaMode {
     #[default]
     Opaque,
-    Mask { cutoff: f32 },
+    Mask {
+        cutoff: f32,
+    },
     Blend,
 }
 

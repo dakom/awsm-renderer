@@ -15,7 +15,7 @@ pub struct AwsmRendererWebGpu {
     pub context: web_sys::GpuCanvasContext,
 }
 
-pub struct AwsmRendererWebGpuBuilder <'a> {
+pub struct AwsmRendererWebGpuBuilder<'a> {
     pub gpu: web_sys::Gpu,
     pub canvas: web_sys::HtmlCanvasElement,
     pub configuration: Option<CanvasConfiguration<'a>>,
@@ -24,7 +24,7 @@ pub struct AwsmRendererWebGpuBuilder <'a> {
     pub context: Option<web_sys::GpuCanvasContext>,
 }
 
-impl <'a> AwsmRendererWebGpuBuilder<'a> {
+impl<'a> AwsmRendererWebGpuBuilder<'a> {
     pub fn new(gpu: web_sys::Gpu, canvas: web_sys::HtmlCanvasElement) -> Self {
         Self {
             gpu,
@@ -54,22 +54,18 @@ impl <'a> AwsmRendererWebGpuBuilder<'a> {
     pub async fn build(self) -> Result<AwsmRendererWebGpu> {
         let adapter: web_sys::GpuAdapter = match self.adapter {
             Some(adapter) => adapter,
-            None => {
-                JsFuture::from(self.gpu.request_adapter())
+            None => JsFuture::from(self.gpu.request_adapter())
                 .await
                 .map_err(AwsmCoreError::gpu_adapter)?
-                .unchecked_into()
-            }
+                .unchecked_into(),
         };
 
-        let device:web_sys::GpuDevice = match self.device {
+        let device: web_sys::GpuDevice = match self.device {
             Some(device) => device,
-            None => {
-                JsFuture::from(adapter.request_device())
-                    .await
-                    .map_err(AwsmCoreError::gpu_device)?
-                    .unchecked_into()
-            }
+            None => JsFuture::from(adapter.request_device())
+                .await
+                .map_err(AwsmCoreError::gpu_device)?
+                .unchecked_into(),
         };
 
         let context: web_sys::GpuCanvasContext = match self.canvas.get_context("webgpu") {
@@ -83,7 +79,8 @@ impl <'a> AwsmRendererWebGpuBuilder<'a> {
             None => CanvasConfiguration::new(&device, self.gpu.get_preferred_canvas_format()),
         };
 
-        context.configure(&configuration.into())
+        context
+            .configure(&configuration.into())
             .map_err(AwsmCoreError::context_configuration)?;
 
         Ok(AwsmRendererWebGpu {

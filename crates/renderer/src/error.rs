@@ -5,7 +5,7 @@ use crate::{
     bind_groups::AwsmBindGroupError, camera::AwsmCameraError, instances::AwsmInstanceError,
     lights::AwsmLightError, materials::AwsmMaterialError, mesh::AwsmMeshError,
     pipeline::AwsmPipelineError, shaders::AwsmShaderError, skin::AwsmSkinError,
-    transform::AwsmTransformError,
+    textures::SamplerKey, transform::AwsmTransformError,
 };
 
 #[derive(Error, Debug)]
@@ -51,6 +51,9 @@ pub enum AwsmError {
     SceneTextureCreateView(String),
     #[error("Depth texture create view: {0}")]
     DepthTextureCreateView(String),
+
+    #[error("[post-process] missing post process sampler {0:?}")]
+    MissingPostProcessSampler(SamplerKey),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;

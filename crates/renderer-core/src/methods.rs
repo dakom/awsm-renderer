@@ -37,7 +37,7 @@ impl AwsmRendererWebGpu {
 
     pub fn current_context_texture(&self) -> Result<web_sys::GpuTexture> {
         // fine to call this often, from spec https://gpuweb.github.io/gpuweb/#dom-gpucanvascontext-getcurrenttexture
-        // "Note: The same GPUTexture object will be returned by every call to getCurrentTexture() 
+        // "Note: The same GPUTexture object will be returned by every call to getCurrentTexture()
         // until 'Expire the current texture' runs [...]"
         self.context
             .get_current_texture()

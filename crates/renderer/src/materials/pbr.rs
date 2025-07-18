@@ -1,10 +1,26 @@
 use std::collections::HashMap;
 
+use awsm_renderer_core::{
+    bind_groups::{SamplerBindingLayout, SamplerBindingType, TextureBindingLayout},
+    renderer::AwsmRendererWebGpu,
+    texture::{TextureSampleType, TextureViewDimension},
+};
 
-use awsm_renderer_core::{bind_groups::{SamplerBindingLayout, SamplerBindingType, TextureBindingLayout}, renderer::AwsmRendererWebGpu, texture::{TextureSampleType, TextureViewDimension}};
-
-use crate::{bind_groups::{material_textures::{MaterialBindGroupKey, MaterialBindGroupLayoutKey, MaterialTextureBindingEntry, MaterialTextureBindingLayoutEntry}, uniform_storage::{MeshAllBindGroupBinding, UniformStorageBindGroupIndex}, BindGroups}, buffer::dynamic_uniform::DynamicUniformBuffer, materials::{MaterialAlphaMode, MaterialKey}, textures::{SamplerKey, TextureKey, Textures}, AwsmRenderer, AwsmRendererLogging};
 use super::{AwsmMaterialError, Result};
+use crate::{
+    bind_groups::{
+        material_textures::{
+            MaterialBindGroupKey, MaterialBindGroupLayoutKey, MaterialTextureBindingEntry,
+            MaterialTextureBindingLayoutEntry,
+        },
+        uniform_storage::{MeshAllBindGroupBinding, UniformStorageBindGroupIndex},
+        BindGroups,
+    },
+    buffer::dynamic_uniform::DynamicUniformBuffer,
+    materials::{MaterialAlphaMode, MaterialKey},
+    textures::{SamplerKey, TextureKey, Textures},
+    AwsmRenderer, AwsmRendererLogging,
+};
 
 pub struct PbrMaterials {
     bind_group_layout_keys: HashMap<PbrMaterialBindGroupLayoutCacheKey, MaterialBindGroupLayoutKey>,
@@ -33,7 +49,8 @@ impl PbrMaterials {
     }
 
     pub fn update(&mut self, key: MaterialKey, pbr_material: &PbrMaterial) {
-        self.uniform_buffer.update(key, &pbr_material.uniform_buffer_data());
+        self.uniform_buffer
+            .update(key, &pbr_material.uniform_buffer_data());
         self.uniform_buffer_gpu_dirty = true;
     }
 
@@ -86,42 +103,58 @@ impl AwsmRenderer {
         if let Some(key) = self.materials.pbr.bind_group_layout_keys.get(cache_key) {
             // the bind group layout already exists in cache
             // but we still need to associate it with the material
-            self.bind_groups.material_textures.insert_material_bind_group_layout_lookup(material_key, *key);
+            self.bind_groups
+                .material_textures
+                .insert_material_bind_group_layout_lookup(material_key, *key);
             return Ok(*key);
         }
 
-        let key = self.bind_groups.material_textures
-            .insert_bind_group_layout(
-                &self.gpu,
-                cache_key.entries(),
-            )
+        let key = self
+            .bind_groups
+            .material_textures
+            .insert_bind_group_layout(&self.gpu, cache_key.entries())
             .map_err(AwsmMaterialError::MaterialBindGroupLayout)?;
 
-        self.materials.pbr.bind_group_layout_keys.insert(cache_key.clone(), key);
-        self.bind_groups.material_textures.insert_material_bind_group_layout_lookup(material_key, key);
+        self.materials
+            .pbr
+            .bind_group_layout_keys
+            .insert(cache_key.clone(), key);
+        self.bind_groups
+            .material_textures
+            .insert_material_bind_group_layout_lookup(material_key, key);
 
         Ok(key)
     }
 
-    pub fn add_material_pbr_bind_group(&mut self, material_key: MaterialKey, layout_key: MaterialBindGroupLayoutKey, cache_key: &PbrMaterialBindGroupCacheKey) -> Result<MaterialBindGroupKey> {
+    pub fn add_material_pbr_bind_group(
+        &mut self,
+        material_key: MaterialKey,
+        layout_key: MaterialBindGroupLayoutKey,
+        cache_key: &PbrMaterialBindGroupCacheKey,
+    ) -> Result<MaterialBindGroupKey> {
         if let Some(key) = self.materials.pbr.bind_group_keys.get(cache_key) {
             // the bind group already exists in cache
             // but we still need to associate it with the material
-            self.bind_groups.material_textures.insert_material_bind_group_lookup(material_key, *key);
+            self.bind_groups
+                .material_textures
+                .insert_material_bind_group_lookup(material_key, *key);
             return Ok(*key);
         }
 
         let entries = cache_key.entries(&self.textures)?;
-        let key = self.bind_groups.material_textures
-            .insert_bind_group(
-                &self.gpu,
-                layout_key,
-                &entries,
-            )
+        let key = self
+            .bind_groups
+            .material_textures
+            .insert_bind_group(&self.gpu, layout_key, &entries)
             .map_err(AwsmMaterialError::MaterialBindGroup)?;
 
-        self.materials.pbr.bind_group_keys.insert(cache_key.clone(), key);
-        self.bind_groups.material_textures.insert_material_bind_group_lookup(material_key, key);
+        self.materials
+            .pbr
+            .bind_group_keys
+            .insert(cache_key.clone(), key);
+        self.bind_groups
+            .material_textures
+            .insert_material_bind_group_lookup(material_key, key);
 
         Ok(key)
     }
@@ -136,7 +169,7 @@ pub struct PbrMaterial {
     pub occlusion_strength: f32,
     pub emissive_factor: [f32; 3],
     // these come from initial settings which affects bind group, mesh pipeline etc.
-    // so the only way to change them is to create a new material 
+    // so the only way to change them is to create a new material
     alpha_mode: MaterialAlphaMode,
     double_sided: bool,
 }
@@ -173,7 +206,9 @@ impl PbrMaterial {
             self.alpha_mode = MaterialAlphaMode::Mask { cutoff };
             Ok(())
         } else {
-            Err(AwsmMaterialError::InvalidAlphaModeForCutoff(self.alpha_mode))
+            Err(AwsmMaterialError::InvalidAlphaModeForCutoff(
+                self.alpha_mode,
+            ))
         }
     }
 
@@ -263,7 +298,7 @@ pub struct PbrMaterialBindGroupLayoutCacheKey {
     pub has_emissive_tex: bool,
 }
 
-impl From<&PbrMaterialBindGroupCacheKey> for PbrMaterialBindGroupLayoutCacheKey{
+impl From<&PbrMaterialBindGroupCacheKey> for PbrMaterialBindGroupLayoutCacheKey {
     fn from(cache_key: &PbrMaterialBindGroupCacheKey) -> Self {
         let mut key = PbrMaterialBindGroupLayoutCacheKey::default();
         key.has_base_color_tex = cache_key.base_color_tex.is_some();
@@ -362,7 +397,6 @@ impl PbrMaterialBindGroupCacheKey {
         }
 
         Ok(entries)
-
     }
 }
 

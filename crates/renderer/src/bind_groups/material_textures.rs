@@ -92,7 +92,6 @@ impl MaterialTextureBindGroups {
         Ok(bind_group_key)
     }
 
-
     pub fn insert_bind_group_layout(
         &mut self,
         gpu: &AwsmRendererWebGpu,
@@ -122,7 +121,12 @@ impl MaterialTextureBindGroups {
         Ok(key)
     }
 
-    pub fn insert_bind_group(&mut self, gpu: &AwsmRendererWebGpu, layout_key: MaterialBindGroupLayoutKey, entries: &[MaterialTextureBindingEntry]) -> Result<MaterialBindGroupKey> {
+    pub fn insert_bind_group(
+        &mut self,
+        gpu: &AwsmRendererWebGpu,
+        layout_key: MaterialBindGroupLayoutKey,
+        entries: &[MaterialTextureBindingEntry],
+    ) -> Result<MaterialBindGroupKey> {
         let layout = self
             .layouts
             .get(layout_key)
@@ -141,11 +145,9 @@ impl MaterialTextureBindGroups {
             })
             .collect::<Vec<_>>();
 
-
         let bind_group = gpu_create_bind_group(gpu, "Material", layout, entries);
 
         let key = self.bind_groups.insert(bind_group);
-
 
         Ok(key)
     }
@@ -164,9 +166,9 @@ impl MaterialTextureBindGroups {
         material_key: MaterialKey,
         bind_group_key: MaterialBindGroupKey,
     ) {
-        self.material_bind_group_mapping.insert(material_key, bind_group_key);
+        self.material_bind_group_mapping
+            .insert(material_key, bind_group_key);
     }
-
 }
 
 new_key_type! {

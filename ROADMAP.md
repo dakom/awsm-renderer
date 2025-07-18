@@ -132,11 +132,12 @@ If it's supported here, corresponding core functionality is also supported
 - [ ] Events
 
 ## Post-processing
+- [x] Basic render-texture support
+- [ ] Tonemapping
 - [ ] SSAO
 - [ ] Bloom
 - [ ] TAA 
 - [ ] DOF
-- [ ] Tonemapping
 
 ## Demo-only
 
