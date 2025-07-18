@@ -87,8 +87,10 @@ impl AwsmRenderer {
             .insert_bind_group(
                 &self.gpu,
                 layout_key,
-                &[MaterialTextureBindingEntry::Texture(scene_texture_view),
-                    MaterialTextureBindingEntry::Sampler(scene_texture_sampler)],
+                &[
+                    MaterialTextureBindingEntry::Texture(scene_texture_view),
+                    MaterialTextureBindingEntry::Sampler(scene_texture_sampler),
+                ],
             )
             .map_err(AwsmMaterialError::MaterialBindGroup)?;
 
