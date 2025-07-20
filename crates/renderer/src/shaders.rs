@@ -115,7 +115,7 @@ pub enum ShaderCacheKeyGeometry {
 impl ShaderCacheKeyGeometry {
     pub fn as_mesh(&self) -> &MeshShaderCacheKeyGeometry {
         match self {
-            ShaderCacheKeyGeometry::Mesh(mesh_geometry) => &mesh_geometry,
+            ShaderCacheKeyGeometry::Mesh(mesh_geometry) => mesh_geometry,
             ShaderCacheKeyGeometry::Quad => {
                 panic!("Cannot convert Quad to MeshShaderCacheKeyGeometry")
             }
