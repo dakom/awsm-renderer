@@ -4,7 +4,7 @@ use super::Result;
 use crate::buffer::helpers::slice_zeroes;
 use crate::gltf::buffers::accessor::accessor_to_bytes;
 use crate::mesh::MeshBufferMorphInfo;
-use crate::shaders::{ShaderCacheKeyAttribute, ShaderCacheKeyMorphs};
+use crate::shaders::mesh::{ShaderCacheKeyAttribute, ShaderCacheKeyMorphs};
 
 #[derive(Default, Debug, Clone)]
 pub struct GltfMeshBufferMorphInfo {

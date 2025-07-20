@@ -7,7 +7,7 @@ use crate::buffer::helpers::{u8_to_i16_vec, u8_to_u16_vec};
 use crate::gltf::buffers::normals::compute_normals;
 use crate::gltf::error::AwsmGltfError;
 use crate::mesh::{MeshBufferVertexAttribute, MeshBufferVertexInfo};
-use crate::shaders::ShaderCacheKeyAttribute;
+use crate::shaders::mesh::ShaderCacheKeyAttribute;
 
 use super::accessor::accessor_to_bytes;
 use super::index::GltfMeshBufferIndexInfo;

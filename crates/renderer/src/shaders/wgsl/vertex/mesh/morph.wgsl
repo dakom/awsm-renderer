@@ -20,15 +20,15 @@ fn apply_morphs(input: VertexInput) -> VertexInput {
     // target_size is the total number of floats for each morph_target (for a given vertex, not across all of them) 
     var target_size = 0u; // vec3 for position
 
-    {% if morphs.position %}
+    {% if geometry.as_mesh().morphs.position %}
         target_size += 3u; // vec3 for normals
     {% endif %}
 
-    {% if morphs.normal %}
+    {% if geometry.as_mesh().morphs.normal %}
         target_size += 3u; // vec3 for normals
     {% endif %}
 
-    {% if morphs.tangent %}
+    {% if geometry.as_mesh().morphs.tangent %}
     // vec3 for tangents, not vec4
     // from spec: "Note that the W component for handedness is omitted when targeting TANGENT data since handedness cannot be displaced."
         target_size += 3u; 
@@ -50,19 +50,19 @@ fn apply_morphs(input: VertexInput) -> VertexInput {
         // then, for reach morph target, skip the morph-target data up until this count
         var offset = (input.vertex_index * all_targets_size) + (morph_target * target_size);
 
-        {% if morphs.position %}
+        {% if geometry.as_mesh().morphs.position %}
             let morph_position = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
             output.position += morph_weight * morph_position; 
             offset += 3;
         {% endif %}
 
-        {% if morphs.normal %}
+        {% if geometry.as_mesh().morphs.normal %}
             let morph_normal = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
             output.normal += morph_weight * morph_normal; 
             offset += 3;
         {% endif %}
 
-        {% if morphs.tangent %}
+        {% if geometry.as_mesh().morphs.tangent %}
             let morph_tangent = vec3<f32>(morph_values[offset], morph_values[offset + 1u], morph_values[offset + 2u]);
             // vec3 for tangents, not vec4
             // from spec: "Note that the W component for handedness is omitted when targeting TANGENT data since handedness cannot be displaced."

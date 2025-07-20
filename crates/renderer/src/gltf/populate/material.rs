@@ -1,17 +1,13 @@
 use awsm_renderer_core::sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor};
 
 use crate::{
-    gltf::error::{AwsmGltfError, Result},
-    materials::{
+    gltf::error::{AwsmGltfError, Result}, materials::{
         pbr::{
             PbrMaterial, PbrMaterialBindGroupCacheKey, PbrMaterialBindGroupLayoutCacheKey,
             PbrMaterialTextureCacheKey,
         },
         MaterialAlphaMode,
-    },
-    shaders::PbrShaderCacheKeyMaterial,
-    textures::{SamplerKey, TextureKey},
-    AwsmRenderer,
+    }, shaders::pbr::PbrShaderCacheKeyMaterial, textures::{SamplerKey, TextureKey}, AwsmRenderer
 };
 
 use super::GltfPopulateContext;

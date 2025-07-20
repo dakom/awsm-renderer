@@ -11,7 +11,7 @@ use crate::{
         PipelineLayoutCacheKey, PipelineLayoutKey, RenderPipelineCacheKey, RenderPipelineKey,
     },
     render::RenderContext,
-    shaders::{PostProcessShaderCacheKeyMaterial, ShaderCacheKey, ShaderCacheKeyMaterial, ShaderKey},
+    shaders::{post_process::PostProcessShaderCacheKeyMaterial, ShaderCacheKey, ShaderCacheKeyGeometry, ShaderCacheKeyMaterial, ShaderKey},
     textures::SamplerKey,
     AwsmRenderer,
 };
@@ -164,7 +164,7 @@ impl Default for PostProcessSettings {
 
 impl PostProcessSettings {
     pub fn shader_cache_key(&self) -> ShaderCacheKey {
-        ShaderCacheKey::new(Vec::new(), ShaderCacheKeyMaterial::PostProcess(PostProcessShaderCacheKeyMaterial {
+        ShaderCacheKey::new(ShaderCacheKeyGeometry::Quad, ShaderCacheKeyMaterial::PostProcess(PostProcessShaderCacheKeyMaterial {
             gamma_correction: self.gamma_correction,
         }))
     }

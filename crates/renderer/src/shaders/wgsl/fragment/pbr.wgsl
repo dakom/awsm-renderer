@@ -4,7 +4,7 @@
 {% include "fragment/lighting/brdf.wgsl" %}
 {% include "fragment/lighting/tonemap.wgsl" %}
 
-{% for binding in fragment_buffer_bindings %}
+{% for binding in material.as_pbr().fragment_buffer_bindings %}
     @group({{ binding.group }}) @binding({{ binding.index }}) var {{ binding.name }}: {{ binding.data_type }};
 {% endfor %}
 
@@ -15,7 +15,7 @@ fn frag_main(input: FragmentInput) -> @location(0) vec4<f32> {
     var material = getMaterial(input);
     let n_lights = arrayLength(&lights) / 16u;
 
-    {% if has_normals %}
+    {% if material.as_pbr().has_normals %}
         let normal = normalize(input.world_normal);
     {% else %}
         let normal = vec3<f32>(1.0, 1.0, 1.0);

@@ -10,7 +10,7 @@ use crate::{
     materials::Material,
     mesh::{Mesh, MeshBufferInfo},
     pipeline::{PipelineLayoutCacheKey, RenderPipelineCacheKey},
-    shaders::{ShaderCacheKey, ShaderCacheKeyInstancing, ShaderCacheKeyMaterial},
+    shaders::{mesh::MeshShaderCacheKeyGeometry, ShaderCacheKey, ShaderCacheKeyGeometry, ShaderCacheKeyMaterial},
     skin::SkinKey,
     transform::{Transform, TransformKey},
     AwsmRenderer,
@@ -99,29 +99,21 @@ impl AwsmRenderer {
 
         let material_info = GltfMaterialInfo::new(self, ctx, gltf_primitive.material()).await?;
 
-        let mut shader_cache_key = ShaderCacheKey::new(
-            primitive_buffer_info
-                .vertex
-                .attributes
-                .iter()
-                .map(|s| s.shader_key_kind)
-                .collect(),
+        let shader_cache_key = ShaderCacheKey::new(
+            ShaderCacheKeyGeometry::Mesh(
+                MeshShaderCacheKeyGeometry {
+                    attributes: primitive_buffer_info
+                        .vertex
+                        .attributes
+                        .iter()
+                        .map(|s| s.shader_key_kind)
+                        .collect(),
+                    morphs: primitive_buffer_info.morph.as_ref().map(|m| m.shader_key).unwrap_or_default(),
+                    has_instance_transforms: ctx.transform_is_instanced.lock().unwrap().contains(&transform_key)
+                }
+            ),
             ShaderCacheKeyMaterial::Pbr(material_info.shader_cache_key),
         );
-
-        if let Some(shader_morph_key) = primitive_buffer_info.morph.as_ref().map(|m| m.shader_key) {
-            shader_cache_key = shader_cache_key.with_morphs(shader_morph_key)
-        }
-
-        if ctx
-            .transform_is_instanced
-            .lock()
-            .unwrap()
-            .contains(&transform_key)
-        {
-            shader_cache_key =
-                shader_cache_key.with_instancing(ShaderCacheKeyInstancing { transform: true });
-        }
 
         let morph_key = match primitive_buffer_info.morph.clone() {
             None => None,
@@ -167,7 +159,7 @@ impl AwsmRenderer {
         // the attributes of this one vertex buffer layout contain all the info needed for the shader locations
         let (vertex_buffer_layout, shader_location) =
             primitive_vertex_buffer_layout(primitive_buffer_info)?;
-        let instance_transform_vertex_buffer_layout = match shader_cache_key.instancing.transform {
+        let instance_transform_vertex_buffer_layout = match shader_cache_key.geometry.as_mesh().has_instance_transforms {
             true => Some(instance_transform_vertex_buffer_layout(shader_location)),
             false => None,
         };
