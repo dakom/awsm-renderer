@@ -134,6 +134,12 @@ impl AppScene {
             }))).await;
         }));
 
+        spawn_local(clone!(state => async move {
+            state.ctx.post_processing.gamma_correction.signal().for_each(clone!(state => move |_| clone!(state => async move {
+                state.on_post_processing_gamma_correction_change();
+            }))).await;
+        }));
+
         state
     }
 
@@ -181,6 +187,21 @@ impl AppScene {
             }
         }));
     }
+
+    fn on_post_processing_gamma_correction_change(self: &Arc<Self>) {
+        let state = self;
+
+        spawn_local(clone!(state => async move {
+            let mut renderer = state.renderer.lock().await;
+            renderer.post_process.settings.gamma_correction = state.ctx.post_processing.gamma_correction.get();
+            if let Err(err) = renderer.post_process_init().await {
+                tracing::error!("Failed to initialize post process: {:?}", err);
+            }
+            if let Err(err) = renderer.post_process_update_view() {
+                tracing::error!("Failed to update post process view: {:?}", err);
+            }
+        }));
+    }   
 
     pub async fn clear(self: &Arc<Self>) {
         let state = self;
@@ -363,7 +384,10 @@ impl AppScene {
                 }
                 FragmentShaderKind::PostProcess => {
                     // this shouldn't be reachable, but just in case
-                    shader_cache_key.material = ShaderCacheKeyMaterial::PostProcess;
+                    tracing::error!(
+                        "Shader kind {:?} is not supported for meshes, skipping",
+                        shader_kind
+                    );
                 }
             }
 

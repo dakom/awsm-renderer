@@ -3,5 +3,9 @@
 
 @fragment
 fn frag_main(in: FragmentInput) -> @location(0) vec4<f32> {
-    return textureSample(input_texture, input_sampler, in.uv);
+    {% if material.as_post_process().gamma_correction %}
+        return textureSample(input_texture, input_sampler, in.uv) * vec4(1.0, 0.0, 0.0, 1.0); 
+    {% else %}
+        return textureSample(input_texture, input_sampler, in.uv);
+    {% endif %}
 }

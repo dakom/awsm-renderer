@@ -4,6 +4,8 @@ use crate::prelude::*;
 pub enum ColorBackground {
     SidebarSelected,
     Sidebar,
+    CheckboxDark,
+    CheckboxLight,
     GltfContent,
     ModalContent,
     UnderlinePrimary,
@@ -32,6 +34,8 @@ impl ColorBackground {
             Self::ButtonRed => ColorRaw::Red.value(),
             Self::ButtonRedHover => ColorRaw::RedLite.value(),
             Self::Dropdown => ColorRaw::Whiteish.value(),
+            Self::CheckboxDark => ColorRaw::Whiteish.value(),
+            Self::CheckboxLight => ColorRaw::Darkish.value(),
             Self::Initial => "initial",
         }
     }
@@ -115,6 +119,18 @@ impl ColorBackground {
             }
         });
 
+        static CHECKBOX_DARK: LazyLock<String> = LazyLock::new(|| {
+            class! {
+              .style("background-color", ColorBackground::CheckboxDark.value())
+            }
+        });
+
+        static CHECKBOX_LIGHT: LazyLock<String> = LazyLock::new(|| {
+            class! {
+              .style("background-color", ColorBackground::CheckboxLight.value())
+            }
+        });
+
         match self {
             Self::SidebarSelected => &*SIDEBAR_SELECTED,
             Self::Sidebar => &*SIDEBAR,
@@ -129,6 +145,8 @@ impl ColorBackground {
             Self::Dropdown => &*DROPDOWN,
             Self::Initial => &*INITIAL,
             Self::GltfContent => &*GLTF_CONTENT,
+            Self::CheckboxDark => &*CHECKBOX_DARK,
+            Self::CheckboxLight => &*CHECKBOX_LIGHT,
         }
     }
 }
@@ -152,6 +170,8 @@ pub enum ColorText {
     Success,
     Label,
     LabelHover,
+    CheckboxDark,
+    CheckboxLight,
 }
 
 impl ColorText {
@@ -174,6 +194,8 @@ impl ColorText {
             Self::InputPlaceholder => ColorRaw::MidGrey.value(),
             Self::Error => ColorRaw::Red.value(),
             Self::Success => ColorRaw::Green.value(),
+            Self::CheckboxDark => ColorRaw::Whiteish.value(),
+            Self::CheckboxLight => ColorRaw::Darkish.value(),
         }
     }
 
@@ -280,6 +302,17 @@ impl ColorText {
             }
         });
 
+        static CHECKBOX_DARK: LazyLock<String> = LazyLock::new(|| {
+            class! {
+              .style("color", ColorText::CheckboxDark.value())
+            }
+        });
+        static CHECKBOX_LIGHT: LazyLock<String> = LazyLock::new(|| {
+            class! {
+              .style("color", ColorText::CheckboxLight.value())
+            }
+        });
+
         match self {
             Self::GltfContent => &*GLTF_CONTENT,
             Self::ButtonPrimary => &*BUTTON_PRIMARY,
@@ -298,6 +331,8 @@ impl ColorText {
             Self::ButtonOutlineRed => &*BUTTON_OUTLINE_RED,
             Self::ButtonOutlineRedHover => &*BUTTON_OUTLINE_RED_HOVER,
             Self::Link => &*LINK,
+            Self::CheckboxDark => &*CHECKBOX_DARK,
+            Self::CheckboxLight => &*CHECKBOX_LIGHT,
         }
     }
 }
@@ -341,6 +376,8 @@ pub enum ColorBorder {
     ButtonOutlineRedHover,
     ButtonDisabled,
     Initial,
+    CheckboxDark,
+    CheckboxLight,
 }
 
 impl ColorBorder {
@@ -358,6 +395,8 @@ impl ColorBorder {
             Self::ButtonOutlineRedHover => ColorRaw::RedLite.value(),
             Self::ButtonDisabled => ColorRaw::AccentVeryLight.value(),
             Self::Initial => "initial",
+            Self::CheckboxDark => ColorRaw::Whiteish.value(),
+            Self::CheckboxLight => ColorRaw::Darkish.value(),
         }
     }
 
@@ -434,6 +473,17 @@ impl ColorBorder {
             }
         });
 
+        static CHECKBOX_DARK: LazyLock<String> = LazyLock::new(|| {
+            class! {
+              .style("border-color", ColorBorder::CheckboxDark.value())
+            }
+        });
+        static CHECKBOX_LIGHT: LazyLock<String> = LazyLock::new(|| {
+            class! {
+              .style("border-color", ColorBorder::CheckboxLight.value())
+            }
+        });
+
         match self {
             Self::Input => &*INPUT,
             Self::Warning => &*WARNING,
@@ -447,6 +497,8 @@ impl ColorBorder {
             Self::ButtonOutlinePrimaryHover => &*BUTTON_OUTLINE_PRIMARY_HOVER,
             Self::ButtonOutlineRed => &*BUTTON_OUTLINE_RED,
             Self::ButtonOutlineRedHover => &*BUTTON_OUTLINE_RED_HOVER,
+            Self::CheckboxDark => &*CHECKBOX_DARK,
+            Self::CheckboxLight => &*CHECKBOX_LIGHT,
         }
     }
 }

@@ -150,7 +150,7 @@ pub struct ShaderCacheKeyInstancing {
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShaderCacheKeyMaterial {
     Pbr(PbrShaderCacheKeyMaterial),
-    PostProcess,
+    PostProcess(PostProcessShaderCacheKeyMaterial),
     DebugNormals,
 }
 
@@ -159,7 +159,7 @@ impl ShaderCacheKeyMaterial {
         match self {
             ShaderCacheKeyMaterial::Pbr(material_key) => material_key.has_alpha_mask,
             ShaderCacheKeyMaterial::DebugNormals => false,
-            ShaderCacheKeyMaterial::PostProcess => false,
+            ShaderCacheKeyMaterial::PostProcess(_) => false,
         }
     }
 
@@ -167,7 +167,7 @@ impl ShaderCacheKeyMaterial {
         match self {
             ShaderCacheKeyMaterial::Pbr(_) => FragmentShaderKind::Pbr,
             ShaderCacheKeyMaterial::DebugNormals => FragmentShaderKind::DebugNormals,
-            ShaderCacheKeyMaterial::PostProcess => FragmentShaderKind::PostProcess,
+            ShaderCacheKeyMaterial::PostProcess(_) => FragmentShaderKind::PostProcess,
         }
     }
 
@@ -175,7 +175,7 @@ impl ShaderCacheKeyMaterial {
         match self {
             ShaderCacheKeyMaterial::Pbr(_) => VertexShaderKind::Mesh,
             ShaderCacheKeyMaterial::DebugNormals => VertexShaderKind::Mesh,
-            ShaderCacheKeyMaterial::PostProcess => VertexShaderKind::Quad,
+            ShaderCacheKeyMaterial::PostProcess(_) => VertexShaderKind::Quad,
         }
     }
 }
@@ -188,6 +188,11 @@ pub struct PbrShaderCacheKeyMaterial {
     pub occlusion_uv_index: Option<u32>,
     pub emissive_uv_index: Option<u32>,
     pub has_alpha_mask: bool,
+}
+
+#[derive(Default, Hash, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PostProcessShaderCacheKeyMaterial {
+    pub gamma_correction: bool,
 }
 
 impl ShaderCacheKeyAttribute {
@@ -227,7 +232,21 @@ impl ShaderCacheKey {
     }
 
     pub fn into_source(&self) -> Result<String> {
-        let mut material = ShaderTemplateMaterial::new(self.material.has_alpha_mask());
+        let mut material = match self.material {
+            ShaderCacheKeyMaterial::Pbr(material_key) => {
+                ShaderTemplateMaterial::Pbr(PbrShaderTemplateMaterial::new(
+                    material_key.has_alpha_mask,
+                ))
+            },
+            ShaderCacheKeyMaterial::DebugNormals => {
+                ShaderTemplateMaterial::Pbr(PbrShaderTemplateMaterial::new(
+                    false
+                ))
+            },
+            ShaderCacheKeyMaterial::PostProcess(material_key) => {
+                ShaderTemplateMaterial::PostProcess(PostProcessShaderTemplateMaterial::new(material_key.gamma_correction))
+            }
+        };
         let mut has_normals = false;
         let mut skins = None;
 
@@ -331,7 +350,7 @@ impl ShaderCacheKey {
             ShaderCacheKeyMaterial::Pbr(material_key) => {
                 if let Some(uv_index) = material_key.base_color_uv_index {
                     push_texture("base_color", uv_index);
-                    material.has_base_color_tex = true;
+                    material.as_pbr_mut().has_base_color_tex = true;
                 }
 
                 if has_normals {
@@ -353,7 +372,7 @@ impl ShaderCacheKey {
                 });
             }
 
-            ShaderCacheKeyMaterial::PostProcess => {}
+            ShaderCacheKeyMaterial::PostProcess(_material_key) => {}
         };
 
         vertex_output_locations = vertex_output_locations
@@ -436,7 +455,13 @@ struct ShaderTemplate {
 }
 
 #[derive(Debug)]
-pub struct ShaderTemplateMaterial {
+pub enum ShaderTemplateMaterial {
+    Pbr(PbrShaderTemplateMaterial),
+    PostProcess(PostProcessShaderTemplateMaterial),
+}
+
+#[derive(Debug)]
+pub struct PbrShaderTemplateMaterial {
     pub has_alpha_mask: bool,
     // the idea here is that with these gates, we can write normal shader code
     // since the variables are assigned (and from then on, we don't care about the location)
@@ -447,7 +472,7 @@ pub struct ShaderTemplateMaterial {
     pub has_normal_tex: bool,
 }
 
-impl ShaderTemplateMaterial {
+impl PbrShaderTemplateMaterial {
     pub fn new(has_alpha_mask: bool) -> Self {
         Self {
             has_alpha_mask,
@@ -456,6 +481,46 @@ impl ShaderTemplateMaterial {
             has_emissive_tex: false,
             has_occlusion_tex: false,
             has_normal_tex: false,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PostProcessShaderTemplateMaterial {
+    pub gamma_correction: bool,
+}
+
+impl PostProcessShaderTemplateMaterial {
+    pub fn new(gamma_correction: bool) -> Self {
+        Self { gamma_correction }
+    }
+}
+
+impl ShaderTemplateMaterial {
+    pub fn as_pbr(&self) -> &PbrShaderTemplateMaterial {
+        match self {
+            ShaderTemplateMaterial::Pbr(material) => material,
+            ShaderTemplateMaterial::PostProcess(_) => {
+                panic!("Cannot convert PostProcessShaderTemplateMaterial to PbrShaderTemplateMaterial");
+            },
+        }
+    }
+
+    pub fn as_pbr_mut(&mut self) -> &mut PbrShaderTemplateMaterial {
+        match self {
+            ShaderTemplateMaterial::Pbr(material) => material,
+            ShaderTemplateMaterial::PostProcess(_) => {
+                panic!("Cannot convert PostProcessShaderTemplateMaterial to PbrShaderTemplateMaterial");
+            },
+        }
+    }
+
+    pub fn as_post_process(&self) -> &PostProcessShaderTemplateMaterial {
+        match self {
+            ShaderTemplateMaterial::PostProcess(material) => material,
+            ShaderTemplateMaterial::Pbr(_) => {
+                panic!("Cannot convert PbrShaderTemplateMaterial to PostProcessShaderTemplateMaterial");
+            },
         }
     }
 }
