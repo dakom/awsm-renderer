@@ -4,7 +4,10 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
-use crate::{pages::app::sidebar::SidebarSection, route::{AppRoute, Route}};
+use crate::{
+    pages::app::sidebar::SidebarSection,
+    route::{AppRoute, Route},
+};
 use anyhow::{Context, Result};
 use dominator::clone;
 use futures_signals::signal::Mutable;

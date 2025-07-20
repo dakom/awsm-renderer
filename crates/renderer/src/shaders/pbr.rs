@@ -1,6 +1,5 @@
 use crate::shaders::{DynamicBufferBinding, VertexLocation, VertexToFragmentAssignment};
 
-
 #[derive(Default, Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PbrShaderCacheKeyMaterial {
     pub base_color_uv_index: Option<u32>,
@@ -17,7 +16,6 @@ impl PbrShaderCacheKeyMaterial {
         let mut fragment_buffer_bindings = Vec::new();
         let mut fragment_input_locations = Vec::new();
         let mut vertex_to_fragment_assignments = Vec::new();
-
 
         let mut push_texture = |name: &str, uv_index: u32| {
             fragment_buffer_bindings.push(DynamicBufferBinding {

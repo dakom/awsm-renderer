@@ -1,7 +1,14 @@
 use awsm_renderer::shaders::FragmentShaderKind;
 
 use crate::{
-    atoms::checkbox::{Checkbox, CheckboxStyle}, models::collections::{GltfId, GLTF_SETS}, pages::app::{context::AppContext, scene::camera::CameraId, sidebar::{current_model_signal, render_checkbox_label}}, prelude::*
+    atoms::checkbox::{Checkbox, CheckboxStyle},
+    models::collections::{GltfId, GLTF_SETS},
+    pages::app::{
+        context::AppContext,
+        scene::camera::CameraId,
+        sidebar::{current_model_signal, render_checkbox_label},
+    },
+    prelude::*,
 };
 
 use super::render_dropdown_label;
@@ -43,10 +50,10 @@ impl SidebarPostProcessing {
                     state.ctx.shader.set_neq(*shader);
                 }))
                 .with_options([
-                    ("Khronos PBR Neutral".to_string(), FragmentShaderKind::Pbr), 
-                    ("Agx".to_string(), FragmentShaderKind::Pbr), 
-                    ("Filmic".to_string(), FragmentShaderKind::Pbr), 
-                    ("None".to_string(), FragmentShaderKind::Pbr), 
+                    ("Khronos PBR Neutral".to_string(), FragmentShaderKind::Pbr),
+                    ("Agx".to_string(), FragmentShaderKind::Pbr),
+                    ("Filmic".to_string(), FragmentShaderKind::Pbr),
+                    ("None".to_string(), FragmentShaderKind::Pbr),
                 ])
                 .render(),
         )

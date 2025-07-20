@@ -11,7 +11,10 @@ use crate::{
         PipelineLayoutCacheKey, PipelineLayoutKey, RenderPipelineCacheKey, RenderPipelineKey,
     },
     render::RenderContext,
-    shaders::{post_process::PostProcessShaderCacheKeyMaterial, ShaderCacheKey, ShaderCacheKeyGeometry, ShaderCacheKeyMaterial, ShaderKey},
+    shaders::{
+        post_process::PostProcessShaderCacheKeyMaterial, ShaderCacheKey, ShaderCacheKeyGeometry,
+        ShaderCacheKeyMaterial, ShaderKey,
+    },
     textures::SamplerKey,
     AwsmRenderer,
 };
@@ -58,7 +61,9 @@ impl AwsmRenderer {
             .await?;
 
         // uses cache
-        let scene_sampler_key = self.add_material_post_proces_scene_sampler(self.post_process.settings.sampler_descriptor())?;
+        let scene_sampler_key = self.add_material_post_proces_scene_sampler(
+            self.post_process.settings.sampler_descriptor(),
+        )?;
 
         let material_key = self
             .materials
@@ -97,9 +102,7 @@ impl AwsmRenderer {
     }
 
     // this is only called when the screen size changes
-    pub fn post_process_update_view(
-        &mut self,
-    ) -> crate::error::Result<()> {
+    pub fn post_process_update_view(&mut self) -> crate::error::Result<()> {
         let (texture_views, _) = self.render_textures.views(&self.gpu)?;
         // safe - guaranteed to be initialized by post_process_init
         let (material_key, sampler) = {
@@ -164,9 +167,12 @@ impl Default for PostProcessSettings {
 
 impl PostProcessSettings {
     pub fn shader_cache_key(&self) -> ShaderCacheKey {
-        ShaderCacheKey::new(ShaderCacheKeyGeometry::Quad, ShaderCacheKeyMaterial::PostProcess(PostProcessShaderCacheKeyMaterial {
-            gamma_correction: self.gamma_correction,
-        }))
+        ShaderCacheKey::new(
+            ShaderCacheKeyGeometry::Quad,
+            ShaderCacheKeyMaterial::PostProcess(PostProcessShaderCacheKeyMaterial {
+                gamma_correction: self.gamma_correction,
+            }),
+        )
     }
 
     pub fn material(&self) -> PostProcessMaterial {

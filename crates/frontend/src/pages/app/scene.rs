@@ -201,7 +201,7 @@ impl AppScene {
                 tracing::error!("Failed to update post process view: {:?}", err);
             }
         }));
-    }   
+    }
 
     pub async fn clear(self: &Arc<Self>) {
         let state = self;

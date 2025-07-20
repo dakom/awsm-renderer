@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use crate::shaders::VertexLocation;
 
-
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct MeshShaderCacheKeyGeometry {
     pub attributes: Vec<ShaderCacheKeyAttribute>,
@@ -73,7 +72,7 @@ pub struct MeshShaderTemplateGeometry {
 
     // simpler ways of doing things
     pub has_normals: bool,
-    pub has_instance_transforms: bool
+    pub has_instance_transforms: bool,
 }
 
 impl From<MeshShaderCacheKeyGeometry> for MeshShaderTemplateGeometry {
@@ -145,7 +144,7 @@ impl From<MeshShaderCacheKeyGeometry> for MeshShaderTemplateGeometry {
             }
         }
 
-        Self { 
+        Self {
             vertex_input_locations,
             morphs: geometry.morphs,
             skins: skins.unwrap_or(0),

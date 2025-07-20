@@ -20,7 +20,7 @@ impl Default for AppContext {
             shader: Mutable::new(FragmentShaderKind::Pbr),
             scene: Mutable::new(None),
             generate_mipmaps: Mutable::new(CONFIG.generate_mipmaps),
-            post_processing: PostProcessingSettings::default()
+            post_processing: PostProcessingSettings::default(),
         }
     }
 }

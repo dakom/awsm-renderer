@@ -8,7 +8,9 @@ use gltf::SidebarGltf;
 use material::SidebarMaterial;
 
 use crate::{
-    models::collections::{GltfId, GLTF_SETS}, pages::app::sidebar::post_processing::SidebarPostProcessing, prelude::*
+    models::collections::{GltfId, GLTF_SETS},
+    pages::app::sidebar::post_processing::SidebarPostProcessing,
+    prelude::*,
 };
 
 use super::context::AppContext;

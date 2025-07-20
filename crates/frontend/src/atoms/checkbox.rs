@@ -25,8 +25,8 @@ impl CheckboxStyle {
 
     pub fn stroke_value(self) -> &'static str {
         match self {
-            CheckboxStyle::Dark => ColorBorder::CheckboxDark.value(), 
-            CheckboxStyle::Light => ColorBorder::CheckboxLight.value(), 
+            CheckboxStyle::Dark => ColorBorder::CheckboxDark.value(),
+            CheckboxStyle::Light => ColorBorder::CheckboxLight.value(),
         }
     }
 

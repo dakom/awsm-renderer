@@ -1,5 +1,7 @@
 use awsm_renderer_core::{
-    bind_groups::{SamplerBindingLayout, SamplerBindingType, TextureBindingLayout}, sampler::SamplerDescriptor, texture::{TextureSampleType, TextureViewDimension}
+    bind_groups::{SamplerBindingLayout, SamplerBindingType, TextureBindingLayout},
+    sampler::SamplerDescriptor,
+    texture::{TextureSampleType, TextureViewDimension},
 };
 
 use super::{AwsmMaterialError, Result};
@@ -7,7 +9,10 @@ use crate::{
     bind_groups::material_textures::{
         MaterialBindGroupKey, MaterialBindGroupLayoutKey, MaterialTextureBindingEntry,
         MaterialTextureBindingLayoutEntry,
-    }, materials::MaterialKey, textures::SamplerKey, AwsmRenderer
+    },
+    materials::MaterialKey,
+    textures::SamplerKey,
+    AwsmRenderer,
 };
 
 pub struct PostProcessMaterials {
@@ -34,7 +39,10 @@ impl PostProcessMaterials {
 }
 
 impl AwsmRenderer {
-    pub fn add_material_post_proces_scene_sampler(&mut self, sampler_descriptor: SamplerDescriptor) -> Result<SamplerKey> {
+    pub fn add_material_post_proces_scene_sampler(
+        &mut self,
+        sampler_descriptor: SamplerDescriptor,
+    ) -> Result<SamplerKey> {
         if let Some(sampler_key) = self.materials.post_process.cached_sampler_key {
             // the sampler already exists in cache
             return Ok(sampler_key);

@@ -10,7 +10,10 @@ use crate::{
     materials::Material,
     mesh::{Mesh, MeshBufferInfo},
     pipeline::{PipelineLayoutCacheKey, RenderPipelineCacheKey},
-    shaders::{mesh::MeshShaderCacheKeyGeometry, ShaderCacheKey, ShaderCacheKeyGeometry, ShaderCacheKeyMaterial},
+    shaders::{
+        mesh::MeshShaderCacheKeyGeometry, ShaderCacheKey, ShaderCacheKeyGeometry,
+        ShaderCacheKeyMaterial,
+    },
     skin::SkinKey,
     transform::{Transform, TransformKey},
     AwsmRenderer,
@@ -100,18 +103,24 @@ impl AwsmRenderer {
         let material_info = GltfMaterialInfo::new(self, ctx, gltf_primitive.material()).await?;
 
         let shader_cache_key = ShaderCacheKey::new(
-            ShaderCacheKeyGeometry::Mesh(
-                MeshShaderCacheKeyGeometry {
-                    attributes: primitive_buffer_info
-                        .vertex
-                        .attributes
-                        .iter()
-                        .map(|s| s.shader_key_kind)
-                        .collect(),
-                    morphs: primitive_buffer_info.morph.as_ref().map(|m| m.shader_key).unwrap_or_default(),
-                    has_instance_transforms: ctx.transform_is_instanced.lock().unwrap().contains(&transform_key)
-                }
-            ),
+            ShaderCacheKeyGeometry::Mesh(MeshShaderCacheKeyGeometry {
+                attributes: primitive_buffer_info
+                    .vertex
+                    .attributes
+                    .iter()
+                    .map(|s| s.shader_key_kind)
+                    .collect(),
+                morphs: primitive_buffer_info
+                    .morph
+                    .as_ref()
+                    .map(|m| m.shader_key)
+                    .unwrap_or_default(),
+                has_instance_transforms: ctx
+                    .transform_is_instanced
+                    .lock()
+                    .unwrap()
+                    .contains(&transform_key),
+            }),
             ShaderCacheKeyMaterial::Pbr(material_info.shader_cache_key),
         );
 
@@ -159,10 +168,11 @@ impl AwsmRenderer {
         // the attributes of this one vertex buffer layout contain all the info needed for the shader locations
         let (vertex_buffer_layout, shader_location) =
             primitive_vertex_buffer_layout(primitive_buffer_info)?;
-        let instance_transform_vertex_buffer_layout = match shader_cache_key.geometry.as_mesh().has_instance_transforms {
-            true => Some(instance_transform_vertex_buffer_layout(shader_location)),
-            false => None,
-        };
+        let instance_transform_vertex_buffer_layout =
+            match shader_cache_key.geometry.as_mesh().has_instance_transforms {
+                true => Some(instance_transform_vertex_buffer_layout(shader_location)),
+                false => None,
+            };
 
         // tracing::info!("indices: {:?}", debug_slice_to_u16(ctx.data.buffers.index_bytes.as_ref().unwrap()));
         // tracing::info!("positions: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[0].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());

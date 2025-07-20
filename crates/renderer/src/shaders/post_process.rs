@@ -1,4 +1,3 @@
-
 #[derive(Default, Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PostProcessShaderCacheKeyMaterial {
     pub gamma_correction: bool,
