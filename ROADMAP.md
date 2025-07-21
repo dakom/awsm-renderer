@@ -108,8 +108,8 @@ If it's supported here, corresponding core functionality is also supported
 - [x] indexed
 - [x] instancing
 - [ ] Early z pre-pass
-- [ ] Opaque front to back
-- [ ] Transparent back to front
+- [x] Opaque front to back
+- [x] Transparent back to front
 
 ## Textures
 - [x] 2D textures
