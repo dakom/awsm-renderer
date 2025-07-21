@@ -2,8 +2,7 @@ use askama::Template;
 
 #[derive(Template, Debug, Default)]
 #[template(path = "vertex/quad.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateVertexQuad {
-}
+pub struct ShaderTemplateVertexQuad {}
 
 impl ShaderTemplateVertexQuad {
     pub fn new() -> Self {

@@ -1,6 +1,15 @@
 use askama::Template;
 
-use crate::shaders::{fragment::{cache_key::ShaderCacheKeyFragment, entry::{debug_normals::ShaderTemplateFragmentDebugNormals, pbr::ShaderTemplateFragmentPbr, post_process::ShaderTemplateFragmentPostProcess}}, vertex::ShaderTemplateVertex};
+use crate::shaders::{
+    fragment::{
+        cache_key::ShaderCacheKeyFragment,
+        entry::{
+            debug_normals::ShaderTemplateFragmentDebugNormals, pbr::ShaderTemplateFragmentPbr,
+            post_process::ShaderTemplateFragmentPostProcess,
+        },
+    },
+    vertex::ShaderTemplateVertex,
+};
 
 // The struct that holds the shader template
 #[derive(Debug)]
@@ -13,21 +22,24 @@ pub enum ShaderTemplateFragment {
 impl ShaderTemplateFragment {
     pub fn new(cache_key: &ShaderCacheKeyFragment, vertex: &mut ShaderTemplateVertex) -> Self {
         match cache_key {
-            ShaderCacheKeyFragment::Pbr(cache_key) => {
-                match vertex {
-                    ShaderTemplateVertex::Mesh(mesh) => {
-                        ShaderTemplateFragment::Pbr(ShaderTemplateFragmentPbr::new(cache_key, &mut mesh.vertex_to_fragment_assignments))
-                    }
-                    ShaderTemplateVertex::Quad(_) => {
-                        ShaderTemplateFragment::Pbr(ShaderTemplateFragmentPbr::new(cache_key, &mut Vec::new()))
-                    }
+            ShaderCacheKeyFragment::Pbr(cache_key) => match vertex {
+                ShaderTemplateVertex::Mesh(mesh) => {
+                    ShaderTemplateFragment::Pbr(ShaderTemplateFragmentPbr::new(
+                        cache_key,
+                        &mut mesh.vertex_to_fragment_assignments,
+                    ))
                 }
-            }
-            ShaderCacheKeyFragment::PostProcess(cache_key) => {
-                ShaderTemplateFragment::PostProcess(ShaderTemplateFragmentPostProcess::new(cache_key))
-            }
+                ShaderTemplateVertex::Quad(_) => ShaderTemplateFragment::Pbr(
+                    ShaderTemplateFragmentPbr::new(cache_key, &mut Vec::new()),
+                ),
+            },
+            ShaderCacheKeyFragment::PostProcess(cache_key) => ShaderTemplateFragment::PostProcess(
+                ShaderTemplateFragmentPostProcess::new(cache_key),
+            ),
             ShaderCacheKeyFragment::DebugNormals(cache_key) => {
-                ShaderTemplateFragment::DebugNormals(ShaderTemplateFragmentDebugNormals::new(cache_key))
+                ShaderTemplateFragment::DebugNormals(ShaderTemplateFragmentDebugNormals::new(
+                    cache_key,
+                ))
             }
         }
     }
@@ -48,7 +60,6 @@ pub struct DynamicBufferBinding {
     pub name: String,
     pub data_type: String,
 }
-
 
 #[derive(Debug)]
 pub struct ShaderTemplateFragmentLocation {

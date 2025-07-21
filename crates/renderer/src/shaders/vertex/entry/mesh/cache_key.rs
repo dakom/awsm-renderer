@@ -44,7 +44,6 @@ impl ShaderCacheKeyVertexMeshAttribute {
     }
 }
 
-
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ShaderCacheKeyVertexMeshMorphs {
     pub position: bool,

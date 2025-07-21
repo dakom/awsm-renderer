@@ -1,6 +1,8 @@
 use awsm_renderer_core::pipeline::{primitive::IndexFormat, vertex::VertexFormat};
 
-use crate::shaders::vertex::entry::mesh::{ShaderCacheKeyVertexMeshAttribute, ShaderCacheKeyVertexMeshMorphs};
+use crate::shaders::vertex::entry::mesh::{
+    ShaderCacheKeyVertexMeshAttribute, ShaderCacheKeyVertexMeshMorphs,
+};
 
 #[derive(Default, Debug, Clone)]
 pub struct MeshBufferInfo {

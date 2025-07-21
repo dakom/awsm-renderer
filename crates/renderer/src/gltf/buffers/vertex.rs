@@ -201,21 +201,35 @@ impl GltfMeshBufferVertexInfo {
                         offset,
                         format: vertex_format,
                         shader_key_kind: match kind {
-                            TempAttributeKind::Positions => ShaderCacheKeyVertexMeshAttribute::Positions,
-                            TempAttributeKind::Normals => ShaderCacheKeyVertexMeshAttribute::Normals,
-                            TempAttributeKind::Tangents => ShaderCacheKeyVertexMeshAttribute::Tangents,
-                            TempAttributeKind::Colors => ShaderCacheKeyVertexMeshAttribute::Colors {
-                                count: attribute_kind_count,
-                            },
-                            TempAttributeKind::TexCoords => ShaderCacheKeyVertexMeshAttribute::TexCoords {
-                                count: attribute_kind_count,
-                            },
-                            TempAttributeKind::Joints => ShaderCacheKeyVertexMeshAttribute::Joints {
-                                count: attribute_kind_count,
-                            },
-                            TempAttributeKind::Weights => ShaderCacheKeyVertexMeshAttribute::Weights {
-                                count: attribute_kind_count,
-                            },
+                            TempAttributeKind::Positions => {
+                                ShaderCacheKeyVertexMeshAttribute::Positions
+                            }
+                            TempAttributeKind::Normals => {
+                                ShaderCacheKeyVertexMeshAttribute::Normals
+                            }
+                            TempAttributeKind::Tangents => {
+                                ShaderCacheKeyVertexMeshAttribute::Tangents
+                            }
+                            TempAttributeKind::Colors => {
+                                ShaderCacheKeyVertexMeshAttribute::Colors {
+                                    count: attribute_kind_count,
+                                }
+                            }
+                            TempAttributeKind::TexCoords => {
+                                ShaderCacheKeyVertexMeshAttribute::TexCoords {
+                                    count: attribute_kind_count,
+                                }
+                            }
+                            TempAttributeKind::Joints => {
+                                ShaderCacheKeyVertexMeshAttribute::Joints {
+                                    count: attribute_kind_count,
+                                }
+                            }
+                            TempAttributeKind::Weights => {
+                                ShaderCacheKeyVertexMeshAttribute::Weights {
+                                    count: attribute_kind_count,
+                                }
+                            }
                         },
                     },
                 ));

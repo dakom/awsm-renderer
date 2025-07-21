@@ -1,4 +1,4 @@
-mod template;
 mod cache_key;
-pub use template::*;
+mod template;
 pub use cache_key::*;
+pub use template::*;

@@ -1,6 +1,9 @@
 use askama::Template;
 
-use crate::shaders::vertex::{entry::{mesh::ShaderTemplateVertexMesh, quad::ShaderTemplateVertexQuad}, ShaderCacheKeyVertex};
+use crate::shaders::vertex::{
+    entry::{mesh::ShaderTemplateVertexMesh, quad::ShaderTemplateVertexQuad},
+    ShaderCacheKeyVertex,
+};
 
 impl ShaderTemplateVertex {
     pub fn new(cache_key: &ShaderCacheKeyVertex) -> Self {
@@ -8,7 +11,9 @@ impl ShaderTemplateVertex {
             ShaderCacheKeyVertex::Mesh(cache_key) => {
                 ShaderTemplateVertex::Mesh(ShaderTemplateVertexMesh::new(cache_key))
             }
-            ShaderCacheKeyVertex::Quad => ShaderTemplateVertex::Quad(ShaderTemplateVertexQuad::new())
+            ShaderCacheKeyVertex::Quad => {
+                ShaderTemplateVertex::Quad(ShaderTemplateVertexQuad::new())
+            }
         }
     }
 }
@@ -28,7 +33,6 @@ impl ShaderTemplateVertex {
         }
     }
 }
-
 
 #[derive(Debug)]
 pub struct ShaderTemplateVertexLocation {

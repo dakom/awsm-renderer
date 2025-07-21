@@ -352,10 +352,17 @@ impl AppScene {
                 ))?;
 
             let old_shader_kind = match &shader_cache_key.fragment {
-                ShaderCacheKeyFragment::Pbr(shader_cache_key_fragment_pbr) => FragmentShaderKind::Pbr,
-                ShaderCacheKeyFragment::DebugNormals(shader_cache_key_fragment_debug_normals) => FragmentShaderKind::DebugNormals,
+                ShaderCacheKeyFragment::Pbr(shader_cache_key_fragment_pbr) => {
+                    FragmentShaderKind::Pbr
+                }
+                ShaderCacheKeyFragment::DebugNormals(shader_cache_key_fragment_debug_normals) => {
+                    FragmentShaderKind::DebugNormals
+                }
                 _ => {
-                    return Err(anyhow!("Unsupported shader kind for meshes: {:?}", shader_cache_key.fragment));
+                    return Err(anyhow!(
+                        "Unsupported shader kind for meshes: {:?}",
+                        shader_cache_key.fragment
+                    ));
                 }
             };
 
@@ -375,10 +382,14 @@ impl AppScene {
 
             match shader_kind {
                 FragmentShaderKind::DebugNormals => {
-                    shader_cache_key.fragment = ShaderCacheKeyFragment::DebugNormals(ShaderCacheKeyFragmentDebugNormals::new(match &shader_cache_key.vertex {
-                        awsm_renderer::shaders::vertex::ShaderCacheKeyVertex::Mesh(mesh) => ShaderTemplateVertexMesh::new(&mesh).has_normals,
-                        awsm_renderer::shaders::vertex::ShaderCacheKeyVertex::Quad => false,
-                    }));
+                    shader_cache_key.fragment = ShaderCacheKeyFragment::DebugNormals(
+                        ShaderCacheKeyFragmentDebugNormals::new(match &shader_cache_key.vertex {
+                            awsm_renderer::shaders::vertex::ShaderCacheKeyVertex::Mesh(mesh) => {
+                                ShaderTemplateVertexMesh::new(&mesh).has_normals
+                            }
+                            awsm_renderer::shaders::vertex::ShaderCacheKeyVertex::Quad => false,
+                        }),
+                    );
                 }
                 FragmentShaderKind::Pbr => {
                     let fragment = self

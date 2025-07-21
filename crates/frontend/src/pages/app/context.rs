@@ -1,4 +1,3 @@
-
 use crate::{pages::app::sidebar::material::FragmentShaderKind, prelude::*};
 
 use super::scene::{camera::CameraId, AppScene};

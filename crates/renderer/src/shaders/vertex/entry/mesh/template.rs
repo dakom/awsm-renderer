@@ -1,7 +1,12 @@
-use std::collections::HashSet;
 use askama::Template;
+use std::collections::HashSet;
 
-use crate::shaders::vertex::{entry::mesh::{ShaderCacheKeyVertexMesh, ShaderCacheKeyVertexMeshAttribute, ShaderCacheKeyVertexMeshMorphs}, ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment};
+use crate::shaders::vertex::{
+    entry::mesh::{
+        ShaderCacheKeyVertexMesh, ShaderCacheKeyVertexMeshAttribute, ShaderCacheKeyVertexMeshMorphs,
+    },
+    ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment,
+};
 
 #[derive(Template, Debug)]
 #[template(path = "vertex/mesh.wgsl", whitespace = "minimize")]
@@ -44,7 +49,7 @@ impl ShaderTemplateVertexMesh {
             }
 
             for count in 0..attribute.count() {
-                vertex_input_locations.push(ShaderTemplateVertexLocation{
+                vertex_input_locations.push(ShaderTemplateVertexLocation {
                     location: vertex_input_locations.len() as u32,
                     interpolation: match attribute {
                         ShaderCacheKeyVertexMeshAttribute::Positions => None,
@@ -59,19 +64,31 @@ impl ShaderTemplateVertexMesh {
                         ShaderCacheKeyVertexMeshAttribute::Positions => "position".to_string(),
                         ShaderCacheKeyVertexMeshAttribute::Normals => "normal".to_string(),
                         ShaderCacheKeyVertexMeshAttribute::Tangents => "tangent".to_string(),
-                        ShaderCacheKeyVertexMeshAttribute::Colors { .. } => format!("color_{count}"),
-                        ShaderCacheKeyVertexMeshAttribute::TexCoords { .. } => format!("uv_{count}"),
-                        ShaderCacheKeyVertexMeshAttribute::Joints { .. } => format!("skin_joint_{count}"),
-                        ShaderCacheKeyVertexMeshAttribute::Weights { .. } => format!("skin_weight_{count}"),
+                        ShaderCacheKeyVertexMeshAttribute::Colors { .. } => {
+                            format!("color_{count}")
+                        }
+                        ShaderCacheKeyVertexMeshAttribute::TexCoords { .. } => {
+                            format!("uv_{count}")
+                        }
+                        ShaderCacheKeyVertexMeshAttribute::Joints { .. } => {
+                            format!("skin_joint_{count}")
+                        }
+                        ShaderCacheKeyVertexMeshAttribute::Weights { .. } => {
+                            format!("skin_weight_{count}")
+                        }
                     },
                     data_type: match attribute {
                         ShaderCacheKeyVertexMeshAttribute::Positions => "vec3<f32>".to_string(),
                         ShaderCacheKeyVertexMeshAttribute::Normals => "vec3<f32>".to_string(),
                         ShaderCacheKeyVertexMeshAttribute::Tangents => "vec3<f32>".to_string(),
                         ShaderCacheKeyVertexMeshAttribute::Colors { .. } => "vec4<f32>".to_string(),
-                        ShaderCacheKeyVertexMeshAttribute::TexCoords { .. } => "vec2<f32>".to_string(),
+                        ShaderCacheKeyVertexMeshAttribute::TexCoords { .. } => {
+                            "vec2<f32>".to_string()
+                        }
                         ShaderCacheKeyVertexMeshAttribute::Joints { .. } => "vec4<u32>".to_string(),
-                        ShaderCacheKeyVertexMeshAttribute::Weights { .. } => "vec4<f32>".to_string(),
+                        ShaderCacheKeyVertexMeshAttribute::Weights { .. } => {
+                            "vec4<f32>".to_string()
+                        }
                     },
                 });
             }

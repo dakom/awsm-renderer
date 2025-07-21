@@ -1,6 +1,11 @@
+use crate::shaders::{
+    fragment::{
+        entry::pbr::ShaderCacheKeyFragmentPbr,
+        template::{DynamicBufferBinding, ShaderTemplateFragmentLocation},
+    },
+    vertex::ShaderTemplateVertexToFragmentAssignment,
+};
 use askama::Template;
-use crate::shaders::{fragment::{entry::pbr::ShaderCacheKeyFragmentPbr, template::{DynamicBufferBinding, ShaderTemplateFragmentLocation}}, vertex::ShaderTemplateVertexToFragmentAssignment};
-
 
 #[derive(Template, Debug)]
 #[template(path = "fragment/pbr.wgsl", whitespace = "minimize")]
@@ -19,7 +24,10 @@ pub struct ShaderTemplateFragmentPbr {
 }
 
 impl ShaderTemplateFragmentPbr {
-    pub fn new(cache_key: &ShaderCacheKeyFragmentPbr, vertex_to_fragment_assignments: &mut Vec<ShaderTemplateVertexToFragmentAssignment>) -> Self {
+    pub fn new(
+        cache_key: &ShaderCacheKeyFragmentPbr,
+        vertex_to_fragment_assignments: &mut Vec<ShaderTemplateVertexToFragmentAssignment>,
+    ) -> Self {
         let mut fragment_buffer_bindings = Vec::new();
         let mut fragment_input_locations = Vec::new();
 
@@ -44,7 +52,7 @@ impl ShaderTemplateFragmentPbr {
                 data_type: "vec2<f32>".to_string(),
             });
 
-            vertex_to_fragment_assignments.push(ShaderTemplateVertexToFragmentAssignment{
+            vertex_to_fragment_assignments.push(ShaderTemplateVertexToFragmentAssignment {
                 vertex_name: format!("uv_{uv_index}"),
                 fragment_name: format!("{name}_uv"),
             });

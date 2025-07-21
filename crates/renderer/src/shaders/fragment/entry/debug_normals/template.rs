@@ -10,6 +10,8 @@ pub struct ShaderTemplateFragmentDebugNormals {
 
 impl ShaderTemplateFragmentDebugNormals {
     pub fn new(cache_key: &ShaderCacheKeyFragmentDebugNormals) -> Self {
-        Self { has_normals: cache_key.has_normals }
+        Self {
+            has_normals: cache_key.has_normals,
+        }
     }
 }

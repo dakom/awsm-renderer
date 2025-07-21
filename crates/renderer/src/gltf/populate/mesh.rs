@@ -11,7 +11,9 @@ use crate::{
     mesh::{Mesh, MeshBufferInfo},
     pipeline::{PipelineLayoutCacheKey, RenderPipelineCacheKey},
     shaders::{
-        fragment::cache_key::ShaderCacheKeyFragment, vertex::{entry::mesh::ShaderCacheKeyVertexMesh, ShaderCacheKeyVertex}, ShaderCacheKey
+        fragment::cache_key::ShaderCacheKeyFragment,
+        vertex::{entry::mesh::ShaderCacheKeyVertexMesh, ShaderCacheKeyVertex},
+        ShaderCacheKey,
     },
     skin::SkinKey,
     transform::{Transform, TransformKey},
@@ -99,10 +101,12 @@ impl AwsmRenderer {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
-        let material_info = GltfMaterialInfo::new(self, ctx, &primitive_buffer_info, gltf_primitive.material()).await?;
+        let material_info =
+            GltfMaterialInfo::new(self, ctx, primitive_buffer_info, gltf_primitive.material())
+                .await?;
 
         let shader_cache_key = ShaderCacheKey::new(
-            ShaderCacheKeyVertex::Mesh(ShaderCacheKeyVertexMesh{
+            ShaderCacheKeyVertex::Mesh(ShaderCacheKeyVertexMesh {
                 attributes: primitive_buffer_info
                     .vertex
                     .attributes

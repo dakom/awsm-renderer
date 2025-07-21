@@ -4,7 +4,9 @@ use super::Result;
 use crate::buffer::helpers::slice_zeroes;
 use crate::gltf::buffers::accessor::accessor_to_bytes;
 use crate::mesh::MeshBufferMorphInfo;
-use crate::shaders::vertex::entry::mesh::{ShaderCacheKeyVertexMeshAttribute, ShaderCacheKeyVertexMeshMorphs};
+use crate::shaders::vertex::entry::mesh::{
+    ShaderCacheKeyVertexMeshAttribute, ShaderCacheKeyVertexMeshMorphs,
+};
 
 #[derive(Default, Debug, Clone)]
 pub struct GltfMeshBufferMorphInfo {
@@ -41,7 +43,7 @@ impl GltfMeshBufferMorphInfo {
         vertex_count: usize,
         morph_bytes: &mut Vec<u8>,
     ) -> Result<Option<Self>> {
-        let shader_key = ShaderCacheKeyVertexMeshMorphs { 
+        let shader_key = ShaderCacheKeyVertexMeshMorphs {
             position: primitive
                 .morph_targets()
                 .any(|morph_target| morph_target.positions().is_some()),
@@ -109,10 +111,11 @@ impl GltfMeshBufferMorphInfo {
 
                 for morph_target_buffer_data in &morph_targets_buffer_data {
                     let mut push_bytes =
-                        |attribute_kind: ShaderCacheKeyVertexMeshAttribute, data: Option<&Cow<'_, [u8]>>| {
+                        |attribute_kind: ShaderCacheKeyVertexMeshAttribute,
+                         data: Option<&Cow<'_, [u8]>>| {
                             let stride_size = match attribute_kind {
                                 ShaderCacheKeyVertexMeshAttribute::Positions => 12, // vec3 of floats
-                                ShaderCacheKeyVertexMeshAttribute::Normals => 12,   // vec3 of floats
+                                ShaderCacheKeyVertexMeshAttribute::Normals => 12, // vec3 of floats
                                 ShaderCacheKeyVertexMeshAttribute::Tangents => 12, // vec3 of floats (yes, not a vec4, morph targets do not include w component)
                                 _ => unreachable!(),
                             };

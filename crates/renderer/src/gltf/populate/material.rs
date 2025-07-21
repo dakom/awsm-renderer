@@ -1,13 +1,23 @@
 use awsm_renderer_core::sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor};
 
 use crate::{
-    gltf::{buffers::GltfMeshBufferInfo, error::{AwsmGltfError, Result}}, materials::{
+    gltf::{
+        buffers::GltfMeshBufferInfo,
+        error::{AwsmGltfError, Result},
+    },
+    materials::{
         pbr::{
             PbrMaterial, PbrMaterialBindGroupCacheKey, PbrMaterialBindGroupLayoutCacheKey,
             PbrMaterialTextureCacheKey,
         },
         MaterialAlphaMode,
-    }, shaders::{fragment::entry::pbr::ShaderCacheKeyFragmentPbr, vertex::entry::mesh::ShaderCacheKeyVertexMeshAttribute}, textures::{SamplerKey, TextureKey}, AwsmRenderer
+    },
+    shaders::{
+        fragment::entry::pbr::ShaderCacheKeyFragmentPbr,
+        vertex::entry::mesh::ShaderCacheKeyVertexMeshAttribute,
+    },
+    textures::{SamplerKey, TextureKey},
+    AwsmRenderer,
 };
 
 use super::GltfPopulateContext;
@@ -27,9 +37,14 @@ impl GltfMaterialInfo {
         gltf_material: gltf::Material<'_>,
     ) -> Result<Self> {
         let mut bind_group_cache_key = PbrMaterialBindGroupCacheKey::default();
-        let mut shader_cache_key = ShaderCacheKeyFragmentPbr::default();
-
-        shader_cache_key.has_normals = primitive_buffer_info.vertex.attributes.iter().any(|a| a.shader_key_kind == ShaderCacheKeyVertexMeshAttribute::Normals);
+        let mut shader_cache_key = ShaderCacheKeyFragmentPbr {
+            has_normals: primitive_buffer_info
+                .vertex
+                .attributes
+                .iter()
+                .any(|a| a.shader_key_kind == ShaderCacheKeyVertexMeshAttribute::Normals),
+            ..ShaderCacheKeyFragmentPbr::default()
+        };
 
         let pbr = gltf_material.pbr_metallic_roughness();
 

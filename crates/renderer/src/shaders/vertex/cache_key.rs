@@ -11,7 +11,9 @@ impl ShaderCacheKeyVertex {
     pub fn as_mesh(&self) -> &ShaderCacheKeyVertexMesh {
         match self {
             ShaderCacheKeyVertex::Mesh(cache_key) => cache_key,
-            ShaderCacheKeyVertex::Quad => panic!("ShaderCacheKeyVertex::Quad does not have a mesh cache key"),
+            ShaderCacheKeyVertex::Quad => {
+                panic!("ShaderCacheKeyVertex::Quad does not have a mesh cache key")
+            }
         }
     }
 }

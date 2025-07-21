@@ -12,7 +12,12 @@ use crate::{
     },
     render::RenderContext,
     shaders::{
-        fragment::{cache_key::ShaderCacheKeyFragment, entry::post_process::ShaderCacheKeyFragmentPostProcess}, vertex::ShaderCacheKeyVertex, ShaderCacheKey, ShaderKey
+        fragment::{
+            cache_key::ShaderCacheKeyFragment,
+            entry::post_process::ShaderCacheKeyFragmentPostProcess,
+        },
+        vertex::ShaderCacheKeyVertex,
+        ShaderCacheKey, ShaderKey,
     },
     textures::SamplerKey,
     AwsmRenderer,

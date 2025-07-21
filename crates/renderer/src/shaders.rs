@@ -1,5 +1,5 @@
-pub mod vertex;
 pub mod fragment;
+pub mod vertex;
 
 use std::collections::HashMap;
 
@@ -11,7 +11,13 @@ use awsm_renderer_core::{
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
-use crate::{shaders::{fragment::{cache_key::ShaderCacheKeyFragment, template::ShaderTemplateFragment}, vertex::{ShaderCacheKeyVertex, ShaderTemplateVertex}}, AwsmRenderer};
+use crate::{
+    shaders::{
+        fragment::{cache_key::ShaderCacheKeyFragment, template::ShaderTemplateFragment},
+        vertex::{ShaderCacheKeyVertex, ShaderTemplateVertex},
+    },
+    AwsmRenderer,
+};
 
 pub struct Shaders {
     lookup: SlotMap<ShaderKey, web_sys::GpuShaderModule>,
@@ -87,7 +93,6 @@ impl ShaderCacheKey {
     }
 }
 
-
 #[derive(Template, Debug)]
 #[template(path = "main.wgsl", whitespace = "minimize")]
 struct ShaderTemplate {
@@ -100,10 +105,7 @@ impl ShaderTemplate {
         let mut vertex = ShaderTemplateVertex::new(&cache_key.vertex);
         let fragment = ShaderTemplateFragment::new(&cache_key.fragment, &mut vertex);
 
-        Self {
-            vertex,
-            fragment,
-        }
+        Self { vertex, fragment }
     }
 
     pub fn into_descriptor(self) -> Result<web_sys::GpuShaderModuleDescriptor> {
@@ -140,7 +142,6 @@ fn print_source(source: &str, with_line_numbers: bool) {
 
     web_sys::console::log_1(&web_sys::wasm_bindgen::JsValue::from(output.as_str()));
 }
-
 
 new_key_type! {
     pub struct ShaderKey;
