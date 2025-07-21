@@ -1,6 +1,5 @@
 # Next up
 
-- Make tonemaping a post-processing step
 - TAA for temporal and edge aliasing
 
 - materials cont'd
@@ -133,7 +132,7 @@ If it's supported here, corresponding core functionality is also supported
 
 ## Post-processing
 - [x] Basic render-texture support
-- [ ] Tonemapping
+- [x] Tonemapping
 - [ ] SSAO
 - [ ] Bloom
 - [ ] TAA 
