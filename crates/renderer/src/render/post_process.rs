@@ -175,6 +175,7 @@ impl PostProcessSettings {
             ShaderCacheKeyVertex::Quad,
             ShaderCacheKeyFragment::PostProcess(ShaderCacheKeyFragmentPostProcess {
                 gamma_correction: self.gamma_correction,
+                tonemapping: self.tonemapping,
             }),
         )
     }
@@ -216,7 +217,9 @@ impl PostProcessSettings {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ToneMapping {
-    ACES,
+    KhronosPbrNeutral,
+    Agx,
+    Filmic,
 }

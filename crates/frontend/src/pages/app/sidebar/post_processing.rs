@@ -1,3 +1,5 @@
+use awsm_renderer::render::post_process::ToneMapping;
+
 use crate::{
     atoms::checkbox::{Checkbox, CheckboxStyle},
     models::collections::{GltfId, GLTF_SETS},
@@ -42,16 +44,19 @@ impl SidebarPostProcessing {
         render_dropdown_label(
             "Tonemapping",
             Dropdown::new()
-                .with_intial_selected(Some(state.ctx.shader.get()))
+                .with_intial_selected(Some(state.ctx.post_processing.tonemapping.get()))
                 .with_bg_color(ColorBackground::Dropdown)
-                .with_on_change(clone!(state => move |shader| {
-                    state.ctx.shader.set_neq(*shader);
+                .with_on_change(clone!(state => move |tonemapping| {
+                    state.ctx.post_processing.tonemapping.set_neq(*tonemapping);
                 }))
                 .with_options([
-                    // ("Khronos PBR Neutral".to_string(), FragmentShaderKind::Pbr),
-                    // ("Agx".to_string(), FragmentShaderKind::Pbr),
-                    // ("Filmic".to_string(), FragmentShaderKind::Pbr),
-                    // ("None".to_string(), FragmentShaderKind::Pbr),
+                    (
+                        "Khronos PBR Neutral".to_string(),
+                        Some(ToneMapping::KhronosPbrNeutral),
+                    ),
+                    ("Agx".to_string(), Some(ToneMapping::Agx)),
+                    ("Filmic".to_string(), Some(ToneMapping::Filmic)),
+                    ("None".to_string(), None),
                 ])
                 .render(),
         )
