@@ -1,6 +1,5 @@
-use awsm_renderer::shaders::FragmentShaderKind;
 
-use crate::prelude::*;
+use crate::{pages::app::sidebar::material::FragmentShaderKind, prelude::*};
 
 use super::scene::{camera::CameraId, AppScene};
 

@@ -13,7 +13,9 @@ use awsm_renderer::gltf::loader::GltfLoader;
 use awsm_renderer::lights::Light;
 use awsm_renderer::mesh::MeshKey;
 use awsm_renderer::pipeline::RenderPipelineKey;
-use awsm_renderer::shaders::{FragmentShaderKind, ShaderCacheKeyMaterial};
+use awsm_renderer::shaders::fragment::cache_key::ShaderCacheKeyFragment;
+use awsm_renderer::shaders::fragment::entry::debug_normals::ShaderCacheKeyFragmentDebugNormals;
+use awsm_renderer::shaders::vertex::entry::mesh::ShaderTemplateVertexMesh;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use awsm_web::dom::resize::ResizeObserver;
 use camera::{Camera, CameraId};
@@ -24,6 +26,7 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 
 use crate::models::collections::GltfId;
 use crate::pages::app::sidebar::current_model_signal;
+use crate::pages::app::sidebar::material::FragmentShaderKind;
 use crate::prelude::*;
 
 use super::canvas;
@@ -40,7 +43,7 @@ pub struct AppScene {
     pub event_listeners: Mutex<Vec<EventListener>>,
     last_size: Cell<(f64, f64)>,
     last_shader_kind: Cell<Option<FragmentShaderKind>>,
-    old_shader_kind_material: Mutex<HashMap<(MeshKey, FragmentShaderKind), ShaderCacheKeyMaterial>>,
+    old_shader_kind_material: Mutex<HashMap<(MeshKey, FragmentShaderKind), ShaderCacheKeyFragment>>,
 }
 
 impl AppScene {
@@ -348,7 +351,13 @@ impl AppScene {
                     pipeline_cache_key.shader_key
                 ))?;
 
-            let old_shader_kind = shader_cache_key.material.fragment_shader_kind();
+            let old_shader_kind = match &shader_cache_key.fragment {
+                ShaderCacheKeyFragment::Pbr(shader_cache_key_fragment_pbr) => FragmentShaderKind::Pbr,
+                ShaderCacheKeyFragment::DebugNormals(shader_cache_key_fragment_debug_normals) => FragmentShaderKind::DebugNormals,
+                _ => {
+                    return Err(anyhow!("Unsupported shader kind for meshes: {:?}", shader_cache_key.fragment));
+                }
+            };
 
             if old_shader_kind == shader_kind {
                 continue;
@@ -360,16 +369,19 @@ impl AppScene {
                 let key = (mesh_key.clone(), old_shader_kind);
 
                 if !old_shader_kind_material.contains_key(&key) {
-                    old_shader_kind_material.insert(key, shader_cache_key.material.clone());
+                    old_shader_kind_material.insert(key, shader_cache_key.fragment.clone());
                 }
             }
 
             match shader_kind {
                 FragmentShaderKind::DebugNormals => {
-                    shader_cache_key.material = ShaderCacheKeyMaterial::DebugNormals;
+                    shader_cache_key.fragment = ShaderCacheKeyFragment::DebugNormals(ShaderCacheKeyFragmentDebugNormals::new(match &shader_cache_key.vertex {
+                        awsm_renderer::shaders::vertex::ShaderCacheKeyVertex::Mesh(mesh) => ShaderTemplateVertexMesh::new(&mesh).has_normals,
+                        awsm_renderer::shaders::vertex::ShaderCacheKeyVertex::Quad => false,
+                    }));
                 }
                 FragmentShaderKind::Pbr => {
-                    let material = self
+                    let fragment = self
                         .old_shader_kind_material
                         .lock()
                         .unwrap()
@@ -380,14 +392,7 @@ impl AppScene {
                         ))?
                         .clone();
 
-                    shader_cache_key.material = material;
-                }
-                FragmentShaderKind::PostProcess => {
-                    // this shouldn't be reachable, but just in case
-                    tracing::error!(
-                        "Shader kind {:?} is not supported for meshes, skipping",
-                        shader_kind
-                    );
+                    shader_cache_key.fragment = fragment;
                 }
             }
 

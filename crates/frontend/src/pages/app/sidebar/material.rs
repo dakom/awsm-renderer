@@ -1,5 +1,3 @@
-use awsm_renderer::shaders::FragmentShaderKind;
-
 use crate::{
     models::collections::{GltfId, GLTF_SETS},
     pages::app::{context::AppContext, scene::camera::CameraId, sidebar::current_model_signal},
@@ -53,4 +51,10 @@ impl SidebarMaterial {
                 .render(),
         )
     }
+}
+
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
+pub enum FragmentShaderKind {
+    Pbr,
+    DebugNormals,
 }

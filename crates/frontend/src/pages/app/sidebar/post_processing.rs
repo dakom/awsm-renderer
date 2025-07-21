@@ -1,5 +1,3 @@
-use awsm_renderer::shaders::FragmentShaderKind;
-
 use crate::{
     atoms::checkbox::{Checkbox, CheckboxStyle},
     models::collections::{GltfId, GLTF_SETS},
@@ -50,10 +48,10 @@ impl SidebarPostProcessing {
                     state.ctx.shader.set_neq(*shader);
                 }))
                 .with_options([
-                    ("Khronos PBR Neutral".to_string(), FragmentShaderKind::Pbr),
-                    ("Agx".to_string(), FragmentShaderKind::Pbr),
-                    ("Filmic".to_string(), FragmentShaderKind::Pbr),
-                    ("None".to_string(), FragmentShaderKind::Pbr),
+                    // ("Khronos PBR Neutral".to_string(), FragmentShaderKind::Pbr),
+                    // ("Agx".to_string(), FragmentShaderKind::Pbr),
+                    // ("Filmic".to_string(), FragmentShaderKind::Pbr),
+                    // ("None".to_string(), FragmentShaderKind::Pbr),
                 ])
                 .render(),
         )

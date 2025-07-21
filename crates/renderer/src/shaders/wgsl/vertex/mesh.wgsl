@@ -1,8 +1,8 @@
-{% if geometry.as_mesh().morphs.any() %}
+{% if morphs.any() %}
     {% include "vertex/mesh/morph.wgsl" %}
 {% endif %}
 
-{% if geometry.as_mesh().skins > 0 %}
+{% if skins > 0 %}
     {% include "vertex/mesh/skin.wgsl" %}
 {% endif %}
 
@@ -17,7 +17,7 @@ struct TransformUniform {
 //***** INPUT/OUTPUT *****
 struct VertexInput {
     @builtin(vertex_index) vertex_index: u32,
-    {% for loc in geometry.as_mesh().vertex_input_locations %}
+    {% for loc in vertex_input_locations %}
         {%- match loc.interpolation %}
             {% when Some with (interpolation) %}
                 @location({{ loc.location }}) @interpolate({{ interpolation }}) {{ loc.name }}: {{ loc.data_type }},
@@ -33,16 +33,16 @@ fn vert_main(raw_input: VertexInput) -> FragmentInput {
     var input = raw_input;
 
     // morphs first: https://github.com/KhronosGroup/glTF/issues/1646#issuecomment-542815692
-    {% if geometry.as_mesh().morphs.any() %}
+    {% if morphs.any() %}
     input = apply_morphs(input);
     {% endif %}
 
-    {% if geometry.as_mesh().skins > 0 %}
+    {% if skins > 0 %}
     input = apply_skin(input);
     {% endif %}
 
     // Transform the vertex position by the model matrix, and then by the view projection matrix
-    {% if geometry.as_mesh().has_instance_transforms %}
+    {% if has_instance_transforms %}
         // Transform the vertex position by the instance transform
         let instance_transform = mat4x4<f32>(
             raw_input.instance_transform_row_0,
@@ -60,12 +60,12 @@ fn vert_main(raw_input: VertexInput) -> FragmentInput {
 
     var pos = model_transform * vec4<f32>(input.position, 1.0);
     output.world_position = pos.xyz;
-    {% if geometry.as_mesh().has_normals %}
+    {% if has_normals %}
         output.world_normal = normalize((model_transform * vec4<f32>(input.normal, 0.0)).xyz);
     {% endif %}
     output.clip_position = camera.view_proj * pos;
 
-    {% for assignment in material.as_pbr().vertex_to_fragment_assignments %}
+    {% for assignment in vertex_to_fragment_assignments %}
         output.{{ assignment.fragment_name }} = input.{{ assignment.vertex_name }};
     {% endfor %}
 

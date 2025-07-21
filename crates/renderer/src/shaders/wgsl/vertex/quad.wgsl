@@ -1,3 +1,4 @@
+
 @vertex
 fn vert_main(@builtin(vertex_index) vertex_index: u32) -> FragmentInput {
     var out: FragmentInput;

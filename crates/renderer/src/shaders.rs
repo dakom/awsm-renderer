@@ -1,8 +1,6 @@
-pub mod mesh;
-pub mod pbr;
-pub mod post_process;
+pub mod vertex;
+pub mod fragment;
 
-use core::panic;
 use std::collections::HashMap;
 
 use askama::Template;
@@ -13,14 +11,7 @@ use awsm_renderer_core::{
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
-use crate::{
-    shaders::{
-        mesh::{MeshShaderCacheKeyGeometry, MeshShaderTemplateGeometry},
-        pbr::{PbrShaderCacheKeyMaterial, PbrShaderTemplateMaterial},
-        post_process::{PostProcessShaderCacheKeyMaterial, PostProcessShaderTemplateMaterial},
-    },
-    AwsmRenderer,
-};
+use crate::{shaders::{fragment::{cache_key::ShaderCacheKeyFragment, template::ShaderTemplateFragment}, vertex::{ShaderCacheKeyVertex, ShaderTemplateVertex}}, AwsmRenderer};
 
 pub struct Shaders {
     lookup: SlotMap<ShaderKey, web_sys::GpuShaderModule>,
@@ -64,7 +55,7 @@ impl AwsmRenderer {
 
         let shader_module = self
             .gpu
-            .compile_shader(&cache_key.clone().into_descriptor()?);
+            .compile_shader(&ShaderTemplate::new(&cache_key).into_descriptor()?);
         shader_module
             .validate_shader()
             .await
@@ -86,124 +77,48 @@ impl AwsmRenderer {
 // is controlled via various components as-needed
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKey {
-    pub material: ShaderCacheKeyMaterial,
-    pub geometry: ShaderCacheKeyGeometry,
+    pub vertex: ShaderCacheKeyVertex,
+    pub fragment: ShaderCacheKeyFragment,
 }
 
 impl ShaderCacheKey {
-    pub fn new(geometry: ShaderCacheKeyGeometry, material: ShaderCacheKeyMaterial) -> Self {
-        Self { geometry, material }
-    }
-
-    pub fn with_geometry(mut self, geometry: ShaderCacheKeyGeometry) -> Self {
-        self.geometry = geometry;
-        self
-    }
-
-    pub fn with_material(mut self, material: ShaderCacheKeyMaterial) -> Self {
-        self.material = material;
-        self
+    pub fn new(vertex: ShaderCacheKeyVertex, fragment: ShaderCacheKeyFragment) -> Self {
+        Self { vertex, fragment }
     }
 }
 
-#[derive(Hash, Debug, Clone, PartialEq, Eq)]
-pub enum ShaderCacheKeyGeometry {
-    Mesh(MeshShaderCacheKeyGeometry),
-    Quad,
+
+#[derive(Template, Debug)]
+#[template(path = "main.wgsl", whitespace = "minimize")]
+struct ShaderTemplate {
+    vertex: ShaderTemplateVertex,
+    fragment: ShaderTemplateFragment,
 }
 
-impl ShaderCacheKeyGeometry {
-    pub fn as_mesh(&self) -> &MeshShaderCacheKeyGeometry {
-        match self {
-            ShaderCacheKeyGeometry::Mesh(mesh_geometry) => mesh_geometry,
-            ShaderCacheKeyGeometry::Quad => {
-                panic!("Cannot convert Quad to MeshShaderCacheKeyGeometry")
-            }
-        }
-    }
-}
+impl ShaderTemplate {
+    pub fn new(cache_key: &ShaderCacheKey) -> Self {
+        let mut vertex = ShaderTemplateVertex::new(&cache_key.vertex);
+        let fragment = ShaderTemplateFragment::new(&cache_key.fragment, &mut vertex);
 
-impl From<ShaderCacheKeyGeometry> for ShaderTemplateGeometry {
-    fn from(geometry: ShaderCacheKeyGeometry) -> Self {
-        match geometry {
-            ShaderCacheKeyGeometry::Mesh(mesh_geometry) => {
-                ShaderTemplateGeometry::Mesh(mesh_geometry.into())
-            }
-            ShaderCacheKeyGeometry::Quad => ShaderTemplateGeometry::Quad,
-        }
-    }
-}
-
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ShaderCacheKeyMaterial {
-    Pbr(PbrShaderCacheKeyMaterial),
-    PostProcess(PostProcessShaderCacheKeyMaterial),
-    DebugNormals,
-}
-
-impl ShaderCacheKeyMaterial {
-    pub fn has_alpha_mask(&self) -> bool {
-        match self {
-            ShaderCacheKeyMaterial::Pbr(material_key) => material_key.has_alpha_mask,
-            ShaderCacheKeyMaterial::DebugNormals => false,
-            ShaderCacheKeyMaterial::PostProcess(_) => false,
+        Self {
+            vertex,
+            fragment,
         }
     }
 
-    pub fn fragment_shader_kind(&self) -> FragmentShaderKind {
-        match self {
-            ShaderCacheKeyMaterial::Pbr(_) => FragmentShaderKind::Pbr,
-            ShaderCacheKeyMaterial::DebugNormals => FragmentShaderKind::DebugNormals,
-            ShaderCacheKeyMaterial::PostProcess(_) => FragmentShaderKind::PostProcess,
-        }
-    }
-
-    pub fn vertex_shader_kind(&self) -> VertexShaderKind {
-        match self {
-            ShaderCacheKeyMaterial::Pbr(_) => VertexShaderKind::Mesh,
-            ShaderCacheKeyMaterial::DebugNormals => VertexShaderKind::Mesh,
-            ShaderCacheKeyMaterial::PostProcess(_) => VertexShaderKind::Quad,
-        }
-    }
-
-    pub fn into_template(self, geometry: &ShaderTemplateGeometry) -> ShaderTemplateMaterial {
-        match self {
-            ShaderCacheKeyMaterial::Pbr(cache_key) => ShaderTemplateMaterial::Pbr(match geometry {
-                ShaderTemplateGeometry::Mesh(mesh_geometry) => {
-                    cache_key.into_template(mesh_geometry.has_normals)
-                }
-                ShaderTemplateGeometry::Quad => cache_key.into_template(false),
-            }),
-            ShaderCacheKeyMaterial::DebugNormals => ShaderTemplateMaterial::Pbr(
-                PbrShaderCacheKeyMaterial::default().into_template(true),
-            ),
-            ShaderCacheKeyMaterial::PostProcess(cache_key) => {
-                ShaderTemplateMaterial::PostProcess(cache_key.into())
-            }
-        }
-    }
-}
-
-impl ShaderCacheKey {
     pub fn into_descriptor(self) -> Result<web_sys::GpuShaderModuleDescriptor> {
         Ok(ShaderModuleDescriptor::new(&self.into_source()?, None).into())
     }
 
     pub fn into_source(self) -> Result<String> {
-        let geometry: ShaderTemplateGeometry = self.geometry.into();
-        let material: ShaderTemplateMaterial = self.material.into_template(&geometry);
+        let main_source = self.render().unwrap();
+        let vertex_source = self.vertex.render().unwrap();
+        let fragment_source = self.fragment.render().unwrap();
 
-        let tmpl = ShaderTemplate {
-            vertex_shader_kind: self.material.vertex_shader_kind(),
-            fragment_shader_kind: self.material.fragment_shader_kind(),
-            material,
-            geometry,
-        };
-
-        let source = tmpl.render().unwrap();
+        let source = format!("{main_source}\n\n{fragment_source}\n\n{vertex_source}");
 
         // tracing::info!("{:#?}", tmpl);
-        // print_source(&source, false);
+        // print_source(&fragment_source, false);
 
         Ok(source)
     }
@@ -226,116 +141,6 @@ fn print_source(source: &str, with_line_numbers: bool) {
     web_sys::console::log_1(&web_sys::wasm_bindgen::JsValue::from(output.as_str()));
 }
 
-#[derive(Template, Debug)]
-#[template(path = "main.wgsl", whitespace = "minimize")]
-struct ShaderTemplate {
-    pub vertex_shader_kind: VertexShaderKind,
-    pub fragment_shader_kind: FragmentShaderKind,
-    pub material: ShaderTemplateMaterial,
-    pub geometry: ShaderTemplateGeometry,
-}
-
-#[derive(Debug)]
-pub enum ShaderTemplateMaterial {
-    Pbr(PbrShaderTemplateMaterial),
-    PostProcess(PostProcessShaderTemplateMaterial),
-}
-
-impl ShaderTemplateMaterial {
-    pub fn as_pbr(&self) -> &PbrShaderTemplateMaterial {
-        match self {
-            ShaderTemplateMaterial::Pbr(material) => material,
-            ShaderTemplateMaterial::PostProcess(_) => {
-                panic!(
-                    "Cannot convert PostProcessShaderTemplateMaterial to PbrShaderTemplateMaterial"
-                );
-            }
-        }
-    }
-
-    pub fn as_pbr_mut(&mut self) -> &mut PbrShaderTemplateMaterial {
-        match self {
-            ShaderTemplateMaterial::Pbr(material) => material,
-            ShaderTemplateMaterial::PostProcess(_) => {
-                panic!(
-                    "Cannot convert PostProcessShaderTemplateMaterial to PbrShaderTemplateMaterial"
-                );
-            }
-        }
-    }
-
-    pub fn as_post_process(&self) -> &PostProcessShaderTemplateMaterial {
-        match self {
-            ShaderTemplateMaterial::PostProcess(material) => material,
-            ShaderTemplateMaterial::Pbr(_) => {
-                panic!(
-                    "Cannot convert PbrShaderTemplateMaterial to PostProcessShaderTemplateMaterial"
-                );
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum ShaderTemplateGeometry {
-    Mesh(MeshShaderTemplateGeometry),
-    Quad,
-}
-
-impl ShaderTemplateGeometry {
-    pub fn as_mesh(&self) -> &MeshShaderTemplateGeometry {
-        match self {
-            ShaderTemplateGeometry::Mesh(geometry) => geometry,
-            ShaderTemplateGeometry::Quad => {
-                panic!("Cannot convert Quad to MeshShaderTemplateGeometry");
-            }
-        }
-    }
-
-    pub fn as_quad(&self) -> &MeshShaderTemplateGeometry {
-        match self {
-            ShaderTemplateGeometry::Quad => {
-                panic!("Cannot convert MeshShaderTemplateGeometry to Quad");
-            }
-            ShaderTemplateGeometry::Mesh(geometry) => geometry,
-        }
-    }
-}
-
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VertexShaderKind {
-    Mesh,
-    Quad,
-}
-
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FragmentShaderKind {
-    DebugNormals,
-    Pbr,
-    PostProcess,
-}
-
-#[derive(Debug)]
-pub struct VertexLocation {
-    location: u32,
-    interpolation: Option<&'static str>,
-    name: String,
-    data_type: String,
-}
-
-#[derive(Debug)]
-pub struct DynamicBufferBinding {
-    group: u32,
-    index: u32,
-    name: String,
-    data_type: String,
-}
-
-#[derive(Debug)]
-pub struct VertexToFragmentAssignment {
-    vertex_name: String,
-    fragment_name: String,
-}
 
 new_key_type! {
     pub struct ShaderKey;

@@ -1,6 +1,6 @@
 mod camera;
 mod gltf;
-mod material;
+pub mod material;
 mod post_processing;
 
 use camera::SidebarCamera;

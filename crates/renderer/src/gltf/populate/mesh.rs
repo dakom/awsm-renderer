@@ -11,8 +11,7 @@ use crate::{
     mesh::{Mesh, MeshBufferInfo},
     pipeline::{PipelineLayoutCacheKey, RenderPipelineCacheKey},
     shaders::{
-        mesh::MeshShaderCacheKeyGeometry, ShaderCacheKey, ShaderCacheKeyGeometry,
-        ShaderCacheKeyMaterial,
+        fragment::cache_key::ShaderCacheKeyFragment, vertex::{entry::mesh::ShaderCacheKeyVertexMesh, ShaderCacheKeyVertex}, ShaderCacheKey
     },
     skin::SkinKey,
     transform::{Transform, TransformKey},
@@ -100,10 +99,10 @@ impl AwsmRenderer {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
-        let material_info = GltfMaterialInfo::new(self, ctx, gltf_primitive.material()).await?;
+        let material_info = GltfMaterialInfo::new(self, ctx, &primitive_buffer_info, gltf_primitive.material()).await?;
 
         let shader_cache_key = ShaderCacheKey::new(
-            ShaderCacheKeyGeometry::Mesh(MeshShaderCacheKeyGeometry {
+            ShaderCacheKeyVertex::Mesh(ShaderCacheKeyVertexMesh{
                 attributes: primitive_buffer_info
                     .vertex
                     .attributes
@@ -121,7 +120,7 @@ impl AwsmRenderer {
                     .unwrap()
                     .contains(&transform_key),
             }),
-            ShaderCacheKeyMaterial::Pbr(material_info.shader_cache_key),
+            ShaderCacheKeyFragment::Pbr(material_info.shader_cache_key),
         );
 
         let morph_key = match primitive_buffer_info.morph.clone() {
@@ -169,7 +168,7 @@ impl AwsmRenderer {
         let (vertex_buffer_layout, shader_location) =
             primitive_vertex_buffer_layout(primitive_buffer_info)?;
         let instance_transform_vertex_buffer_layout =
-            match shader_cache_key.geometry.as_mesh().has_instance_transforms {
+            match shader_cache_key.vertex.as_mesh().has_instance_transforms {
                 true => Some(instance_transform_vertex_buffer_layout(shader_location)),
                 false => None,
             };

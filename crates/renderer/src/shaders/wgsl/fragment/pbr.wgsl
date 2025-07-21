@@ -4,7 +4,17 @@
 {% include "fragment/lighting/brdf.wgsl" %}
 {% include "fragment/lighting/tonemap.wgsl" %}
 
-{% for binding in material.as_pbr().fragment_buffer_bindings %}
+/// Input from the vertex shader
+struct FragmentInput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_position: vec3<f32>, 
+
+    {% for loc in fragment_input_locations %}
+        @location({{ loc.location }}) {{ loc.name }}: {{ loc.data_type }},
+    {% endfor %}
+};
+
+{% for binding in fragment_buffer_bindings %}
     @group({{ binding.group }}) @binding({{ binding.index }}) var {{ binding.name }}: {{ binding.data_type }};
 {% endfor %}
 
@@ -15,7 +25,7 @@ fn frag_main(input: FragmentInput) -> @location(0) vec4<f32> {
     var material = getMaterial(input);
     let n_lights = arrayLength(&lights) / 16u;
 
-    {% if material.as_pbr().has_normals %}
+    {% if has_normals %}
         let normal = normalize(input.world_normal);
     {% else %}
         let normal = vec3<f32>(1.0, 1.0, 1.0);

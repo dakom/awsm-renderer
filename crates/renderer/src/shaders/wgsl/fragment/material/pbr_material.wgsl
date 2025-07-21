@@ -31,31 +31,31 @@ struct PbrMaterial {
 };
 
 fn getMaterial(input: FragmentInput) -> PbrMaterial {
-    {% if material.as_pbr().has_base_color_tex %}
+    {% if has_base_color_tex %}
         let base_color_uv = input.base_color_uv;
     {% else %}
         let base_color_uv = vec2<f32>(0.0, 0.0);
     {% endif %}
 
-    {% if material.as_pbr().has_metallic_roughness_tex %}
+    {% if has_metallic_roughness_tex %}
         let metallic_roughness_uv = input.metallic_roughness_uv;
     {% else %}
         let metallic_roughness_uv = vec2<f32>(0.0, 0.0);
     {% endif %}
 
-    {% if material.as_pbr().has_normal_tex %}
+    {% if has_normal_tex %}
         let normal_uv = input.normal_uv;
     {% else %}
         let normal_uv = vec2<f32>(0.0, 0.0);
     {% endif %}
 
-    {% if material.as_pbr().has_occlusion_tex %}
+    {% if has_occlusion_tex %}
         let occlusion_uv = input.occlusion_uv;
     {% else %}
         let occlusion_uv = vec2<f32>(0.0, 0.0);
     {% endif %}
 
-    {% if material.as_pbr().has_emissive_tex %}
+    {% if has_emissive_tex %}
         let emissive_uv = input.emissive_uv;
     {% else %}
         let emissive_uv = vec2<f32>(0.0, 0.0);
@@ -63,7 +63,7 @@ fn getMaterial(input: FragmentInput) -> PbrMaterial {
 
 
     let base_color = sample_base_color(u_material.base_color_factor, base_color_uv);
-    {% if material.as_pbr().has_alpha_mask %}
+    {% if has_alpha_mask %}
         // early discard as soon as possible, to avoid expensive calculations
         if base_color.a < u_material.alpha_cutoff {
             discard;
@@ -90,7 +90,7 @@ fn getMaterial(input: FragmentInput) -> PbrMaterial {
 //  texture‑or‑factor fetch helpers
 //--------------------------------------------------------------------
 fn sample_base_color(base_color_factor: vec4<f32>, uv: vec2<f32>) -> vec4<f32> {
-    {% if material.as_pbr().has_base_color_tex %}
+    {% if has_base_color_tex %}
         let tex = textureSample(base_color_tex, base_color_sampler, uv);
         var color = tex * base_color_factor;
     {% else %}
@@ -108,7 +108,7 @@ fn sample_base_color(base_color_factor: vec4<f32>, uv: vec2<f32>) -> vec4<f32> {
 
 fn sample_metal_rough(metallic_factor: f32, roughness_factor: f32, uv: vec2<f32>) -> vec2<f32> { // x=metallic y=roughness
 
-    {% if material.as_pbr().has_metallic_roughness_tex %}
+    {% if has_metallic_roughness_tex %}
         let tex = textureSample(metallic_roughness_tex, metallic_roughness_sampler, uv);
         return vec2<f32>(tex.b, tex.g) *
                vec2<f32>(1.0, 1.0) +          // texture is already linear
@@ -121,7 +121,7 @@ fn sample_metal_rough(metallic_factor: f32, roughness_factor: f32, uv: vec2<f32>
 }
 
 fn sample_normal(n: vec3<f32>, normal_scale: f32, uv: vec2<f32>) -> vec3<f32> {
-    {% if material.as_pbr().has_normal_tex %}
+    {% if has_normal_tex %}
         let tex = textureSample(normal_tex, normal_sampler, uv);
         let raw = tex.xyz * 2.0 - 1.0;
         // Tangent‑space normal; assume matrix TBN in caller
@@ -132,7 +132,7 @@ fn sample_normal(n: vec3<f32>, normal_scale: f32, uv: vec2<f32>) -> vec3<f32> {
 }
 
 fn sample_occlusion(occlusion_strength: f32, uv: vec2<f32>) -> f32 {
-    {% if material.as_pbr().has_occlusion_tex %}
+    {% if has_occlusion_tex %}
         let tex = textureSample(occlusion_tex, occlusion_sampler, uv);
         return mix(1.0, tex.r, occlusion_strength);
     {% else %}
@@ -141,7 +141,7 @@ fn sample_occlusion(occlusion_strength: f32, uv: vec2<f32>) -> f32 {
 }
 
 fn sample_emissive(emissive_factor: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {
-    {% if material.as_pbr().has_emissive_tex %}
+    {% if has_emissive_tex %}
         let tex = textureSample(emissive_tex, emissive_sampler, uv);
         return tex.rgb * emissive_factor;
     {% else %}
