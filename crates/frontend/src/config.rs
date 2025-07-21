@@ -4,7 +4,10 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
-use crate::route::{AppRoute, Route};
+use crate::{
+    pages::app::sidebar::SidebarSection,
+    route::{AppRoute, Route},
+};
 use anyhow::{Context, Result};
 use dominator::clone;
 use futures_signals::signal::Mutable;
@@ -19,6 +22,7 @@ pub struct Config {
     pub media_baseurl: String,
     pub gltf_url: String,
     pub generate_mipmaps: bool,
+    pub initial_sidebar_open: Option<SidebarSection>,
 }
 
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
@@ -47,6 +51,8 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         },
 
         generate_mipmaps: true,
+        //initial_sidebar_open: Some(SidebarSection::Gltf),
+        initial_sidebar_open: Some(SidebarSection::PostProcessing),
     };
 
     config

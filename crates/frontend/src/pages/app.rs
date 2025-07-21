@@ -1,7 +1,7 @@
 mod canvas;
 mod context;
 mod scene;
-mod sidebar;
+pub mod sidebar;
 
 use canvas::AppCanvas;
 use context::AppContext;

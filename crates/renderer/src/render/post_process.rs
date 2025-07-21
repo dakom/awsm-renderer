@@ -11,29 +11,28 @@ use crate::{
         PipelineLayoutCacheKey, PipelineLayoutKey, RenderPipelineCacheKey, RenderPipelineKey,
     },
     render::RenderContext,
-    shaders::{ShaderCacheKey, ShaderCacheKeyMaterial, ShaderKey},
+    shaders::{
+        fragment::{
+            cache_key::ShaderCacheKeyFragment,
+            entry::post_process::ShaderCacheKeyFragmentPostProcess,
+        },
+        vertex::ShaderCacheKeyVertex,
+        ShaderCacheKey, ShaderKey,
+    },
     textures::SamplerKey,
     AwsmRenderer,
 };
 
 pub struct PostProcess {
     pub settings: PostProcessSettings,
-    cache: Option<PostProcessCache>,
     // only optional due to bootstrapping, it will be set before AwsmRenderer is created
     inner: Option<PostProcessInner>,
-}
-
-struct PostProcessCache {
-    pub material_key: MaterialKey,
-    pub sampler_key: SamplerKey,
-    pub settings: PostProcessSettings,
 }
 
 impl PostProcess {
     pub fn new(settings: PostProcessSettings) -> Self {
         Self {
             settings,
-            cache: None,
             inner: None,
         }
     }
@@ -56,40 +55,37 @@ impl PostProcess {
 
 impl AwsmRenderer {
     // so that we don't need to make the render function async
-    // we initialize this
+    // this is only called once, when the renderer is (re)created
+    // or when the post process settings change in a way that requires recreating the render pipeline
+    // such as changing the shader or the texture format
     pub async fn post_process_init(&mut self) -> crate::error::Result<()> {
+        // uses cache
         let shader_key = self
             .add_shader(self.post_process.settings.shader_cache_key())
             .await?;
-        let (material_key, sampler_key) = match &self.post_process.cache {
-            Some(cache) if cache.settings == self.post_process.settings => {
-                (cache.material_key, cache.sampler_key)
-            }
-            _ => {
-                let material_key = self
-                    .materials
-                    .insert(Material::PostProcess(self.post_process.settings.material()));
-                let sampler = self.gpu.create_sampler(Some(
-                    &self.post_process.settings.sampler_descriptor().into(),
-                ));
-                let sampler_key = self.textures.add_sampler(sampler);
-                self.post_process.cache = Some(PostProcessCache {
-                    material_key,
-                    sampler_key,
-                    settings: self.post_process.settings.clone(),
-                });
-                (material_key, sampler_key)
-            }
-        };
 
+        // uses cache
+        let scene_sampler_key = self.add_material_post_proces_scene_sampler(
+            self.post_process.settings.sampler_descriptor(),
+        )?;
+
+        let material_key = self
+            .materials
+            .insert(Material::PostProcess(self.post_process.settings.material()));
+
+        // uses cache
         let material_bind_group_layout_key =
             self.add_material_post_process_bind_group_layout(material_key)?;
+
+        // uses cache
         let pipeline_layout_key = self.add_pipeline_layout(
             Some("post process"),
             self.post_process
                 .settings
                 .pipeline_layout_cache_key(material_bind_group_layout_key),
         )?;
+
+        // uses cache
         let render_pipeline_key = self
             .add_render_pipeline(
                 Some("post process"),
@@ -102,31 +98,30 @@ impl AwsmRenderer {
             .await?;
         self.post_process.inner = Some(PostProcessInner {
             material_key,
-            sampler_key,
+            scene_sampler_key,
             render_pipeline_key,
         });
 
         Ok(())
     }
 
-    pub fn post_process_update_view(
-        &mut self,
-        scene_texture_view: web_sys::GpuTextureView,
-    ) -> crate::error::Result<()> {
+    // this is only called when the screen size changes
+    pub fn post_process_update_view(&mut self) -> crate::error::Result<()> {
+        let (texture_views, _) = self.render_textures.views(&self.gpu)?;
         // safe - guaranteed to be initialized by post_process_init
         let (material_key, sampler) = {
             let post_process = self.post_process.inner.as_mut().unwrap();
             let sampler = self
                 .textures
-                .get_sampler(post_process.sampler_key)
+                .get_sampler(post_process.scene_sampler_key)
                 .ok_or(crate::error::AwsmError::MissingPostProcessSampler(
-                    post_process.sampler_key,
+                    post_process.scene_sampler_key,
                 ))?
                 .clone();
             (post_process.material_key, sampler)
         };
 
-        self.add_material_post_process_bind_group(material_key, scene_texture_view, sampler)?;
+        self.add_material_post_process_bind_group(material_key, texture_views.scene, sampler)?;
 
         Ok(())
     }
@@ -134,7 +129,7 @@ impl AwsmRenderer {
 
 struct PostProcessInner {
     pub material_key: MaterialKey,
-    pub sampler_key: SamplerKey,
+    pub scene_sampler_key: SamplerKey,
     pub render_pipeline_key: RenderPipelineKey,
 }
 
@@ -161,6 +156,7 @@ impl PostProcessInner {
 pub struct PostProcessSettings {
     pub enabled: bool,
     pub tonemapping: Option<ToneMapping>,
+    pub gamma_correction: bool,
 }
 
 impl Default for PostProcessSettings {
@@ -168,20 +164,27 @@ impl Default for PostProcessSettings {
         Self {
             enabled: true,
             tonemapping: None,
+            gamma_correction: false,
         }
     }
 }
 
 impl PostProcessSettings {
     pub fn shader_cache_key(&self) -> ShaderCacheKey {
-        ShaderCacheKey::new(Vec::new(), ShaderCacheKeyMaterial::PostProcess)
+        ShaderCacheKey::new(
+            ShaderCacheKeyVertex::Quad,
+            ShaderCacheKeyFragment::PostProcess(ShaderCacheKeyFragmentPostProcess {
+                gamma_correction: self.gamma_correction,
+                tonemapping: self.tonemapping,
+            }),
+        )
     }
 
     pub fn material(&self) -> PostProcessMaterial {
         PostProcessMaterial {}
     }
 
-    pub fn sampler_descriptor(&self) -> SamplerDescriptor {
+    pub fn sampler_descriptor(&self) -> SamplerDescriptor<'static> {
         SamplerDescriptor {
             label: Some("post process sampler"),
             min_filter: Some(FilterMode::Linear),
@@ -214,7 +217,9 @@ impl PostProcessSettings {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ToneMapping {
-    ACES,
+    KhronosPbrNeutral,
+    Agx,
+    Filmic,
 }

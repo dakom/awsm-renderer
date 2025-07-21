@@ -13,7 +13,9 @@ use awsm_renderer::gltf::loader::GltfLoader;
 use awsm_renderer::lights::Light;
 use awsm_renderer::mesh::MeshKey;
 use awsm_renderer::pipeline::RenderPipelineKey;
-use awsm_renderer::shaders::{FragmentShaderKind, ShaderCacheKeyMaterial};
+use awsm_renderer::shaders::fragment::cache_key::ShaderCacheKeyFragment;
+use awsm_renderer::shaders::fragment::entry::debug_normals::ShaderCacheKeyFragmentDebugNormals;
+use awsm_renderer::shaders::vertex::entry::mesh::ShaderTemplateVertexMesh;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use awsm_web::dom::resize::ResizeObserver;
 use camera::{Camera, CameraId};
@@ -24,6 +26,7 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 
 use crate::models::collections::GltfId;
 use crate::pages::app::sidebar::current_model_signal;
+use crate::pages::app::sidebar::material::FragmentShaderKind;
 use crate::prelude::*;
 
 use super::canvas;
@@ -40,7 +43,7 @@ pub struct AppScene {
     pub event_listeners: Mutex<Vec<EventListener>>,
     last_size: Cell<(f64, f64)>,
     last_shader_kind: Cell<Option<FragmentShaderKind>>,
-    old_shader_kind_material: Mutex<HashMap<(MeshKey, FragmentShaderKind), ShaderCacheKeyMaterial>>,
+    old_shader_kind_material: Mutex<HashMap<(MeshKey, FragmentShaderKind), ShaderCacheKeyFragment>>,
 }
 
 impl AppScene {
@@ -134,6 +137,18 @@ impl AppScene {
             }))).await;
         }));
 
+        spawn_local(clone!(state => async move {
+            state.ctx.post_processing.gamma_correction.signal().for_each(clone!(state => move |_| clone!(state => async move {
+                state.on_post_processing_gamma_correction_change();
+            }))).await;
+        }));
+
+        spawn_local(clone!(state => async move {
+            state.ctx.post_processing.tonemapping.signal().for_each(clone!(state => move |_| clone!(state => async move {
+                state.on_post_processing_tonemapping_change();
+            }))).await;
+        }));
+
         state
     }
 
@@ -179,6 +194,42 @@ impl AppScene {
             if let Err(err) = state.render().await {
                 tracing::error!("Failed to render after shader change: {:?}", err);
             }
+        }));
+    }
+
+    fn on_post_processing_gamma_correction_change(self: &Arc<Self>) {
+        let state = self;
+
+        spawn_local(clone!(state => async move {
+            let mut renderer = state.renderer.lock().await;
+            state.stop_animation_loop();
+            renderer.post_process.settings.gamma_correction = state.ctx.post_processing.gamma_correction.get();
+            if let Err(err) = renderer.post_process_init().await {
+                tracing::error!("Failed to initialize post process: {:?}", err);
+            }
+            if let Err(err) = renderer.post_process_update_view() {
+                tracing::error!("Failed to update post process view: {:?}", err);
+            }
+            state.start_animation_loop();
+        }));
+    }
+
+    fn on_post_processing_tonemapping_change(self: &Arc<Self>) {
+        let state = self;
+
+        spawn_local(clone!(state => async move {
+            let mut renderer = state.renderer.lock().await;
+            state.stop_animation_loop();
+
+            renderer.post_process.settings.tonemapping = state.ctx.post_processing.tonemapping.get();
+            if let Err(err) = renderer.post_process_init().await {
+                tracing::error!("Failed to initialize post process: {:?}", err);
+            }
+            if let Err(err) = renderer.post_process_update_view() {
+                tracing::error!("Failed to update post process view: {:?}", err);
+            }
+
+            state.start_animation_loop();
         }));
     }
 
@@ -230,7 +281,7 @@ impl AppScene {
 
         renderer.lights.insert(Light::Directional {
             color: [1.0, 1.0, 1.0],
-            intensity: 3.0,
+            intensity: 1.0,
             direction: [-0.5, -0.25, -0.75],
         });
 
@@ -327,7 +378,20 @@ impl AppScene {
                     pipeline_cache_key.shader_key
                 ))?;
 
-            let old_shader_kind = shader_cache_key.material.fragment_shader_kind();
+            let old_shader_kind = match &shader_cache_key.fragment {
+                ShaderCacheKeyFragment::Pbr(shader_cache_key_fragment_pbr) => {
+                    FragmentShaderKind::Pbr
+                }
+                ShaderCacheKeyFragment::DebugNormals(shader_cache_key_fragment_debug_normals) => {
+                    FragmentShaderKind::DebugNormals
+                }
+                _ => {
+                    return Err(anyhow!(
+                        "Unsupported shader kind for meshes: {:?}",
+                        shader_cache_key.fragment
+                    ));
+                }
+            };
 
             if old_shader_kind == shader_kind {
                 continue;
@@ -339,16 +403,23 @@ impl AppScene {
                 let key = (mesh_key.clone(), old_shader_kind);
 
                 if !old_shader_kind_material.contains_key(&key) {
-                    old_shader_kind_material.insert(key, shader_cache_key.material.clone());
+                    old_shader_kind_material.insert(key, shader_cache_key.fragment.clone());
                 }
             }
 
             match shader_kind {
                 FragmentShaderKind::DebugNormals => {
-                    shader_cache_key.material = ShaderCacheKeyMaterial::DebugNormals;
+                    shader_cache_key.fragment = ShaderCacheKeyFragment::DebugNormals(
+                        ShaderCacheKeyFragmentDebugNormals::new(match &shader_cache_key.vertex {
+                            awsm_renderer::shaders::vertex::ShaderCacheKeyVertex::Mesh(mesh) => {
+                                ShaderTemplateVertexMesh::new(&mesh).has_normals
+                            }
+                            awsm_renderer::shaders::vertex::ShaderCacheKeyVertex::Quad => false,
+                        }),
+                    );
                 }
                 FragmentShaderKind::Pbr => {
-                    let material = self
+                    let fragment = self
                         .old_shader_kind_material
                         .lock()
                         .unwrap()
@@ -359,11 +430,7 @@ impl AppScene {
                         ))?
                         .clone();
 
-                    shader_cache_key.material = material;
-                }
-                FragmentShaderKind::PostProcess => {
-                    // this shouldn't be reachable, but just in case
-                    shader_cache_key.material = ShaderCacheKeyMaterial::PostProcess;
+                    shader_cache_key.fragment = fragment;
                 }
             }
 

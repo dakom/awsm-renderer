@@ -42,7 +42,7 @@ fn vert_main(raw_input: VertexInput) -> FragmentInput {
     {% endif %}
 
     // Transform the vertex position by the model matrix, and then by the view projection matrix
-    {% if has_instance_transform %}
+    {% if has_instance_transforms %}
         // Transform the vertex position by the instance transform
         let instance_transform = mat4x4<f32>(
             raw_input.instance_transform_row_0,

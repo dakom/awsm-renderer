@@ -49,7 +49,7 @@ impl AwsmRenderer {
 
         let (texture_views, views_changed) = self.render_textures.views(&self.gpu)?;
         if views_changed {
-            self.post_process_update_view(texture_views.scene.clone())?;
+            self.post_process_update_view()?;
         }
 
         let renderables = self.collect_renderables();

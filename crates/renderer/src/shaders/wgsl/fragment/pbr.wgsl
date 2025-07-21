@@ -4,6 +4,16 @@
 {% include "fragment/lighting/brdf.wgsl" %}
 {% include "fragment/lighting/tonemap.wgsl" %}
 
+/// Input from the vertex shader
+struct FragmentInput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_position: vec3<f32>, 
+
+    {% for loc in fragment_input_locations %}
+        @location({{ loc.location }}) {{ loc.name }}: {{ loc.data_type }},
+    {% endfor %}
+};
+
 {% for binding in fragment_buffer_bindings %}
     @group({{ binding.group }}) @binding({{ binding.index }}) var {{ binding.name }}: {{ binding.data_type }};
 {% endfor %}

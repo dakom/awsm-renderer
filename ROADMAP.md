@@ -1,6 +1,5 @@
 # Next up
 
-- Make tonemaping a post-processing step
 - TAA for temporal and edge aliasing
 
 - materials cont'd
@@ -68,7 +67,7 @@ If it's supported here, corresponding core functionality is also supported
         - [ ] normal
         - [ ] occlusion
         - [ ] emissive
-    - [ ] mipmaps
+    - [x] mipmaps
 - Lighting (TODO - fill this out as we go)
 - Skybox (TODO - fill this out as we go)
 
@@ -109,13 +108,13 @@ If it's supported here, corresponding core functionality is also supported
 - [x] indexed
 - [x] instancing
 - [ ] Early z pre-pass
-- [ ] Opaque front to back
-- [ ] Transparent back to front
+- [x] Opaque front to back
+- [x] Transparent back to front
 
 ## Textures
 - [x] 2D textures
 - [ ] 3D textures
-- [ ] Mipmaps (port https://github.com/JolifantoBambla/webgpu-spd)
+- [x] Mipmaps (port https://github.com/JolifantoBambla/webgpu-spd)
 
 ## Skybox
 - [ ] Cubemap
@@ -133,7 +132,7 @@ If it's supported here, corresponding core functionality is also supported
 
 ## Post-processing
 - [x] Basic render-texture support
-- [ ] Tonemapping
+- [x] Tonemapping
 - [ ] SSAO
 - [ ] Bloom
 - [ ] TAA 
