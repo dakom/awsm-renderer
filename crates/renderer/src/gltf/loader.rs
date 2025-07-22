@@ -1,4 +1,6 @@
-use awsm_renderer_core::image::{ImageBitmapOptions, ImageData, PremultiplyAlpha};
+use awsm_renderer_core::image::{
+    ColorSpaceConversion, ImageBitmapOptions, ImageData, PremultiplyAlpha,
+};
 use futures::future::try_join_all;
 /// Loads a GltfResource, independently of the renderer
 /// the loaded resource can then be passed into renderer.populate_gltf()
@@ -183,8 +185,12 @@ fn get_image_futures<'a>(
         .images()
         .map(|image| {
             let base = Arc::clone(&base);
-            let options =
-                Some(ImageBitmapOptions::new().with_premultiply_alpha(PremultiplyAlpha::None));
+            // We very intentionally set these. See notes on `ImageData::load_url` for why.
+            let options = Some(
+                ImageBitmapOptions::new()
+                    .with_premultiply_alpha(PremultiplyAlpha::None)
+                    .with_color_space_conversion(ColorSpaceConversion::Default),
+            );
             async move {
                 match image.source() {
                     image::Source::Uri { uri, mime_type: _ } => {

@@ -21,6 +21,27 @@ pub enum ImageData {
     },
 }
 
+// If we don't set premultiply, the browser will use the default, which may be to apply it - or NOT!
+// Recommendation here is to set it explicitly to none rather than relying on defaults.
+// However, for color space conversion, we want the browser to optimally try to load the image in the best color space it can.
+// Since we don't have full control over the image loading process, we might as well let the browser handle it
+// and then we at least *more* safely assume it's srgb, which is the most common color space for web images.
+// (our EXR loader just deals with raw data)
+//
+// Color space handling:
+// - EXR: Uses `TextureFormat::Rgba32Float` - data is already linear from the file format
+// - Bitmap images: Uses `TextureFormat::Rgba8Unorm` - we manually convert sRGB→linear in shaders
+//
+// We use Rgba8Unorm instead of Rgba8UnormSrgb because sRGB formats don't support STORAGE usage,
+// which is required for compute-based mipmap generation. The manual conversion gives us full control
+// and allows us to handle mixed content (some textures might not be sRGB).
+//
+// The browser loads bitmap data in whatever color space it thinks is appropriate (usually sRGB),
+// then we handle the sRGB→linear conversion explicitly in our shaders using srgb_to_linear().
+// See:
+// https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-imagebitmapoptions-premultiplyalpha
+// https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-imagebitmapoptions-colorspaceconversion
+
 impl ImageData {
     cfg_if::cfg_if! {
         if #[cfg(feature = "exr")] {
@@ -43,10 +64,15 @@ impl ImageData {
 
     pub fn format(&self) -> TextureFormat {
         match self {
-            // TODO - is this right?
             #[cfg(feature = "exr")]
+            // EXR files use Rgba32Float and are already in linear space
             Self::Exr(_) => TextureFormat::Rgba32float,
-
+            // We use Rgba8Unorm (not Rgba8UnormSrgb) because:
+            // 1. sRGB formats don't support STORAGE usage needed for mipmap generation
+            // 2. We handle sRGB→linear conversion manually in shaders for full control
+            // 3. This gives us flexibility for mixed content (some textures might not be sRGB)
+            //
+            // Regular images use Rgba8Unorm and get converted via srgb_to_linear() in shaders
             Self::Bitmap { .. } => TextureFormat::Rgba8unorm,
         }
     }

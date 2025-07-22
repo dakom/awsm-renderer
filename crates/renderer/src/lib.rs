@@ -60,9 +60,11 @@ pub struct AwsmRenderer {
     pub lights: Lights,
     pub textures: Textures,
     pub logging: AwsmRendererLogging,
-    pub clear_color: Color,
     pub render_textures: RenderTextures,
     pub post_process: PostProcess,
+    // we pick between these on the fly
+    _clear_color_perceptual_to_linear: Color,
+    _clear_color: Color,
 
     #[cfg(feature = "gltf")]
     gltf: gltf::cache::GltfCache,
@@ -76,7 +78,7 @@ impl AwsmRenderer {
         // meh, just recreate the renderer, it's fine
         let renderer = AwsmRendererBuilder::new(self.gpu.clone())
             .with_logging(self.logging.clone())
-            .with_clear_color(self.clear_color.clone())
+            .with_clear_color(self._clear_color.clone())
             .with_scene_texture_format(self.render_textures.scene_texture_format)
             .with_depth_texture_format(self.render_textures.depth_texture_format)
             .build()
@@ -87,50 +89,51 @@ impl AwsmRenderer {
     }
 }
 
-pub struct AwsmRendererBuilder<'a> {
-    gpu: AwsmRendererGpuBuilderKind<'a>,
+pub struct AwsmRendererBuilder {
+    gpu: AwsmRendererGpuBuilderKind,
     logging: AwsmRendererLogging,
     scene_texture_format: TextureFormat,
     depth_texture_format: TextureFormat,
     clear_color: Color,
+    post_process_settings: PostProcessSettings,
 }
 
-pub enum AwsmRendererGpuBuilderKind<'a> {
-    WebGpuBuilder(AwsmRendererWebGpuBuilder<'a>),
+pub enum AwsmRendererGpuBuilderKind {
+    WebGpuBuilder(AwsmRendererWebGpuBuilder),
     WebGpuBuilt(AwsmRendererWebGpu),
 }
 
-impl<'a> From<AwsmRendererWebGpuBuilder<'a>> for AwsmRendererGpuBuilderKind<'a> {
-    fn from(builder: AwsmRendererWebGpuBuilder<'a>) -> Self {
+impl From<AwsmRendererWebGpuBuilder> for AwsmRendererGpuBuilderKind {
+    fn from(builder: AwsmRendererWebGpuBuilder) -> Self {
         AwsmRendererGpuBuilderKind::WebGpuBuilder(builder)
     }
 }
 
-impl From<AwsmRendererWebGpu> for AwsmRendererGpuBuilderKind<'_> {
+impl From<AwsmRendererWebGpu> for AwsmRendererGpuBuilderKind {
     fn from(gpu: AwsmRendererWebGpu) -> Self {
         AwsmRendererGpuBuilderKind::WebGpuBuilt(gpu)
     }
 }
 
-impl From<(web_sys::Gpu, web_sys::HtmlCanvasElement)> for AwsmRendererGpuBuilderKind<'_> {
-    fn from((gpu, canvas): (web_sys::Gpu, web_sys::HtmlCanvasElement)) -> Self {
-        AwsmRendererGpuBuilderKind::WebGpuBuilder(AwsmRendererWebGpuBuilder::new(gpu, canvas))
-    }
-}
-
-impl<'a> AwsmRendererBuilder<'a> {
-    pub fn new(gpu: impl Into<AwsmRendererGpuBuilderKind<'a>>) -> Self {
+impl AwsmRendererBuilder {
+    pub fn new(gpu: impl Into<AwsmRendererGpuBuilderKind>) -> Self {
         Self {
             gpu: gpu.into(),
             logging: AwsmRendererLogging::default(),
             scene_texture_format: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
             depth_texture_format: TextureFormat::Depth24plus,
             clear_color: Color::BLACK,
+            post_process_settings: PostProcessSettings::default(),
         }
     }
 
     pub fn with_logging(mut self, logging: AwsmRendererLogging) -> Self {
         self.logging = logging;
+        self
+    }
+
+    pub fn with_post_process(mut self, settings: PostProcessSettings) -> Self {
+        self.post_process_settings = settings;
         self
     }
 
@@ -156,6 +159,7 @@ impl<'a> AwsmRendererBuilder<'a> {
             scene_texture_format,
             depth_texture_format,
             clear_color,
+            post_process_settings,
         } = self;
 
         let gpu = match gpu {
@@ -173,7 +177,6 @@ impl<'a> AwsmRendererBuilder<'a> {
         let pipelines = Pipelines::new();
         let lights = Lights::new();
         let textures = Textures::new();
-        let post_process_settings = PostProcessSettings::default();
         let render_textures = RenderTextures::new(scene_texture_format, depth_texture_format);
         let post_process = PostProcess::new(post_process_settings);
         #[cfg(feature = "gltf")]
@@ -194,7 +197,8 @@ impl<'a> AwsmRendererBuilder<'a> {
             pipelines,
             lights,
             textures,
-            clear_color,
+            _clear_color: clear_color.clone(),
+            _clear_color_perceptual_to_linear: clear_color.perceptual_to_linear(),
             logging,
             render_textures,
             post_process,

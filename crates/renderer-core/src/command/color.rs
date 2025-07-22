@@ -46,6 +46,15 @@ impl Color {
         }
     }
 
+    pub fn perceptual_to_linear(self) -> Self {
+        Self {
+            r: perceptual_to_linear(self.r),
+            g: perceptual_to_linear(self.g),
+            b: perceptual_to_linear(self.b),
+            a: self.a,
+        }
+    }
+
     pub fn as_js_value(&self) -> JsValue {
         let arr = js_sys::Array::new();
         arr.push(&JsValue::from_f64(self.r));
@@ -54,5 +63,14 @@ impl Color {
         arr.push(&JsValue::from_f64(self.a));
 
         arr.into()
+    }
+}
+
+fn perceptual_to_linear(perceptual: f64) -> f64 {
+    // Same implementation as srgb_to_linear
+    if perceptual <= 0.04045 {
+        perceptual / 12.92
+    } else {
+        ((perceptual + 0.055) / 1.055).powf(2.4)
     }
 }

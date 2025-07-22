@@ -1,5 +1,12 @@
 use awsm_renderer::{
-    core::renderer::AwsmRendererWebGpuBuilder, AwsmRendererBuilder, AwsmRendererLogging,
+    core::{
+        command::color::Color,
+        configuration::{CanvasAlphaMode, CanvasConfiguration, CanvasToneMappingMode},
+        renderer::AwsmRendererWebGpuBuilder,
+        texture::TextureFormat,
+    },
+    render::post_process::PostProcessSettings,
+    AwsmRendererBuilder, AwsmRendererLogging,
 };
 use awsm_web::dom::resize::{self, ResizeObserver};
 use wasm_bindgen_futures::spawn_local;
@@ -61,8 +68,14 @@ impl AppCanvas {
                 .after_inserted(clone!(state => move |canvas| {
                     spawn_local(clone!(state => async move {
                         let gpu = web_sys::window().unwrap().navigator().gpu();
-                        let renderer = AwsmRendererBuilder::new((gpu, canvas))
+                        let gpu_builder = AwsmRendererWebGpuBuilder::new(gpu, canvas).with_configuration(CanvasConfiguration::default()
+                            .with_alpha_mode(CanvasAlphaMode::Opaque)
+                            .with_tone_mapping(CanvasToneMappingMode::Standard)
+                        );
+                        let renderer = AwsmRendererBuilder::new(gpu_builder)
                             .with_logging(AwsmRendererLogging { render_timings: true })
+                            .with_post_process(state.ctx.post_processing.clone().into())
+                            .with_clear_color(Color::MID_GREY)
                             .build()
                             .await
                             .unwrap();

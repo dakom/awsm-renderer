@@ -164,7 +164,7 @@ impl Default for PostProcessSettings {
         Self {
             enabled: true,
             tonemapping: None,
-            gamma_correction: false,
+            gamma_correction: true,
         }
     }
 }

@@ -1,3 +1,4 @@
+{% include "utils/color_space.wgsl" %}
 {% include "fragment/lighting/math.wgsl" %}
 {% include "fragment/lighting/lights.wgsl" %}
 {% include "fragment/material/pbr_material.wgsl" %}
@@ -46,10 +47,6 @@ fn frag_main(input: FragmentInput) -> @location(0) vec4<f32> {
             color += ambient * material.base_color.rgb;
         }
     }
-
-    // tone map
-    //color = aces_tonemap(color);
-    //color = gamma_correct(color, 2.2); // gamma correct for sRGB displays
 
     return vec4<f32>(color, material.base_color.a);
 }

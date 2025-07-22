@@ -1,7 +1,6 @@
 pub mod post_process;
 pub mod textures;
 
-use awsm_renderer_core::command::color::Color;
 use awsm_renderer_core::command::render_pass::{
     ColorAttachment, DepthStencilAttachment, RenderPassDescriptor, RenderPassEncoder,
 };
@@ -66,6 +65,13 @@ impl AwsmRenderer {
                 &texture_views.scene
             }
         };
+
+        let clear_color =
+            if self.post_process.settings.enabled && self.post_process.settings.gamma_correction {
+                self._clear_color_perceptual_to_linear.clone()
+            } else {
+                self._clear_color.clone()
+            };
         let scene_render_pass = command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 color_attachments: vec![ColorAttachment::new(
@@ -73,7 +79,7 @@ impl AwsmRenderer {
                     LoadOp::Clear,
                     StoreOp::Store,
                 )
-                .with_clear_color(self.clear_color.clone())],
+                .with_clear_color(clear_color)],
                 depth_stencil_attachment: Some(
                     DepthStencilAttachment::new(&texture_views.depth)
                         .with_depth_load_op(LoadOp::Clear)
@@ -127,8 +133,7 @@ impl AwsmRenderer {
                         &current_texture_view,
                         LoadOp::Clear,
                         StoreOp::Store,
-                    )
-                    .with_clear_color(Color::BLACK)],
+                    )],
                     depth_stencil_attachment: None,
                     ..Default::default()
                 }
