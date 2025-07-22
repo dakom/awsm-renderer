@@ -138,14 +138,8 @@ impl AppScene {
         }));
 
         spawn_local(clone!(state => async move {
-            state.ctx.post_processing.gamma_correction.signal().for_each(clone!(state => move |_| clone!(state => async move {
-                state.on_post_processing_gamma_correction_change();
-            }))).await;
-        }));
-
-        spawn_local(clone!(state => async move {
-            state.ctx.post_processing.tonemapping.signal().for_each(clone!(state => move |_| clone!(state => async move {
-                state.on_post_processing_tonemapping_change();
+            state.ctx.post_processing.signal().for_each(clone!(state => move |_| clone!(state => async move {
+                state.on_post_processing_change();
             }))).await;
         }));
 
@@ -197,38 +191,19 @@ impl AppScene {
         }));
     }
 
-    fn on_post_processing_gamma_correction_change(self: &Arc<Self>) {
+    fn on_post_processing_change(self: &Arc<Self>) {
         let state = self;
 
         spawn_local(clone!(state => async move {
             let mut renderer = state.renderer.lock().await;
             state.stop_animation_loop();
-            renderer.post_process.settings.gamma_correction = state.ctx.post_processing.gamma_correction.get();
+            renderer.post_process.settings = state.ctx.post_processing.clone().into();
             if let Err(err) = renderer.post_process_init().await {
                 tracing::error!("Failed to initialize post process: {:?}", err);
             }
             if let Err(err) = renderer.post_process_update_view() {
                 tracing::error!("Failed to update post process view: {:?}", err);
             }
-            state.start_animation_loop();
-        }));
-    }
-
-    fn on_post_processing_tonemapping_change(self: &Arc<Self>) {
-        let state = self;
-
-        spawn_local(clone!(state => async move {
-            let mut renderer = state.renderer.lock().await;
-            state.stop_animation_loop();
-
-            renderer.post_process.settings.tonemapping = state.ctx.post_processing.tonemapping.get();
-            if let Err(err) = renderer.post_process_init().await {
-                tracing::error!("Failed to initialize post process: {:?}", err);
-            }
-            if let Err(err) = renderer.post_process_update_view() {
-                tracing::error!("Failed to update post process view: {:?}", err);
-            }
-
             state.start_animation_loop();
         }));
     }
@@ -297,13 +272,6 @@ impl AppScene {
     }
 
     pub async fn setup_all(self: &Arc<Self>) -> Result<()> {
-        {
-            let mut renderer = self.renderer.lock().await;
-
-            renderer.clear_color = Color::MID_GREY;
-            renderer.gpu.configure(None)?;
-        }
-
         self.last_shader_kind.set(None);
         self.old_shader_kind_material.lock().unwrap().clear();
 

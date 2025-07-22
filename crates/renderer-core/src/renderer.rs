@@ -15,16 +15,16 @@ pub struct AwsmRendererWebGpu {
     pub context: web_sys::GpuCanvasContext,
 }
 
-pub struct AwsmRendererWebGpuBuilder<'a> {
+pub struct AwsmRendererWebGpuBuilder {
     pub gpu: web_sys::Gpu,
     pub canvas: web_sys::HtmlCanvasElement,
-    pub configuration: Option<CanvasConfiguration<'a>>,
+    pub configuration: Option<CanvasConfiguration>,
     pub adapter: Option<web_sys::GpuAdapter>,
     pub device: Option<web_sys::GpuDevice>,
     pub context: Option<web_sys::GpuCanvasContext>,
 }
 
-impl<'a> AwsmRendererWebGpuBuilder<'a> {
+impl AwsmRendererWebGpuBuilder {
     pub fn new(gpu: web_sys::Gpu, canvas: web_sys::HtmlCanvasElement) -> Self {
         Self {
             gpu,
@@ -36,7 +36,7 @@ impl<'a> AwsmRendererWebGpuBuilder<'a> {
         }
     }
 
-    pub fn with_configuration(mut self, configuration: CanvasConfiguration<'a>) -> Self {
+    pub fn with_configuration(mut self, configuration: CanvasConfiguration) -> Self {
         self.configuration = Some(configuration);
         self
     }
@@ -74,13 +74,13 @@ impl<'a> AwsmRendererWebGpuBuilder<'a> {
             Ok(None) => Err(AwsmCoreError::CanvasContext("No context found".to_string())),
         }?;
 
-        let configuration = match self.configuration {
-            Some(config) => config,
-            None => CanvasConfiguration::new(&device, self.gpu.get_preferred_canvas_format()),
-        };
-
         context
-            .configure(&configuration.into())
+            .configure(
+                &self
+                    .configuration
+                    .unwrap_or_default()
+                    .into_js(&self.gpu, &device),
+            )
             .map_err(AwsmCoreError::context_configuration)?;
 
         Ok(AwsmRendererWebGpu {

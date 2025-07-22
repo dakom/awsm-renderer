@@ -23,6 +23,7 @@ pub struct Config {
     pub gltf_url: String,
     pub generate_mipmaps: bool,
     pub initial_sidebar_open: Option<SidebarSection>,
+    pub post_processing_enabled: bool,
 }
 
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
@@ -51,8 +52,9 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         },
 
         generate_mipmaps: true,
-        //initial_sidebar_open: Some(SidebarSection::Gltf),
-        initial_sidebar_open: Some(SidebarSection::PostProcessing),
+        initial_sidebar_open: Some(SidebarSection::Gltf),
+        //initial_sidebar_open: Some(SidebarSection::PostProcessing),
+        post_processing_enabled: true,
     };
 
     config

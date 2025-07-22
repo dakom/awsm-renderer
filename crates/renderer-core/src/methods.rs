@@ -395,13 +395,12 @@ impl AwsmRendererWebGpu {
     }
 
     pub fn configure(&mut self, configuration: Option<CanvasConfiguration>) -> Result<()> {
-        let configuration = match configuration {
-            Some(config) => config,
-            None => CanvasConfiguration::new(&self.device, self.gpu.get_preferred_canvas_format()),
-        };
-
         self.context
-            .configure(&configuration.into())
+            .configure(
+                &configuration
+                    .unwrap_or_default()
+                    .into_js(&self.gpu, &self.device),
+            )
             .map_err(AwsmCoreError::context_configuration)?;
         Ok(())
     }
