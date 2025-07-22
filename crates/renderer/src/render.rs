@@ -1,7 +1,6 @@
 pub mod post_process;
 pub mod textures;
 
-use awsm_renderer_core::command::color::Color;
 use awsm_renderer_core::command::render_pass::{
     ColorAttachment, DepthStencilAttachment, RenderPassDescriptor, RenderPassEncoder,
 };

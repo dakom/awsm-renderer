@@ -103,7 +103,7 @@ pub enum AwsmRendererGpuBuilderKind {
     WebGpuBuilt(AwsmRendererWebGpu),
 }
 
-impl<'a> From<AwsmRendererWebGpuBuilder> for AwsmRendererGpuBuilderKind {
+impl From<AwsmRendererWebGpuBuilder> for AwsmRendererGpuBuilderKind {
     fn from(builder: AwsmRendererWebGpuBuilder) -> Self {
         AwsmRendererGpuBuilderKind::WebGpuBuilder(builder)
     }
