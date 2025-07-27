@@ -52,8 +52,8 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         },
 
         generate_mipmaps: true,
-        initial_sidebar_open: Some(SidebarSection::Gltf),
-        //initial_sidebar_open: Some(SidebarSection::PostProcessing),
+        //initial_sidebar_open: Some(SidebarSection::Gltf),
+        initial_sidebar_open: Some(SidebarSection::PostProcessing),
         post_processing_enabled: true,
     };
 

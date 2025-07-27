@@ -1,3 +1,5 @@
+pub mod taa;
+
 use awsm_renderer_core::{
     pipeline::{fragment::ColorTargetState, primitive::PrimitiveState},
     sampler::{FilterMode, SamplerDescriptor},
@@ -157,6 +159,7 @@ pub struct PostProcessSettings {
     pub enabled: bool,
     pub tonemapping: Option<ToneMapping>,
     pub gamma_correction: bool,
+    pub anti_aliasing: bool,
 }
 
 impl Default for PostProcessSettings {
@@ -165,6 +168,7 @@ impl Default for PostProcessSettings {
             enabled: true,
             tonemapping: None,
             gamma_correction: true,
+            anti_aliasing: true,
         }
     }
 }
@@ -176,6 +180,7 @@ impl PostProcessSettings {
             ShaderCacheKeyFragment::PostProcess(ShaderCacheKeyFragmentPostProcess {
                 gamma_correction: self.gamma_correction,
                 tonemapping: self.tonemapping,
+                anti_aliasing: self.anti_aliasing,
             }),
         )
     }

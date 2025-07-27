@@ -4,4 +4,5 @@ use crate::render::post_process::ToneMapping;
 pub struct ShaderCacheKeyFragmentPostProcess {
     pub gamma_correction: bool,
     pub tonemapping: Option<ToneMapping>,
+    pub anti_aliasing: bool,
 }

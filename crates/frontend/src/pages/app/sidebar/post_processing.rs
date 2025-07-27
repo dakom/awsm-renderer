@@ -28,6 +28,8 @@ impl SidebarPostProcessing {
             class! {
                 .style("display", "flex")
                 .style("flex-direction", "column")
+                .style("align-items", "flex-start")
+                .style("gap", "1rem")
             }
         });
 
@@ -35,6 +37,7 @@ impl SidebarPostProcessing {
             .class(&*CONTAINER)
             .child(state.render_tonemap_selector())
             .child(state.render_gamma_selector())
+            .child(state.render_anti_alias_selector())
         })
     }
 
@@ -72,6 +75,20 @@ impl SidebarPostProcessing {
             .with_selected_signal(state.ctx.post_processing.gamma_correction.signal())
             .with_on_click(clone!(state => move || {
                 state.ctx.post_processing.gamma_correction.set_neq(!state.ctx.post_processing.gamma_correction.get());
+            }))
+            .render()
+    }
+
+    fn render_anti_alias_selector(self: &Arc<Self>) -> Dom {
+        let state = self;
+
+        Checkbox::new(CheckboxStyle::Dark)
+            .with_content_after(html!("span", {
+                .text("Anti-aliasing")
+            }))
+            .with_selected_signal(state.ctx.post_processing.anti_aliasing.signal())
+            .with_on_click(clone!(state => move || {
+                state.ctx.post_processing.anti_aliasing.set_neq(!state.ctx.post_processing.anti_aliasing.get());
             }))
             .render()
     }

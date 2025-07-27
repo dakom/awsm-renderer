@@ -264,9 +264,9 @@ impl MeshAllBindGroupBinding {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u32)]
 pub enum MeshShapeBindGroupBinding {
-    MorphTargetWeights = 0,
-    MorphTargetValues = 1,
-    SkinJointMatrices = 2,
+    MorphTargetWeights,
+    MorphTargetValues,
+    SkinJointMatrices,
 }
 
 impl MeshShapeBindGroupBinding {
