@@ -1,19 +1,19 @@
+pub mod context;
 pub mod post_process;
 pub mod textures;
-pub mod context;
 
 use awsm_renderer_core::command::color::Color;
 use awsm_renderer_core::command::render_pass::{
-    ColorAttachment, DepthStencilAttachment, RenderPassDescriptor
+    ColorAttachment, DepthStencilAttachment, RenderPassDescriptor,
 };
 use awsm_renderer_core::command::{LoadOp, StoreOp};
 use awsm_renderer_core::texture::TextureFormat;
 
 use crate::error::Result;
 use crate::render::context::RenderContext;
+use crate::render::textures::{RenderTextureFormats, RenderTextureViews};
 use crate::renderable::Renderable;
 use crate::AwsmRenderer;
-use crate::render::textures::{RenderTextureFormats, RenderTextureViews};
 
 impl AwsmRenderer {
     // this should only be called once per frame
@@ -47,7 +47,6 @@ impl AwsmRenderer {
             .uniforms
             .write_gpu(&self.logging, &self.gpu, &self.bind_groups)?;
 
-
         let (texture_views, views_changed) = self.render_textures.views(&self.gpu)?;
 
         let ctx = if !self.post_process.settings.enabled {
@@ -55,7 +54,7 @@ impl AwsmRenderer {
                 &self.gpu.current_context_texture_view()?,
                 &texture_views.world_position_current(post_process_ping_pong),
                 &texture_views.depth,
-                self._clear_color.clone()
+                self._clear_color.clone(),
             )?
         } else {
             if views_changed {
@@ -65,13 +64,10 @@ impl AwsmRenderer {
                 &texture_views.scene,
                 &texture_views.world_position_current(post_process_ping_pong),
                 &texture_views.depth,
-                self._clear_color_perceptual_to_linear.clone()
+                self._clear_color_perceptual_to_linear.clone(),
             )?;
 
-            self.render_post_process(
-                &mut ctx,
-                &texture_views,
-            )?;
+            self.render_post_process(&mut ctx, &texture_views)?;
 
             ctx
         };
@@ -164,17 +160,13 @@ impl AwsmRenderer {
         let scene_render_pass = command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 color_attachments: vec![
-                    ColorAttachment::new(
-                        color_texture_view,
-                        LoadOp::Clear,
-                        StoreOp::Store,
-                    )
-                    .with_clear_color(clear_color),
+                    ColorAttachment::new(color_texture_view, LoadOp::Clear, StoreOp::Store)
+                        .with_clear_color(clear_color),
                     ColorAttachment::new(
                         world_position_texture_view,
                         LoadOp::Clear,
                         StoreOp::Store,
-                    )
+                    ),
                 ],
                 depth_stencil_attachment: Some(
                     DepthStencilAttachment::new(&depth_texture_view)
@@ -222,12 +214,12 @@ impl AwsmRenderer {
         Ok(ctx)
     }
 
-    fn render_post_process(&self,
+    fn render_post_process(
+        &self,
         ctx: &mut RenderContext,
         texture_views: &RenderTextureViews,
     ) -> Result<()> {
         let current_texture_view = self.gpu.current_context_texture_view()?;
-
 
         let post_process_pass = ctx.command_encoder.begin_render_pass(
             &RenderPassDescriptor {
@@ -245,7 +237,9 @@ impl AwsmRenderer {
 
         ctx.render_pass.set_bind_group(
             1,
-            ctx.bind_groups.uniform_storages.gpu_post_process_bind_group(),
+            ctx.bind_groups
+                .uniform_storages
+                .gpu_post_process_bind_group(),
             None,
         )?;
 
@@ -257,8 +251,7 @@ impl AwsmRenderer {
             ctx.last_render_pipeline_key = Some(self.post_process.render_pipeline_key());
         }
 
-        self.post_process
-            .push_commands(ctx, &texture_views.scene)?;
+        self.post_process.push_commands(ctx, &texture_views.scene)?;
         ctx.render_pass.end();
 
         Ok(())

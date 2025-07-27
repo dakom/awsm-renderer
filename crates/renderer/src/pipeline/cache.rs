@@ -176,11 +176,11 @@ impl PipelineLayoutCacheKey {
             PipelineLayoutCacheKey::PostProcess {
                 material_layout_key,
             } => {
-                let bind_group_layouts = vec![bind_groups
-                    .material_textures
-                    .gpu_bind_group_layout(material_layout_key)?
-                    .clone(),
-
+                let bind_group_layouts = vec![
+                    bind_groups
+                        .material_textures
+                        .gpu_bind_group_layout(material_layout_key)?
+                        .clone(),
                     bind_groups
                         .uniform_storages
                         .gpu_post_process_bind_group_layout()

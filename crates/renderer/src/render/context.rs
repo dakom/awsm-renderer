@@ -1,7 +1,14 @@
 use awsm_renderer_core::command::{render_pass::RenderPassEncoder, CommandEncoder};
 
-use crate::{bind_groups::BindGroups, instances::Instances, materials::Materials, mesh::Meshes, pipeline::{Pipelines, RenderPipelineKey}, skin::Skins, transform::Transforms};
-
+use crate::{
+    bind_groups::BindGroups,
+    instances::Instances,
+    materials::Materials,
+    mesh::Meshes,
+    pipeline::{Pipelines, RenderPipelineKey},
+    skin::Skins,
+    transform::Transforms,
+};
 
 pub struct RenderContext<'a> {
     pub command_encoder: CommandEncoder,

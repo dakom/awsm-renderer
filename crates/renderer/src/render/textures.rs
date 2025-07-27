@@ -16,7 +16,7 @@ type ViewChanged = bool;
 #[derive(Clone, Debug)]
 pub struct RenderTextureFormats {
     pub scene: TextureFormat,
-    pub world_position: TextureFormat, 
+    pub world_position: TextureFormat,
     pub depth: TextureFormat,
 }
 
@@ -38,11 +38,7 @@ impl RenderTextures {
         }
     }
 
-
-    pub fn views(
-        &mut self,
-        gpu: &AwsmRendererWebGpu,
-    ) -> Result<(RenderTextureViews, ViewChanged)> {
+    pub fn views(&mut self, gpu: &AwsmRendererWebGpu) -> Result<(RenderTextureViews, ViewChanged)> {
         self.with_inner(gpu, |inner| Ok(inner.views()))
     }
 
@@ -64,12 +60,8 @@ impl RenderTextures {
             inner.destroy();
         }
 
-        let inner = RenderTexturesInner::new(
-            gpu,
-            self.formats.clone(),
-            current_size.0,
-            current_size.1,
-        )?;
+        let inner =
+            RenderTexturesInner::new(gpu, self.formats.clone(), current_size.0, current_size.1)?;
         self.inner = Some(inner);
 
         f(self.inner.as_mut().unwrap()).map(|result| (result, true))
@@ -78,7 +70,7 @@ impl RenderTextures {
 
 pub struct RenderTextureViews {
     pub scene: web_sys::GpuTextureView,
-    pub world_positions: [web_sys::GpuTextureView;2], // Used for ping-pong rendering so we get current and previous world positions
+    pub world_positions: [web_sys::GpuTextureView; 2], // Used for ping-pong rendering so we get current and previous world positions
     pub depth: web_sys::GpuTextureView,
 }
 
@@ -98,8 +90,8 @@ struct RenderTexturesInner {
     pub scene_texture_view: web_sys::GpuTextureView,
     pub depth_texture: web_sys::GpuTexture,
     pub depth_texture_view: web_sys::GpuTextureView,
-    pub world_position_textures: [web_sys::GpuTexture;2], // Used for ping-pong rendering so we get current and previous world positions
-    pub world_position_texture_views: [web_sys::GpuTextureView;2], // Used for ping-pong rendering so we get current and previous world positions
+    pub world_position_textures: [web_sys::GpuTexture; 2], // Used for ping-pong rendering so we get current and previous world positions
+    pub world_position_texture_views: [web_sys::GpuTextureView; 2], // Used for ping-pong rendering so we get current and previous world positions
     pub width: u32,
     pub height: u32,
     ping_pong_views: bool,
@@ -148,12 +140,12 @@ impl RenderTexturesInner {
         ];
 
         let world_position_texture_views: [web_sys::GpuTextureView; 2] = [
-            world_position_textures[0]
-                .create_view()
-                .map_err(|e| AwsmPostProcessError::RenderTextureView(format!("world position: {e:?}")))?,
-            world_position_textures[1]
-                .create_view()
-                .map_err(|e| AwsmPostProcessError::RenderTextureView(format!("world position: {e:?}")))?,
+            world_position_textures[0].create_view().map_err(|e| {
+                AwsmPostProcessError::RenderTextureView(format!("world position: {e:?}"))
+            })?,
+            world_position_textures[1].create_view().map_err(|e| {
+                AwsmPostProcessError::RenderTextureView(format!("world position: {e:?}"))
+            })?,
         ];
 
         let depth_texture = gpu.create_texture(

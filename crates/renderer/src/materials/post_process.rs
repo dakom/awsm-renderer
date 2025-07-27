@@ -9,7 +9,11 @@ use crate::{
     bind_groups::material_textures::{
         MaterialBindGroupKey, MaterialBindGroupLayoutKey, MaterialTextureBindingEntry,
         MaterialTextureBindingLayoutEntry,
-    }, materials::MaterialKey, render::textures::RenderTextureViews, textures::SamplerKey, AwsmRenderer
+    },
+    materials::MaterialKey,
+    render::textures::RenderTextureViews,
+    textures::SamplerKey,
+    AwsmRenderer,
 };
 
 pub struct PostProcessMaterials {
@@ -78,7 +82,6 @@ impl AwsmRenderer {
             // but rather using textureLoad() to read the texture directly
             .with_sample_type(TextureSampleType::UnfilterableFloat);
 
-
         let key = self
             .bind_groups
             .material_textures
@@ -87,7 +90,9 @@ impl AwsmRenderer {
                 vec![
                     MaterialTextureBindingLayoutEntry::Texture(scene_texture_entry),
                     MaterialTextureBindingLayoutEntry::Sampler(scene_sampler_entry),
-                    MaterialTextureBindingLayoutEntry::Texture(world_position_texture_entry.clone()),
+                    MaterialTextureBindingLayoutEntry::Texture(
+                        world_position_texture_entry.clone(),
+                    ),
                     MaterialTextureBindingLayoutEntry::Texture(world_position_texture_entry),
                 ],
             )
@@ -120,8 +125,12 @@ impl AwsmRenderer {
                 &[
                     MaterialTextureBindingEntry::Texture(render_textures.scene.clone()),
                     MaterialTextureBindingEntry::Sampler(scene_texture_sampler),
-                    MaterialTextureBindingEntry::Texture(render_textures.world_positions[0].clone()),
-                    MaterialTextureBindingEntry::Texture(render_textures.world_positions[1].clone()),
+                    MaterialTextureBindingEntry::Texture(
+                        render_textures.world_positions[0].clone(),
+                    ),
+                    MaterialTextureBindingEntry::Texture(
+                        render_textures.world_positions[1].clone(),
+                    ),
                 ],
             )
             .map_err(AwsmMaterialError::MaterialBindGroup)?;

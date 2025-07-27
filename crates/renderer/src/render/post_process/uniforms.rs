@@ -1,6 +1,12 @@
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 
-use crate::{bind_groups::{uniform_storage::{PostProcessBindGroupBinding, UniformStorageBindGroupIndex}, BindGroups}, AwsmRendererLogging};
+use crate::{
+    bind_groups::{
+        uniform_storage::{PostProcessBindGroupBinding, UniformStorageBindGroupIndex},
+        BindGroups,
+    },
+    AwsmRendererLogging,
+};
 
 use super::error::{AwsmPostProcessError, Result};
 pub struct PostProcessUniforms {
@@ -67,7 +73,9 @@ impl PostProcessUniforms {
                 .uniform_storages
                 .gpu_write(
                     gpu,
-                    UniformStorageBindGroupIndex::PostProcess(PostProcessBindGroupBinding::Settings),
+                    UniformStorageBindGroupIndex::PostProcess(
+                        PostProcessBindGroupBinding::Settings,
+                    ),
                     None,
                     self.raw_data.as_slice(),
                     None,

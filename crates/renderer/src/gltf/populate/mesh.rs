@@ -245,7 +245,9 @@ impl AwsmRenderer {
             .with_primitive(primitive_state)
             .with_push_vertex_buffer_layout(vertex_buffer_layout)
             .with_push_fragment_target(color_target_state)
-            .with_push_fragment_target(ColorTargetState::new(self.renderable_texture_formats().world_position))
+            .with_push_fragment_target(ColorTargetState::new(
+                self.renderable_texture_formats().world_position,
+            ))
             .with_depth_stencil(depth_stencil_state);
 
         if let Some(instance_transform_vertex_buffer_layout) =

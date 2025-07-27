@@ -1,9 +1,11 @@
+pub mod error;
 pub mod taa;
 pub mod uniforms;
-pub mod error;
 
 use awsm_renderer_core::{
-    pipeline::{fragment::ColorTargetState, primitive::PrimitiveState}, sampler::{FilterMode, SamplerDescriptor}, texture::TextureFormat
+    pipeline::{fragment::ColorTargetState, primitive::PrimitiveState},
+    sampler::{FilterMode, SamplerDescriptor},
+    texture::TextureFormat,
 };
 
 use crate::{
@@ -12,7 +14,10 @@ use crate::{
     pipeline::{
         PipelineLayoutCacheKey, PipelineLayoutKey, RenderPipelineCacheKey, RenderPipelineKey,
     },
-    render::{post_process::{error::AwsmPostProcessError, uniforms::PostProcessUniforms}, RenderContext},
+    render::{
+        post_process::{error::AwsmPostProcessError, uniforms::PostProcessUniforms},
+        RenderContext,
+    },
     shaders::{
         fragment::{
             cache_key::ShaderCacheKeyFragment,
@@ -113,7 +118,7 @@ impl AwsmRenderer {
     pub fn post_process_update_view(&mut self) -> crate::error::Result<()> {
         let (texture_views, _) = self.render_textures.views(&self.gpu)?;
         // safe - guaranteed to be initialized by post_process_init
-        let (material_key, scene_sampler) ={
+        let (material_key, scene_sampler) = {
             let post_process = self.post_process.inner.as_mut().unwrap();
             let scene_sampler = self
                 .textures
