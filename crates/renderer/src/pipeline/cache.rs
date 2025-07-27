@@ -179,7 +179,13 @@ impl PipelineLayoutCacheKey {
                 let bind_group_layouts = vec![bind_groups
                     .material_textures
                     .gpu_bind_group_layout(material_layout_key)?
-                    .clone()];
+                    .clone(),
+
+                    bind_groups
+                        .uniform_storages
+                        .gpu_post_process_bind_group_layout()
+                        .clone(),
+                ];
                 Ok(PipelineLayoutDescriptor::new(label, bind_group_layouts))
             }
         }

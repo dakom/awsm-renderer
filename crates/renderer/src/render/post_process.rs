@@ -1,9 +1,9 @@
 pub mod taa;
+pub mod uniforms;
+pub mod error;
 
 use awsm_renderer_core::{
-    pipeline::{fragment::ColorTargetState, primitive::PrimitiveState},
-    sampler::{FilterMode, SamplerDescriptor},
-    texture::TextureFormat,
+    pipeline::{fragment::ColorTargetState, primitive::PrimitiveState}, sampler::{FilterMode, SamplerDescriptor}, texture::TextureFormat
 };
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
     pipeline::{
         PipelineLayoutCacheKey, PipelineLayoutKey, RenderPipelineCacheKey, RenderPipelineKey,
     },
-    render::RenderContext,
+    render::{post_process::{error::AwsmPostProcessError, uniforms::PostProcessUniforms}, RenderContext},
     shaders::{
         fragment::{
             cache_key::ShaderCacheKeyFragment,
@@ -27,6 +27,7 @@ use crate::{
 
 pub struct PostProcess {
     pub settings: PostProcessSettings,
+    pub uniforms: PostProcessUniforms,
     // only optional due to bootstrapping, it will be set before AwsmRenderer is created
     inner: Option<PostProcessInner>,
 }
@@ -35,6 +36,7 @@ impl PostProcess {
     pub fn new(settings: PostProcessSettings) -> Self {
         Self {
             settings,
+            uniforms: PostProcessUniforms::new(),
             inner: None,
         }
     }
@@ -67,8 +69,8 @@ impl AwsmRenderer {
             .await?;
 
         // uses cache
-        let scene_sampler_key = self.add_material_post_proces_scene_sampler(
-            self.post_process.settings.sampler_descriptor(),
+        let scene_sampler_key = self.add_material_post_process_scene_sampler(
+            self.post_process.settings.scene_sampler_descriptor(),
         )?;
 
         let material_key = self
@@ -111,19 +113,20 @@ impl AwsmRenderer {
     pub fn post_process_update_view(&mut self) -> crate::error::Result<()> {
         let (texture_views, _) = self.render_textures.views(&self.gpu)?;
         // safe - guaranteed to be initialized by post_process_init
-        let (material_key, sampler) = {
+        let (material_key, scene_sampler) ={
             let post_process = self.post_process.inner.as_mut().unwrap();
-            let sampler = self
+            let scene_sampler = self
                 .textures
                 .get_sampler(post_process.scene_sampler_key)
-                .ok_or(crate::error::AwsmError::MissingPostProcessSampler(
+                .ok_or(AwsmPostProcessError::MissingPostProcessSampler(
                     post_process.scene_sampler_key,
                 ))?
                 .clone();
-            (post_process.material_key, sampler)
+
+            (post_process.material_key, scene_sampler)
         };
 
-        self.add_material_post_process_bind_group(material_key, texture_views.scene, sampler)?;
+        self.add_material_post_process_bind_group(material_key, &texture_views, scene_sampler)?;
 
         Ok(())
     }
@@ -189,11 +192,18 @@ impl PostProcessSettings {
         PostProcessMaterial {}
     }
 
-    pub fn sampler_descriptor(&self) -> SamplerDescriptor<'static> {
+    pub fn scene_sampler_descriptor(&self) -> SamplerDescriptor<'static> {
         SamplerDescriptor {
-            label: Some("post process sampler"),
+            label: Some("post process scene sampler"),
             min_filter: Some(FilterMode::Linear),
             mag_filter: Some(FilterMode::Linear),
+            ..SamplerDescriptor::default()
+        }
+    }
+
+    pub fn world_position_sampler_descriptor(&self) -> SamplerDescriptor<'static> {
+        SamplerDescriptor {
+            label: Some("post process world position sampler"),
             ..SamplerDescriptor::default()
         }
     }

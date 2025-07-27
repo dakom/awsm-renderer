@@ -13,7 +13,7 @@ use crate::error::Result;
 use crate::render::context::RenderContext;
 use crate::renderable::Renderable;
 use crate::AwsmRenderer;
-use crate::render::textures::RenderTextureViews;
+use crate::render::textures::{RenderTextureFormats, RenderTextureViews};
 
 impl AwsmRenderer {
     // this should only be called once per frame
@@ -25,6 +25,8 @@ impl AwsmRenderer {
         } else {
             None
         };
+
+        let post_process_ping_pong = self.post_process.uniforms.toggle_ping_pong()?;
 
         self.transforms
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
@@ -41,12 +43,17 @@ impl AwsmRenderer {
         self.meshes.write_gpu(&self.logging, &self.gpu)?;
         self.camera
             .write_gpu(&self.logging, &self.gpu, &self.bind_groups)?;
+        self.post_process
+            .uniforms
+            .write_gpu(&self.logging, &self.gpu, &self.bind_groups)?;
 
 
         let (texture_views, views_changed) = self.render_textures.views(&self.gpu)?;
+
         let ctx = if !self.post_process.settings.enabled {
             self.render_renderables(
                 &self.gpu.current_context_texture_view()?,
+                &texture_views.world_position_current(post_process_ping_pong),
                 &texture_views.depth,
                 self._clear_color.clone()
             )?
@@ -56,6 +63,7 @@ impl AwsmRenderer {
             }
             let mut ctx = self.render_renderables(
                 &texture_views.scene,
+                &texture_views.world_position_current(post_process_ping_pong),
                 &texture_views.depth,
                 self._clear_color_perceptual_to_linear.clone()
             )?;
@@ -73,15 +81,17 @@ impl AwsmRenderer {
         Ok(())
     }
 
-    pub fn scene_target_texture_format(&self) -> TextureFormat {
-        match self.post_process.settings.enabled {
-            true => self.render_textures.scene_texture_format,
-            false => self.gpu.current_context_format(),
-        }
+    pub fn renderable_texture_formats(&self) -> RenderTextureFormats {
+        let mut texture_formats = self.render_textures.formats.clone();
+        if !self.post_process.settings.enabled {
+            texture_formats.scene = self.gpu.current_context_format();
+        };
+
+        texture_formats
     }
 
     pub fn scene_target_depth_texture_format(&self) -> TextureFormat {
-        self.render_textures.depth_texture_format
+        self.render_textures.formats.depth
     }
 
     fn collect_renderables(&self) -> Vec<Renderable<'_>> {
@@ -144,6 +154,7 @@ impl AwsmRenderer {
     fn render_renderables(
         &self,
         color_texture_view: &web_sys::GpuTextureView,
+        world_position_texture_view: &web_sys::GpuTextureView,
         depth_texture_view: &web_sys::GpuTextureView,
         clear_color: Color,
     ) -> Result<RenderContext> {
@@ -158,7 +169,12 @@ impl AwsmRenderer {
                         LoadOp::Clear,
                         StoreOp::Store,
                     )
-                    .with_clear_color(clear_color)
+                    .with_clear_color(clear_color),
+                    ColorAttachment::new(
+                        world_position_texture_view,
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    )
                 ],
                 depth_stencil_attachment: Some(
                     DepthStencilAttachment::new(&depth_texture_view)
@@ -212,6 +228,7 @@ impl AwsmRenderer {
     ) -> Result<()> {
         let current_texture_view = self.gpu.current_context_texture_view()?;
 
+
         let post_process_pass = ctx.command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 color_attachments: vec![ColorAttachment::new(
@@ -225,6 +242,12 @@ impl AwsmRenderer {
             .into(),
         )?;
         ctx.render_pass = post_process_pass;
+
+        ctx.render_pass.set_bind_group(
+            1,
+            ctx.bind_groups.uniform_storages.gpu_post_process_bind_group(),
+            None,
+        )?;
 
         if ctx.last_render_pipeline_key != Some(self.post_process.render_pipeline_key()) {
             ctx.render_pass.set_pipeline(

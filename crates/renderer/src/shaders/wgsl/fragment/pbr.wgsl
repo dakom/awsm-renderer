@@ -9,6 +9,7 @@
 struct FragmentInput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) world_position: vec3<f32>, 
+    @location(1) prev_world_position: vec3<f32>, 
 
     {% for loc in fragment_input_locations %}
         @location({{ loc.location }}) {{ loc.name }}: {{ loc.data_type }},
@@ -19,10 +20,14 @@ struct FragmentInput {
     @group({{ binding.group }}) @binding({{ binding.index }}) var {{ binding.name }}: {{ binding.data_type }};
 {% endfor %}
 
-
+struct FragmentOutput {
+    @location(0) color: vec4<f32>,
+    // texture target, used to calculate motion vectors
+    @location(1) world_position: vec4<f32>,
+};
 
 @fragment
-fn frag_main(input: FragmentInput) -> @location(0) vec4<f32> {
+fn frag_main(input: FragmentInput) -> FragmentOutput {
     var material = getMaterial(input);
     let n_lights = arrayLength(&lights) / 16u;
 
@@ -48,5 +53,10 @@ fn frag_main(input: FragmentInput) -> @location(0) vec4<f32> {
         }
     }
 
-    return vec4<f32>(color, material.base_color.a);
+    var output: FragmentOutput;
+
+    output.color = vec4<f32>(color, material.base_color.a);
+    output.world_position = vec4<f32>(input.world_position, 1.0);
+
+    return output;
 }

@@ -9,15 +9,12 @@ use crate::{
     bind_groups::material_textures::{
         MaterialBindGroupKey, MaterialBindGroupLayoutKey, MaterialTextureBindingEntry,
         MaterialTextureBindingLayoutEntry,
-    },
-    materials::MaterialKey,
-    textures::SamplerKey,
-    AwsmRenderer,
+    }, materials::MaterialKey, render::textures::RenderTextureViews, textures::SamplerKey, AwsmRenderer
 };
 
 pub struct PostProcessMaterials {
     cached_bind_group_layout_key: Option<MaterialBindGroupLayoutKey>,
-    cached_sampler_key: Option<SamplerKey>,
+    cached_scene_sampler_key: Option<SamplerKey>,
 }
 
 impl Default for PostProcessMaterials {
@@ -30,7 +27,7 @@ impl PostProcessMaterials {
     pub fn new() -> Self {
         PostProcessMaterials {
             cached_bind_group_layout_key: None,
-            cached_sampler_key: None,
+            cached_scene_sampler_key: None,
         }
     }
     pub fn update(&mut self, _material_key: MaterialKey, _material: &PostProcessMaterial) {
@@ -39,18 +36,18 @@ impl PostProcessMaterials {
 }
 
 impl AwsmRenderer {
-    pub fn add_material_post_proces_scene_sampler(
+    pub fn add_material_post_process_scene_sampler(
         &mut self,
         sampler_descriptor: SamplerDescriptor,
     ) -> Result<SamplerKey> {
-        if let Some(sampler_key) = self.materials.post_process.cached_sampler_key {
+        if let Some(sampler_key) = self.materials.post_process.cached_scene_sampler_key {
             // the sampler already exists in cache
             return Ok(sampler_key);
         }
 
         let sampler = self.gpu.create_sampler(Some(&sampler_descriptor.into()));
         let sampler_key = self.textures.add_sampler(sampler);
-        self.materials.post_process.cached_sampler_key = Some(sampler_key);
+        self.materials.post_process.cached_scene_sampler_key = Some(sampler_key);
         Ok(sampler_key)
     }
 
@@ -67,12 +64,20 @@ impl AwsmRenderer {
             return Ok(key);
         }
 
-        let texture_entry = TextureBindingLayout::new()
+        let scene_texture_entry = TextureBindingLayout::new()
             .with_view_dimension(TextureViewDimension::N2d)
             .with_sample_type(TextureSampleType::Float);
 
-        let sampler_entry =
+        let scene_sampler_entry =
             SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering);
+
+        let world_position_texture_entry = TextureBindingLayout::new()
+            .with_view_dimension(TextureViewDimension::N2d)
+            // Better compatiblity with Rgba32float, which is used for world position textures
+            // this pairs with the idea that we aren't passing a sampler for the world position texture
+            // but rather using textureLoad() to read the texture directly
+            .with_sample_type(TextureSampleType::UnfilterableFloat);
+
 
         let key = self
             .bind_groups
@@ -80,8 +85,10 @@ impl AwsmRenderer {
             .insert_bind_group_layout(
                 &self.gpu,
                 vec![
-                    MaterialTextureBindingLayoutEntry::Texture(texture_entry),
-                    MaterialTextureBindingLayoutEntry::Sampler(sampler_entry),
+                    MaterialTextureBindingLayoutEntry::Texture(scene_texture_entry),
+                    MaterialTextureBindingLayoutEntry::Sampler(scene_sampler_entry),
+                    MaterialTextureBindingLayoutEntry::Texture(world_position_texture_entry.clone()),
+                    MaterialTextureBindingLayoutEntry::Texture(world_position_texture_entry),
                 ],
             )
             .map_err(AwsmMaterialError::MaterialBindGroupLayout)?;
@@ -98,7 +105,7 @@ impl AwsmRenderer {
     pub fn add_material_post_process_bind_group(
         &mut self,
         material_key: MaterialKey,
-        scene_texture_view: web_sys::GpuTextureView,
+        render_textures: &RenderTextureViews,
         scene_texture_sampler: web_sys::GpuSampler,
     ) -> Result<MaterialBindGroupKey> {
         // this will be retrieved from the cache
@@ -111,8 +118,10 @@ impl AwsmRenderer {
                 &self.gpu,
                 layout_key,
                 &[
-                    MaterialTextureBindingEntry::Texture(scene_texture_view),
+                    MaterialTextureBindingEntry::Texture(render_textures.scene.clone()),
                     MaterialTextureBindingEntry::Sampler(scene_texture_sampler),
+                    MaterialTextureBindingEntry::Texture(render_textures.world_positions[0].clone()),
+                    MaterialTextureBindingEntry::Texture(render_textures.world_positions[1].clone()),
                 ],
             )
             .map_err(AwsmMaterialError::MaterialBindGroup)?;
