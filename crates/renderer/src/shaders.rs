@@ -120,7 +120,7 @@ impl ShaderTemplate {
         let source = format!("{main_source}\n\n{fragment_source}\n\n{vertex_source}");
 
         // tracing::info!("{:#?}", tmpl);
-        // print_source(&fragment_source, false);
+        // print_source(&vertex_source, true);
 
         Ok(source)
     }

@@ -1,7 +1,6 @@
 use awsm_renderer_core::{
     command::color::Color,
     renderer::{AwsmRendererWebGpu, AwsmRendererWebGpuBuilder},
-    texture::TextureFormat,
 };
 use bind_groups::BindGroups;
 use camera::CameraBuffer;
@@ -17,7 +16,7 @@ use transform::Transforms;
 
 use crate::render::{
     post_process::{PostProcess, PostProcessSettings},
-    textures::RenderTextures,
+    textures::{RenderTextureFormats, RenderTextures},
 };
 
 pub mod bind_groups;
@@ -79,8 +78,7 @@ impl AwsmRenderer {
         let renderer = AwsmRendererBuilder::new(self.gpu.clone())
             .with_logging(self.logging.clone())
             .with_clear_color(self._clear_color.clone())
-            .with_scene_texture_format(self.render_textures.scene_texture_format)
-            .with_depth_texture_format(self.render_textures.depth_texture_format)
+            .with_render_texture_formats(self.render_textures.formats.clone())
             .build()
             .await?;
 
@@ -92,8 +90,7 @@ impl AwsmRenderer {
 pub struct AwsmRendererBuilder {
     gpu: AwsmRendererGpuBuilderKind,
     logging: AwsmRendererLogging,
-    scene_texture_format: TextureFormat,
-    depth_texture_format: TextureFormat,
+    render_texture_formats: RenderTextureFormats,
     clear_color: Color,
     post_process_settings: PostProcessSettings,
 }
@@ -120,8 +117,7 @@ impl AwsmRendererBuilder {
         Self {
             gpu: gpu.into(),
             logging: AwsmRendererLogging::default(),
-            scene_texture_format: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
-            depth_texture_format: TextureFormat::Depth24plus,
+            render_texture_formats: RenderTextureFormats::default(),
             clear_color: Color::BLACK,
             post_process_settings: PostProcessSettings::default(),
         }
@@ -137,13 +133,8 @@ impl AwsmRendererBuilder {
         self
     }
 
-    pub fn with_scene_texture_format(mut self, format: TextureFormat) -> Self {
-        self.scene_texture_format = format;
-        self
-    }
-
-    pub fn with_depth_texture_format(mut self, format: TextureFormat) -> Self {
-        self.depth_texture_format = format;
+    pub fn with_render_texture_formats(mut self, formats: RenderTextureFormats) -> Self {
+        self.render_texture_formats = formats;
         self
     }
 
@@ -156,8 +147,7 @@ impl AwsmRendererBuilder {
         let Self {
             gpu,
             logging,
-            scene_texture_format,
-            depth_texture_format,
+            render_texture_formats,
             clear_color,
             post_process_settings,
         } = self;
@@ -177,7 +167,7 @@ impl AwsmRendererBuilder {
         let pipelines = Pipelines::new();
         let lights = Lights::new();
         let textures = Textures::new();
-        let render_textures = RenderTextures::new(scene_texture_format, depth_texture_format);
+        let render_textures = RenderTextures::new(render_texture_formats);
         let post_process = PostProcess::new(post_process_settings);
         #[cfg(feature = "gltf")]
         let gltf = gltf::cache::GltfCache::default();

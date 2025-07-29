@@ -87,7 +87,7 @@ impl ShaderTemplateFragmentPbr {
         }
 
         for location in &mut fragment_input_locations {
-            const HARDCODED_LOCATION_LEN: u32 = 1; // account for hardcoded locations like world_position
+            const HARDCODED_LOCATION_LEN: u32 = 2; // account for hardcoded locations like world_position and clip_position
             location.location += HARDCODED_LOCATION_LEN;
         }
 

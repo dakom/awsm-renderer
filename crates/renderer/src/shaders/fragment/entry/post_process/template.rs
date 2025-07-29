@@ -9,6 +9,7 @@ use askama::Template;
 pub struct ShaderTemplateFragmentPostProcess {
     pub gamma_correction: bool,
     pub tonemapping: Option<ToneMapping>,
+    pub anti_aliasing: bool,
 }
 
 impl ShaderTemplateFragmentPostProcess {
@@ -16,6 +17,7 @@ impl ShaderTemplateFragmentPostProcess {
         Self {
             gamma_correction: cache_key.gamma_correction,
             tonemapping: cache_key.tonemapping,
+            anti_aliasing: cache_key.anti_aliasing,
         }
     }
 }

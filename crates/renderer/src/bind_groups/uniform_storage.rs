@@ -10,13 +10,14 @@ use awsm_renderer_core::{
 use super::{gpu_create_bind_group, gpu_create_layout, AwsmBindGroupError, Result};
 use crate::{
     camera::CameraBuffer, lights::Lights, materials::pbr::PbrMaterial, mesh::morphs::Morphs,
-    skin::Skins, transform::Transforms,
+    render::post_process::uniforms::PostProcessUniforms, skin::Skins, transform::Transforms,
 };
 
 pub struct UniformStorageBindGroups {
     universal: UniformStorageBindGroup,
     mesh_all: UniformStorageBindGroup,
     mesh_shape: UniformStorageBindGroup,
+    post_process: UniformStorageBindGroup,
 }
 
 impl UniformStorageBindGroups {
@@ -24,11 +25,13 @@ impl UniformStorageBindGroups {
         let universal = create_universal_bind_group(gpu)?;
         let mesh_all = create_mesh_all_bind_group(gpu)?;
         let mesh_shape = create_mesh_shape_bind_group(gpu)?;
+        let post_process = create_post_process_bind_group(gpu)?;
 
         Ok(Self {
             universal,
             mesh_all,
             mesh_shape,
+            post_process,
         })
     }
 
@@ -41,6 +44,9 @@ impl UniformStorageBindGroups {
     pub fn gpu_mesh_shape_bind_group(&self) -> &web_sys::GpuBindGroup {
         &self.mesh_shape.bind_group
     }
+    pub fn gpu_post_process_bind_group(&self) -> &web_sys::GpuBindGroup {
+        &self.post_process.bind_group
+    }
 
     pub fn gpu_universal_bind_group_layout(&self) -> &web_sys::GpuBindGroupLayout {
         &self.universal.layout
@@ -50,6 +56,9 @@ impl UniformStorageBindGroups {
     }
     pub fn gpu_mesh_shape_bind_group_layout(&self) -> &web_sys::GpuBindGroupLayout {
         &self.mesh_shape.layout
+    }
+    pub fn gpu_post_process_bind_group_layout(&self) -> &web_sys::GpuBindGroupLayout {
+        &self.post_process.layout
     }
 
     pub fn gpu_write(
@@ -70,6 +79,9 @@ impl UniformStorageBindGroups {
             }
             UniformStorageBindGroupIndex::MeshShape(binding) => {
                 &self.mesh_shape.buffers[binding as u32 as usize]
+            }
+            UniformStorageBindGroupIndex::PostProcess(binding) => {
+                &self.post_process.buffers[binding as u32 as usize]
             }
         };
 
@@ -137,6 +149,22 @@ impl UniformStorageBindGroups {
                         .collect(),
                 );
             }
+            UniformStorageBindGroupIndex::PostProcess(binding) => {
+                let buffer =
+                    gpu_create_buffer(gpu, binding.label(), binding.buffer_usage(), new_size)?;
+                self.post_process.buffers[binding as usize] = buffer;
+                self.post_process.bind_group = gpu_create_bind_group(
+                    gpu,
+                    "PostProcess",
+                    &self.post_process.layout,
+                    PostProcessBindGroupBinding::all()
+                        .into_iter()
+                        .map(|binding| {
+                            binding.bind_group_entry(&self.post_process.buffers[binding as usize])
+                        })
+                        .collect(),
+                );
+            }
         }
 
         Ok(())
@@ -154,6 +182,7 @@ pub enum UniformStorageBindGroupIndex {
     Universal(UniversalBindGroupBinding),
     MeshAll(MeshAllBindGroupBinding),
     MeshShape(MeshShapeBindGroupBinding),
+    PostProcess(PostProcessBindGroupBinding),
 }
 
 impl UniformStorageBindGroupIndex {
@@ -162,6 +191,7 @@ impl UniformStorageBindGroupIndex {
             Self::Universal(binding) => binding.label(),
             Self::MeshAll(binding) => binding.label(),
             Self::MeshShape(binding) => binding.label(),
+            Self::PostProcess(binding) => binding.label(),
         }
     }
 }
@@ -264,9 +294,9 @@ impl MeshAllBindGroupBinding {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u32)]
 pub enum MeshShapeBindGroupBinding {
-    MorphTargetWeights = 0,
-    MorphTargetValues = 1,
-    SkinJointMatrices = 2,
+    MorphTargetWeights,
+    MorphTargetValues,
+    SkinJointMatrices,
 }
 
 impl MeshShapeBindGroupBinding {
@@ -309,6 +339,45 @@ impl MeshShapeBindGroupBinding {
                 Self::MorphTargetWeights => BindGroupResource::Buffer(BufferBinding::new(buffer)),
                 Self::MorphTargetValues => BindGroupResource::Buffer(BufferBinding::new(buffer)),
                 Self::SkinJointMatrices => BindGroupResource::Buffer(BufferBinding::new(buffer)),
+            },
+        )
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[repr(u32)]
+pub enum PostProcessBindGroupBinding {
+    Settings = 0,
+}
+
+impl PostProcessBindGroupBinding {
+    pub fn all() -> [Self; 1] {
+        [Self::Settings]
+    }
+
+    pub fn initial_buffer_size(self) -> usize {
+        match self {
+            Self::Settings => PostProcessUniforms::BYTE_SIZE,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Settings => "Post Process Settings",
+        }
+    }
+
+    pub fn buffer_usage(self) -> BufferUsage {
+        match self {
+            Self::Settings => BufferUsage::new().with_uniform().with_copy_dst(),
+        }
+    }
+
+    pub fn bind_group_entry(self, buffer: &web_sys::GpuBuffer) -> BindGroupEntry {
+        BindGroupEntry::new(
+            self as u32,
+            match self {
+                Self::Settings => BindGroupResource::Buffer(BufferBinding::new(buffer)),
             },
         )
     }
@@ -481,6 +550,51 @@ pub(super) fn create_mesh_shape_bind_group(
         "MeshShape",
         &layout,
         MeshShapeBindGroupBinding::all()
+            .into_iter()
+            .map(|binding| binding.bind_group_entry(&buffers[binding as usize]))
+            .collect(),
+    );
+
+    Ok(UniformStorageBindGroup {
+        bind_group,
+        layout,
+        buffers,
+    })
+}
+
+pub(super) fn create_post_process_bind_group(
+    gpu: &AwsmRendererWebGpu,
+) -> Result<UniformStorageBindGroup> {
+    let buffers = PostProcessBindGroupBinding::all()
+        .into_iter()
+        .map(|binding| {
+            gpu_create_buffer(
+                gpu,
+                binding.label(),
+                binding.buffer_usage(),
+                binding.initial_buffer_size(),
+            )
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let layout = gpu_create_layout(
+        gpu,
+        "PostProcess",
+        vec![BindGroupLayoutEntry::new(
+            PostProcessBindGroupBinding::Settings as u32,
+            BindGroupLayoutResource::Buffer(
+                BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
+            ),
+        )
+        .with_visibility_vertex()
+        .with_visibility_fragment()],
+    )?;
+
+    let bind_group = gpu_create_bind_group(
+        gpu,
+        "Post Process",
+        &layout,
+        PostProcessBindGroupBinding::all()
             .into_iter()
             .map(|binding| binding.bind_group_entry(&buffers[binding as usize]))
             .collect(),

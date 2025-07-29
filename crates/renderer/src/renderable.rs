@@ -2,7 +2,7 @@ use crate::{
     error::AwsmError,
     mesh::{Mesh, MeshKey},
     pipeline::RenderPipelineKey,
-    render::RenderContext,
+    render::context::RenderContext,
     transform::TransformKey,
 };
 

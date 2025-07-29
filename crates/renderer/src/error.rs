@@ -4,8 +4,8 @@ use thiserror::Error;
 use crate::{
     bind_groups::AwsmBindGroupError, camera::AwsmCameraError, instances::AwsmInstanceError,
     lights::AwsmLightError, materials::AwsmMaterialError, mesh::AwsmMeshError,
-    pipeline::AwsmPipelineError, shaders::AwsmShaderError, skin::AwsmSkinError,
-    textures::SamplerKey, transform::AwsmTransformError,
+    pipeline::AwsmPipelineError, render::post_process::error::AwsmPostProcessError,
+    shaders::AwsmShaderError, skin::AwsmSkinError, transform::AwsmTransformError,
 };
 
 #[derive(Error, Debug)]
@@ -47,13 +47,8 @@ pub enum AwsmError {
     #[error("{0}")]
     Light(#[from] AwsmLightError),
 
-    #[error("Scene texture create view: {0}")]
-    SceneTextureCreateView(String),
-    #[error("Depth texture create view: {0}")]
-    DepthTextureCreateView(String),
-
     #[error("[post-process] missing post process sampler {0:?}")]
-    MissingPostProcessSampler(SamplerKey),
+    PostProcess(#[from] AwsmPostProcessError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;
