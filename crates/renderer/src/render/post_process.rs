@@ -1,4 +1,3 @@
-pub mod camera_jitter;
 pub mod error;
 pub mod taa;
 pub mod uniforms;
@@ -8,7 +7,6 @@ use awsm_renderer_core::{
     sampler::{FilterMode, SamplerDescriptor},
     texture::TextureFormat,
 };
-use glam::Mat4;
 
 use crate::{
     bind_groups::material_textures::MaterialBindGroupLayoutKey,
@@ -17,10 +15,7 @@ use crate::{
         PipelineLayoutCacheKey, PipelineLayoutKey, RenderPipelineCacheKey, RenderPipelineKey,
     },
     render::{
-        post_process::{
-            camera_jitter::PostProcessCameraJitter, error::AwsmPostProcessError,
-            uniforms::PostProcessUniforms,
-        },
+        post_process::{error::AwsmPostProcessError, uniforms::PostProcessUniforms},
         RenderContext,
     },
     shaders::{
@@ -43,6 +38,8 @@ pub struct PostProcess {
 }
 
 impl PostProcess {
+    pub const CAMERA_JITTER_MOVED: f32 = 0.8;
+    pub const CAMERA_JITTER_STILL: f32 = 0.5;
     pub fn new(settings: PostProcessSettings) -> Self {
         Self {
             settings,
@@ -61,19 +58,6 @@ impl PostProcess {
         ping_pong: bool,
     ) -> crate::error::Result<()> {
         self.inner.as_ref().unwrap().push_commands(ctx, ping_pong)
-    }
-
-    pub fn apply_camera_jitter(
-        &mut self,
-        projection: &mut Mat4,
-        screen_width: u32,
-        screen_height: u32,
-    ) {
-        self.inner
-            .as_mut()
-            .unwrap()
-            .camera_jitter
-            .apply(projection, screen_width, screen_height);
     }
 }
 
@@ -132,7 +116,6 @@ impl AwsmRenderer {
             material_key_pong,
             linear_sampler_key,
             render_pipeline_key,
-            camera_jitter: PostProcessCameraJitter::new(),
         });
 
         Ok(())
@@ -175,7 +158,6 @@ struct PostProcessInner {
     pub material_key_pong: MaterialKey,
     pub linear_sampler_key: SamplerKey,
     pub render_pipeline_key: RenderPipelineKey,
-    pub camera_jitter: PostProcessCameraJitter,
 }
 
 impl PostProcessInner {

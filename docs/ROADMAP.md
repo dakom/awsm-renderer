@@ -1,21 +1,6 @@
 # Next up
 
-- Get rid of camera jitter in CPU entirely, do in GPU only, e.g.
-
-```
-// Normal projection
-    let clip_pos = projection_matrix * view_matrix * model_matrix * vec4<f32>(in.position, 1.0);
-    
-    // Apply sub-pixel jitter directly in clip space
-    let jitter = get_halton_jitter(frame_count); // Or pass as uniform
-    let jittered_pos = clip_pos + vec4<f32>(jitter * 2.0 / screen_size, 0.0, 0.0);
-```
-
-(this should also cleanup some places where we pass screen width/height, etc.)
-
 - Rewrite entire pipeline to match README doc (Visiblity+)
-
-- Ensure TAA is working 
 
 - materials cont'd
     - normal texture

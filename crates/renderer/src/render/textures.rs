@@ -8,7 +8,7 @@ use crate::render::post_process::error::{AwsmPostProcessError, Result};
 #[derive(Default)]
 pub struct RenderTextures {
     pub formats: RenderTextureFormats,
-    ping_pong: bool,
+    frame_count: u32,
     inner: Option<RenderTexturesInner>,
 }
 
@@ -37,21 +37,28 @@ impl RenderTextures {
     pub fn new(formats: RenderTextureFormats) -> Self {
         Self {
             formats,
-            ping_pong: false,
+            frame_count: 0,
             inner: None,
         }
     }
 
-    pub fn toggle_ping_pong(&mut self) -> bool {
-        self.ping_pong = !self.ping_pong;
-        self.ping_pong
+    pub fn next_frame(&mut self) {
+        self.frame_count = self.frame_count.wrapping_add(1);
+    }
+
+    pub fn frame_count(&self) -> u32 {
+        self.frame_count
+    }
+
+    pub fn ping_pong(&self) -> bool {
+        self.frame_count() % 2 == 0
     }
 
     pub fn views(&mut self, gpu: &AwsmRendererWebGpu) -> Result<(RenderTextureViews, ViewChanged)> {
         let current_size = gpu.current_context_texture_size()?;
         match self.inner.as_ref() {
             Some(inner) if (inner.width, inner.height) == current_size => {
-                return Ok((RenderTextureViews::new(inner, self.ping_pong), false));
+                return Ok((RenderTextureViews::new(inner, self.ping_pong()), false));
                 // No change in size, return existing views
             }
             _ => {}
@@ -66,7 +73,7 @@ impl RenderTextures {
         self.inner = Some(inner);
 
         Ok((
-            RenderTextureViews::new(self.inner.as_ref().unwrap(), self.ping_pong),
+            RenderTextureViews::new(self.inner.as_ref().unwrap(), self.ping_pong()),
             true,
         ))
     }

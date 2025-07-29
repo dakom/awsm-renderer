@@ -21,7 +21,7 @@ impl Default for PostProcessUniforms {
 }
 
 impl PostProcessUniforms {
-    pub const BYTE_SIZE: usize = 32; // see `update()` for details
+    pub const BYTE_SIZE: usize = 64; // see `update()` for details
 
     pub fn new() -> Self {
         Self {
@@ -32,20 +32,16 @@ impl PostProcessUniforms {
 
     // this is fast/cheap to call, so we can call it multiple times a frame
     // it will only update the data in the buffer once per frame, at render time
-    pub fn update(&mut self, ping_pong: bool) -> Result<()> {
+    pub fn update(&mut self, frame_count: u32, camera_moved: bool) -> Result<()> {
         let mut offset = 0;
 
-        let mut write_bool = |value: bool| {
-            if value {
-                self.raw_data[offset..offset + 4].copy_from_slice(&1u32.to_ne_bytes());
-            } else {
-                self.raw_data[offset..offset + 4].copy_from_slice(&0u32.to_ne_bytes());
-            }
-
+        let mut write_u32 = |value: u32| {
+            self.raw_data[offset..offset + 4].copy_from_slice(&value.to_ne_bytes());
             offset += 4;
         };
 
-        write_bool(ping_pong);
+        write_u32(frame_count);
+        write_u32(if camera_moved { 1 } else { 0 });
 
         self.gpu_dirty = true;
 
@@ -70,9 +66,7 @@ impl PostProcessUniforms {
                 .uniform_storages
                 .gpu_write(
                     gpu,
-                    UniformStorageBindGroupIndex::PostProcess(
-                        PostProcessBindGroupBinding::Settings,
-                    ),
+                    UniformStorageBindGroupIndex::PostProcess(PostProcessBindGroupBinding::Data),
                     None,
                     self.raw_data.as_slice(),
                     None,

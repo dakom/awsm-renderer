@@ -7,10 +7,11 @@
     @group(0) @binding(1) var scene_texture_sampler: sampler;
 {% endif %}
 
-@group(1) @binding(0) var<uniform> settings: Settings;
+@group(1) @binding(0) var<uniform> post_process_data: PostProcessData;
 
-struct Settings {
-    ping_pong: u32 
+struct PostProcessData {
+    frame_count: u32,
+    camera_moved: u32, // 0 or 1
 }
 
 // Input from the vertex shader
@@ -37,7 +38,6 @@ struct FragmentOutput {
 
 @fragment
 fn frag_main(in: FragmentInput) -> FragmentOutput {
-
     {% if anti_aliasing %}
         var accumulated_color:vec4<f32> = anti_alias(in);
     {% else %}

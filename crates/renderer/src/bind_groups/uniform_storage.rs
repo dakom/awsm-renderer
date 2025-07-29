@@ -347,29 +347,29 @@ impl MeshShapeBindGroupBinding {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u32)]
 pub enum PostProcessBindGroupBinding {
-    Settings = 0,
+    Data = 0,
 }
 
 impl PostProcessBindGroupBinding {
     pub fn all() -> [Self; 1] {
-        [Self::Settings]
+        [Self::Data]
     }
 
     pub fn initial_buffer_size(self) -> usize {
         match self {
-            Self::Settings => PostProcessUniforms::BYTE_SIZE,
+            Self::Data => PostProcessUniforms::BYTE_SIZE,
         }
     }
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Settings => "Post Process Settings",
+            Self::Data => "Post Process Data",
         }
     }
 
     pub fn buffer_usage(self) -> BufferUsage {
         match self {
-            Self::Settings => BufferUsage::new().with_uniform().with_copy_dst(),
+            Self::Data => BufferUsage::new().with_uniform().with_copy_dst(),
         }
     }
 
@@ -377,7 +377,7 @@ impl PostProcessBindGroupBinding {
         BindGroupEntry::new(
             self as u32,
             match self {
-                Self::Settings => BindGroupResource::Buffer(BufferBinding::new(buffer)),
+                Self::Data => BindGroupResource::Buffer(BufferBinding::new(buffer)),
             },
         )
     }
@@ -581,7 +581,7 @@ pub(super) fn create_post_process_bind_group(
         gpu,
         "PostProcess",
         vec![BindGroupLayoutEntry::new(
-            PostProcessBindGroupBinding::Settings as u32,
+            PostProcessBindGroupBinding::Data as u32,
             BindGroupLayoutResource::Buffer(
                 BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
             ),
