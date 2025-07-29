@@ -11,7 +11,7 @@ use awsm_renderer_core::texture::TextureFormat;
 
 use crate::error::Result;
 use crate::render::context::RenderContext;
-use crate::render::textures::{RenderTextureFormats, RenderTextureViews};
+use crate::render::textures::RenderTextureFormats;
 use crate::renderable::Renderable;
 use crate::AwsmRenderer;
 
@@ -65,14 +65,14 @@ impl AwsmRenderer {
             }
             let mut ctx = self.render_renderables(
                 &texture_views.scene,
-                &texture_views.clip_position_render_target(),
-                &texture_views.depth_render_target(),
+                texture_views.clip_position_render_target(),
+                texture_views.depth_render_target(),
                 self._clear_color_perceptual_to_linear.clone(),
             )?;
 
             self.render_post_process(
                 &mut ctx,
-                &texture_views.accumulation_render_target(),
+                texture_views.accumulation_render_target(),
                 ping_pong,
             )?;
 
@@ -229,7 +229,7 @@ impl AwsmRenderer {
             &RenderPassDescriptor {
                 color_attachments: vec![
                     ColorAttachment::new(&current_texture_view, LoadOp::Clear, StoreOp::Store),
-                    ColorAttachment::new(&accumulation_texture_view, LoadOp::Load, StoreOp::Store),
+                    ColorAttachment::new(accumulation_texture_view, LoadOp::Load, StoreOp::Store),
                 ],
                 depth_stencil_attachment: None,
                 ..Default::default()

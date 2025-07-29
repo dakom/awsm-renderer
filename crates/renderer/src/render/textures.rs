@@ -66,7 +66,7 @@ impl RenderTextures {
         self.inner = Some(inner);
 
         Ok((
-            RenderTextureViews::new(&self.inner.as_ref().unwrap(), self.ping_pong),
+            RenderTextureViews::new(self.inner.as_ref().unwrap(), self.ping_pong),
             true,
         ))
     }

@@ -6,6 +6,12 @@ pub struct PostProcessCameraJitter {
     jitter_scale: f32,
 }
 
+impl Default for PostProcessCameraJitter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PostProcessCameraJitter {
     pub fn new() -> Self {
         Self {
@@ -62,7 +68,7 @@ impl PostProcessCameraJitter {
         let jitter_scale = 0.25; // Adjust this value to control jitter strength
         let scaled_jitter = jitter * jitter_scale;
 
-        let jitter_offset = scaled_jitter / Vec2::new(screen_width as f32, screen_height as f32);
+        let _jitter_offset = scaled_jitter / Vec2::new(screen_width as f32, screen_height as f32);
 
         // projection.w_axis.x += jitter_offset.x * 2.0;
         // projection.w_axis.y += jitter_offset.y * 2.0;
