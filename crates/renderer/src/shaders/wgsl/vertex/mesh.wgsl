@@ -63,11 +63,14 @@ fn vert_main(raw_input: VertexInput) -> FragmentInput {
     {% if has_normals %}
         output.world_normal = normalize((model_transform * vec4<f32>(input.normal, 0.0)).xyz);
     {% endif %}
-    output.clip_position = camera.view_proj * pos;
+
 
     {% for assignment in vertex_to_fragment_assignments %}
         output.{{ assignment.fragment_name }} = input.{{ assignment.vertex_name }};
     {% endfor %}
+
+    output.clip_position = camera.view_proj * pos;
+    output.screen_position = camera.view_proj * pos;
 
     return output;
 }

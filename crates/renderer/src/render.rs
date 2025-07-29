@@ -26,7 +26,9 @@ impl AwsmRenderer {
             None
         };
 
-        let post_process_ping_pong = self.post_process.uniforms.toggle_ping_pong()?;
+        // this should probably be called first so we get the uniform in this frame
+        let ping_pong = self.render_textures.toggle_ping_pong(); 
+        self.post_process.uniforms.update(ping_pong)?;
 
         self.transforms
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
@@ -52,8 +54,9 @@ impl AwsmRenderer {
         let ctx = if !self.post_process.settings.enabled {
             self.render_renderables(
                 &self.gpu.current_context_texture_view()?,
-                &texture_views.world_position_current(post_process_ping_pong),
-                &texture_views.depth,
+                // just always render to 0 since we don't have ping-pong
+                &texture_views.clip_positions[0],
+                &texture_views.depths[0],
                 self._clear_color.clone(),
             )?
         } else {
@@ -62,12 +65,12 @@ impl AwsmRenderer {
             }
             let mut ctx = self.render_renderables(
                 &texture_views.scene,
-                &texture_views.world_position_current(post_process_ping_pong),
-                &texture_views.depth,
+                &texture_views.clip_position_render_target(),
+                &texture_views.depth_render_target(),
                 self._clear_color_perceptual_to_linear.clone(),
             )?;
 
-            self.render_post_process(&mut ctx, &texture_views)?;
+            self.render_post_process(&mut ctx, &texture_views.accumulation_render_target(), ping_pong)?;
 
             ctx
         };
@@ -149,8 +152,8 @@ impl AwsmRenderer {
 
     fn render_renderables(
         &self,
-        color_texture_view: &web_sys::GpuTextureView,
-        world_position_texture_view: &web_sys::GpuTextureView,
+        scene_texture_view: &web_sys::GpuTextureView,
+        clip_position_texture_view: &web_sys::GpuTextureView,
         depth_texture_view: &web_sys::GpuTextureView,
         clear_color: Color,
     ) -> Result<RenderContext> {
@@ -160,16 +163,16 @@ impl AwsmRenderer {
         let scene_render_pass = command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 color_attachments: vec![
-                    ColorAttachment::new(color_texture_view, LoadOp::Clear, StoreOp::Store)
+                    ColorAttachment::new(scene_texture_view, LoadOp::Clear, StoreOp::Store)
                         .with_clear_color(clear_color),
                     ColorAttachment::new(
-                        world_position_texture_view,
+                        clip_position_texture_view,
                         LoadOp::Clear,
                         StoreOp::Store,
                     ),
                 ],
                 depth_stencil_attachment: Some(
-                    DepthStencilAttachment::new(&depth_texture_view)
+                    DepthStencilAttachment::new(depth_texture_view)
                         .with_depth_load_op(LoadOp::Clear)
                         .with_depth_store_op(StoreOp::Store)
                         .with_depth_clear_value(1.0),
@@ -217,17 +220,25 @@ impl AwsmRenderer {
     fn render_post_process(
         &self,
         ctx: &mut RenderContext,
-        texture_views: &RenderTextureViews,
+        accumulation_texture_view: &web_sys::GpuTextureView,
+        ping_pong: bool
     ) -> Result<()> {
         let current_texture_view = self.gpu.current_context_texture_view()?;
 
         let post_process_pass = ctx.command_encoder.begin_render_pass(
             &RenderPassDescriptor {
-                color_attachments: vec![ColorAttachment::new(
-                    &current_texture_view,
-                    LoadOp::Clear,
-                    StoreOp::Store,
-                )],
+                color_attachments: vec![
+                    ColorAttachment::new(
+                        &current_texture_view,
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    ),
+                    ColorAttachment::new(
+                        &accumulation_texture_view,
+                        LoadOp::Load,
+                        StoreOp::Store,
+                    )
+                ],
                 depth_stencil_attachment: None,
                 ..Default::default()
             }
@@ -251,7 +262,7 @@ impl AwsmRenderer {
             ctx.last_render_pipeline_key = Some(self.post_process.render_pipeline_key());
         }
 
-        self.post_process.push_commands(ctx, &texture_views.scene)?;
+        self.post_process.push_commands(ctx, ping_pong)?;
         ctx.render_pass.end();
 
         Ok(())

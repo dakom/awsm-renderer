@@ -12,7 +12,12 @@ use super::error::{AwsmPostProcessError, Result};
 pub struct PostProcessUniforms {
     pub(crate) raw_data: [u8; Self::BYTE_SIZE],
     gpu_dirty: bool,
-    ping_pong: bool,
+}
+
+impl Default for PostProcessUniforms {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PostProcessUniforms {
@@ -22,20 +27,13 @@ impl PostProcessUniforms {
         Self {
             raw_data: [0; Self::BYTE_SIZE],
             gpu_dirty: true,
-            ping_pong: false,
         }
     }
 
-    pub fn toggle_ping_pong(&mut self) -> Result<bool> {
-        self.ping_pong = !self.ping_pong;
-        self.update()?;
-
-        Ok(self.ping_pong)
-    }
 
     // this is fast/cheap to call, so we can call it multiple times a frame
     // it will only update the data in the buffer once per frame, at render time
-    fn update(&mut self) -> Result<()> {
+    pub fn update(&mut self, ping_pong: bool) -> Result<()> {
         let mut offset = 0;
 
         let mut write_bool = |value: bool| {
@@ -48,7 +46,7 @@ impl PostProcessUniforms {
             offset += 4;
         };
 
-        write_bool(self.ping_pong);
+        write_bool(ping_pong);
 
         self.gpu_dirty = true;
 

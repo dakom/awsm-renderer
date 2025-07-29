@@ -7,11 +7,15 @@ use crate::bind_groups::{
     uniform_storage::UniformStorageBindGroupIndex, uniform_storage::UniversalBindGroupBinding,
     AwsmBindGroupError, BindGroups,
 };
+use crate::render::post_process::PostProcess;
 use crate::{AwsmRenderer, AwsmRendererLogging};
 
 impl AwsmRenderer {
     pub fn update_camera(&mut self, camera: &impl CameraExt) -> Result<()> {
-        self.camera.update(camera)
+        let (screen_width, screen_height) = self.gpu.current_context_texture_size().map_err(AwsmCameraError::ScreenSize)?;
+        self.camera.update(camera, &mut self.post_process, screen_width, screen_height)?;
+
+        Ok(())
     }
 }
 
@@ -40,9 +44,13 @@ impl CameraBuffer {
 
     // this is fast/cheap to call, so we can call it multiple times a frame
     // it will only update the data in the buffer once per frame, at render time
-    pub(crate) fn update(&mut self, camera: &impl CameraExt) -> Result<()> {
+    pub(crate) fn update(&mut self, camera: &impl CameraExt, post_process: &mut PostProcess, screen_width: u32, screen_height: u32) -> Result<()> {
         let view = camera.view_matrix(); // 16 floats
-        let proj = camera.projection_matrix(); // 16 floats
+        let mut proj = camera.projection_matrix(); // 16 floats
+
+        if post_process.settings.anti_aliasing {
+            post_process.apply_camera_jitter(&mut proj, screen_width, screen_height);
+        }
 
         let view_proj = proj * view; // 16 floats
         let inv_view_proj = view_proj.inverse(); // 16 floats
@@ -122,4 +130,7 @@ pub enum AwsmCameraError {
 
     #[error("[camera] Error writing buffer: {0:?}")]
     WriteBuffer(AwsmBindGroupError),
+
+    #[error("[camera] Couldn't get screen size: {0:?}")]
+    ScreenSize(AwsmCoreError),
 }

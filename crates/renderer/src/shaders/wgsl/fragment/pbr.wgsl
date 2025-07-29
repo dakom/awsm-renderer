@@ -7,9 +7,9 @@
 
 /// Input from the vertex shader
 struct FragmentInput {
-    @builtin(position) clip_position: vec4<f32>,
+    @builtin(position) screen_position: vec4<f32>, // for rasterization, interpolated
     @location(0) world_position: vec3<f32>, 
-    @location(1) prev_world_position: vec3<f32>, 
+    @location(1) clip_position: vec4<f32>, // for motion vectors
 
     {% for loc in fragment_input_locations %}
         @location({{ loc.location }}) {{ loc.name }}: {{ loc.data_type }},
@@ -21,9 +21,9 @@ struct FragmentInput {
 {% endfor %}
 
 struct FragmentOutput {
-    @location(0) color: vec4<f32>,
+    @location(0) scene: vec4<f32>,
     // texture target, used to calculate motion vectors
-    @location(1) world_position: vec4<f32>,
+    @location(1) clip_position: vec4<f32>,
 };
 
 @fragment
@@ -55,8 +55,8 @@ fn frag_main(input: FragmentInput) -> FragmentOutput {
 
     var output: FragmentOutput;
 
-    output.color = vec4<f32>(color, material.base_color.a);
-    output.world_position = vec4<f32>(input.world_position, 1.0);
+    output.scene = vec4<f32>(color, material.base_color.a);
+    output.clip_position = input.clip_position;
 
     return output;
 }
