@@ -27,9 +27,11 @@ impl AwsmRenderer {
         };
 
         // this should probably be called first so we get the uniform in this frame
-        let ping_pong = self.render_textures.toggle_ping_pong();
-        self.post_process.uniforms.update(ping_pong)?;
+        self.render_textures.next_frame();
 
+        self.post_process
+            .uniforms
+            .update(self.render_textures.frame_count(), self.camera.moved())?;
         self.transforms
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
         self.materials
@@ -73,7 +75,7 @@ impl AwsmRenderer {
             self.render_post_process(
                 &mut ctx,
                 texture_views.accumulation_render_target(),
-                ping_pong,
+                self.render_textures.ping_pong(),
             )?;
 
             ctx

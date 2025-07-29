@@ -69,6 +69,7 @@ fn vert_main(raw_input: VertexInput) -> FragmentInput {
         output.{{ assignment.fragment_name }} = input.{{ assignment.vertex_name }};
     {% endfor %}
 
+
     output.clip_position = camera.view_proj * pos;
     output.screen_position = camera.view_proj * pos;
 

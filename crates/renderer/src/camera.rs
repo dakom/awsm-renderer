@@ -1,6 +1,6 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec2, Vec3};
 use thiserror::Error;
 
 use crate::bind_groups::{
@@ -8,16 +8,22 @@ use crate::bind_groups::{
     AwsmBindGroupError, BindGroups,
 };
 use crate::render::post_process::PostProcess;
+use crate::render::textures::RenderTextures;
 use crate::{AwsmRenderer, AwsmRendererLogging};
 
 impl AwsmRenderer {
     pub fn update_camera(&mut self, camera: &impl CameraExt) -> Result<()> {
-        let (screen_width, screen_height) = self
+        let (current_width, current_height) = self
             .gpu
             .current_context_texture_size()
             .map_err(AwsmCameraError::ScreenSize)?;
-        self.camera
-            .update(camera, &mut self.post_process, screen_width, screen_height)?;
+        self.camera.update(
+            camera,
+            &self.render_textures,
+            &self.post_process,
+            current_width as f32,
+            current_height as f32,
+        )?;
 
         Ok(())
     }
@@ -25,6 +31,9 @@ impl AwsmRenderer {
 
 pub struct CameraBuffer {
     pub(crate) raw_data: [u8; Self::BYTE_SIZE],
+    last_view_matrix: Option<Mat4>,
+    last_proj_matrix: Option<Mat4>,
+    camera_moved: bool,
     gpu_dirty: bool,
 }
 
@@ -43,6 +52,9 @@ impl CameraBuffer {
         Ok(Self {
             raw_data: [0; Self::BYTE_SIZE],
             gpu_dirty: true,
+            last_view_matrix: None,
+            last_proj_matrix: None,
+            camera_moved: false,
         })
     }
 
@@ -51,15 +63,46 @@ impl CameraBuffer {
     pub(crate) fn update(
         &mut self,
         camera: &impl CameraExt,
-        post_process: &mut PostProcess,
-        screen_width: u32,
-        screen_height: u32,
+        render_textures: &RenderTextures,
+        post_process: &PostProcess,
+        screen_width: f32,
+        screen_height: f32,
     ) -> Result<()> {
         let view = camera.view_matrix(); // 16 floats
         let mut proj = camera.projection_matrix(); // 16 floats
 
-        if post_process.settings.anti_aliasing {
-            post_process.apply_camera_jitter(&mut proj, screen_width, screen_height);
+        self.camera_moved = match (&self.last_view_matrix, &self.last_proj_matrix) {
+            (Some(last_view), Some(last_proj)) => {
+                fn matrices_equal(a: Mat4, b: Mat4, epsilon: f32) -> bool {
+                    for i in 0..16 {
+                        if (a.to_cols_array()[i] - b.to_cols_array()[i]).abs() > epsilon {
+                            return false;
+                        }
+                    }
+                    true
+                }
+                // Check if matrices changed (with small epsilon for floating point comparison)
+                !matrices_equal(*last_view, view, 1e-6) || !matrices_equal(*last_proj, proj, 1e-6)
+            }
+            _ => true, // First frame, assume movement
+        };
+
+        if post_process.settings.enabled && post_process.settings.anti_aliasing {
+            let jitter_strength = if self.camera_moved {
+                PostProcess::CAMERA_JITTER_MOVED
+            } else {
+                PostProcess::CAMERA_JITTER_STILL
+            };
+            // TAA jitter
+            let jitter = get_halton_jitter(render_textures.frame_count());
+            let jitter_ndc_x = (jitter.x / screen_width) * jitter_strength;
+            let jitter_ndc_y = (jitter.y / screen_height) * jitter_strength;
+
+            // Create jitter translation matrix
+            let jitter_matrix = Mat4::from_translation(Vec3::new(jitter_ndc_x, jitter_ndc_y, 0.0));
+
+            // Apply to your projection matrix
+            proj = jitter_matrix * proj;
         }
 
         let view_proj = proj * view; // 16 floats
@@ -93,10 +136,20 @@ impl CameraBuffer {
         write_to_data(&inv_view_proj.to_cols_array());
         write_to_data(&inv_view.to_cols_array());
         write_to_data(&position.to_array());
+        self.raw_data[offset..offset + 4]
+            .copy_from_slice(&render_textures.frame_count().to_ne_bytes());
 
         self.gpu_dirty = true;
 
+        // Store for next frame (unjittered versions)
+        self.last_view_matrix = Some(camera.view_matrix());
+        self.last_proj_matrix = Some(camera.projection_matrix());
+
         Ok(())
+    }
+
+    pub fn moved(&self) -> bool {
+        self.camera_moved
     }
 
     // writes to the GPU
@@ -129,6 +182,24 @@ impl CameraBuffer {
 
         Ok(())
     }
+}
+fn get_halton_jitter(frame_count: u32) -> Vec2 {
+    let x = halton(frame_count, 2) - 0.5;
+    let y = halton(frame_count, 3) - 0.5;
+    Vec2::new(x, y)
+}
+
+fn halton(mut index: u32, base: u32) -> f32 {
+    let mut result = 0.0;
+    let mut f = 1.0;
+
+    while index > 0 {
+        f /= base as f32;
+        result += f * (index % base) as f32;
+        index /= base;
+    }
+
+    result
 }
 
 type Result<T> = std::result::Result<T, AwsmCameraError>;
