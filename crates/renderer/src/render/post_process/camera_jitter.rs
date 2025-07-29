@@ -3,7 +3,6 @@ use glam::{Mat4, Vec2};
 pub struct PostProcessCameraJitter {
     frame_index: u32,
     max_samples: u32,
-    jitter_scale: f32,
 }
 
 impl Default for PostProcessCameraJitter {
@@ -16,8 +15,7 @@ impl PostProcessCameraJitter {
     pub fn new() -> Self {
         Self {
             frame_index: 0,
-            max_samples: 16,    // Standard for AAA TAA - can be adjusted
-            jitter_scale: 0.02, // Very subtle jitter - 2% of a pixel
+            max_samples: 16, // Standard for AAA TAA - can be adjusted
         }
     }
 
@@ -25,15 +23,6 @@ impl PostProcessCameraJitter {
         Self {
             frame_index: 0,
             max_samples,
-            jitter_scale: 0.02,
-        }
-    }
-
-    pub fn new_with_scale(max_samples: u32, jitter_scale: f32) -> Self {
-        Self {
-            frame_index: 0,
-            max_samples,
-            jitter_scale,
         }
     }
 
@@ -60,7 +49,7 @@ impl PostProcessCameraJitter {
         Vec2::new(x, y)
     }
 
-    pub fn apply(&mut self, projection: &mut Mat4, screen_width: u32, screen_height: u32) {
+    pub fn apply(&mut self, _projection: &mut Mat4, screen_width: u32, screen_height: u32) {
         let sample_index = (self.frame_index % self.max_samples) + 1; // Start from 1 to avoid (0,0)
         let jitter = self.get_halton_jitter(sample_index);
 
