@@ -9,8 +9,7 @@ use awsm_renderer_core::{
 use super::{AwsmMaterialError, Result};
 use crate::{
     bind_groups::material_textures::{
-        MaterialBindGroupLayoutKey, MaterialTextureBindingEntry,
-        MaterialTextureBindingLayoutEntry,
+        MaterialBindGroupLayoutKey, MaterialTextureBindingEntry, MaterialTextureBindingLayoutEntry,
     },
     materials::MaterialKey,
     render::{post_process::PostProcessSettings, textures::RenderTextureViews},
@@ -61,7 +60,12 @@ impl AwsmRenderer {
         &mut self,
         material_key: MaterialKey,
     ) -> Result<MaterialBindGroupLayoutKey> {
-        if let Some(key) = self.materials.post_process.cached_bind_group_layout_key.get(&self.post_process.settings) {
+        if let Some(key) = self
+            .materials
+            .post_process
+            .cached_bind_group_layout_key
+            .get(&self.post_process.settings)
+        {
             // the bind group layout already exists in cache, though we still need to associate it with the material key
             self.bind_groups
                 .material_textures
@@ -76,8 +80,6 @@ impl AwsmRenderer {
         let linear_sampler_entry =
             SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering);
 
-
-
         let key = if self.post_process.settings.anti_aliasing {
             let clip_position_texture_entry = TextureBindingLayout::new()
                 .with_view_dimension(TextureViewDimension::N2d)
@@ -90,41 +92,42 @@ impl AwsmRenderer {
                 .with_view_dimension(TextureViewDimension::N2d)
                 .with_sample_type(TextureSampleType::Float);
 
-            self
-            .bind_groups
-            .material_textures
-            .insert_bind_group_layout(
-                &self.gpu,
-                vec![
-                    MaterialTextureBindingLayoutEntry::Texture(scene_texture_entry),
-                    MaterialTextureBindingLayoutEntry::Sampler(linear_sampler_entry),
-                    MaterialTextureBindingLayoutEntry::Texture(accumulation_texture_entry),
-                    MaterialTextureBindingLayoutEntry::Texture(
-                        clip_position_texture_entry.clone(),
-                    ),
-                    MaterialTextureBindingLayoutEntry::Texture(clip_position_texture_entry),
-                ],
-            )
-            .map_err(AwsmMaterialError::MaterialBindGroupLayout)?
+            self.bind_groups
+                .material_textures
+                .insert_bind_group_layout(
+                    &self.gpu,
+                    vec![
+                        MaterialTextureBindingLayoutEntry::Texture(scene_texture_entry),
+                        MaterialTextureBindingLayoutEntry::Sampler(linear_sampler_entry),
+                        MaterialTextureBindingLayoutEntry::Texture(accumulation_texture_entry),
+                        MaterialTextureBindingLayoutEntry::Texture(
+                            clip_position_texture_entry.clone(),
+                        ),
+                        MaterialTextureBindingLayoutEntry::Texture(clip_position_texture_entry),
+                    ],
+                )
+                .map_err(AwsmMaterialError::MaterialBindGroupLayout)?
         } else {
-            self
-            .bind_groups
-            .material_textures
-            .insert_bind_group_layout(
-                &self.gpu,
-                vec![
-                    MaterialTextureBindingLayoutEntry::Texture(scene_texture_entry),
-                    MaterialTextureBindingLayoutEntry::Sampler(linear_sampler_entry),
-                ],
-            )
-            .map_err(AwsmMaterialError::MaterialBindGroupLayout)?
+            self.bind_groups
+                .material_textures
+                .insert_bind_group_layout(
+                    &self.gpu,
+                    vec![
+                        MaterialTextureBindingLayoutEntry::Texture(scene_texture_entry),
+                        MaterialTextureBindingLayoutEntry::Sampler(linear_sampler_entry),
+                    ],
+                )
+                .map_err(AwsmMaterialError::MaterialBindGroupLayout)?
         };
 
         self.bind_groups
             .material_textures
             .insert_material_bind_group_layout_lookup(material_key, key);
 
-        self.materials.post_process.cached_bind_group_layout_key.insert(self.post_process.settings.clone(), key);
+        self.materials
+            .post_process
+            .cached_bind_group_layout_key
+            .insert(self.post_process.settings.clone(), key);
 
         Ok(key)
     }
@@ -151,9 +154,15 @@ impl AwsmRenderer {
                     &[
                         MaterialTextureBindingEntry::Texture(render_texture_views.scene.clone()),
                         MaterialTextureBindingEntry::Sampler(linear_texture_sampler.clone()),
-                        MaterialTextureBindingEntry::Texture(render_texture_views.accumulations[0].clone()),
-                        MaterialTextureBindingEntry::Texture(render_texture_views.clip_positions[0].clone()),
-                        MaterialTextureBindingEntry::Texture(render_texture_views.clip_positions[1].clone()),
+                        MaterialTextureBindingEntry::Texture(
+                            render_texture_views.accumulations[0].clone(),
+                        ),
+                        MaterialTextureBindingEntry::Texture(
+                            render_texture_views.clip_positions[0].clone(),
+                        ),
+                        MaterialTextureBindingEntry::Texture(
+                            render_texture_views.clip_positions[1].clone(),
+                        ),
                     ],
                 )
                 .map_err(AwsmMaterialError::MaterialBindGroup)?;
@@ -171,9 +180,15 @@ impl AwsmRenderer {
                         MaterialTextureBindingEntry::Texture(render_texture_views.scene.clone()),
                         MaterialTextureBindingEntry::Sampler(linear_texture_sampler),
                         // change the accumulation texture to the second one
-                        MaterialTextureBindingEntry::Texture(render_texture_views.accumulations[1].clone()),
-                        MaterialTextureBindingEntry::Texture(render_texture_views.clip_positions[1].clone()),
-                        MaterialTextureBindingEntry::Texture(render_texture_views.clip_positions[0].clone()),
+                        MaterialTextureBindingEntry::Texture(
+                            render_texture_views.accumulations[1].clone(),
+                        ),
+                        MaterialTextureBindingEntry::Texture(
+                            render_texture_views.clip_positions[1].clone(),
+                        ),
+                        MaterialTextureBindingEntry::Texture(
+                            render_texture_views.clip_positions[0].clone(),
+                        ),
                     ],
                 )
                 .map_err(AwsmMaterialError::MaterialBindGroup)?;
@@ -201,7 +216,6 @@ impl AwsmRenderer {
                 .material_textures
                 .insert_material_bind_group_lookup(material_key_pong, key);
         };
-
 
         Ok(())
     }

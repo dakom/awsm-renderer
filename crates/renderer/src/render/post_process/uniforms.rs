@@ -30,7 +30,6 @@ impl PostProcessUniforms {
         }
     }
 
-
     // this is fast/cheap to call, so we can call it multiple times a frame
     // it will only update the data in the buffer once per frame, at render time
     pub fn update(&mut self, ping_pong: bool) -> Result<()> {

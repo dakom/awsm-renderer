@@ -51,7 +51,8 @@ impl RenderTextures {
         let current_size = gpu.current_context_texture_size()?;
         match self.inner.as_ref() {
             Some(inner) if (inner.width, inner.height) == current_size => {
-                return Ok((RenderTextureViews::new(inner, self.ping_pong), false)); // No change in size, return existing views
+                return Ok((RenderTextureViews::new(inner, self.ping_pong), false));
+                // No change in size, return existing views
             }
             _ => {}
         }
@@ -60,10 +61,14 @@ impl RenderTextures {
             inner.destroy();
         }
 
-        let inner = RenderTexturesInner::new(gpu, self.formats.clone(), current_size.0, current_size.1)?;
+        let inner =
+            RenderTexturesInner::new(gpu, self.formats.clone(), current_size.0, current_size.1)?;
         self.inner = Some(inner);
 
-        Ok((RenderTextureViews::new(&self.inner.as_ref().unwrap(), self.ping_pong), true))
+        Ok((
+            RenderTextureViews::new(&self.inner.as_ref().unwrap(), self.ping_pong),
+            true,
+        ))
     }
 }
 
@@ -72,14 +77,17 @@ pub struct RenderTextureViews {
     pub depths: [web_sys::GpuTextureView; 2],
     pub accumulations: [web_sys::GpuTextureView; 2],
     pub clip_positions: [web_sys::GpuTextureView; 2],
-    ping_pong: bool
+    ping_pong: bool,
 }
 
 impl RenderTextureViews {
     pub fn new(inner: &RenderTexturesInner, ping_pong: bool) -> Self {
         Self {
             scene: inner.scene_texture_view.clone(),
-            depths: [inner.depth_texture_views[0].clone(), inner.depth_texture_views[1].clone()],
+            depths: [
+                inner.depth_texture_views[0].clone(),
+                inner.depth_texture_views[1].clone(),
+            ],
             accumulations: [
                 inner.accumulation_texture_views[0].clone(),
                 inner.accumulation_texture_views[1].clone(),
@@ -115,18 +123,17 @@ impl RenderTextureViews {
             &self.depths[1]
         }
     }
-
 }
 
 #[allow(dead_code)]
 pub struct RenderTexturesInner {
     pub scene_texture: web_sys::GpuTexture,
     pub scene_texture_view: web_sys::GpuTextureView,
-    pub depth_textures: [web_sys::GpuTexture;2],
-    pub depth_texture_views: [web_sys::GpuTextureView;2],
+    pub depth_textures: [web_sys::GpuTexture; 2],
+    pub depth_texture_views: [web_sys::GpuTextureView; 2],
     pub accumulation_textures: [web_sys::GpuTexture; 2],
     pub accumulation_texture_views: [web_sys::GpuTextureView; 2],
-    pub clip_position_textures: [web_sys::GpuTexture; 2], 
+    pub clip_position_textures: [web_sys::GpuTexture; 2],
     pub clip_position_texture_views: [web_sys::GpuTextureView; 2],
     pub width: u32,
     pub height: u32,
@@ -169,7 +176,6 @@ impl RenderTexturesInner {
             )?,
         ];
 
-
         let accumulation_textures = [
             gpu.create_texture(
                 &TextureDescriptor::new(
@@ -192,7 +198,7 @@ impl RenderTexturesInner {
                 )
                 .with_label("Scene texture 2")
                 .into(),
-            )?
+            )?,
         ];
 
         let clip_position_textures = [
@@ -217,7 +223,7 @@ impl RenderTexturesInner {
                 )
                 .with_label("Clip position texture 2")
                 .into(),
-            )?
+            )?,
         ];
 
         let scene_texture_view = scene_texture
@@ -229,7 +235,7 @@ impl RenderTexturesInner {
                 .map_err(|e| AwsmPostProcessError::RenderTextureView(format!("depth: {e:?}")))?,
             depth_textures[1]
                 .create_view()
-                .map_err(|e| AwsmPostProcessError::RenderTextureView(format!("depth: {e:?}")))?
+                .map_err(|e| AwsmPostProcessError::RenderTextureView(format!("depth: {e:?}")))?,
         ];
 
         let accumulation_texture_views = [
@@ -238,7 +244,7 @@ impl RenderTexturesInner {
             })?,
             accumulation_textures[1].create_view().map_err(|e| {
                 AwsmPostProcessError::RenderTextureView(format!("accumulation: {e:?}"))
-            })?
+            })?,
         ];
 
         let clip_position_texture_views = [
@@ -247,7 +253,7 @@ impl RenderTexturesInner {
             })?,
             clip_position_textures[1].create_view().map_err(|e| {
                 AwsmPostProcessError::RenderTextureView(format!("clip_position: {e:?}"))
-            })?
+            })?,
         ];
 
         Ok(Self {
@@ -275,6 +281,6 @@ impl RenderTexturesInner {
         }
         for texture in self.clip_position_textures {
             texture.destroy();
-        } 
+        }
     }
 }

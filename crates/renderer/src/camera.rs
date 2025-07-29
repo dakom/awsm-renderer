@@ -12,8 +12,12 @@ use crate::{AwsmRenderer, AwsmRendererLogging};
 
 impl AwsmRenderer {
     pub fn update_camera(&mut self, camera: &impl CameraExt) -> Result<()> {
-        let (screen_width, screen_height) = self.gpu.current_context_texture_size().map_err(AwsmCameraError::ScreenSize)?;
-        self.camera.update(camera, &mut self.post_process, screen_width, screen_height)?;
+        let (screen_width, screen_height) = self
+            .gpu
+            .current_context_texture_size()
+            .map_err(AwsmCameraError::ScreenSize)?;
+        self.camera
+            .update(camera, &mut self.post_process, screen_width, screen_height)?;
 
         Ok(())
     }
@@ -44,7 +48,13 @@ impl CameraBuffer {
 
     // this is fast/cheap to call, so we can call it multiple times a frame
     // it will only update the data in the buffer once per frame, at render time
-    pub(crate) fn update(&mut self, camera: &impl CameraExt, post_process: &mut PostProcess, screen_width: u32, screen_height: u32) -> Result<()> {
+    pub(crate) fn update(
+        &mut self,
+        camera: &impl CameraExt,
+        post_process: &mut PostProcess,
+        screen_width: u32,
+        screen_height: u32,
+    ) -> Result<()> {
         let view = camera.view_matrix(); // 16 floats
         let mut proj = camera.projection_matrix(); // 16 floats
 

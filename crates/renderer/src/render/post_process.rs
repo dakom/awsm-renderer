@@ -1,7 +1,7 @@
+pub mod camera_jitter;
 pub mod error;
 pub mod taa;
 pub mod uniforms;
-pub mod camera_jitter;
 
 use awsm_renderer_core::{
     pipeline::{fragment::ColorTargetState, primitive::PrimitiveState},
@@ -17,7 +17,11 @@ use crate::{
         PipelineLayoutCacheKey, PipelineLayoutKey, RenderPipelineCacheKey, RenderPipelineKey,
     },
     render::{
-        post_process::{camera_jitter::PostProcessCameraJitter, error::AwsmPostProcessError, uniforms::PostProcessUniforms}, RenderContext
+        post_process::{
+            camera_jitter::PostProcessCameraJitter, error::AwsmPostProcessError,
+            uniforms::PostProcessUniforms,
+        },
+        RenderContext,
     },
     shaders::{
         fragment::{
@@ -56,14 +60,20 @@ impl PostProcess {
         ctx: &mut RenderContext,
         ping_pong: bool,
     ) -> crate::error::Result<()> {
-        self.inner
-            .as_ref()
-            .unwrap()
-            .push_commands(ctx, ping_pong)
+        self.inner.as_ref().unwrap().push_commands(ctx, ping_pong)
     }
 
-    pub fn apply_camera_jitter(&mut self, projection: &mut Mat4, screen_width: u32, screen_height: u32) {
-        self.inner.as_mut().unwrap().camera_jitter.apply(projection, screen_width, screen_height);
+    pub fn apply_camera_jitter(
+        &mut self,
+        projection: &mut Mat4,
+        screen_width: u32,
+        screen_height: u32,
+    ) {
+        self.inner
+            .as_mut()
+            .unwrap()
+            .camera_jitter
+            .apply(projection, screen_width, screen_height);
     }
 }
 
@@ -104,16 +114,15 @@ impl AwsmRenderer {
                 .pipeline_layout_cache_key(material_bind_group_layout_key),
         )?;
 
-
         // uses cache
-        let render_pipeline_key= self
+        let render_pipeline_key = self
             .add_render_pipeline(
                 Some("post process"),
                 self.post_process.settings.render_pipeline_cache_key(
                     shader_key,
                     pipeline_layout_key,
                     self.gpu.current_context_format(),
-                    self.render_textures.formats.accumulation
+                    self.render_textures.formats.accumulation,
                 ),
             )
             .await?;
@@ -143,10 +152,19 @@ impl AwsmRenderer {
                 ))?
                 .clone();
 
-            (post_process.material_key_ping, post_process.material_key_pong, linear_sampler)
+            (
+                post_process.material_key_ping,
+                post_process.material_key_pong,
+                linear_sampler,
+            )
         };
 
-        self.add_material_post_process_bind_group(material_key_ping, material_key_pong, &texture_views, linear_sampler)?;
+        self.add_material_post_process_bind_group(
+            material_key_ping,
+            material_key_pong,
+            &texture_views,
+            linear_sampler,
+        )?;
 
         Ok(())
     }
@@ -157,7 +175,7 @@ struct PostProcessInner {
     pub material_key_pong: MaterialKey,
     pub linear_sampler_key: SamplerKey,
     pub render_pipeline_key: RenderPipelineKey,
-    pub camera_jitter: PostProcessCameraJitter
+    pub camera_jitter: PostProcessCameraJitter,
 }
 
 impl PostProcessInner {
@@ -166,7 +184,6 @@ impl PostProcessInner {
         ctx: &mut RenderContext,
         ping_pong: bool,
     ) -> crate::error::Result<()> {
-
         let material_key = if ping_pong {
             self.material_key_pong
         } else {
@@ -177,7 +194,6 @@ impl PostProcessInner {
             .bind_groups
             .material_textures
             .gpu_bind_group_by_material(material_key)?;
-
 
         ctx.render_pass
             .set_bind_group(0, material_bind_group, None)?;

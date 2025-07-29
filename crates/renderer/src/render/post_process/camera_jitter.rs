@@ -10,7 +10,7 @@ impl PostProcessCameraJitter {
     pub fn new() -> Self {
         Self {
             frame_index: 0,
-            max_samples: 16, // Standard for AAA TAA - can be adjusted
+            max_samples: 16,    // Standard for AAA TAA - can be adjusted
             jitter_scale: 0.02, // Very subtle jitter - 2% of a pixel
         }
     }
@@ -36,13 +36,13 @@ impl PostProcessCameraJitter {
         let mut result = 0.0;
         let mut fraction = 1.0 / base as f32;
         let mut i = index;
-        
+
         while i > 0 {
             result += (i % base) as f32 * fraction;
             i /= base;
             fraction /= base as f32;
         }
-        
+
         result
     }
 

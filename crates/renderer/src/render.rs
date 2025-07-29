@@ -27,7 +27,7 @@ impl AwsmRenderer {
         };
 
         // this should probably be called first so we get the uniform in this frame
-        let ping_pong = self.render_textures.toggle_ping_pong(); 
+        let ping_pong = self.render_textures.toggle_ping_pong();
         self.post_process.uniforms.update(ping_pong)?;
 
         self.transforms
@@ -70,7 +70,11 @@ impl AwsmRenderer {
                 self._clear_color_perceptual_to_linear.clone(),
             )?;
 
-            self.render_post_process(&mut ctx, &texture_views.accumulation_render_target(), ping_pong)?;
+            self.render_post_process(
+                &mut ctx,
+                &texture_views.accumulation_render_target(),
+                ping_pong,
+            )?;
 
             ctx
         };
@@ -165,11 +169,7 @@ impl AwsmRenderer {
                 color_attachments: vec![
                     ColorAttachment::new(scene_texture_view, LoadOp::Clear, StoreOp::Store)
                         .with_clear_color(clear_color),
-                    ColorAttachment::new(
-                        clip_position_texture_view,
-                        LoadOp::Clear,
-                        StoreOp::Store,
-                    ),
+                    ColorAttachment::new(clip_position_texture_view, LoadOp::Clear, StoreOp::Store),
                 ],
                 depth_stencil_attachment: Some(
                     DepthStencilAttachment::new(depth_texture_view)
@@ -221,23 +221,15 @@ impl AwsmRenderer {
         &self,
         ctx: &mut RenderContext,
         accumulation_texture_view: &web_sys::GpuTextureView,
-        ping_pong: bool
+        ping_pong: bool,
     ) -> Result<()> {
         let current_texture_view = self.gpu.current_context_texture_view()?;
 
         let post_process_pass = ctx.command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 color_attachments: vec![
-                    ColorAttachment::new(
-                        &current_texture_view,
-                        LoadOp::Clear,
-                        StoreOp::Store,
-                    ),
-                    ColorAttachment::new(
-                        &accumulation_texture_view,
-                        LoadOp::Load,
-                        StoreOp::Store,
-                    )
+                    ColorAttachment::new(&current_texture_view, LoadOp::Clear, StoreOp::Store),
+                    ColorAttachment::new(&accumulation_texture_view, LoadOp::Load, StoreOp::Store),
                 ],
                 depth_stencil_attachment: None,
                 ..Default::default()
