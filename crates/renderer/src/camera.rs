@@ -1,26 +1,22 @@
+use awsm_renderer_core::buffers::{BufferDescriptor, BufferUsage};
 use awsm_renderer_core::error::AwsmCoreError;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::{Mat4, Vec2, Vec3};
 use thiserror::Error;
 
-use crate::bind_groups::{
-    uniform_storage::UniformStorageBindGroupIndex, uniform_storage::UniversalBindGroupBinding,
-    AwsmBindGroupError, BindGroups,
-};
-use crate::render::post_process::PostProcess;
-use crate::render::textures::RenderTextures;
+use crate::bind_groups::{AwsmBindGroupError, BindGroups};
+use crate::render_textures::RenderTextures;
 use crate::{AwsmRenderer, AwsmRendererLogging};
 
 impl AwsmRenderer {
     pub fn update_camera(&mut self, camera: &impl CameraExt) -> Result<()> {
         let (current_width, current_height) = self
             .gpu
-            .current_context_texture_size()
-            .map_err(AwsmCameraError::ScreenSize)?;
+            .current_context_texture_size()?;
         self.camera.update(
             camera,
             &self.render_textures,
-            &self.post_process,
+            true,
             current_width as f32,
             current_height as f32,
         )?;
@@ -31,6 +27,7 @@ impl AwsmRenderer {
 
 pub struct CameraBuffer {
     pub(crate) raw_data: [u8; Self::BYTE_SIZE],
+    pub(crate) gpu_buffer: web_sys::GpuBuffer,
     last_view_matrix: Option<Mat4>,
     last_proj_matrix: Option<Mat4>,
     camera_moved: bool,
@@ -48,13 +45,20 @@ pub trait CameraExt {
 impl CameraBuffer {
     pub const BYTE_SIZE: usize = 336; // see `update()` for details
 
-    pub fn new() -> Result<Self> {
+    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
+        let gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
+            Some("Camera"),
+            Self::BYTE_SIZE,
+            BufferUsage::new().with_uniform().with_copy_dst()
+        ).into())?;
+
         Ok(Self {
             raw_data: [0; Self::BYTE_SIZE],
             gpu_dirty: true,
             last_view_matrix: None,
             last_proj_matrix: None,
             camera_moved: false,
+            gpu_buffer,
         })
     }
 
@@ -64,7 +68,7 @@ impl CameraBuffer {
         &mut self,
         camera: &impl CameraExt,
         render_textures: &RenderTextures,
-        post_process: &PostProcess,
+        apply_jitter: bool,
         screen_width: f32,
         screen_height: f32,
     ) -> Result<()> {
@@ -87,11 +91,11 @@ impl CameraBuffer {
             _ => true, // First frame, assume movement
         };
 
-        if post_process.settings.enabled && post_process.settings.anti_aliasing {
+        if apply_jitter {
             let jitter_strength = if self.camera_moved {
-                PostProcess::CAMERA_JITTER_MOVED
+                0.2
             } else {
-                PostProcess::CAMERA_JITTER_STILL
+                0.8
             };
             // TAA jitter
             let jitter = get_halton_jitter(render_textures.frame_count());
@@ -166,17 +170,8 @@ impl CameraBuffer {
                 None
             };
 
-            bind_groups
-                .uniform_storages
-                .gpu_write(
-                    gpu,
-                    UniformStorageBindGroupIndex::Universal(UniversalBindGroupBinding::Camera),
-                    None,
-                    self.raw_data.as_slice(),
-                    None,
-                    None,
-                )
-                .map_err(AwsmCameraError::WriteBuffer)?;
+            gpu.write_buffer(&self.gpu_buffer, None, self.raw_data.as_slice(), None, None)?;
+
             self.gpu_dirty = false;
         }
 
@@ -206,12 +201,6 @@ type Result<T> = std::result::Result<T, AwsmCameraError>;
 
 #[derive(Error, Debug)]
 pub enum AwsmCameraError {
-    #[error("[camera] Error creating buffer: {0:?}")]
-    CreateBuffer(AwsmCoreError),
-
-    #[error("[camera] Error writing buffer: {0:?}")]
-    WriteBuffer(AwsmBindGroupError),
-
-    #[error("[camera] Couldn't get screen size: {0:?}")]
-    ScreenSize(AwsmCoreError),
+    #[error("[camera] {0:?}")]
+    Core(#[from] AwsmCoreError),
 }

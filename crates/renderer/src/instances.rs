@@ -9,7 +9,7 @@ use thiserror::Error;
 use crate::{
     bind_groups::AwsmBindGroupError,
     buffer::dynamic_storage::DynamicStorageBuffer,
-    transform::{Transform, TransformKey, Transforms},
+    transforms::{Transform, TransformKey, Transforms},
     AwsmRendererLogging,
 };
 

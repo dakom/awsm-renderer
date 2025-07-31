@@ -1,45 +1,33 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::LazyLock};
 
 use awsm_renderer_core::{
-    bind_groups::{SamplerBindingLayout, SamplerBindingType, TextureBindingLayout},
-    renderer::AwsmRendererWebGpu,
-    texture::{TextureSampleType, TextureViewDimension},
+    bind_groups::{BindGroupLayoutResource, SamplerBindingLayout, SamplerBindingType, TextureBindingLayout}, buffers::{BufferDescriptor, BufferUsage}, renderer::AwsmRendererWebGpu, texture::{TextureSampleType, TextureViewDimension}
 };
 
 use super::{AwsmMaterialError, Result};
 use crate::{
-    bind_groups::{
-        material_textures::{
-            MaterialBindGroupKey, MaterialBindGroupLayoutKey, MaterialTextureBindingEntry,
-            MaterialTextureBindingLayoutEntry,
-        },
-        uniform_storage::{MeshAllBindGroupBinding, UniformStorageBindGroupIndex},
-        BindGroups,
-    },
-    buffer::dynamic_uniform::DynamicUniformBuffer,
-    materials::{MaterialAlphaMode, MaterialKey},
-    textures::{SamplerKey, TextureKey, Textures},
-    AwsmRenderer, AwsmRendererLogging,
+    bind_group_layout::{BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey}, bind_groups::{BindGroupCreate, BindGroups}, buffer::dynamic_uniform::DynamicUniformBuffer, materials::{MaterialAlphaMode, MaterialKey}, textures::{SamplerKey, TextureKey, Textures}, AwsmRenderer, AwsmRendererLogging
 };
 
+static BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| {
+    BufferUsage::new().with_uniform().with_copy_dst()
+});
+
 pub struct PbrMaterials {
-    bind_group_layout_keys: HashMap<PbrMaterialBindGroupLayoutCacheKey, MaterialBindGroupLayoutKey>,
-    bind_group_keys: HashMap<PbrMaterialBindGroupCacheKey, MaterialBindGroupKey>,
     uniform_buffer: DynamicUniformBuffer<MaterialKey>,
     uniform_buffer_gpu_dirty: bool,
-}
-
-impl Default for PbrMaterials {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub(crate) gpu_buffer: web_sys::GpuBuffer,
 }
 
 impl PbrMaterials {
-    pub fn new() -> Self {
-        Self {
-            bind_group_layout_keys: HashMap::new(),
-            bind_group_keys: HashMap::new(),
+    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
+        let gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
+            Some("Pbr Materials"),
+            PbrMaterial::INITIAL_ELEMENTS * PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT,
+            *BUFFER_USAGE,
+        ).into())?;
+
+        Ok(Self {
             uniform_buffer: DynamicUniformBuffer::new(
                 PbrMaterial::INITIAL_ELEMENTS,
                 PbrMaterial::BYTE_SIZE,
@@ -47,7 +35,8 @@ impl PbrMaterials {
                 Some("PbrUniformBuffer".to_string()),
             ),
             uniform_buffer_gpu_dirty: false,
-        }
+            gpu_buffer,
+        })
     }
 
     pub fn buffer_offset(&self, key: MaterialKey) -> Option<usize> {
@@ -73,96 +62,21 @@ impl PbrMaterials {
                 None
             };
 
-            let bind_group_index =
-                UniformStorageBindGroupIndex::MeshAll(MeshAllBindGroupBinding::PbrMaterial);
             if let Some(new_size) = self.uniform_buffer.take_gpu_needs_resize() {
-                bind_groups
-                    .uniform_storages
-                    .gpu_resize(gpu, bind_group_index, new_size)
-                    .map_err(AwsmMaterialError::PbrMaterialBindGroupResize)?;
+                self.gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
+                    Some("Pbr Material"),
+                    new_size,
+                    *BUFFER_USAGE,
+                ).into())?;
+
+                bind_groups.mark_create(BindGroupCreate::PbrMaterialUniform);
             }
 
-            bind_groups
-                .uniform_storages
-                .gpu_write(
-                    gpu,
-                    bind_group_index,
-                    None,
-                    self.uniform_buffer.raw_slice(),
-                    None,
-                    None,
-                )
-                .map_err(AwsmMaterialError::PbrMaterialBindGroupWrite)?;
+            gpu.write_buffer(&self.gpu_buffer, None, self.uniform_buffer.raw_slice(), None, None)?;
 
             self.uniform_buffer_gpu_dirty = false;
         }
         Ok(())
-    }
-}
-
-impl AwsmRenderer {
-    pub fn add_material_pbr_bind_group_layout(
-        &mut self,
-        material_key: MaterialKey,
-        cache_key: &PbrMaterialBindGroupLayoutCacheKey,
-    ) -> Result<MaterialBindGroupLayoutKey> {
-        if let Some(key) = self.materials.pbr.bind_group_layout_keys.get(cache_key) {
-            // the bind group layout already exists in cache
-            // but we still need to associate it with the material
-            self.bind_groups
-                .material_textures
-                .insert_material_bind_group_layout_lookup(material_key, *key);
-            return Ok(*key);
-        }
-
-        let key = self
-            .bind_groups
-            .material_textures
-            .insert_bind_group_layout(&self.gpu, cache_key.entries())
-            .map_err(AwsmMaterialError::MaterialBindGroupLayout)?;
-
-        self.materials
-            .pbr
-            .bind_group_layout_keys
-            .insert(cache_key.clone(), key);
-        self.bind_groups
-            .material_textures
-            .insert_material_bind_group_layout_lookup(material_key, key);
-
-        Ok(key)
-    }
-
-    pub fn add_material_pbr_bind_group(
-        &mut self,
-        material_key: MaterialKey,
-        layout_key: MaterialBindGroupLayoutKey,
-        cache_key: &PbrMaterialBindGroupCacheKey,
-    ) -> Result<MaterialBindGroupKey> {
-        if let Some(key) = self.materials.pbr.bind_group_keys.get(cache_key) {
-            // the bind group already exists in cache
-            // but we still need to associate it with the material
-            self.bind_groups
-                .material_textures
-                .insert_material_bind_group_lookup(material_key, *key);
-            return Ok(*key);
-        }
-
-        let entries = cache_key.entries(&self.textures)?;
-        let key = self
-            .bind_groups
-            .material_textures
-            .insert_bind_group(&self.gpu, layout_key, &entries)
-            .map_err(AwsmMaterialError::MaterialBindGroup)?;
-
-        self.materials
-            .pbr
-            .bind_group_keys
-            .insert(cache_key.clone(), key);
-        self.bind_groups
-            .material_textures
-            .insert_material_bind_group_lookup(material_key, key);
-
-        Ok(key)
     }
 }
 
@@ -295,120 +209,4 @@ impl PbrMaterial {
     }
 }
 
-// just a cache key for re-using the bind group layouts
-#[derive(Default, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PbrMaterialBindGroupLayoutCacheKey {
-    pub has_base_color_tex: bool,
-    pub has_metallic_roughness_tex: bool,
-    pub has_normal_tex: bool,
-    pub has_occlusion_tex: bool,
-    pub has_emissive_tex: bool,
-}
 
-impl From<&PbrMaterialBindGroupCacheKey> for PbrMaterialBindGroupLayoutCacheKey {
-    fn from(cache_key: &PbrMaterialBindGroupCacheKey) -> Self {
-        PbrMaterialBindGroupLayoutCacheKey {
-            has_base_color_tex: cache_key.base_color_tex.is_some(),
-            has_metallic_roughness_tex: cache_key.metallic_roughness_tex.is_some(),
-            has_normal_tex: cache_key.normal_tex.is_some(),
-            has_occlusion_tex: cache_key.occlusion_tex.is_some(),
-            has_emissive_tex: cache_key.emissive_tex.is_some(),
-        }
-    }
-}
-
-impl PbrMaterialBindGroupLayoutCacheKey {
-    pub fn entries(&self) -> Vec<MaterialTextureBindingLayoutEntry> {
-        let mut entries = Vec::new();
-
-        let mut push_simple = || {
-            let entry = TextureBindingLayout::new()
-                .with_view_dimension(TextureViewDimension::N2d)
-                .with_sample_type(TextureSampleType::Float);
-            entries.push(MaterialTextureBindingLayoutEntry::Texture(entry));
-
-            let entry =
-                SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering);
-
-            entries.push(MaterialTextureBindingLayoutEntry::Sampler(entry));
-        };
-
-        if self.has_base_color_tex {
-            push_simple();
-        }
-        if self.has_metallic_roughness_tex {
-            push_simple();
-        }
-        if self.has_normal_tex {
-            push_simple();
-        }
-        if self.has_occlusion_tex {
-            push_simple();
-        }
-        if self.has_emissive_tex {
-            push_simple();
-        }
-
-        entries
-    }
-}
-
-// just a cache key for re-using the bind groups
-#[derive(Default, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PbrMaterialBindGroupCacheKey {
-    pub base_color_tex: Option<PbrMaterialTextureCacheKey>,
-    pub metallic_roughness_tex: Option<PbrMaterialTextureCacheKey>,
-    pub normal_tex: Option<PbrMaterialTextureCacheKey>,
-    pub occlusion_tex: Option<PbrMaterialTextureCacheKey>,
-    pub emissive_tex: Option<PbrMaterialTextureCacheKey>,
-}
-
-impl PbrMaterialBindGroupCacheKey {
-    pub fn entries(&self, textures: &Textures) -> Result<Vec<MaterialTextureBindingEntry>> {
-        let mut entries = Vec::new();
-
-        let mut push_texture = |dep: &PbrMaterialTextureCacheKey| -> Result<()> {
-            let texture = textures
-                .get_texture(dep.texture_key)
-                .ok_or(AwsmMaterialError::MissingTexture(dep.texture_key))?;
-            let texture_view = texture.create_view().map_err(|err| {
-                AwsmMaterialError::CreateTextureView(format!("{:?}: {:?}", dep.texture_key, err))
-            })?;
-            let entry = MaterialTextureBindingEntry::Texture(texture_view);
-            entries.push(entry);
-
-            let sampler = textures
-                .get_sampler(dep.sampler_key)
-                .ok_or(AwsmMaterialError::MissingSampler(dep.sampler_key))?;
-            let entry = MaterialTextureBindingEntry::Sampler(sampler.clone());
-            entries.push(entry);
-
-            Ok(())
-        };
-
-        if let Some(tex) = &self.base_color_tex {
-            push_texture(tex)?;
-        }
-
-        if let Some(tex) = &self.metallic_roughness_tex {
-            push_texture(tex)?;
-        }
-        if let Some(tex) = &self.normal_tex {
-            push_texture(tex)?;
-        }
-        if let Some(tex) = &self.occlusion_tex {
-            push_texture(tex)?;
-        }
-        if let Some(tex) = &self.emissive_tex {
-            push_texture(tex)?;
-        }
-
-        Ok(entries)
-    }
-}
-
-#[derive(Default, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PbrMaterialTextureCacheKey {
-    pub texture_key: TextureKey,
-    pub sampler_key: SamplerKey,
-}

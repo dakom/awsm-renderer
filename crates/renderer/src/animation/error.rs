@@ -1,7 +1,7 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::{mesh::AwsmMeshError, transform::AwsmTransformError};
+use crate::{mesh::AwsmMeshError, transforms::AwsmTransformError};
 
 use super::AnimationKey;
 

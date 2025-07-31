@@ -43,7 +43,7 @@ impl Meshes {
             index_infos: SecondaryMap::new(),
             index_dirty: true,
             vertex_dirty: true,
-            morphs: Morphs::new(),
+            morphs: Morphs::new(gpu)?,
         })
     }
 

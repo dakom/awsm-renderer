@@ -1,25 +1,7 @@
-use awsm_renderer_core::{
-    command::color::Color,
-    renderer::{AwsmRendererWebGpu, AwsmRendererWebGpuBuilder},
-};
-use bind_groups::BindGroups;
-use camera::CameraBuffer;
-use instances::Instances;
-use lights::Lights;
-use materials::Materials;
-use mesh::Meshes;
-use pipeline::Pipelines;
-use shaders::Shaders;
-use skin::Skins;
-use textures::Textures;
-use transform::Transforms;
-
-use crate::render::{
-    post_process::{PostProcess, PostProcessSettings},
-    textures::{RenderTextureFormats, RenderTextures},
-};
+#![allow(warnings)]
 
 pub mod bind_groups;
+pub mod bind_group_layout;
 pub mod bounds;
 pub mod buffer;
 pub mod camera;
@@ -28,13 +10,15 @@ pub mod instances;
 pub mod lights;
 pub mod materials;
 pub mod mesh;
-pub mod pipeline;
+pub mod pipelines;
+pub mod pipeline_layouts;
 pub mod render;
+pub mod render_textures;
+pub mod render_passes;
 pub mod renderable;
 pub mod shaders;
-pub mod skin;
 pub mod textures;
-pub mod transform;
+pub mod transforms;
 pub mod update;
 pub mod core {
     pub use awsm_renderer_core::*;
@@ -45,8 +29,28 @@ pub mod gltf;
 #[cfg(feature = "animation")]
 pub mod animation;
 
+use awsm_renderer_core::{
+    command::color::Color,
+    renderer::{AwsmRendererWebGpu, AwsmRendererWebGpuBuilder},
+};
+use bind_groups::BindGroups;
+use camera::CameraBuffer;
+use instances::Instances;
+use lights::Lights;
+use materials::Materials;
+use mesh::Meshes;
+use pipelines::Pipelines;
+use shaders::Shaders;
+use mesh::skins::Skins;
+use textures::Textures;
+use transforms::Transforms;
+
+use crate::{bind_group_layout::BindGroupLayouts, bind_groups::RenderPassBindGroups, pipeline_layouts::PipelineLayouts, render_passes::geometry::bind_group::GeometryBindGroups, render_textures::{RenderTextureFormats, RenderTextures}};
+
+
 pub struct AwsmRenderer {
     pub gpu: core::renderer::AwsmRendererWebGpu,
+    pub bind_group_layouts: BindGroupLayouts,
     pub bind_groups: BindGroups,
     pub meshes: Meshes,
     pub camera: CameraBuffer,
@@ -55,12 +59,12 @@ pub struct AwsmRenderer {
     pub instances: Instances,
     pub shaders: Shaders,
     pub materials: Materials,
+    pub pipeline_layouts: PipelineLayouts,
     pub pipelines: Pipelines,
     pub lights: Lights,
     pub textures: Textures,
     pub logging: AwsmRendererLogging,
     pub render_textures: RenderTextures,
-    pub post_process: PostProcess,
     // we pick between these on the fly
     _clear_color_perceptual_to_linear: Color,
     _clear_color: Color,
@@ -92,7 +96,6 @@ pub struct AwsmRendererBuilder {
     logging: AwsmRendererLogging,
     render_texture_formats: RenderTextureFormats,
     clear_color: Color,
-    post_process_settings: PostProcessSettings,
 }
 
 pub enum AwsmRendererGpuBuilderKind {
@@ -119,17 +122,11 @@ impl AwsmRendererBuilder {
             logging: AwsmRendererLogging::default(),
             render_texture_formats: RenderTextureFormats::default(),
             clear_color: Color::BLACK,
-            post_process_settings: PostProcessSettings::default(),
         }
     }
 
     pub fn with_logging(mut self, logging: AwsmRendererLogging) -> Self {
         self.logging = logging;
-        self
-    }
-
-    pub fn with_post_process(mut self, settings: PostProcessSettings) -> Self {
-        self.post_process_settings = settings;
         self
     }
 
@@ -149,26 +146,27 @@ impl AwsmRendererBuilder {
             logging,
             render_texture_formats,
             clear_color,
-            post_process_settings,
         } = self;
 
         let gpu = match gpu {
             AwsmRendererGpuBuilderKind::WebGpuBuilder(builder) => builder.build().await?,
             AwsmRendererGpuBuilderKind::WebGpuBuilt(gpu) => gpu,
         };
-        let bind_groups = bind_groups::BindGroups::new(&gpu)?;
-        let camera = camera::CameraBuffer::new()?;
+        let camera = camera::CameraBuffer::new(&gpu)?;
+        let lights = Lights::new(&gpu)?;
         let meshes = Meshes::new(&gpu)?;
-        let transforms = Transforms::new()?;
-        let skins = Skins::new();
+        let transforms = Transforms::new(&gpu)?;
         let instances = Instances::new(&gpu)?;
+        let skins = Skins::new(&gpu)?;
+        let materials = Materials::new(&gpu)?;
+
+        let bind_group_layouts = BindGroupLayouts::new();
+        let bind_groups = BindGroups::new();
         let shaders = Shaders::new();
-        let materials = Materials::new();
+        let pipeline_layouts = PipelineLayouts::new();
         let pipelines = Pipelines::new();
-        let lights = Lights::new();
         let textures = Textures::new();
         let render_textures = RenderTextures::new(render_texture_formats);
-        let post_process = PostProcess::new(post_process_settings);
         #[cfg(feature = "gltf")]
         let gltf = gltf::cache::GltfCache::default();
         #[cfg(feature = "animation")]
@@ -182,8 +180,10 @@ impl AwsmRendererBuilder {
             skins,
             instances,
             shaders,
+            bind_group_layouts,
             bind_groups,
             materials,
+            pipeline_layouts,
             pipelines,
             lights,
             textures,
@@ -191,14 +191,11 @@ impl AwsmRendererBuilder {
             _clear_color_perceptual_to_linear: clear_color.perceptual_to_linear(),
             logging,
             render_textures,
-            post_process,
             #[cfg(feature = "gltf")]
             gltf,
             #[cfg(feature = "animation")]
             animations,
         };
-
-        _self.post_process_init().await?;
 
         Ok(_self)
     }

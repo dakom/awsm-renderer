@@ -1,4 +1,4 @@
-use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+use awsm_renderer_core::{error::AwsmCoreError, renderer::AwsmRendererWebGpu};
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use thiserror::Error;
 
@@ -6,37 +6,27 @@ use crate::{
     bind_groups::{AwsmBindGroupError, BindGroups},
     materials::{
         pbr::{PbrMaterial, PbrMaterials},
-        post_process::{PostProcessMaterial, PostProcessMaterials},
     },
     textures::{SamplerKey, TextureKey},
     AwsmRendererLogging,
 };
 
 pub mod pbr;
-pub mod post_process;
 
 pub struct Materials {
     lookup: SlotMap<MaterialKey, Material>,
     // optimization to avoid loading whole material to check if it has alpha blend
     alpha_blend: SecondaryMap<MaterialKey, bool>,
     pub pbr: PbrMaterials,
-    pub post_process: PostProcessMaterials,
-}
-
-impl Default for Materials {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl Materials {
-    pub fn new() -> Self {
-        Materials {
+    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
+        Ok(Materials {
             lookup: SlotMap::with_key(),
             alpha_blend: SecondaryMap::new(),
-            pbr: PbrMaterials::new(),
-            post_process: PostProcessMaterials::new(),
-        }
+            pbr: PbrMaterials::new(gpu)?,
+        })
     }
 
     pub fn get(&self, key: MaterialKey) -> Option<&Material> {
@@ -62,9 +52,6 @@ impl Materials {
             match material {
                 Material::Pbr(pbr_material) => {
                     self.pbr.update(key, pbr_material);
-                }
-                Material::PostProcess(post_process_material) => {
-                    self.post_process.update(key, post_process_material);
                 }
             }
         }
@@ -92,7 +79,6 @@ impl Materials {
 #[derive(Debug, Clone)]
 pub enum Material {
     Pbr(PbrMaterial),
-    PostProcess(PostProcessMaterial),
 }
 
 impl Material {
@@ -100,7 +86,6 @@ impl Material {
     pub fn has_alpha_blend(&self) -> bool {
         match self {
             Material::Pbr(pbr_material) => pbr_material.has_alpha_blend(),
-            Material::PostProcess(_) => false,
         }
     }
 }
@@ -129,7 +114,7 @@ new_key_type! {
     pub struct MaterialKey;
 }
 
-type Result<T> = std::result::Result<T, AwsmMaterialError>;
+pub type Result<T> = std::result::Result<T, AwsmMaterialError>;
 
 #[derive(Error, Debug)]
 pub enum AwsmMaterialError {
@@ -158,4 +143,7 @@ pub enum AwsmMaterialError {
 
     #[error("[material] pbr unable to write bind group: {0:?}")]
     PbrMaterialBindGroupWrite(AwsmBindGroupError),
+
+    #[error("[material] {0:?}")]
+    Core(#[from] AwsmCoreError),
 }

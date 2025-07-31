@@ -1,7 +1,7 @@
 #[derive(Debug, Clone)]
 pub struct BufferDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBuffer#descriptor
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBufferDescriptor.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuBufferDescriptor.html
     pub label: Option<&'a str>,
     pub mapped_at_creation: Option<bool>,
     pub size: usize,
@@ -27,7 +27,7 @@ impl<'a> BufferDescriptor<'a> {
 #[derive(Debug, Clone)]
 pub struct BufferBinding<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroup#gpubufferbinding_objects
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBufferBinding.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuBufferBinding.html
     pub buffer: &'a web_sys::GpuBuffer,
     pub offset: Option<usize>,
     pub size: Option<usize>,
@@ -54,7 +54,7 @@ impl<'a> BufferBinding<'a> {
 }
 
 #[derive(Hash, Debug, Clone, Default, Copy, PartialEq, Eq)]
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/gpu_buffer_usage/index.html
+// https://docs.rs/web-sys/latest/web_sys/gpu_buffer_usage/index.html
 pub struct BufferUsage(u32);
 
 impl From<u32> for BufferUsage {

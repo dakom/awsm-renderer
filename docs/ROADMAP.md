@@ -1,6 +1,7 @@
 # Next up
 
 - Rewrite entire pipeline to match README doc (Visiblity+)
+    - move shaders to passes (template and cache_key stuff should be ported)
 
 - materials cont'd
     - normal texture
@@ -9,6 +10,9 @@
 - IBL
 
 - Is it right that specular isn't moving across sphere test when camera moves?
+
+- Instancing with different materials
+  - just write a storage buffer before draw call and use instance_index
 
 
 - fix "dev-release" mode (just base path?)
@@ -99,6 +103,7 @@ If it's supported here, corresponding core functionality is also supported
 - [x] Instancing
     - One dynamic uniform bind group for transforms
     - Gpu gating on dirty flag
+    - [ ] support different materials 
 - Camera
     - [x] Single uniform buffer 
     - [ ] Frustum culling
@@ -135,7 +140,7 @@ If it's supported here, corresponding core functionality is also supported
 - [x] Tonemapping
 - [ ] SSAO
 - [ ] Bloom
-- [ ] TAA 
+- [x] TAA 
 - [ ] DOF
 
 ## Demo-only

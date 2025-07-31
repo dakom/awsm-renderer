@@ -4,9 +4,9 @@ use std::{
 };
 
 use crate::{
-    skin::SkinKey,
+    mesh::skins::SkinKey,
     textures::{SamplerKey, TextureKey},
-    transform::TransformKey,
+    transforms::TransformKey,
     AwsmRenderer,
 };
 

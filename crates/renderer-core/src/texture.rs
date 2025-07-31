@@ -1,17 +1,17 @@
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuTextureFormat.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuTextureFormat.html
 pub type TextureFormat = web_sys::GpuTextureFormat;
 pub type TextureAspect = web_sys::GpuTextureAspect;
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuTextureViewDimension.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuTextureViewDimension.html
 pub type TextureViewDimension = web_sys::GpuTextureViewDimension;
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuTextureSampleType.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuTextureSampleType.html
 pub type TextureSampleType = web_sys::GpuTextureSampleType;
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuTextureDimension.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuTextureDimension.html
 pub type TextureDimension = web_sys::GpuTextureDimension;
 
 #[derive(Debug, Clone)]
 pub struct TextureDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createTexture#descriptor
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuTextureDescriptor.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuTextureDescriptor.html
     pub format: TextureFormat,
     pub size: Extent3d,
     pub usage: TextureUsage,
@@ -61,7 +61,7 @@ impl<'a> TextureDescriptor<'a> {
 #[derive(Debug, Clone, Default)]
 pub struct TextureUsage {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUTexture/usage
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/gpu_texture_usage/index.html
+    // https://docs.rs/web-sys/latest/web_sys/gpu_texture_usage/index.html
     pub copy_dst: bool,
     pub copy_src: bool,
     pub render_attachment: bool,
@@ -149,7 +149,7 @@ impl Extent3d {
 #[derive(Debug, Clone, Default)]
 pub struct TextureViewDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUTexture/createView#descriptor
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuTextureViewDescriptor.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuTextureViewDescriptor.html
     pub array_layer_count: Option<u32>,
     pub aspect: Option<TextureAspect>,
     pub base_array_layer: Option<u32>,
@@ -313,7 +313,7 @@ impl From<ExternalTextureDescriptor<'_>> for web_sys::GpuExternalTextureDescript
 impl From<Extent3d> for web_sys::GpuExtent3dDict {
     fn from(size: Extent3d) -> Self {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createTexture#size
-        // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuExtent3dDict.html
+        // https://docs.rs/web-sys/latest/web_sys/struct.GpuExtent3dDict.html
         let size_js = web_sys::GpuExtent3dDict::new(size.width);
 
         if let Some(height) = size.height {

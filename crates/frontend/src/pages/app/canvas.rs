@@ -5,7 +5,6 @@ use awsm_renderer::{
         renderer::AwsmRendererWebGpuBuilder,
         texture::TextureFormat,
     },
-    render::post_process::PostProcessSettings,
     AwsmRendererBuilder, AwsmRendererLogging,
 };
 use awsm_web::dom::resize::{self, ResizeObserver};
@@ -74,7 +73,6 @@ impl AppCanvas {
                         );
                         let renderer = AwsmRendererBuilder::new(gpu_builder)
                             .with_logging(AwsmRendererLogging { render_timings: true })
-                            .with_post_process(state.ctx.post_processing.clone().into())
                             .with_clear_color(Color::MID_GREY)
                             .build()
                             .await

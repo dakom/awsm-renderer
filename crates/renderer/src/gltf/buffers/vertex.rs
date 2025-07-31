@@ -7,7 +7,7 @@ use crate::buffer::helpers::{u8_to_i16_vec, u8_to_u16_vec};
 use crate::gltf::buffers::normals::compute_normals;
 use crate::gltf::error::AwsmGltfError;
 use crate::mesh::{MeshBufferVertexAttribute, MeshBufferVertexInfo};
-use crate::shaders::vertex::entry::mesh::ShaderCacheKeyVertexMeshAttribute;
+use crate::render_passes::geometry::shader::cache_key::ShaderCacheKeyGeometryAttribute;
 
 use super::accessor::accessor_to_bytes;
 use super::index::GltfMeshBufferIndexInfo;
@@ -202,31 +202,31 @@ impl GltfMeshBufferVertexInfo {
                         format: vertex_format,
                         shader_key_kind: match kind {
                             TempAttributeKind::Positions => {
-                                ShaderCacheKeyVertexMeshAttribute::Positions
+                                ShaderCacheKeyGeometryAttribute::Positions
                             }
                             TempAttributeKind::Normals => {
-                                ShaderCacheKeyVertexMeshAttribute::Normals
+                                ShaderCacheKeyGeometryAttribute::Normals
                             }
                             TempAttributeKind::Tangents => {
-                                ShaderCacheKeyVertexMeshAttribute::Tangents
+                                ShaderCacheKeyGeometryAttribute::Tangents
                             }
                             TempAttributeKind::Colors => {
-                                ShaderCacheKeyVertexMeshAttribute::Colors {
+                                ShaderCacheKeyGeometryAttribute::Colors {
                                     count: attribute_kind_count,
                                 }
                             }
                             TempAttributeKind::TexCoords => {
-                                ShaderCacheKeyVertexMeshAttribute::TexCoords {
+                                ShaderCacheKeyGeometryAttribute::TexCoords {
                                     count: attribute_kind_count,
                                 }
                             }
                             TempAttributeKind::Joints => {
-                                ShaderCacheKeyVertexMeshAttribute::Joints {
+                                ShaderCacheKeyGeometryAttribute::Joints {
                                     count: attribute_kind_count,
                                 }
                             }
                             TempAttributeKind::Weights => {
-                                ShaderCacheKeyVertexMeshAttribute::Weights {
+                                ShaderCacheKeyGeometryAttribute::Weights {
                                     count: attribute_kind_count,
                                 }
                             }
@@ -238,15 +238,15 @@ impl GltfMeshBufferVertexInfo {
             }
 
             attributes.sort_by(|(_, a), (_, b)| {
-                fn inner_num(x: &ShaderCacheKeyVertexMeshAttribute) -> u32 {
+                fn inner_num(x: &ShaderCacheKeyGeometryAttribute) -> u32 {
                     match x {
-                        ShaderCacheKeyVertexMeshAttribute::Positions => 0,
-                        ShaderCacheKeyVertexMeshAttribute::Normals => 1,
-                        ShaderCacheKeyVertexMeshAttribute::Tangents => 2,
-                        ShaderCacheKeyVertexMeshAttribute::Colors { .. } => 3,
-                        ShaderCacheKeyVertexMeshAttribute::TexCoords { .. } => 4,
-                        ShaderCacheKeyVertexMeshAttribute::Joints { .. } => 5,
-                        ShaderCacheKeyVertexMeshAttribute::Weights { .. } => 6,
+                        ShaderCacheKeyGeometryAttribute::Positions => 0,
+                        ShaderCacheKeyGeometryAttribute::Normals => 1,
+                        ShaderCacheKeyGeometryAttribute::Tangents => 2,
+                        ShaderCacheKeyGeometryAttribute::Colors { .. } => 3,
+                        ShaderCacheKeyGeometryAttribute::TexCoords { .. } => 4,
+                        ShaderCacheKeyGeometryAttribute::Joints { .. } => 5,
+                        ShaderCacheKeyGeometryAttribute::Weights { .. } => 6,
                     }
                 }
 

@@ -11,7 +11,7 @@ use crate::{
         error::{AwsmGltfError, Result},
     },
     mesh::MorphKey,
-    transform::TransformKey,
+    transforms::TransformKey,
     AwsmRenderer,
 };
 

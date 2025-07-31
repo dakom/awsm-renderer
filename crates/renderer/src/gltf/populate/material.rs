@@ -4,28 +4,17 @@ use crate::{
     gltf::{
         buffers::GltfMeshBufferInfo,
         error::{AwsmGltfError, Result},
-    },
-    materials::{
-        pbr::{
-            PbrMaterial, PbrMaterialBindGroupCacheKey, PbrMaterialBindGroupLayoutCacheKey,
-            PbrMaterialTextureCacheKey,
-        },
+    }, materials::{
+        pbr::PbrMaterial, 
         MaterialAlphaMode,
-    },
-    shaders::{
-        fragment::entry::pbr::ShaderCacheKeyFragmentPbr,
-        vertex::entry::mesh::ShaderCacheKeyVertexMeshAttribute,
-    },
-    textures::{SamplerKey, TextureKey},
-    AwsmRenderer,
+    }, render_passes::{geometry::shader::cache_key::ShaderCacheKeyGeometryAttribute, material::{cache_key::ShaderCacheKeyMaterial, looks::{pbr::{bind_group::{PbrMaterialBindGroupCacheKey, PbrMaterialTextureCacheKey}, shader::cache_key::ShaderCacheKeyMaterialPbr}, shader_cache_key::ShaderCacheKeyMaterialLook}, opaque::shader::cache_key::ShaderCacheKeyOpaqueMaterial, transparent::shader::cache_key::ShaderCacheKeyTransparentMaterial}}, textures::{SamplerKey, TextureKey}, AwsmRenderer
 };
 
 use super::GltfPopulateContext;
 
 pub struct GltfMaterialInfo {
     pub bind_group_cache_key: PbrMaterialBindGroupCacheKey,
-    pub bind_group_layout_cache_key: PbrMaterialBindGroupLayoutCacheKey,
-    pub shader_cache_key: ShaderCacheKeyFragmentPbr,
+    pub shader_cache_key: ShaderCacheKeyMaterial,
     pub material: PbrMaterial,
 }
 
@@ -37,13 +26,13 @@ impl GltfMaterialInfo {
         gltf_material: gltf::Material<'_>,
     ) -> Result<Self> {
         let mut bind_group_cache_key = PbrMaterialBindGroupCacheKey::default();
-        let mut shader_cache_key = ShaderCacheKeyFragmentPbr {
+        let mut shader_cache_key = ShaderCacheKeyMaterialPbr {
             has_normals: primitive_buffer_info
                 .vertex
                 .attributes
                 .iter()
-                .any(|a| a.shader_key_kind == ShaderCacheKeyVertexMeshAttribute::Normals),
-            ..ShaderCacheKeyFragmentPbr::default()
+                .any(|a| a.shader_key_kind == ShaderCacheKeyGeometryAttribute::Normals),
+            ..Default::default()
         };
 
         let pbr = gltf_material.pbr_metallic_roughness();
@@ -103,7 +92,6 @@ impl GltfMaterialInfo {
             gltf::material::AlphaMode::Blend => MaterialAlphaMode::Blend,
         };
         let mut material = PbrMaterial::new(alpha_mode, gltf_material.double_sided());
-        let bind_group_layout_cache_key = (&bind_group_cache_key).into();
 
         if let Some(normal_tex) = gltf_material.normal_texture() {
             material.normal_scale = normal_tex.scale();
@@ -121,8 +109,18 @@ impl GltfMaterialInfo {
 
         Ok(Self {
             bind_group_cache_key,
-            bind_group_layout_cache_key,
-            shader_cache_key,
+            shader_cache_key: match gltf_material.alpha_mode() {
+                gltf::material::AlphaMode::Opaque | gltf::material::AlphaMode::Mask => ShaderCacheKeyMaterial::Opaque(
+                    ShaderCacheKeyOpaqueMaterial {
+                        look: ShaderCacheKeyMaterialLook::Pbr(shader_cache_key),
+                    },
+                ),
+                gltf::material::AlphaMode::Blend => ShaderCacheKeyMaterial::Transparent(
+                    ShaderCacheKeyTransparentMaterial {
+                        look: ShaderCacheKeyMaterialLook::Pbr(shader_cache_key),
+                    },
+                ),
+            },
             material,
         })
     }

@@ -20,7 +20,7 @@ use wasm_bindgen::prelude::*;
 #[derive(Debug, Clone)]
 pub struct RenderPipelineDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#descriptor
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuRenderPipelineDescriptor.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuRenderPipelineDescriptor.html
     // fill this out with a lot more detail
     depth_stencil: Option<DepthStencilState>,
     fragment: Option<FragmentState<'a>>,

@@ -3,7 +3,7 @@ use crate::texture::TextureAspect;
 #[derive(Debug, Clone)]
 pub struct TexelCopyBufferInfo<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/copyBufferToTexture#source
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuTexelCopyBufferInfo.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuTexelCopyBufferInfo.html
     pub buffer: &'a web_sys::GpuBuffer,
     pub bytes_per_row: Option<u32>,
     pub offset: Option<u64>,
@@ -13,7 +13,7 @@ pub struct TexelCopyBufferInfo<'a> {
 #[derive(Debug, Clone)]
 pub struct TexelCopyTextureInfo<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/copyBufferToTexture#destination
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuTexelCopyTextureInfo.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuTexelCopyTextureInfo.html
     pub texture: &'a web_sys::GpuTexture,
     pub aspect: Option<TextureAspect>,
     pub mip_level: Option<u32>,
@@ -23,7 +23,7 @@ pub struct TexelCopyTextureInfo<'a> {
 #[derive(Debug, Clone)]
 pub struct TexelCopyBufferLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/writeTexture#datalayout
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuTexelCopyBufferLayout.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuTexelCopyBufferLayout.html
     pub bytes_per_row: Option<u32>,
     pub rows_per_image: Option<u32>,
     pub offset: Option<u64>,
@@ -32,7 +32,7 @@ pub struct TexelCopyBufferLayout {
 #[derive(Debug, Clone, Default)]
 pub struct Origin3d {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/copyBufferToTexture#origin
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuOrigin3dDict.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuOrigin3dDict.html
     pub x: Option<u32>,
     pub y: Option<u32>,
     pub z: Option<u32>,

@@ -1,17 +1,15 @@
-use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+use std::sync::LazyLock;
+
+use awsm_renderer_core::{buffers::{BufferDescriptor, BufferUsage}, error::AwsmCoreError, renderer::AwsmRendererWebGpu};
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
 use crate::{
-    bind_groups::{
-        uniform_storage::{UniformStorageBindGroupIndex, UniversalBindGroupBinding},
-        AwsmBindGroupError, BindGroups,
-    },
-    buffer::dynamic_uniform::DynamicUniformBuffer,
-    AwsmRendererLogging,
+    bind_groups::{BindGroupCreate, BindGroups}, buffer::dynamic_uniform::DynamicUniformBuffer, AwsmRendererLogging
 };
 
 pub struct Lights {
+    pub(crate) gpu_buffer: web_sys::GpuBuffer,
     lights: SlotMap<LightKey, Light>,
     // we use it as a storage buffer, because we need dynamic lengths, but it's a fixed size like a uniform
     storage_buffer: DynamicUniformBuffer<LightKey>,
@@ -170,18 +168,21 @@ impl Light {
     }
 }
 
-impl Default for Lights {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+static BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
 
 impl Lights {
     pub const INITIAL_ELEMENTS: usize = 8; // 8 lights is a decent baseline
     pub const BYTE_ALIGNMENT: usize = 64; // we aren't using it as a uniform buffer, so storage rules apply
     pub const BYTE_SIZE: usize = 64;
-    pub fn new() -> Self {
-        Lights {
+
+    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
+        let gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
+            Some("Lights"),
+            Self::INITIAL_ELEMENTS * Self::BYTE_ALIGNMENT,
+            *BUFFER_USAGE,
+        ).into())?;
+
+        Ok(Lights {
             lights: SlotMap::with_key(),
             storage_buffer: DynamicUniformBuffer::new(
                 Self::INITIAL_ELEMENTS,
@@ -190,7 +191,8 @@ impl Lights {
                 Some("Lights".to_string()),
             ),
             gpu_dirty: true,
-        }
+            gpu_buffer,
+        })
     }
 
     pub fn insert(&mut self, light: Light) -> Result<LightKey> {
@@ -234,14 +236,17 @@ impl Lights {
                 None
             };
 
-            let bind_group_index =
-                UniformStorageBindGroupIndex::Universal(UniversalBindGroupBinding::Lights);
             if let Some(new_size) = self.storage_buffer.take_gpu_needs_resize() {
-                bind_groups
-                    .uniform_storages
-                    .gpu_resize(gpu, bind_group_index, new_size)
-                    .map_err(AwsmLightError::BindGroupResize)?;
+                self.gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
+                    Some("Lights"),
+                    new_size,
+                    *BUFFER_USAGE,
+                ).into())?;
+
+                bind_groups.mark_create(BindGroupCreate::Lights);
             }
+
+            gpu.write_buffer(&self.gpu_buffer, None, self.storage_buffer.raw_slice(), None, None)?;
 
             // for (index, chunk) in self.storage_buffer.raw_slice().chunks_exact(64).enumerate() {
             //     let values = unsafe {
@@ -252,17 +257,6 @@ impl Lights {
 
             // tracing::info!("n_lights should be {}", self.storage_buffer.raw_slice().len() / (4 * 16));
 
-            bind_groups
-                .uniform_storages
-                .gpu_write(
-                    gpu,
-                    bind_group_index,
-                    None,
-                    self.storage_buffer.raw_slice(),
-                    None,
-                    None,
-                )
-                .map_err(AwsmLightError::BindGroupWrite)?;
 
             self.gpu_dirty = false;
         }
@@ -278,9 +272,6 @@ type Result<T> = std::result::Result<T, AwsmLightError>;
 
 #[derive(Error, Debug)]
 pub enum AwsmLightError {
-    #[error("[light] unable to resize bind group: {0:?}")]
-    BindGroupResize(AwsmBindGroupError),
-
-    #[error("[light] unable to write bind group: {0:?}")]
-    BindGroupWrite(AwsmBindGroupError),
+    #[error("[light] {0:?}")]
+    Core(#[from] AwsmCoreError),
 }

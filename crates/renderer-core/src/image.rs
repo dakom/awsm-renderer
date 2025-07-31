@@ -309,7 +309,7 @@ impl<'a> CopyExternalImageDestInfo<'a> {
 impl From<CopyExternalImageSourceInfo<'_>> for web_sys::GpuCopyExternalImageSourceInfo {
     fn from(info: CopyExternalImageSourceInfo) -> Self {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/copyExternalImageToTexture#source
-        // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuCopyExternalImageSourceInfo.html
+        // https://docs.rs/web-sys/latest/web_sys/struct.GpuCopyExternalImageSourceInfo.html
         let info_js = web_sys::GpuCopyExternalImageSourceInfo::new(&info.source);
 
         if let Some(flip_y) = info.flip_y {
@@ -340,7 +340,7 @@ impl From<CopyExternalImageSourceInfo<'_>> for web_sys::GpuCopyExternalImageSour
 impl From<CopyExternalImageDestInfo<'_>> for web_sys::GpuCopyExternalImageDestInfo {
     fn from(info: CopyExternalImageDestInfo) -> Self {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/copyExternalImageToTexture#destination
-        // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuCopyExternalImageDestInfo.html
+        // https://docs.rs/web-sys/latest/web_sys/struct.GpuCopyExternalImageDestInfo.html
         let info_js = web_sys::GpuCopyExternalImageDestInfo::new(info.texture);
 
         if let Some(aspect) = info.aspect {

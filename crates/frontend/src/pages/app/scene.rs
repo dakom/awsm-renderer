@@ -12,10 +12,6 @@ use awsm_renderer::gltf::data::GltfData;
 use awsm_renderer::gltf::loader::GltfLoader;
 use awsm_renderer::lights::Light;
 use awsm_renderer::mesh::MeshKey;
-use awsm_renderer::pipeline::RenderPipelineKey;
-use awsm_renderer::shaders::fragment::cache_key::ShaderCacheKeyFragment;
-use awsm_renderer::shaders::fragment::entry::debug_normals::ShaderCacheKeyFragmentDebugNormals;
-use awsm_renderer::shaders::vertex::entry::mesh::ShaderTemplateVertexMesh;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use awsm_web::dom::resize::ResizeObserver;
 use camera::{Camera, CameraId};
@@ -43,7 +39,6 @@ pub struct AppScene {
     pub event_listeners: Mutex<Vec<EventListener>>,
     last_size: Cell<(f64, f64)>,
     last_shader_kind: Cell<Option<FragmentShaderKind>>,
-    old_shader_kind_material: Mutex<HashMap<(MeshKey, FragmentShaderKind), ShaderCacheKeyFragment>>,
 }
 
 impl AppScene {
@@ -61,7 +56,6 @@ impl AppScene {
             event_listeners: Mutex::new(Vec::new()),
             last_size: Cell::new((0.0, 0.0)),
             last_shader_kind: Cell::new(None),
-            old_shader_kind_material: Mutex::new(HashMap::new()),
         });
 
         let resize_observer = ResizeObserver::new(
@@ -131,18 +125,6 @@ impl AppScene {
             }))).await;
         }));
 
-        spawn_local(clone!(state => async move {
-            state.ctx.shader.signal().for_each(clone!(state => move |_| clone!(state => async move {
-                state.on_shader_change();
-            }))).await;
-        }));
-
-        spawn_local(clone!(state => async move {
-            state.ctx.post_processing.signal().for_each(clone!(state => move |_| clone!(state => async move {
-                state.on_post_processing_change();
-            }))).await;
-        }));
-
         state
     }
 
@@ -167,44 +149,6 @@ impl AppScene {
             if let Err(err) = state.render().await {
                 tracing::error!("Failed to render after canvas resize: {:?}", err);
             }
-        }));
-    }
-
-    fn on_shader_change(self: &Arc<Self>) {
-        let state = self;
-
-        spawn_local(clone!(state => async move {
-            let shader_kind = state.ctx.shader.get();
-            let last_shader_kind = state.last_shader_kind.get();
-
-            if Some(shader_kind) == last_shader_kind {
-                return;
-            }
-
-            if let Err(err) = state.setup_shader().await {
-                tracing::error!("Failed to change shader: {:?}", err);
-            }
-
-            if let Err(err) = state.render().await {
-                tracing::error!("Failed to render after shader change: {:?}", err);
-            }
-        }));
-    }
-
-    fn on_post_processing_change(self: &Arc<Self>) {
-        let state = self;
-
-        spawn_local(clone!(state => async move {
-            let mut renderer = state.renderer.lock().await;
-            state.stop_animation_loop();
-            renderer.post_process.settings = state.ctx.post_processing.clone().into();
-            if let Err(err) = renderer.post_process_init().await {
-                tracing::error!("Failed to initialize post process: {:?}", err);
-            }
-            if let Err(err) = renderer.post_process_update_view() {
-                tracing::error!("Failed to update post process view: {:?}", err);
-            }
-            state.start_animation_loop();
         }));
     }
 
@@ -273,11 +217,8 @@ impl AppScene {
 
     pub async fn setup_all(self: &Arc<Self>) -> Result<()> {
         self.last_shader_kind.set(None);
-        self.old_shader_kind_material.lock().unwrap().clear();
 
         self.setup_viewport().await?;
-
-        self.setup_shader().await?;
 
         Ok(())
     }
@@ -317,99 +258,6 @@ impl AppScene {
                     *camera = Some(Camera::new_perspective(scene_aabb, camera_aspect));
                 }
             }
-        }
-
-        Ok(())
-    }
-
-    pub async fn setup_shader(self: &Arc<Self>) -> Result<()> {
-        let mut renderer = self.renderer.lock().await;
-
-        let shader_kind = self.ctx.shader.get();
-
-        for mesh_key in renderer.meshes.keys().collect::<Vec<_>>() {
-            let render_pipeline_key = renderer.meshes.get(mesh_key)?.render_pipeline_key;
-
-            let mut pipeline_cache_key = renderer
-                .pipelines
-                .get_render_pipeline_cache_from_key(&render_pipeline_key)
-                .ok_or(anyhow::anyhow!(
-                    "Failed to get render pipeline cache key from key: {:?}",
-                    render_pipeline_key
-                ))?;
-
-            let mut shader_cache_key = renderer
-                .shaders
-                .get_shader_cache_from_key(&pipeline_cache_key.shader_key)
-                .ok_or(anyhow::anyhow!(
-                    "Failed to get shader cache key from key: {:?}",
-                    pipeline_cache_key.shader_key
-                ))?;
-
-            let old_shader_kind = match &shader_cache_key.fragment {
-                ShaderCacheKeyFragment::Pbr(shader_cache_key_fragment_pbr) => {
-                    FragmentShaderKind::Pbr
-                }
-                ShaderCacheKeyFragment::DebugNormals(shader_cache_key_fragment_debug_normals) => {
-                    FragmentShaderKind::DebugNormals
-                }
-                _ => {
-                    return Err(anyhow!(
-                        "Unsupported shader kind for meshes: {:?}",
-                        shader_cache_key.fragment
-                    ));
-                }
-            };
-
-            if old_shader_kind == shader_kind {
-                continue;
-            }
-
-            {
-                let mut old_shader_kind_material = self.old_shader_kind_material.lock().unwrap();
-
-                let key = (mesh_key.clone(), old_shader_kind);
-
-                if !old_shader_kind_material.contains_key(&key) {
-                    old_shader_kind_material.insert(key, shader_cache_key.fragment.clone());
-                }
-            }
-
-            match shader_kind {
-                FragmentShaderKind::DebugNormals => {
-                    shader_cache_key.fragment = ShaderCacheKeyFragment::DebugNormals(
-                        ShaderCacheKeyFragmentDebugNormals::new(match &shader_cache_key.vertex {
-                            awsm_renderer::shaders::vertex::ShaderCacheKeyVertex::Mesh(mesh) => {
-                                ShaderTemplateVertexMesh::new(&mesh).has_normals
-                            }
-                            awsm_renderer::shaders::vertex::ShaderCacheKeyVertex::Quad => false,
-                        }),
-                    );
-                }
-                FragmentShaderKind::Pbr => {
-                    let fragment = self
-                        .old_shader_kind_material
-                        .lock()
-                        .unwrap()
-                        .get(&(mesh_key.clone(), shader_kind))
-                        .ok_or(anyhow::anyhow!(
-                            "Failed to get material for shader kind {:?}",
-                            shader_kind
-                        ))?
-                        .clone();
-
-                    shader_cache_key.fragment = fragment;
-                }
-            }
-
-            let shader_key = renderer.add_shader(shader_cache_key).await?;
-            pipeline_cache_key.shader_key = shader_key;
-
-            let new_render_pipeline_key = renderer
-                .add_render_pipeline(None, pipeline_cache_key)
-                .await?;
-
-            renderer.meshes.get_mut(mesh_key)?.render_pipeline_key = new_render_pipeline_key;
         }
 
         Ok(())

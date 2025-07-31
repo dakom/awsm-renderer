@@ -3,9 +3,7 @@ use gltf::Semantic;
 use thiserror::Error;
 
 use crate::{
-    animation::AwsmAnimationError, bind_groups::AwsmBindGroupError, materials::AwsmMaterialError,
-    mesh::AwsmMeshError, pipeline::AwsmPipelineError, shaders::AwsmShaderError,
-    skin::AwsmSkinError, transform::AwsmTransformError,
+    animation::AwsmAnimationError, bind_group_layout::AwsmBindGroupLayoutError, bind_groups::AwsmBindGroupError, materials::AwsmMaterialError, mesh::{skins::AwsmSkinError, AwsmMeshError}, pipeline_layouts::AwsmPipelineLayoutError, pipelines::render_pipeline::AwsmRenderPipelineError, shaders::AwsmShaderError, transforms::AwsmTransformError
 };
 
 #[derive(Error, Debug)]
@@ -30,9 +28,6 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] Unable to write buffer: {0:?}")]
     BufferWrite(AwsmCoreError),
-
-    #[error("[gltf] Unable to create bind group layout: {0:?}")]
-    BindGroupLayout(AwsmCoreError),
 
     #[error("[gltf] Unsupported primitive mode: {0:?}")]
     UnsupportedPrimitiveMode(gltf::mesh::Mode),
@@ -64,9 +59,6 @@ pub enum AwsmGltfError {
     #[error("[gltf] {0:?}")]
     Mesh(#[from] AwsmMeshError),
 
-    #[error("[gltf] {0:?}")]
-    Pipeline(#[from] AwsmPipelineError),
-
     #[error("[gltf] mesh primitive shader: {0:?}")]
     MeshPrimitiveShader(AwsmCoreError),
 
@@ -78,6 +70,18 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] {0:?}")]
     Skin(#[from] AwsmSkinError),
+
+    #[error("[gltf] {0:?}")]
+    BindGroup(#[from] AwsmBindGroupError),
+
+    #[error("[gltf] {0:?}")]
+    BindGroupLayout(#[from] AwsmBindGroupLayoutError),
+
+    #[error("[gltf] {0:?}")]
+    PipelineLayout(#[from] AwsmPipelineLayoutError),
+
+    #[error("[gltf] {0:?}")]
+    RenderPipeline(#[from] AwsmRenderPipelineError),
 
     #[error("[gltf] morph animation exists but no morph target found")]
     MissingMorphForAnimation,

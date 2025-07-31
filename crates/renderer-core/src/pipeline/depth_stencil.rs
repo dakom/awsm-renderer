@@ -7,7 +7,7 @@ use crate::compare::CompareFunction;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DepthStencilState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#depthstencil_object_structure
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuDepthStencilState.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuDepthStencilState.html
     pub depth_bias: Option<i32>,
     pub depth_bias_clamp: Option<OrderedFloat<f32>>,
     pub depth_bias_slope_scale: Option<OrderedFloat<f32>>,
@@ -95,7 +95,7 @@ impl std::hash::Hash for DepthStencilState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StencilFaceState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#stencilback
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuStencilFaceState.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuStencilFaceState.html
     pub compare: Option<CompareFunction>,
     pub fail_op: Option<StencilOperation>,
     pub depth_fail_op: Option<StencilOperation>,

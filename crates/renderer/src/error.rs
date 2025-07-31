@@ -2,10 +2,7 @@ use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
 use crate::{
-    bind_groups::AwsmBindGroupError, camera::AwsmCameraError, instances::AwsmInstanceError,
-    lights::AwsmLightError, materials::AwsmMaterialError, mesh::AwsmMeshError,
-    pipeline::AwsmPipelineError, render::post_process::error::AwsmPostProcessError,
-    shaders::AwsmShaderError, skin::AwsmSkinError, transform::AwsmTransformError,
+    bind_groups::AwsmBindGroupError, camera::AwsmCameraError, instances::AwsmInstanceError, lights::AwsmLightError, materials::AwsmMaterialError, mesh::{skins::AwsmSkinError, AwsmMeshError}, pipelines::render_pipeline::AwsmRenderPipelineError, render_textures::AwsmRenderTextureError, shaders::AwsmShaderError, transforms::AwsmTransformError
 };
 
 #[derive(Error, Debug)]
@@ -42,13 +39,13 @@ pub enum AwsmError {
     Material(#[from] AwsmMaterialError),
 
     #[error("{0}")]
-    Pipeline(#[from] AwsmPipelineError),
+    RenderPipeline(#[from] AwsmRenderPipelineError),
 
     #[error("{0}")]
     Light(#[from] AwsmLightError),
 
-    #[error("[post-process] missing post process sampler {0:?}")]
-    PostProcess(#[from] AwsmPostProcessError),
+    #[error("{0}")]
+    RenderTexture(#[from] AwsmRenderTextureError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;

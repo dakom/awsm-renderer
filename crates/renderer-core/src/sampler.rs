@@ -3,7 +3,7 @@ use crate::compare::CompareFunction;
 #[derive(Debug, Clone, Default)]
 pub struct SamplerDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createSampler#descriptor
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuSamplerDescriptor.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuSamplerDescriptor.html
     pub address_mode_u: Option<AddressMode>,
     pub address_mode_v: Option<AddressMode>,
     pub address_mode_w: Option<AddressMode>,
@@ -17,11 +17,11 @@ pub struct SamplerDescriptor<'a> {
     pub mipmap_filter: Option<MipmapFilterMode>,
 }
 
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuAddressMode.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuAddressMode.html
 pub type AddressMode = web_sys::GpuAddressMode;
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuFilterMode.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuFilterMode.html
 pub type FilterMode = web_sys::GpuFilterMode;
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuMipmapFilterMode.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuMipmapFilterMode.html
 pub type MipmapFilterMode = web_sys::GpuMipmapFilterMode;
 
 // js conversions

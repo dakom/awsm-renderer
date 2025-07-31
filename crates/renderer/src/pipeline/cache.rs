@@ -11,7 +11,7 @@ use awsm_renderer_core::pipeline::{
 };
 
 use crate::{
-    bind_groups::{material_textures::MaterialBindGroupLayoutKey, BindGroups},
+    bind_group::{material_textures::MaterialBindGroupLayoutKey, BindGroups},
     shaders::ShaderKey,
 };
 
@@ -37,9 +37,6 @@ pub enum PipelineLayoutCacheKey {
         has_skin_key: bool,
         material_layout_key: MaterialBindGroupLayoutKey,
     },
-    PostProcess {
-        material_layout_key: MaterialBindGroupLayoutKey,
-    },
 }
 
 impl PipelineLayoutCacheKey {
@@ -51,12 +48,6 @@ impl PipelineLayoutCacheKey {
         Self::Mesh {
             has_morph_key,
             has_skin_key,
-            material_layout_key,
-        }
-    }
-
-    pub fn new_post_process(material_layout_key: MaterialBindGroupLayoutKey) -> Self {
-        Self::PostProcess {
             material_layout_key,
         }
     }
@@ -171,21 +162,6 @@ impl PipelineLayoutCacheKey {
                     );
                 }
 
-                Ok(PipelineLayoutDescriptor::new(label, bind_group_layouts))
-            }
-            PipelineLayoutCacheKey::PostProcess {
-                material_layout_key,
-            } => {
-                let bind_group_layouts = vec![
-                    bind_groups
-                        .material_textures
-                        .gpu_bind_group_layout(material_layout_key)?
-                        .clone(),
-                    bind_groups
-                        .uniform_storages
-                        .gpu_post_process_bind_group_layout()
-                        .clone(),
-                ];
                 Ok(PipelineLayoutDescriptor::new(label, bind_group_layouts))
             }
         }
