@@ -69,6 +69,7 @@ impl RenderTextures {
 
     pub fn views(&mut self, gpu: &AwsmRendererWebGpu) -> Result<RenderTextureViews> {
         let current_size = gpu.current_context_texture_size().map_err(AwsmRenderTextureError::CurrentScreenSize)?;
+        let current_display = gpu.current_context_texture_view().map_err(AwsmRenderTextureError::CurrentTextureView)?;
 
         let size_changed = match self.inner.as_ref() {
             Some(inner) => {
@@ -87,7 +88,7 @@ impl RenderTextures {
             self.inner = Some(inner);
         }
 
-        Ok(RenderTextureViews::new(self.inner.as_ref().unwrap(), self.ping_pong(), current_size.0, current_size.1, size_changed))
+        Ok(RenderTextureViews::new(self.inner.as_ref().unwrap(), current_display, self.ping_pong(), current_size.0, current_size.1, size_changed))
     }
 }
 
@@ -102,13 +103,14 @@ pub struct RenderTextureViews {
     pub oit_alpha: web_sys::GpuTextureView,
     pub depth: web_sys::GpuTextureView,
     pub composite: web_sys::GpuTextureView,
+    pub display: web_sys::GpuTextureView,
     pub size_changed: bool,
     pub width: u32,
     pub height: u32,
 }
 
 impl RenderTextureViews {
-    pub fn new(inner: &RenderTexturesInner, ping_pong: bool, width: u32, height: u32, size_changed: bool) -> Self {
+    pub fn new(inner: &RenderTexturesInner, display: web_sys::GpuTextureView, ping_pong: bool, width: u32, height: u32, size_changed: bool) -> Self {
         let curr_index = if ping_pong { 0 } else { 1 };
         let prev_index = if ping_pong { 1 } else { 0 };
         Self {
@@ -122,6 +124,7 @@ impl RenderTextureViews {
             oit_alpha: inner.oit_alpha_view.clone(),
             depth: inner.depth_view.clone(),
             composite: inner.composite_view.clone(),
+            display,
             size_changed,
             width,
             height,
@@ -389,9 +392,12 @@ pub enum AwsmRenderTextureError {
     #[error("[render_texture] Error creating texture: {0:?}")]
     CreateTexture(AwsmCoreError),
 
-    #[error("[render_texture] Error creating texture view: {0:?}")]
+    #[error("[render_texture] Error creating texture view: {0}")]
     CreateTextureView(String),
 
     #[error("[render_texture] Error getting current screen size: {0:?}")]
     CurrentScreenSize(AwsmCoreError),
+
+    #[error("[render_texture] Error getting current texture view: {0:?}")]
+    CurrentTextureView(AwsmCoreError),
 }

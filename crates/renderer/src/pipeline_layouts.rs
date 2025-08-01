@@ -29,7 +29,7 @@ impl PipelineLayouts {
             return Ok(*key);
         }
 
-        let bind_group_layout_entries = cache_key
+        let pipeline_bind_group_layouts = cache_key
             .bind_group_layouts
             .iter()
             .map(|key| {
@@ -40,7 +40,7 @@ impl PipelineLayouts {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let pipeline_layout = gpu.create_pipeline_layout(&PipelineLayoutDescriptor::new(None, bind_group_layout_entries).into());
+        let pipeline_layout = gpu.create_pipeline_layout(&PipelineLayoutDescriptor::new(None, pipeline_bind_group_layouts).into());
 
         let key = self.lookup.insert(pipeline_layout);
         self.cache.insert(cache_key, key);
@@ -63,7 +63,7 @@ impl Default for PipelineLayouts {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PipelineLayoutCacheKey {
-    bind_group_layouts: Vec<BindGroupLayoutKey>,
+    pub bind_group_layouts: Vec<BindGroupLayoutKey>,
 }
 
 impl PipelineLayoutCacheKey {

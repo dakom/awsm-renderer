@@ -1,4 +1,4 @@
-use std::hash::Hash;
+use std::{borrow::Cow, hash::Hash};
 
 use crate::{
     buffers::BufferBinding,
@@ -265,7 +265,7 @@ pub enum BindGroupResource<'a> {
     Buffer(BufferBinding<'a>),
     ExternalTexture(&'a web_sys::GpuExternalTexture),
     Sampler(&'a web_sys::GpuSampler),
-    TextureView(web_sys::GpuTextureView),
+    TextureView(Cow<'a, web_sys::GpuTextureView>),
 }
 
 impl<'a> BindGroupDescriptor<'a> {
@@ -431,7 +431,7 @@ impl From<BindGroupEntry<'_>> for web_sys::GpuBindGroupEntry {
                 BindGroupResource::Buffer(buffer) => web_sys::GpuBufferBinding::from(buffer).into(),
                 BindGroupResource::ExternalTexture(external_texture) => external_texture.into(),
                 BindGroupResource::Sampler(sampler) => sampler.into(),
-                BindGroupResource::TextureView(texture_view) => texture_view.into(),
+                BindGroupResource::TextureView(texture_view) => texture_view.as_ref().into(),
             },
         )
     }

@@ -4,10 +4,8 @@ use thiserror::Error;
 
 use crate::{
     bind_groups::{AwsmBindGroupError, BindGroups},
-    materials::{
-        pbr::{PbrMaterial, PbrMaterials},
-    },
-    textures::{SamplerKey, TextureKey},
+    materials::pbr::{PbrMaterial, PbrMaterials},
+    textures::{AwsmTextureError, SamplerKey, TextureKey},
     AwsmRendererLogging,
 };
 
@@ -120,14 +118,9 @@ pub type Result<T> = std::result::Result<T, AwsmMaterialError>;
 pub enum AwsmMaterialError {
     #[error("[material] missing alpha blend lookup: {0:?}")]
     MissingAlphaBlendLookup(MaterialKey),
-    #[error("[material] missing texture: {0:?}")]
-    MissingTexture(TextureKey),
 
     #[error("[material] create texture view: {0}")]
     CreateTextureView(String),
-
-    #[error("[material] missing sampler: {0:?}")]
-    MissingSampler(SamplerKey),
 
     #[error("[material] unable to create bind group: {0:?}")]
     MaterialBindGroup(AwsmBindGroupError),
@@ -146,4 +139,7 @@ pub enum AwsmMaterialError {
 
     #[error("[material] {0:?}")]
     Core(#[from] AwsmCoreError),
+
+    #[error("[material] {0:?}")]
+    Texture(#[from] AwsmTextureError),
 }

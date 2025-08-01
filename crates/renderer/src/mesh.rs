@@ -6,6 +6,7 @@ pub mod skins;
 
 use awsm_renderer_core::{command::render_pass::RenderPassEncoder, pipeline::primitive::IndexFormat};
 
+use crate::render_passes::geometry::bind_group::GeometryBindGroups;
 use crate::{bounds::Aabb, pipelines::render_pipeline::RenderPipelineKey};
 use crate::materials::MaterialKey;
 use crate::render::RenderContext;
@@ -81,7 +82,7 @@ impl Mesh {
         self
     }
 
-    pub fn push_commands(&self, ctx: &RenderContext, mesh_key: MeshKey, render_pass: &RenderPassEncoder) -> Result<()> {
+    pub fn push_geometry_pass_commands(&self, ctx: &RenderContext, mesh_key: MeshKey, render_pass: &RenderPassEncoder, geometry_bind_groups: &GeometryBindGroups) -> Result<()> {
         let transform_offset = ctx.transforms.buffer_offset(self.transform_key)? as u32;
         let pbr_material_offset = ctx
             .materials
@@ -91,7 +92,7 @@ impl Mesh {
 
         render_pass.set_bind_group(
             1,
-            ctx.bind_groups.render_pass.geometry.transforms.get_bind_group()?,
+            geometry_bind_groups.transforms.get_bind_group()?,
             Some(&[transform_offset, pbr_material_offset]),
         )?;
 
@@ -107,13 +108,13 @@ impl Mesh {
             };
 
             let skin_offset = match self.skin_key {
-                Some(skin_key) => ctx.skins.joint_matrices_offset(skin_key)? as u32,
+                Some(skin_key) => ctx.meshes.skins.joint_matrices_offset(skin_key)? as u32,
                 None => 0,
             };
 
             render_pass.set_bind_group(
                 2,
-                ctx.bind_groups.render_pass.geometry.animation.get_bind_group()?,
+                geometry_bind_groups.vertex_animation.get_bind_group()?,
                 Some(&[morph_weights_offset, morph_values_offset, skin_offset]),
             )?;
         }

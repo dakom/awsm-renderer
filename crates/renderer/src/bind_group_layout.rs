@@ -33,7 +33,15 @@ impl BindGroupLayouts {
             .iter()
             .cloned()
             .enumerate()
-            .map(|(index, entry)| entry.into_entry(index as u32))
+            .map(|(index, entry)| {
+                BindGroupLayoutEntry {
+                    binding: index as u32,
+                    visibility_compute: entry.visibility_compute,
+                    visibility_vertex: entry.visibility_vertex,
+                    visibility_fragment: entry.visibility_fragment,
+                    resource: entry.resource
+                }
+            })
             .collect();
 
         let bind_group_layout = gpu.create_bind_group_layout(
@@ -66,6 +74,11 @@ impl Default for BindGroupLayouts {
 pub struct BindGroupLayoutCacheKey {
     pub entries: Vec<BindGroupLayoutCacheKeyEntry>,
 }
+impl BindGroupLayoutCacheKey {
+    pub fn new(entries: Vec<BindGroupLayoutCacheKeyEntry>) -> Self {
+        Self { entries }
+    }
+}
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct BindGroupLayoutCacheKeyEntry {
@@ -73,24 +86,6 @@ pub struct BindGroupLayoutCacheKeyEntry {
     pub visibility_compute: bool,
     pub visibility_vertex: bool,
     pub visibility_fragment: bool,
-}
-
-impl BindGroupLayoutCacheKeyEntry {
-    pub fn into_entry(self, binding: u32) -> BindGroupLayoutEntry {
-        let BindGroupLayoutCacheKeyEntry {
-            resource,
-            visibility_compute,
-            visibility_vertex,
-            visibility_fragment,
-        } = self;
-        BindGroupLayoutEntry {
-            binding,
-            visibility_compute,
-            visibility_vertex,
-            visibility_fragment,
-            resource
-        }
-    }
 }
 
 new_key_type! {

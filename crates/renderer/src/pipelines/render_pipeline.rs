@@ -33,7 +33,7 @@ impl RenderPipelines {
         let cache_key_clone = cache_key.clone();
 
         let shader_module = shaders
-            .get_shader(cache_key.shader_key)
+            .get(cache_key.shader_key)
             .ok_or(AwsmRenderPipelineError::MissingShader(cache_key.shader_key))?;
 
         let layout = pipeline_layouts.get(cache_key.layout_key)?;

@@ -167,7 +167,7 @@ impl Morphs {
                     *BUFFER_USAGE_WEIGHTS,
                 ).into())?;
 
-                bind_groups.mark_create(BindGroupCreate::MorphTargetWeights);
+                bind_groups.mark_create(BindGroupCreate::MorphTargetWeightsResize);
 
             }
             gpu.write_buffer(&self.gpu_buffer_weights, None, self.weights.raw_slice(), None, None)?;
@@ -188,7 +188,7 @@ impl Morphs {
                     *BUFFER_USAGE_VALUES,
                 ).into())?;
 
-                bind_groups.mark_create(BindGroupCreate::MorphTargetValues);
+                bind_groups.mark_create(BindGroupCreate::MorphTargetValuesResize);
             }
             gpu.write_buffer(&self.gpu_buffer_values, None, self.values.raw_slice(), None, None)?;
 

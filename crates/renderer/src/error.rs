@@ -2,7 +2,7 @@ use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
 use crate::{
-    bind_groups::AwsmBindGroupError, camera::AwsmCameraError, instances::AwsmInstanceError, lights::AwsmLightError, materials::AwsmMaterialError, mesh::{skins::AwsmSkinError, AwsmMeshError}, pipelines::render_pipeline::AwsmRenderPipelineError, render_textures::AwsmRenderTextureError, shaders::AwsmShaderError, transforms::AwsmTransformError
+    bind_group_layout::AwsmBindGroupLayoutError, bind_groups::AwsmBindGroupError, camera::AwsmCameraError, instances::AwsmInstanceError, lights::AwsmLightError, materials::AwsmMaterialError, mesh::{skins::AwsmSkinError, AwsmMeshError}, pipeline_layouts::AwsmPipelineLayoutError, pipelines::render_pipeline::AwsmRenderPipelineError, render_textures::AwsmRenderTextureError, shaders::AwsmShaderError, textures::AwsmTextureError, transforms::AwsmTransformError
 };
 
 #[derive(Error, Debug)]
@@ -30,6 +30,9 @@ pub enum AwsmError {
     BindGroup(#[from] AwsmBindGroupError),
 
     #[error("{0}")]
+    BindGroupLayout(#[from] AwsmBindGroupLayoutError),
+
+    #[error("{0}")]
     Shader(#[from] AwsmShaderError),
 
     #[error("{0}")]
@@ -39,6 +42,9 @@ pub enum AwsmError {
     Material(#[from] AwsmMaterialError),
 
     #[error("{0}")]
+    PipelineLayout(#[from] AwsmPipelineLayoutError),
+
+    #[error("{0}")]
     RenderPipeline(#[from] AwsmRenderPipelineError),
 
     #[error("{0}")]
@@ -46,6 +52,9 @@ pub enum AwsmError {
 
     #[error("{0}")]
     RenderTexture(#[from] AwsmRenderTextureError),
+
+    #[error("{0}")]
+    Texture(#[from] AwsmTextureError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;

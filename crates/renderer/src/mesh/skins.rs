@@ -16,8 +16,8 @@ impl AwsmRenderer {
     pub fn update_skins(&mut self) {
         let dirty_skin_joints = self.transforms.take_dirty_skin_joints();
         if !dirty_skin_joints.is_empty() {
-            self.skins.update(dirty_skin_joints, &self.transforms);
-            self.skins.gpu_dirty = true;
+            self.meshes.skins.update(dirty_skin_joints, &self.transforms);
+            self.meshes.skins.gpu_dirty = true;
         }
     }
 }
@@ -161,7 +161,7 @@ impl Skins {
                     *BUFFER_USAGE,
                 ).into())?;
 
-                bind_groups.mark_create(BindGroupCreate::SkinJointMatrices);
+                bind_groups.mark_create(BindGroupCreate::SkinJointMatricesResize);
             }
 
             gpu.write_buffer(&self.gpu_buffer, None, self.skin_matrices.raw_slice(), None, None)?;

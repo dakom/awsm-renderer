@@ -45,7 +45,7 @@ use mesh::skins::Skins;
 use textures::Textures;
 use transforms::Transforms;
 
-use crate::{bind_group_layout::BindGroupLayouts, bind_groups::RenderPassBindGroups, pipeline_layouts::PipelineLayouts, render_passes::geometry::bind_group::GeometryBindGroups, render_textures::{RenderTextureFormats, RenderTextures}};
+use crate::{bind_group_layout::BindGroupLayouts, pipeline_layouts::PipelineLayouts, render_passes::{geometry::bind_group::GeometryBindGroups, RenderPassInitContext, RenderPasses}, render_textures::{RenderTextureFormats, RenderTextures}};
 
 
 pub struct AwsmRenderer {
@@ -55,7 +55,6 @@ pub struct AwsmRenderer {
     pub meshes: Meshes,
     pub camera: CameraBuffer,
     pub transforms: Transforms,
-    pub skins: Skins,
     pub instances: Instances,
     pub shaders: Shaders,
     pub materials: Materials,
@@ -65,6 +64,7 @@ pub struct AwsmRenderer {
     pub textures: Textures,
     pub logging: AwsmRendererLogging,
     pub render_textures: RenderTextures,
+    pub render_passes: RenderPasses,
     // we pick between these on the fly
     _clear_color_perceptual_to_linear: Color,
     _clear_color: Color,
@@ -152,20 +152,35 @@ impl AwsmRendererBuilder {
             AwsmRendererGpuBuilderKind::WebGpuBuilder(builder) => builder.build().await?,
             AwsmRendererGpuBuilderKind::WebGpuBuilt(gpu) => gpu,
         };
+
+        let mut pipeline_layouts = PipelineLayouts::new();
+        let mut bind_group_layouts = BindGroupLayouts::new();
+        let mut pipelines = Pipelines::new();
+        let mut shaders = Shaders::new();
+        let textures = Textures::new();
+
         let camera = camera::CameraBuffer::new(&gpu)?;
         let lights = Lights::new(&gpu)?;
         let meshes = Meshes::new(&gpu)?;
         let transforms = Transforms::new(&gpu)?;
         let instances = Instances::new(&gpu)?;
-        let skins = Skins::new(&gpu)?;
         let materials = Materials::new(&gpu)?;
 
-        let bind_group_layouts = BindGroupLayouts::new();
+        // temporarily push into an init struct for creating render passes
+        // we'll then destructure it to get our values back
+        let mut render_pass_init = RenderPassInitContext {
+            gpu,
+            bind_group_layouts,
+            pipeline_layouts,
+            pipelines,
+            shaders,
+            render_texture_formats,
+            textures
+        };
+        let render_passes = RenderPasses::new(&mut render_pass_init).await?;
+        let RenderPassInitContext { gpu, bind_group_layouts, pipeline_layouts, pipelines, shaders, render_texture_formats, textures } = render_pass_init;
+
         let bind_groups = BindGroups::new();
-        let shaders = Shaders::new();
-        let pipeline_layouts = PipelineLayouts::new();
-        let pipelines = Pipelines::new();
-        let textures = Textures::new();
         let render_textures = RenderTextures::new(render_texture_formats);
         #[cfg(feature = "gltf")]
         let gltf = gltf::cache::GltfCache::default();
@@ -177,7 +192,6 @@ impl AwsmRendererBuilder {
             meshes,
             camera,
             transforms,
-            skins,
             instances,
             shaders,
             bind_group_layouts,
@@ -187,6 +201,7 @@ impl AwsmRendererBuilder {
             pipelines,
             lights,
             textures,
+            render_passes,
             _clear_color: clear_color.clone(),
             _clear_color_perceptual_to_linear: clear_color.perceptual_to_linear(),
             logging,

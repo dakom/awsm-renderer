@@ -11,6 +11,7 @@ new_key_type! {
 #[derive(Debug, Clone, Default)]
 pub struct Animations {
     players: DenseSlotMap<AnimationKey, AnimationPlayer>,
+    // Different kinds of animations:
     transforms: SecondaryMap<AnimationKey, TransformKey>,
     morphs: SecondaryMap<AnimationKey, MorphKey>,
 }

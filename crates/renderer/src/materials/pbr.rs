@@ -69,7 +69,7 @@ impl PbrMaterials {
                     *BUFFER_USAGE,
                 ).into())?;
 
-                bind_groups.mark_create(BindGroupCreate::PbrMaterialUniform);
+                bind_groups.mark_create(BindGroupCreate::PbrMaterialUniformResize);
             }
 
             gpu.write_buffer(&self.gpu_buffer, None, self.uniform_buffer.raw_slice(), None, None)?;

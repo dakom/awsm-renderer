@@ -1,7 +1,7 @@
 use awsm_renderer_core::command::render_pass::RenderPassEncoder;
 
 use crate::{
-    error::AwsmError, mesh::{Mesh, MeshKey}, pipelines::render_pipeline::RenderPipelineKey, render::RenderContext, transforms::TransformKey, AwsmRenderer
+    error::AwsmError, mesh::{Mesh, MeshKey}, pipelines::render_pipeline::RenderPipelineKey, render::RenderContext, render_passes::geometry::bind_group::GeometryBindGroups, transforms::TransformKey, AwsmRenderer
 };
 
 impl AwsmRenderer {
@@ -76,9 +76,9 @@ impl Renderable<'_> {
         }
     }
 
-    pub fn push_commands(&self, ctx: &RenderContext, render_pass: &RenderPassEncoder) -> Result<()> {
+    pub fn push_geometry_pass_commands(&self, ctx: &RenderContext, render_pass: &RenderPassEncoder, geometry_bind_groups: &GeometryBindGroups) -> Result<()> {
         match self {
-            Self::Mesh { mesh, key, .. } => mesh.push_commands(ctx, *key, render_pass),
+            Self::Mesh { mesh, key, .. } => mesh.push_geometry_pass_commands(ctx, *key, render_pass, geometry_bind_groups),
         }
     }
 }

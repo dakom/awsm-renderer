@@ -196,7 +196,7 @@ impl Transforms {
                     *BUFFER_USAGE,
                 ).into())?;
 
-                bind_groups.mark_create(BindGroupCreate::Transforms);
+                bind_groups.mark_create(BindGroupCreate::TransformsResize);
             }
 
             gpu.write_buffer(&self.gpu_buffer, None, self.buffer.raw_slice(), None, None)?;

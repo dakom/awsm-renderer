@@ -29,6 +29,8 @@ futures = {workspace = true}
 slotmap = {workspace = true}
 glam = {workspace = true}
 askama = {workspace = true}
+strum = {workspace = true}
+ordered-float = {workspace = true}
 
 # Optional deps
 gloo-net = {workspace = true, optional = true}

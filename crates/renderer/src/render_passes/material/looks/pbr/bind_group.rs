@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use awsm_renderer_core::{bind_groups::{BindGroupDescriptor, BindGroupEntry, BindGroupLayoutResource, BindGroupResource, SamplerBindingLayout, SamplerBindingType, TextureBindingLayout}, renderer::AwsmRendererWebGpu, texture::{TextureSampleType, TextureViewDimension}};
 
 use crate::{bind_group_layout::{BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey}, bind_groups::AwsmBindGroupError, materials::{AwsmMaterialError, Result}, textures::{SamplerKey, TextureKey, Textures}};
@@ -18,18 +20,17 @@ impl PbrMaterialBindGroupCacheKey {
         let mut entries = Vec::new();
 
         let mut push_texture = |dep: PbrMaterialTextureCacheKey| -> Result<()> {
-            let texture = textures
-                .get_texture(dep.texture_key)
-                .ok_or(AwsmMaterialError::MissingTexture(dep.texture_key))?;
+            let texture = textures.get_texture(dep.texture_key)?;
+
             let texture_view = texture.create_view().map_err(|err| {
                 AwsmMaterialError::CreateTextureView(format!("{:?}: {:?}", dep.texture_key, err))
             })?;
-            let entry = BindGroupEntry::new(entries.len() as u32, BindGroupResource::TextureView(texture_view));
+
+            let entry = BindGroupEntry::new(entries.len() as u32, BindGroupResource::TextureView(Cow::Owned(texture_view)));
             entries.push(entry);
 
-            let sampler = textures
-                .get_sampler(dep.sampler_key)
-                .ok_or(AwsmMaterialError::MissingSampler(dep.sampler_key))?;
+            let sampler = textures.get_sampler(dep.sampler_key)?;
+
             let entry = BindGroupEntry::new(entries.len() as u32, BindGroupResource::Sampler(sampler));
             entries.push(entry);
 

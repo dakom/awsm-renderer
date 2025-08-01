@@ -3,7 +3,7 @@ use gltf::Semantic;
 use thiserror::Error;
 
 use crate::{
-    animation::AwsmAnimationError, bind_group_layout::AwsmBindGroupLayoutError, bind_groups::AwsmBindGroupError, materials::AwsmMaterialError, mesh::{skins::AwsmSkinError, AwsmMeshError}, pipeline_layouts::AwsmPipelineLayoutError, pipelines::render_pipeline::AwsmRenderPipelineError, shaders::AwsmShaderError, transforms::AwsmTransformError
+    animation::AwsmAnimationError, bind_group_layout::AwsmBindGroupLayoutError, bind_groups::AwsmBindGroupError, materials::AwsmMaterialError, mesh::{skins::AwsmSkinError, AwsmMeshError}, pipeline_layouts::AwsmPipelineLayoutError, pipelines::render_pipeline::AwsmRenderPipelineError, shaders::AwsmShaderError, textures::AwsmTextureError, transforms::AwsmTransformError
 };
 
 #[derive(Error, Debug)]
@@ -140,6 +140,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] material: {0:?}")]
     Material(#[from] AwsmMaterialError),
+
+    #[error("[gltf] texture: {0:?}")]
+    Texture(#[from] AwsmTextureError),
 
     #[error("[gltf] unable to construct normals: {0}")]
     ConstructNormals(String),

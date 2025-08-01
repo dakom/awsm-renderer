@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -76,13 +77,13 @@ pub async fn generate_mipmaps(
 
         // Create bind group
         // Input texture binding
-        let input_binding = BindGroupEntry::new(0, BindGroupResource::TextureView(input_view));
+        let input_binding = BindGroupEntry::new(0, BindGroupResource::TextureView(Cow::Owned(input_view)));
 
         // Sampler binding
         let sampler_binding = BindGroupEntry::new(1, BindGroupResource::Sampler(&sampler));
 
         // Output texture binding
-        let output_binding = BindGroupEntry::new(2, BindGroupResource::TextureView(output_view));
+        let output_binding = BindGroupEntry::new(2, BindGroupResource::TextureView(Cow::Owned(output_view)));
 
         let bind_group = gpu.create_bind_group(
             &BindGroupDescriptor::new(

@@ -1,6 +1,6 @@
 use crate::compare::CompareFunction;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct SamplerDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createSampler#descriptor
     // https://docs.rs/web-sys/latest/web_sys/struct.GpuSamplerDescriptor.html
@@ -16,6 +16,7 @@ pub struct SamplerDescriptor<'a> {
     pub min_filter: Option<FilterMode>,
     pub mipmap_filter: Option<MipmapFilterMode>,
 }
+
 
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuAddressMode.html
 pub type AddressMode = web_sys::GpuAddressMode;
@@ -46,10 +47,10 @@ impl From<SamplerDescriptor<'_>> for web_sys::GpuSamplerDescriptor {
             sampler_js.set_label(label);
         }
         if let Some(lod_min_clamp) = descriptor.lod_min_clamp {
-            sampler_js.set_lod_min_clamp(lod_min_clamp);
+            sampler_js.set_lod_min_clamp(lod_min_clamp.into());
         }
         if let Some(lod_max_clamp) = descriptor.lod_max_clamp {
-            sampler_js.set_lod_max_clamp(lod_max_clamp);
+            sampler_js.set_lod_max_clamp(lod_max_clamp.into());
         }
         if let Some(max_anisotropy) = descriptor.max_anisotropy {
             sampler_js.set_max_anisotropy(max_anisotropy);

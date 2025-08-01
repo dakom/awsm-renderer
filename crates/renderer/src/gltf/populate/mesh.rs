@@ -134,10 +134,18 @@ impl AwsmRenderer {
             .materials
             .insert(Material::Pbr(material_info.material.clone()));
 
-        let bind_group_layout_key = self.bind_group_layouts.get_key(&self.gpu, (&material_info.bind_group_cache_key).into())?;
-        let bind_group_layout = self.bind_group_layouts.get(bind_group_layout_key)?;
+        let material_bind_group_layout_key = self.bind_group_layouts.get_key(&self.gpu, (&material_info.bind_group_cache_key).into())?;
 
-        let pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![bind_group_layout_key]);
+        let mut pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
+            self.render_passes.geometry.bind_groups.camera_lights.bind_group_layout_key,
+            self.render_passes.geometry.bind_groups.transforms.bind_group_layout_key, // includes materials for now
+        ]);
+
+        if morph_key.is_some() || skin_key.is_some() {
+            pipeline_layout_cache_key.bind_group_layouts.push(
+                self.render_passes.geometry.bind_groups.vertex_animation.bind_group_layout_key,
+            );
+        } 
 
         // we only need one vertex buffer per-mesh, because we've already constructed our buffers
         // to be one contiguous buffer of interleaved vertex data.
@@ -182,7 +190,7 @@ impl AwsmRenderer {
                 false => CullMode::Back,
             });
 
-        let shader_key = self.add_shader(shader_cache_key).await?;
+        let shader_key = self.shaders.get_key(&self.gpu, shader_cache_key).await?;
 
         let pipeline_layout_key = self.pipeline_layouts.get_key(&self.gpu, &self.bind_group_layouts, pipeline_layout_cache_key)?;
 

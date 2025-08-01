@@ -1,3 +1,14 @@
+# Set entity id in uniform buffers
+
+Actually: 
+
+1. change to material offset (will be an offset in the material uniform buffer)
+2. geometry shader only needs to read in header
+3. put a lot more info in the material (texture indices etc.)
+4. compute shader can read the entire uniform buffer, so it can load from offset (gets its own buffer group binding)
+5. transparent rendering uses regular dynamic offset to read the whole material as usual
+
+
 # World Position Reconstruction Math: 
 
 A common way to implement this is to reconstruct the view-space position first, then transform it to world space. In your shading shader:

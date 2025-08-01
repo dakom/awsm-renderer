@@ -7,7 +7,7 @@ use crate::{
     }, materials::{
         pbr::PbrMaterial, 
         MaterialAlphaMode,
-    }, render_passes::{geometry::shader::cache_key::ShaderCacheKeyGeometryAttribute, material::{cache_key::ShaderCacheKeyMaterial, looks::{pbr::{bind_group::{PbrMaterialBindGroupCacheKey, PbrMaterialTextureCacheKey}, shader::cache_key::ShaderCacheKeyMaterialPbr}, shader_cache_key::ShaderCacheKeyMaterialLook}, opaque::shader::cache_key::ShaderCacheKeyOpaqueMaterial, transparent::shader::cache_key::ShaderCacheKeyTransparentMaterial}}, textures::{SamplerKey, TextureKey}, AwsmRenderer
+    }, render_passes::{geometry::shader::cache_key::ShaderCacheKeyGeometryAttribute, material::{cache_key::ShaderCacheKeyMaterial, looks::{pbr::{bind_group::{PbrMaterialBindGroupCacheKey, PbrMaterialTextureCacheKey}, shader::cache_key::ShaderCacheKeyMaterialPbr}, shader_cache_key::ShaderCacheKeyMaterialLook}, opaque::shader::cache_key::ShaderCacheKeyOpaqueMaterial, transparent::shader::cache_key::ShaderCacheKeyTransparentMaterial}}, textures::{SamplerCacheKey, SamplerKey, TextureKey}, AwsmRenderer
 };
 
 use super::GltfPopulateContext;
@@ -214,23 +214,23 @@ impl GltfTextureInfo {
             .ok_or(AwsmGltfError::MissingTextureDocIndex(self.index))?;
         let gltf_sampler = gltf_texture.sampler();
 
-        let mut descriptor = SamplerDescriptor {
+        let mut sampler_cache_key = SamplerCacheKey {
             // This looks better with our mipmap generation...
             // if it's overridden by the glTF sampler, fine.
             // but otherwise, let's just do what looks best.
             min_filter: Some(FilterMode::Linear),
             mag_filter: Some(FilterMode::Linear),
             mipmap_filter: Some(MipmapFilterMode::Linear),
-            ..SamplerDescriptor::default()
+            ..Default::default()
         };
 
         if let Some(mag_filter) = gltf_sampler.mag_filter() {
             match mag_filter {
                 gltf::texture::MagFilter::Linear => {
-                    descriptor.mag_filter = Some(FilterMode::Linear)
+                    sampler_cache_key.mag_filter = Some(FilterMode::Linear)
                 }
                 gltf::texture::MagFilter::Nearest => {
-                    descriptor.mag_filter = Some(FilterMode::Nearest)
+                    sampler_cache_key.mag_filter = Some(FilterMode::Nearest)
                 }
             }
         }
@@ -238,56 +238,54 @@ impl GltfTextureInfo {
         if let Some(min_filter) = gltf_sampler.min_filter() {
             match min_filter {
                 gltf::texture::MinFilter::Linear => {
-                    descriptor.min_filter = Some(FilterMode::Linear)
+                    sampler_cache_key.min_filter = Some(FilterMode::Linear)
                 }
                 gltf::texture::MinFilter::Nearest => {
-                    descriptor.min_filter = Some(FilterMode::Nearest)
+                    sampler_cache_key.min_filter = Some(FilterMode::Nearest)
                 }
                 gltf::texture::MinFilter::NearestMipmapNearest => {
-                    descriptor.min_filter = Some(FilterMode::Nearest);
-                    descriptor.mipmap_filter = Some(MipmapFilterMode::Nearest);
+                    sampler_cache_key.min_filter = Some(FilterMode::Nearest);
+                    sampler_cache_key.mipmap_filter = Some(MipmapFilterMode::Nearest);
                 }
                 gltf::texture::MinFilter::LinearMipmapNearest => {
-                    descriptor.min_filter = Some(FilterMode::Linear);
-                    descriptor.mipmap_filter = Some(MipmapFilterMode::Nearest);
+                    sampler_cache_key.min_filter = Some(FilterMode::Linear);
+                    sampler_cache_key.mipmap_filter = Some(MipmapFilterMode::Nearest);
                 }
                 gltf::texture::MinFilter::NearestMipmapLinear => {
-                    descriptor.min_filter = Some(FilterMode::Nearest);
-                    descriptor.mipmap_filter = Some(MipmapFilterMode::Linear);
+                    sampler_cache_key.min_filter = Some(FilterMode::Nearest);
+                    sampler_cache_key.mipmap_filter = Some(MipmapFilterMode::Linear);
                 }
                 gltf::texture::MinFilter::LinearMipmapLinear => {
-                    descriptor.min_filter = Some(FilterMode::Linear);
-                    descriptor.mipmap_filter = Some(MipmapFilterMode::Linear);
+                    sampler_cache_key.min_filter = Some(FilterMode::Linear);
+                    sampler_cache_key.mipmap_filter = Some(MipmapFilterMode::Linear);
                 }
             }
         }
 
         match gltf_sampler.wrap_s() {
             gltf::texture::WrappingMode::ClampToEdge => {
-                descriptor.address_mode_u = Some(AddressMode::ClampToEdge)
+                sampler_cache_key.address_mode_u = Some(AddressMode::ClampToEdge)
             }
             gltf::texture::WrappingMode::MirroredRepeat => {
-                descriptor.address_mode_u = Some(AddressMode::MirrorRepeat)
+                sampler_cache_key.address_mode_u = Some(AddressMode::MirrorRepeat)
             }
             gltf::texture::WrappingMode::Repeat => {
-                descriptor.address_mode_u = Some(AddressMode::Repeat)
+                sampler_cache_key.address_mode_u = Some(AddressMode::Repeat)
             }
         }
 
         match gltf_sampler.wrap_t() {
             gltf::texture::WrappingMode::ClampToEdge => {
-                descriptor.address_mode_v = Some(AddressMode::ClampToEdge)
+                sampler_cache_key.address_mode_v = Some(AddressMode::ClampToEdge)
             }
             gltf::texture::WrappingMode::MirroredRepeat => {
-                descriptor.address_mode_v = Some(AddressMode::MirrorRepeat)
+                sampler_cache_key.address_mode_v = Some(AddressMode::MirrorRepeat)
             }
             gltf::texture::WrappingMode::Repeat => {
-                descriptor.address_mode_v = Some(AddressMode::Repeat)
+                sampler_cache_key.address_mode_v = Some(AddressMode::Repeat)
             }
         }
 
-        let sampler = renderer.gpu.create_sampler(Some(&descriptor.into()));
-
-        Ok(renderer.textures.add_sampler(sampler))
+        Ok(renderer.textures.get_sampler_key(&renderer.gpu, sampler_cache_key)?)
     }
 }

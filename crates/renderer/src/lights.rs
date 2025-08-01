@@ -243,7 +243,7 @@ impl Lights {
                     *BUFFER_USAGE,
                 ).into())?;
 
-                bind_groups.mark_create(BindGroupCreate::Lights);
+                bind_groups.mark_create(BindGroupCreate::LightsResize);
             }
 
             gpu.write_buffer(&self.gpu_buffer, None, self.storage_buffer.raw_slice(), None, None)?;

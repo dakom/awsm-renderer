@@ -7,12 +7,12 @@ struct FragmentInput {
 }
 
 @fragment
-fn frag_main(in: FragmentInput) -> location(0) vec4<f32> {
+fn frag_main(in: FragmentInput) -> @location(0) vec4<f32> {
     // Sample the composite texture using the provided UV coordinates
     let color: vec4<f32> = textureSample(composite_texture, composite_texture_sampler, in.uv);
     
     // Return the sampled color
-    // return color;
+    return color;
 
-    return vec4<f32>(1.0, 0.0, 0.0, 1.0); // Placeholder color (red)
+    //return vec4<f32>(1.0, 0.0, 0.0, 1.0); // Placeholder color (red)
 }

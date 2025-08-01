@@ -59,6 +59,7 @@ impl AwsmRenderer {
             };
 
             let skin_key = self
+                .meshes
                 .skins
                 .insert(joints, inverse_bind_matrices.unwrap_or_default())?;
 

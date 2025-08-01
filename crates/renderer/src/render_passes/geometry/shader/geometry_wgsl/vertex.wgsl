@@ -6,8 +6,6 @@
     {% include "geometry_wgsl/vertex/skin.wgsl" %}
 {% endif %}
 
-@group(1) @binding(0)
-var<uniform> u_transform: TransformUniform;
 
 struct CameraUniform {
     view: mat4x4<f32>,
@@ -21,6 +19,9 @@ struct CameraUniform {
 
 @group(0) @binding(0)
 var<uniform> camera: CameraUniform;
+
+@group(1) @binding(0)
+var<uniform> u_transform: TransformUniform;
 
 struct TransformUniform {
     model: mat4x4<f32>,

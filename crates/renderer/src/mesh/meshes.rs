@@ -4,6 +4,7 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
 use crate::buffer::dynamic_storage::DynamicStorageBuffer;
+use crate::mesh::skins::Skins;
 use crate::AwsmRendererLogging;
 
 use super::error::{AwsmMeshError, Result};
@@ -21,6 +22,7 @@ pub struct Meshes {
     vertex_dirty: bool,
     index_dirty: bool,
     pub morphs: Morphs,
+    pub skins: Skins,
 }
 
 impl Meshes {
@@ -44,6 +46,7 @@ impl Meshes {
             index_dirty: true,
             vertex_dirty: true,
             morphs: Morphs::new(gpu)?,
+            skins: Skins::new(gpu)?,
         })
     }
 

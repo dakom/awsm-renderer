@@ -80,7 +80,8 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
     // * use a free slot if available
     // * grow the buffer if needed
     // It does not touch the GPU, and can be called many times a frame
-    pub fn update_with(&mut self, key: K, f: impl FnOnce(&mut [u8])) {
+    // returns the offset where the data was written
+    pub fn update_with(&mut self, key: K, f: impl FnOnce(&mut [u8])) -> usize {
         // If we don't have a slot, set one
         let slot = match self.slot_indices.get(key) {
             Some(slot) => *slot,
@@ -109,18 +110,24 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
 
         // we can mutate the slice directly
         f(&mut self.raw_data[offset_bytes..offset_bytes + self.byte_size]);
+
+        offset_bytes
     }
 
-    pub fn update(&mut self, key: K, values: &[u8]) {
+    // Inserts or updates an item in the buffer
+    // returns the offset where the data was written
+    pub fn update(&mut self, key: K, values: &[u8]) -> usize {
         self.update_with(key, |data| {
             data[..values.len()].copy_from_slice(values);
-        });
+        })
     }
 
-    pub fn update_offset(&mut self, key: K, offset: usize, values: &[u8]) {
+    // updates the slot at the given key with the given *local* offset within the data
+    // returns the global offset in the buffer
+    pub fn update_offset(&mut self, key: K, offset: usize, values: &[u8]) -> usize {
         self.update_with(key, |data| {
             data[offset..offset + values.len()].copy_from_slice(values);
-        });
+        })
     }
 
     pub fn raw_slice(&self) -> &[u8] {

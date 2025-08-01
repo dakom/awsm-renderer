@@ -5,17 +5,18 @@ use awsm_renderer_core::command::render_pass::{
 use awsm_renderer_core::command::{CommandEncoder, LoadOp, StoreOp};
 use awsm_renderer_core::texture::TextureFormat;
 
-use crate::bind_groups::BindGroups;
+use crate::bind_groups::{BindGroupCreate, BindGroupRecreateContext, BindGroups};
 use crate::error::Result;
 use crate::instances::Instances;
 use crate::materials::Materials;
 use crate::mesh::skins::Skins;
 use crate::mesh::Meshes;
 use crate::pipelines::Pipelines;
+use crate::render_passes::RenderPasses;
 use crate::render_textures::{RenderTextureFormats, RenderTextureViews};
 use crate::renderable::Renderable;
 use crate::transforms::Transforms;
-use crate::AwsmRenderer;
+use crate::{AwsmRenderer, AwsmRendererLogging};
 
 impl AwsmRenderer {
     // this should only be called once per frame
@@ -37,7 +38,7 @@ impl AwsmRenderer {
         self.lights
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
         self.instances.write_gpu(&self.logging, &self.gpu)?;
-        self.skins
+        self.meshes.skins
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
         self.meshes
             .morphs
@@ -46,28 +47,99 @@ impl AwsmRenderer {
         self.camera
             .write_gpu(&self.logging, &self.gpu, &self.bind_groups)?;
 
-        self.recreate_marked_bind_groups()?;
+        let render_texture_views = self.render_textures.views(&self.gpu)?;
 
-        let texture_views = self.render_textures.views(&self.gpu)?;
+        if render_texture_views.size_changed {
+            self.bind_groups.mark_create(BindGroupCreate::TextureViewResize);
+        }
+
+        self.bind_groups.recreate(
+            BindGroupRecreateContext {
+                gpu: &self.gpu,
+                render_texture_views: &render_texture_views,
+                textures: &self.textures, 
+                materials: &self.materials,
+                bind_group_layouts: &mut self.bind_group_layouts,
+                meshes: &self.meshes,
+                camera: &self.camera,
+                lights: &self.lights,
+                transforms: &self.transforms,
+            },
+            &mut self.render_passes
+        )?;
 
         let ctx = RenderContext {
             command_encoder: self.gpu.create_command_encoder(Some("Rendering")),
-            texture_views,
+            render_texture_views,
             transforms: &self.transforms,
             meshes: &self.meshes,
             materials: &self.materials,
             pipelines: &self.pipelines,
-            skins: &self.skins,
             instances: &self.instances,
             bind_groups: &self.bind_groups,
         };
 
-        self.render_geometry_pass(&ctx)?;
-        self.render_light_culling_pass(&ctx)?;
-        self.render_material_opaque_pass(&ctx)?;
-        self.render_material_transparent_pass(&ctx)?;
-        self.render_composite_pass(&ctx)?;
-        self.render_display_pass(&ctx)?;
+        {
+            let _maybe_span_guard = if self.logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Geometry RenderPass").entered())
+            } else {
+                None
+            };
+
+            let renderables = self.collect_renderables(false);
+            self.render_passes.geometry.render(&ctx, renderables)?;
+        }
+
+        {
+            let _maybe_span_guard = if self.logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Light Culling RenderPass").entered())
+            } else {
+                None
+            };
+
+            self.render_passes.light_culling.render(&ctx)?;
+        }
+
+        {
+            let _maybe_span_guard = if self.logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Material Opaque RenderPass").entered())
+            } else {
+                None
+            };
+
+            self.render_passes.material_opaque.render(&ctx)?;
+        }
+
+        {
+            let _maybe_span_guard = if self.logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Material Transparent RenderPass").entered())
+            } else {
+                None
+            };
+
+            let renderables = self.collect_renderables(false);
+            self.render_passes.material_transparent.render(&ctx, renderables)?;
+        }
+
+        {
+            let _maybe_span_guard = if self.logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Composite RenderPass").entered())
+            } else {
+                None
+            };
+
+            self.render_passes.composite.render(&ctx)?;
+        }
+
+        {
+            let _maybe_span_guard = if self.logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Display RenderPass").entered())
+            } else {
+                None
+            };
+
+            self.render_passes.display.render(&ctx)?;
+        }
 
         self.gpu.submit_commands(&ctx.command_encoder.finish());
 
@@ -78,12 +150,11 @@ impl AwsmRenderer {
 
 pub struct RenderContext<'a> {
     pub command_encoder: CommandEncoder,
-    pub texture_views: RenderTextureViews,
+    pub render_texture_views: RenderTextureViews,
     pub transforms: &'a Transforms,
     pub meshes: &'a Meshes,
     pub pipelines: &'a Pipelines,
     pub materials: &'a Materials,
-    pub skins: &'a Skins,
     pub instances: &'a Instances,
     pub bind_groups: &'a BindGroups,
 }

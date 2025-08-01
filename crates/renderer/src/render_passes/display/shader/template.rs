@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use askama::Template;
 
-use crate::{render_passes::{display::shader::cache_key::ShaderCacheKeyDisplay, geometry::shader::cache_key::{ShaderCacheKeyGeometry, ShaderCacheKeyGeometryAttribute, ShaderCacheKeyGeometryMorphs}, material::template::{ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment}}, shaders::{AwsmShaderError, Result}};
+use crate::{render_passes::{display::shader::cache_key::ShaderCacheKeyDisplay, geometry::shader::cache_key::{ShaderCacheKeyGeometry, ShaderCacheKeyGeometryAttribute, ShaderCacheKeyGeometryMorphs}, material::template::{ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment}}, shaders::{print_shader_source, AwsmShaderError, Result}};
 
 
 #[derive(Debug)]

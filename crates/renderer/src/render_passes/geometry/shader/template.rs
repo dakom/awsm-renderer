@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use askama::Template;
 
-use crate::{render_passes::{geometry::shader::cache_key::{ShaderCacheKeyGeometry, ShaderCacheKeyGeometryAttribute, ShaderCacheKeyGeometryMorphs}, material::template::{ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment}}, shaders::{AwsmShaderError, Result}};
+use crate::{render_passes::{geometry::shader::cache_key::{ShaderCacheKeyGeometry, ShaderCacheKeyGeometryAttribute, ShaderCacheKeyGeometryMorphs}, material::template::{ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment}}, shaders::{print_shader_source, AwsmShaderError, Result}};
 
 
 #[derive(Debug)]
@@ -149,6 +149,9 @@ impl ShaderTemplateGeometry {
     pub fn into_source(self) -> Result<String> {
         let vertex_source = self.vertex.render()?;
         let fragment_source = self.fragment.render()?;
+
+        //print_shader_source(&vertex_source, true);
+
         Ok(format!("{}\n{}", vertex_source, fragment_source))
     }
 }
