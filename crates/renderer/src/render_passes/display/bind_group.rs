@@ -7,7 +7,7 @@ use crate::{bind_group_layout::{BindGroupLayoutCacheKey, BindGroupLayoutCacheKey
 #[derive(Default)]
 pub struct DisplayBindGroups {
     pub bind_group_layout_key: BindGroupLayoutKey,
-    pub composite_sampler_key: SamplerKey,
+    // this is set via `recreate` mechanism
     _bind_group: Option<web_sys::GpuBindGroup>,
 }
 
@@ -21,31 +21,13 @@ impl DisplayBindGroups {
                 visibility_vertex: true,
                 visibility_fragment: true,
                 visibility_compute: false,
-            },
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Sampler(SamplerBindingLayout::new()
-                    .with_binding_type(SamplerBindingType::Filtering)
-                ),
-                visibility_vertex: true,
-                visibility_fragment: true,
-                visibility_compute: false,
-            },
+            }
         ] };
 
         let bind_group_layout_key = ctx.bind_group_layouts.get_key(&ctx.gpu, bind_group_layout_cache_key)?;
 
-        let composite_sampler_key = ctx.textures.get_sampler_key(
-            &ctx.gpu,
-            SamplerCacheKey {
-                min_filter: Some(FilterMode::Linear),
-                mag_filter: Some(FilterMode::Linear),
-                ..Default::default()
-            }
-        )?;
-
         Ok(Self {
             bind_group_layout_key,
-            composite_sampler_key,
             _bind_group: None, 
         })
     }
@@ -60,7 +42,6 @@ impl DisplayBindGroups {
             Some("Display"), 
             vec![
                 BindGroupEntry::new(0, BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.composite))),
-                BindGroupEntry::new(1, BindGroupResource::Sampler(ctx.textures.get_sampler(self.composite_sampler_key)?))
             ]
         );
 

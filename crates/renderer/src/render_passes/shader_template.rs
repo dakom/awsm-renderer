@@ -33,4 +33,15 @@ impl ShaderTemplateRenderPass {
             ShaderTemplateRenderPass::Display(tmpl) => tmpl.into_source(),
         }
     }
+
+    #[cfg(debug_assertions)]
+    pub fn debug_label(&self) -> Option<&str> {
+        match self {
+            ShaderTemplateRenderPass::Geometry(tmpl) => tmpl.debug_label(),
+            ShaderTemplateRenderPass::LightCulling(tmpl) => tmpl.debug_label(),
+            ShaderTemplateRenderPass::Material(tmpl) => tmpl.debug_label(),
+            ShaderTemplateRenderPass::Composite(tmpl) => tmpl.debug_label(),
+            ShaderTemplateRenderPass::Display(tmpl) => tmpl.debug_label(),
+        }
+    }
 }

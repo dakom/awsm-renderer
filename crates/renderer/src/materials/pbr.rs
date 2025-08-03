@@ -43,9 +43,13 @@ impl PbrMaterials {
         self.uniform_buffer.offset(key)
     }
 
-    pub fn update(&mut self, key: MaterialKey, pbr_material: &PbrMaterial) {
-        self.uniform_buffer
-            .update(key, &pbr_material.uniform_buffer_data());
+    pub fn update(&mut self, key: MaterialKey, pbr_material: &mut PbrMaterial) {
+        self.uniform_buffer.update_with(key, |offset, data| {
+            pbr_material.uniform_buffer_offset = Some(offset);
+            let values = pbr_material.uniform_buffer_data();
+            data[..values.len()].copy_from_slice(&values);
+        });
+
         self.uniform_buffer_gpu_dirty = true;
     }
 
@@ -82,6 +86,7 @@ impl PbrMaterials {
 
 #[derive(Clone, Debug)]
 pub struct PbrMaterial {
+    pub uniform_buffer_offset: Option<usize>,
     pub base_color_factor: [f32; 4],
     pub metallic_factor: f32,
     pub roughness_factor: f32,
@@ -97,6 +102,7 @@ pub struct PbrMaterial {
 impl Default for PbrMaterial {
     fn default() -> Self {
         Self {
+            uniform_buffer_offset: None,
             base_color_factor: [1.0, 1.0, 1.0, 1.0],
             metallic_factor: 1.0,
             roughness_factor: 1.0,
@@ -177,33 +183,31 @@ impl PbrMaterial {
             }
         };
 
-        // first 16 bytes: base_color_factor: vec4<f32>
+        // 16 bytes (4 * 4 byte (32 bit) integers or floats)
+        write((self.uniform_buffer_offset.unwrap_or(0) as u32).into());
+        write(self.alpha_mode.variant_as_u32().into()); // 4 bytes, offset 4 -> offset 8
+        write(self.alpha_cutoff().unwrap_or(0.0f32).into()); // 4 bytes, offset 8 -> offset 12
+        write(if self.double_sided { 1u32.into() } else { 0u32.into() }); // 4 bytes, offset 12 -> offset 16
+
+        // 16 bytes (4 * 4 byte (32 bit) floats)
         write(self.base_color_factor[0].into());
         write(self.base_color_factor[1].into());
         write(self.base_color_factor[2].into());
         write(self.base_color_factor[3].into());
 
-        // next 16 bytes: metallic_factor, roughness_factor, normal_scale, occlusion_strength
+        // 16 bytes (4 * 4 byte (32 bit) floats)
         write(self.metallic_factor.into());
         write(self.roughness_factor.into());
         write(self.normal_scale.into());
         write(self.occlusion_strength.into());
 
-        // next 16 bytes: emissive factor and padding
+        // 12 bytes (3 * 4 byte (32 bit) floats)
         write(self.emissive_factor[0].into());
         write(self.emissive_factor[1].into());
         write(self.emissive_factor[2].into());
-        write(0.0.into());
 
-        // last 16 bytes: alpha_mode, alpha cutoff, double_sided, padding
-        write(self.alpha_mode.variant_as_u32().into());
-        write(self.alpha_cutoff().unwrap_or(0.0).into());
-        write(if self.double_sided {
-            1.into()
-        } else {
-            0.into()
-        });
-        write(0.0.into());
+        // 4 bytes of padding to align to 64 bytes
+        write(0u32.into());
 
         data
     }

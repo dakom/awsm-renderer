@@ -48,7 +48,7 @@ This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient 
 - Run for each mesh with opaque material
 - Rendering benefits from hardware occlusion culling, objects are drawn front-to-back
 - Outputs to multiple render targets (MRTs):
-  - `entity_id_texture`: Encodes entity reference per pixel
+  - `material_offset_texture`: Encodes material reference per pixel
   - `world_normal_texture`: Interpolated world-space normal
   - `screen_pos_texture`: Clip-space/NDC position for TAA (post-skinning/morphs) _and linear eye_space depth_ in z coordinate
   - `motion_vector_texture`: Computed as difference between current and previous `screen_pos_texture`
@@ -63,8 +63,8 @@ This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient 
 ### 3. Opaque Material Shading Pass (Compute Shader)
 - Single fullscreen compute dispatch (using same workgroup/tiling as Light Culling)
 - For each screen pixel:
-  - Read entity ID
-  - Fetch the material data from a single, large storage buffer (via material id indirection)
+  - Read material offset 
+  - Fetch the material data from a single, large uniform buffer (via material offset)
   - Fetch the relevant light list from the associated tile
   - Sample the `world_normal_texture` and `screen_pos_texture`
   - Calculate world position by using (screen_pos,depth), inverse view matrix, and 
@@ -73,6 +73,7 @@ This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient 
 
 ### 4. Transparent Material Shading Pass (Vertex + Fragment)
 - Run for each mesh with transparent material
+- Fetch the material data from a the same material uniform buffer (bound w/ dynamic offset)
 - Uses Weighted Blended Order-Independent Transparency (OIT)
 - Uses the Depth buffer from (1) to discard occluded fragments w/ depth testing (but writes are off)
 - Outputs to multiple textures:

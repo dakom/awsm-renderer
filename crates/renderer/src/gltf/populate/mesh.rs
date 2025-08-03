@@ -138,7 +138,7 @@ impl AwsmRenderer {
 
         let mut pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
             self.render_passes.geometry.bind_groups.camera_lights.bind_group_layout_key,
-            self.render_passes.geometry.bind_groups.transforms.bind_group_layout_key, // includes materials for now
+            self.render_passes.geometry.bind_groups.transform_materials.bind_group_layout_key,
         ]);
 
         if morph_key.is_some() || skin_key.is_some() {

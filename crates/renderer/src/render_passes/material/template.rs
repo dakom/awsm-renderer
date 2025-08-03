@@ -1,11 +1,11 @@
 use askama::Template;
 
-use crate::{render_passes::material::{cache_key::ShaderCacheKeyMaterial, opaque::shader::template::ShaderTemplateOpaqueMaterial, transparent::shader::{cache_key::ShaderCacheKeyTransparentMaterial, template::ShaderTemplateTransparentMaterial}}, shaders::{AwsmShaderError, Result}};
+use crate::{render_passes::material::{cache_key::ShaderCacheKeyMaterial, opaque::shader::template::ShaderTemplateMaterialOpaque, transparent::shader::{cache_key::ShaderCacheKeyMaterialTransparent, template::ShaderTemplateMaterialTransparent}}, shaders::{AwsmShaderError, Result}};
 
 #[derive(Debug)]
 pub enum ShaderTemplateMaterial {
-    Transparent(ShaderTemplateTransparentMaterial),
-    Opaque(ShaderTemplateOpaqueMaterial),
+    Transparent(ShaderTemplateMaterialTransparent),
+    Opaque(ShaderTemplateMaterialOpaque),
 }
 
 impl TryFrom<&ShaderCacheKeyMaterial> for ShaderTemplateMaterial {
@@ -24,6 +24,14 @@ impl ShaderTemplateMaterial {
         match self {
             ShaderTemplateMaterial::Opaque(tmpl) => tmpl.into_source(),
             ShaderTemplateMaterial::Transparent(tmpl) => tmpl.into_source(),
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn debug_label(&self) -> Option<&str> {
+        match self {
+            ShaderTemplateMaterial::Opaque(tmpl) => tmpl.debug_label(),
+            ShaderTemplateMaterial::Transparent(tmpl) => tmpl.debug_label(),
         }
     }
 }

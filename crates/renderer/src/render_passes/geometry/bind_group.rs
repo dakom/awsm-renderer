@@ -5,19 +5,19 @@ use crate::error::Result;
 
 pub struct GeometryBindGroups {
     pub camera_lights: GeometryBindGroupCameraLights,
-    pub transforms: GeometryBindGroupTransforms,
+    pub transform_materials: GeometryBindGroupTransformMaterials,
     pub vertex_animation: GeometryBindGroupVertexAnimation,
 }
 
 impl GeometryBindGroups {
     pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
         let camera_lights = GeometryBindGroupCameraLights::new(ctx).await?;
-        let transforms = GeometryBindGroupTransforms::new(ctx).await?;
+        let transform_materials = GeometryBindGroupTransformMaterials::new(ctx).await?;
         let vertex_animation = GeometryBindGroupVertexAnimation::new(ctx).await?;
 
         Ok(Self {
             camera_lights,
-            transforms,
+            transform_materials,
             vertex_animation,
         })
     }
@@ -25,6 +25,7 @@ impl GeometryBindGroups {
 
 pub struct GeometryBindGroupCameraLights {
     pub bind_group_layout_key: BindGroupLayoutKey,
+    // this is set via `recreate` mechanism
     _bind_group: Option<web_sys::GpuBindGroup>,
 }
 
@@ -78,12 +79,13 @@ impl GeometryBindGroupCameraLights {
 
 
 #[derive(Default)]
-pub struct GeometryBindGroupTransforms {
+pub struct GeometryBindGroupTransformMaterials {
     pub bind_group_layout_key: BindGroupLayoutKey,
+    // this is set via `recreate` mechanism
     _bind_group: Option<web_sys::GpuBindGroup>,
 }
 
-impl GeometryBindGroupTransforms {
+impl GeometryBindGroupTransformMaterials {
     pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey { entries: vec![
             // Transform
@@ -148,6 +150,7 @@ impl GeometryBindGroupTransforms {
 #[derive(Default)]
 pub struct GeometryBindGroupVertexAnimation {
     pub bind_group_layout_key: BindGroupLayoutKey,
+    // this is set via `recreate` mechanism
     _bind_group: Option<web_sys::GpuBindGroup>,
 }
 

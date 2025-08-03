@@ -149,9 +149,15 @@ impl ShaderTemplateGeometry {
     pub fn into_source(self) -> Result<String> {
         let vertex_source = self.vertex.render()?;
         let fragment_source = self.fragment.render()?;
+        let source = format!("{}\n{}", vertex_source, fragment_source);
 
-        //print_shader_source(&vertex_source, true);
+        //print_shader_source(&source, true);
 
-        Ok(format!("{}\n{}", vertex_source, fragment_source))
+        Ok(source)
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn debug_label(&self) -> Option<&str> {
+        Some("Geometry")
     }
 }

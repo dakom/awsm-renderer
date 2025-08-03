@@ -1,6 +1,6 @@
 use askama::Template;
 
-use crate::{render_passes::{composite::shader::cache_key::ShaderCacheKeyComposite, material::opaque::shader::cache_key::ShaderCacheKeyOpaqueMaterial}, shaders::{AwsmShaderError, Result}};
+use crate::{render_passes::composite::shader::cache_key::ShaderCacheKeyComposite, shaders::{AwsmShaderError, Result}};
 
 #[derive(Template, Debug)]
 #[template(path = "composite_wgsl/compute.wgsl", whitespace = "minimize")]
@@ -19,5 +19,10 @@ impl TryFrom<&ShaderCacheKeyComposite> for ShaderTemplateComposite {
 impl ShaderTemplateComposite {
     pub fn into_source(self) -> Result<String> {
         Ok(self.render()?)
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn debug_label(&self) -> Option<&str> {
+        Some("Composite")
     }
 }

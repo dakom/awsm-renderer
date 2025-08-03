@@ -46,7 +46,7 @@ impl RenderPipelines {
 
         let mut descriptor = RenderPipelineDescriptor::new(vertex, None)
             .with_primitive(cache_key.primitive)
-            .with_layout(PipelineLayoutKind::Custom(layout.clone()))
+            .with_layout(PipelineLayoutKind::Custom(&layout))
             .with_fragment(fragment);
 
         if let Some(depth_stencil) = cache_key.depth_stencil {

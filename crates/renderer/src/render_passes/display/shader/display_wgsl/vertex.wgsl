@@ -21,10 +21,10 @@ fn vert_main(@builtin(vertex_index) vertex_index: u32) -> FragmentInput {
     
     // Convert NDC coordinates (-1 to 1) to UV coordinates (0 to 1)
     // Note: Y is flipped because texture coordinates have origin at top-left
-    out.uv = vec2<f32>(
-        (x + 1.0) * 0.5,     // -1→0, 1→1, 3→2 (off-screen)
-        (1.0 - y) * 0.5      // -1→1, 1→0, 3→-1 (off-screen)
-    );
+    // out.uv = vec2<f32>(
+    //     (x + 1.0) * 0.5,     // -1→0, 1→1, 3→2 (off-screen)
+    //     (1.0 - y) * 0.5      // -1→1, 1→0, 3→-1 (off-screen)
+    // );
 
     return out;
 }

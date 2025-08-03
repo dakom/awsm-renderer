@@ -2,7 +2,7 @@ use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
 use crate::{
-    bind_group_layout::AwsmBindGroupLayoutError, bind_groups::AwsmBindGroupError, camera::AwsmCameraError, instances::AwsmInstanceError, lights::AwsmLightError, materials::AwsmMaterialError, mesh::{skins::AwsmSkinError, AwsmMeshError}, pipeline_layouts::AwsmPipelineLayoutError, pipelines::render_pipeline::AwsmRenderPipelineError, render_textures::AwsmRenderTextureError, shaders::AwsmShaderError, textures::AwsmTextureError, transforms::AwsmTransformError
+    bind_group_layout::AwsmBindGroupLayoutError, bind_groups::AwsmBindGroupError, camera::AwsmCameraError, instances::AwsmInstanceError, lights::AwsmLightError, materials::AwsmMaterialError, mesh::{skins::AwsmSkinError, AwsmMeshError}, pipeline_layouts::AwsmPipelineLayoutError, pipelines::{compute_pipeline::AwsmComputePipelineError, render_pipeline::AwsmRenderPipelineError}, render_textures::AwsmRenderTextureError, shaders::AwsmShaderError, textures::AwsmTextureError, transforms::AwsmTransformError
 };
 
 #[derive(Error, Debug)]
@@ -46,6 +46,9 @@ pub enum AwsmError {
 
     #[error("{0}")]
     RenderPipeline(#[from] AwsmRenderPipelineError),
+
+    #[error("{0}")]
+    ComputePipeline(#[from] AwsmComputePipelineError),
 
     #[error("{0}")]
     Light(#[from] AwsmLightError),

@@ -7,7 +7,7 @@ use crate::{
     }, materials::{
         pbr::PbrMaterial, 
         MaterialAlphaMode,
-    }, render_passes::{geometry::shader::cache_key::ShaderCacheKeyGeometryAttribute, material::{cache_key::ShaderCacheKeyMaterial, looks::{pbr::{bind_group::{PbrMaterialBindGroupCacheKey, PbrMaterialTextureCacheKey}, shader::cache_key::ShaderCacheKeyMaterialPbr}, shader_cache_key::ShaderCacheKeyMaterialLook}, opaque::shader::cache_key::ShaderCacheKeyOpaqueMaterial, transparent::shader::cache_key::ShaderCacheKeyTransparentMaterial}}, textures::{SamplerCacheKey, SamplerKey, TextureKey}, AwsmRenderer
+    }, render_passes::{geometry::shader::cache_key::ShaderCacheKeyGeometryAttribute, material::{cache_key::ShaderCacheKeyMaterial, looks::{pbr::{bind_group::{PbrMaterialBindGroupCacheKey, PbrMaterialTextureCacheKey}, shader::cache_key::ShaderCacheKeyMaterialPbr}, shader_cache_key::ShaderCacheKeyMaterialLook}, opaque::shader::cache_key::ShaderCacheKeyMaterialOpaque, transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent}}, textures::{SamplerCacheKey, SamplerKey, TextureKey}, AwsmRenderer
 };
 
 use super::GltfPopulateContext;
@@ -111,12 +111,12 @@ impl GltfMaterialInfo {
             bind_group_cache_key,
             shader_cache_key: match gltf_material.alpha_mode() {
                 gltf::material::AlphaMode::Opaque | gltf::material::AlphaMode::Mask => ShaderCacheKeyMaterial::Opaque(
-                    ShaderCacheKeyOpaqueMaterial {
+                    ShaderCacheKeyMaterialOpaque {
                         look: ShaderCacheKeyMaterialLook::Pbr(shader_cache_key),
                     },
                 ),
                 gltf::material::AlphaMode::Blend => ShaderCacheKeyMaterial::Transparent(
-                    ShaderCacheKeyTransparentMaterial {
+                    ShaderCacheKeyMaterialTransparent {
                         look: ShaderCacheKeyMaterialLook::Pbr(shader_cache_key),
                     },
                 ),

@@ -1,13 +1,13 @@
 use wasm_bindgen::prelude::*;
 
 #[derive(Default, Debug, Clone)]
-pub enum PipelineLayoutKind {
+pub enum PipelineLayoutKind<'a> {
     #[default]
     Auto,
-    Custom(web_sys::GpuPipelineLayout),
+    Custom(&'a web_sys::GpuPipelineLayout),
 }
 
-impl From<PipelineLayoutKind> for JsValue {
+impl From<PipelineLayoutKind<'_>> for JsValue {
     fn from(layout_kind: PipelineLayoutKind) -> JsValue {
         match layout_kind {
             PipelineLayoutKind::Auto => JsValue::from_str("auto"),

@@ -3,6 +3,7 @@ use awsm_renderer_core::command::render_pass::{
     ColorAttachment, DepthStencilAttachment, RenderPassDescriptor,
 };
 use awsm_renderer_core::command::{CommandEncoder, LoadOp, StoreOp};
+use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use awsm_renderer_core::texture::TextureFormat;
 
 use crate::bind_groups::{BindGroupCreate, BindGroupRecreateContext, BindGroups};
@@ -69,6 +70,7 @@ impl AwsmRenderer {
         )?;
 
         let ctx = RenderContext {
+            gpu: &self.gpu,
             command_encoder: self.gpu.create_command_encoder(Some("Rendering")),
             render_texture_views,
             transforms: &self.transforms,
@@ -149,6 +151,7 @@ impl AwsmRenderer {
 }
 
 pub struct RenderContext<'a> {
+    pub gpu: &'a AwsmRendererWebGpu,
     pub command_encoder: CommandEncoder,
     pub render_texture_views: RenderTextureViews,
     pub transforms: &'a Transforms,

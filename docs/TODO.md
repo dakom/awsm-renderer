@@ -1,12 +1,18 @@
-# Set entity id in uniform buffers
+# Get started with opaque material pass 
 
-Actually: 
+1. Sanity check - only draw where there's geometry
 
-1. change to material offset (will be an offset in the material uniform buffer)
-2. geometry shader only needs to read in header
-3. put a lot more info in the material (texture indices etc.)
-4. compute shader can read the entire uniform buffer, so it can load from offset (gets its own buffer group binding)
-5. transparent rendering uses regular dynamic offset to read the whole material as usual
+... then
+2. Read material at material_offset
+3. Calculate world position
+4. Write basic material
+
+# Get started with light culling pass
+
+1. Write light
+2. Use in opaque material pass
+
+
 
 
 # World Position Reconstruction Math: 

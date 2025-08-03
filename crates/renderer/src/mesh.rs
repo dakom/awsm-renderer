@@ -92,7 +92,7 @@ impl Mesh {
 
         render_pass.set_bind_group(
             1,
-            geometry_bind_groups.transforms.get_bind_group()?,
+            geometry_bind_groups.transform_materials.get_bind_group()?,
             Some(&[transform_offset, pbr_material_offset]),
         )?;
 

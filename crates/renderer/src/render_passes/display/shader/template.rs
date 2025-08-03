@@ -54,4 +54,9 @@ impl ShaderTemplateDisplay {
         let fragment_source = self.fragment.render()?;
         Ok(format!("{}\n{}", vertex_source, fragment_source))
     }
+
+    #[cfg(debug_assertions)]
+    pub fn debug_label(&self) -> Option<&str> {
+        Some("Display")
+    }
 }

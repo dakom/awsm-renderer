@@ -175,10 +175,10 @@ impl AwsmRendererBuilder {
             pipelines,
             shaders,
             render_texture_formats,
-            textures
+            textures,
         };
         let render_passes = RenderPasses::new(&mut render_pass_init).await?;
-        let RenderPassInitContext { gpu, bind_group_layouts, pipeline_layouts, pipelines, shaders, render_texture_formats, textures } = render_pass_init;
+        let RenderPassInitContext { gpu, bind_group_layouts, pipeline_layouts, pipelines, shaders, render_texture_formats, textures} = render_pass_init;
 
         let bind_groups = BindGroups::new();
         let render_textures = RenderTextures::new(render_texture_formats);

@@ -31,6 +31,7 @@ struct MipmapPipeline {
 thread_local! {
     // key is TextureFormat as u32
     static MIPMAP_PIPELINE: RefCell<HashMap<u32, MipmapPipeline>> = RefCell::new(HashMap::new());
+    static SHADER_MODULE: RefCell<Option<web_sys::GpuShaderModule>> = RefCell::new(None);
 }
 
 pub async fn generate_mipmaps(
@@ -128,14 +129,28 @@ async fn get_mipmap_pipeline(
         return Ok(pipeline);
     }
 
-    let shader_module = gpu.compile_shader(
-        &ShaderModuleDescriptor::new(include_str!("./mipmap_shader.wgsl"), Some("Mipmap Shader"))
-            .into(),
-    );
+    let shader_module = SHADER_MODULE.with(|shader_module| shader_module.borrow().clone());
 
-    shader_module.validate_shader().await?;
+    let shader_module = match shader_module {
+        Some(module) => module,
+        None => {
+            let shader_module = gpu.compile_shader(
+                &ShaderModuleDescriptor::new(include_str!("./mipmap_shader.wgsl"), Some("Mipmap Shader"))
+                    .into(),
+            );
 
-    let compute = ProgrammableStage::new(shader_module, None);
+            shader_module.validate_shader().await?;
+
+            SHADER_MODULE.with(|shader_module_rc| {
+                *shader_module_rc.borrow_mut() = Some(shader_module.clone());
+            });
+
+            shader_module
+        }
+    };
+
+
+    let compute = ProgrammableStage::new(&shader_module, None);
 
     let bind_group_layout = gpu.create_bind_group_layout(
         &BindGroupLayoutDescriptor::new(Some("Mipmap Bind Group Layout"))
@@ -170,15 +185,15 @@ async fn get_mipmap_pipeline(
             ])
             .into(),
     )?;
-    let layout = PipelineLayoutKind::Custom(
-        gpu.create_pipeline_layout(
-            &PipelineLayoutDescriptor::new(
-                Some("Mipmap Pipeline Layout"),
-                vec![bind_group_layout.clone()],
-            )
-            .into(),
-        ),
+
+    let layout = gpu.create_pipeline_layout(
+        &PipelineLayoutDescriptor::new(
+            Some("Mipmap Pipeline Layout"),
+            vec![bind_group_layout.clone()],
+        )
+        .into(),
     );
+    let layout = PipelineLayoutKind::Custom(&layout);
 
     let pipeline_descriptor =
         ComputePipelineDescriptor::new(compute, layout.clone(), Some("Mipmap Pipeline"));

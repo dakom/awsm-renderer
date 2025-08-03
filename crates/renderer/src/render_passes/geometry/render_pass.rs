@@ -23,9 +23,9 @@ impl GeometryRenderPass {
             &RenderPassDescriptor {
                 label: Some("Geometry Render Pass"),
                 color_attachments: vec![
-                    ColorAttachment::new(&ctx.render_texture_views.entity_id, LoadOp::Clear, StoreOp::Store),
+                    ColorAttachment::new(&ctx.render_texture_views.material_offset, LoadOp::Clear, StoreOp::Store),
                     ColorAttachment::new(&ctx.render_texture_views.world_normal, LoadOp::Clear, StoreOp::Store),
-                    ColorAttachment::new(&ctx.render_texture_views.curr_screen_pos, LoadOp::Clear, StoreOp::Store),
+                    ColorAttachment::new(&ctx.render_texture_views.screen_pos[ctx.render_texture_views.curr_index], LoadOp::Clear, StoreOp::Store),
                     ColorAttachment::new(&ctx.render_texture_views.motion_vector, LoadOp::Clear, StoreOp::Store),
                 ],
                 depth_stencil_attachment: Some(

@@ -10,7 +10,8 @@ use awsm_renderer_core::{
 use strum::{EnumIter, IntoEnumIterator};
 use thiserror::Error;
 
-use crate::{bind_group_layout::{AwsmBindGroupLayoutError, BindGroupLayouts}, camera::CameraBuffer, lights::Lights, materials::Materials, mesh::Meshes, render_passes::{composite::bind_group::CompositeBindGroups, display::bind_group::DisplayBindGroups, geometry::bind_group::GeometryBindGroups, light_culling::bind_group::LightCullingBindGroups, material::bind_group::MaterialBindGroups, RenderPasses}, render_textures::RenderTextureViews, textures::Textures, transforms::Transforms, AwsmRenderer};
+use crate::{bind_group_layout::BindGroupLayouts, camera::CameraBuffer, lights::Lights, materials::Materials, mesh::Meshes, render_passes::RenderPasses, render_textures::RenderTextureViews, textures::Textures, transforms::Transforms};
+
 
 // There are no cache keys for bind groups, they are created on demand
 // Since changes to storages, uniforms, and textures are the reason to recreate bind groups,
@@ -22,9 +23,6 @@ use crate::{bind_group_layout::{AwsmBindGroupLayoutError, BindGroupLayouts}, cam
 //
 // That conscpicuously does not include changes to material textures
 // since those are looked up via the material key and do not require a bind group recreation
-impl AwsmRenderer {
-}
-
 pub struct BindGroupRecreateContext<'a> {
     pub gpu: &'a AwsmRendererWebGpu,
     pub render_texture_views: &'a RenderTextureViews,
@@ -71,9 +69,8 @@ impl BindGroups {
             render_passes.geometry.bind_groups.camera_lights.recreate(&ctx)?;
         }
 
-        // for now we also do this for material changes - will be moved to something else later 
         if self.create_list.contains(&BindGroupCreate::TransformsResize) || self.create_list.contains(&BindGroupCreate::PbrMaterialUniformResize) {
-            render_passes.geometry.bind_groups.transforms.recreate(&ctx)?;
+            render_passes.geometry.bind_groups.transform_materials.recreate(&ctx)?;
         }
 
         if self.create_list.contains(&BindGroupCreate::MorphTargetWeightsResize) 
@@ -83,6 +80,10 @@ impl BindGroups {
         }
 
         if self.create_list.contains(&BindGroupCreate::TextureViewResize) {
+            render_passes.light_culling.bind_groups.recreate(&ctx)?;
+            render_passes.material_opaque.bind_groups.recreate(&ctx)?;
+            render_passes.material_transparent.bind_groups.recreate(&ctx)?;
+            render_passes.composite.bind_groups.recreate(&ctx)?;
             render_passes.display.bind_groups.recreate(&ctx)?;
         }
 

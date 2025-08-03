@@ -73,8 +73,23 @@ impl TryFrom<&ShaderCacheKey> for ShaderTemplate {
 }
 
 impl ShaderTemplate {
+    #[cfg(debug_assertions)]
+    pub fn into_descriptor(self) -> Result<web_sys::GpuShaderModuleDescriptor> {
+        let label = self.debug_label().map(|l| l.to_string());
+        Ok(ShaderModuleDescriptor::new(&self.into_source()?, label.as_deref()).into())
+    }
+
+    #[cfg(not(debug_assertions))]
     pub fn into_descriptor(self) -> Result<web_sys::GpuShaderModuleDescriptor> {
         Ok(ShaderModuleDescriptor::new(&self.into_source()?, None).into())
+    }
+
+
+    #[cfg(debug_assertions)]
+    pub fn debug_label(&self) -> Option<&str> {
+        match self {
+            ShaderTemplate::RenderPass(tmpl) => tmpl.debug_label(),
+        }
     }
 
     pub fn into_source(self) -> Result<String> {

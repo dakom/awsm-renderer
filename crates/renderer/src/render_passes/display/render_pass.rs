@@ -25,7 +25,7 @@ impl DisplayRenderPass {
             &RenderPassDescriptor {
                 label: Some("Display Render Pass"),
                 color_attachments: vec![
-                    ColorAttachment::new(&ctx.render_texture_views.display, LoadOp::Clear, StoreOp::Store)
+                    ColorAttachment::new(&ctx.gpu.current_context_texture_view()?, LoadOp::Clear, StoreOp::Store)
                 ],
                 ..Default::default()
             }
