@@ -9,6 +9,8 @@ use wasm_bindgen::prelude::*;
 pub mod bitmap;
 #[cfg(feature = "exr")]
 pub mod exr;
+#[cfg(feature = "atlas")]
+pub mod atlas;
 pub mod mipmap;
 
 #[derive(Clone, Debug)]
@@ -90,7 +92,15 @@ impl ImageData {
         }
     }
 
-    pub fn size(&self) -> Extent3d {
+    pub fn size(&self) -> (u32, u32) {
+        match self {
+            #[cfg(feature = "exr")]
+            Self::Exr(exr) => (exr.width as u32, exr.height as u32),
+            Self::Bitmap { image, .. } => (image.width(), image.height()),
+        }
+    }
+
+    pub fn extent_3d(&self) -> Extent3d {
         match self {
             #[cfg(feature = "exr")]
             Self::Exr(exr) => Extent3d {
@@ -156,10 +166,12 @@ impl ImageData {
             },
         };
 
-        let mut descriptor = TextureDescriptor::new(self.format(), self.size(), usage);
+        let mut descriptor = TextureDescriptor::new(self.format(), self.extent_3d(), usage);
         let mipmap_levels = if generate_mipmap {
+            let (width, height) = self.size();
+
             let mipmap_levels =
-                mipmap::calculate_mipmap_levels(self.size().width, self.size().height.unwrap_or(1));
+                mipmap::calculate_mipmap_levels(width, height);
 
             descriptor = descriptor.with_mip_level_count(mipmap_levels);
 
@@ -176,14 +188,15 @@ impl ImageData {
         if generate_mipmap {
             dest = dest.with_mip_level(0);
         }
-        gpu.copy_external_image_to_texture(&source.into(), &dest.into(), &self.size().into())?;
+        gpu.copy_external_image_to_texture(&source.into(), &dest.into(), &self.extent_3d().into())?;
 
         if let Some(mipmap_levels) = mipmap_levels {
+            let (width, height) = self.size();
             generate_mipmaps(
                 gpu,
                 &texture,
-                self.size().width,
-                self.size().height.unwrap_or(1),
+                width,
+                height,
                 mipmap_levels,
             )
             .await?;

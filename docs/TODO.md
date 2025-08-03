@@ -1,3 +1,5 @@
+# Finish texture atlas writer
+
 # Get started with opaque material pass 
 
 1. Sanity check - only draw where there's geometry

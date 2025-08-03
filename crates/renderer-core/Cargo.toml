@@ -8,9 +8,10 @@ authors.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["exr"]
+default = ["exr", "atlas"]
 exr = ["dep:exr", "image"]
 image = ["dep:gloo-net"]
+atlas = ["dep:binpack2d"]
 
 [dependencies]
 anyhow = {workspace = true} 
@@ -26,3 +27,4 @@ ordered-float = { workspace = true}
 # optional deps
 gloo-net = {workspace = true, optional = true}
 exr = {workspace = true, optional = true}
+binpack2d = {workspace = true, optional = true}

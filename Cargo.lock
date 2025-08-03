@@ -95,6 +95,7 @@ name = "awsm-renderer-core"
 version = "0.1.0-alpha.3"
 dependencies = [
  "anyhow",
+ "binpack2d",
  "cfg-if",
  "exr",
  "futures",
@@ -149,6 +150,12 @@ checksum = "ba62675e8242a4c4e806d12f11d136e626e6c8361d6b829310732241652a178a"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "binpack2d"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c3793db1a9ea79234eac9513713a00ca32751417046d92db5320f0b2574394f"
 
 [[package]]
 name = "bit_field"

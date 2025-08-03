@@ -90,6 +90,22 @@ pub enum AwsmCoreError {
     #[error("[gpu] Failed to create js value from exr image data: {0}")]
     ExrImageToJsValue(String),
 
+    #[cfg(feature = "atlas")]
+    #[error("[gpu] Largest Image {largest_img_width}x{largest_img_height} (padding {padding}) was too large to fit in atlas {atlas_width}x{atlas_height}")]
+    ImageAtlasSize {
+        largest_img_width: usize,
+        largest_img_height: usize,
+        atlas_width: usize,
+        atlas_height: usize,
+        padding: usize
+    },
+    #[cfg(feature = "atlas")]
+    #[error("[gpu] Atlast depth {provided} is too small, required at least {required}")]
+    ImageAtlasDepthTooSmall {
+        provided: usize,
+        required: usize,
+    },
+
     #[error("[gpu] Failed to get Shader compilation info: {0}")]
     ShaderCompilationInfo(String),
 

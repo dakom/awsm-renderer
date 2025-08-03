@@ -31,7 +31,7 @@ struct MipmapPipeline {
 thread_local! {
     // key is TextureFormat as u32
     static MIPMAP_PIPELINE: RefCell<HashMap<u32, MipmapPipeline>> = RefCell::new(HashMap::new());
-    static SHADER_MODULE: RefCell<Option<web_sys::GpuShaderModule>> = RefCell::new(None);
+    static MIPMAP_SHADER_MODULE: RefCell<Option<web_sys::GpuShaderModule>> = RefCell::new(None);
 }
 
 pub async fn generate_mipmaps(
@@ -129,7 +129,7 @@ async fn get_mipmap_pipeline(
         return Ok(pipeline);
     }
 
-    let shader_module = SHADER_MODULE.with(|shader_module| shader_module.borrow().clone());
+    let shader_module = MIPMAP_SHADER_MODULE.with(|shader_module| shader_module.borrow().clone());
 
     let shader_module = match shader_module {
         Some(module) => module,
@@ -141,7 +141,7 @@ async fn get_mipmap_pipeline(
 
             shader_module.validate_shader().await?;
 
-            SHADER_MODULE.with(|shader_module_rc| {
+            MIPMAP_SHADER_MODULE.with(|shader_module_rc| {
                 *shader_module_rc.borrow_mut() = Some(shader_module.clone());
             });
 
