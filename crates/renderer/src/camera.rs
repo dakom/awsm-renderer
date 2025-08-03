@@ -9,12 +9,13 @@ use crate::render_textures::RenderTextures;
 use crate::{AwsmRenderer, AwsmRendererLogging};
 
 impl AwsmRenderer {
-    pub fn update_camera(&mut self, camera: &impl CameraExt) -> Result<()> {
+    pub fn update_camera(&mut self, camera_matrices: CameraMatrices) -> Result<()> {
         let (current_width, current_height) = self
             .gpu
             .current_context_texture_size()?;
+
         self.camera.update(
-            camera,
+            camera_matrices,
             &self.render_textures,
             true,
             current_width as f32,
@@ -28,18 +29,26 @@ impl AwsmRenderer {
 pub struct CameraBuffer {
     pub(crate) raw_data: [u8; Self::BYTE_SIZE],
     pub(crate) gpu_buffer: web_sys::GpuBuffer,
-    last_view_matrix: Option<Mat4>,
-    last_proj_matrix: Option<Mat4>,
+    pub last_matrices: Option<CameraMatrices>,
     camera_moved: bool,
     gpu_dirty: bool,
 }
 
-pub trait CameraExt {
-    fn projection_matrix(&self) -> Mat4;
+#[derive(Clone, Debug)]
+pub struct CameraMatrices {
+    pub view: Mat4,
+    pub projection: Mat4,
+    pub position_world: Vec3,
+}
 
-    fn view_matrix(&self) -> Mat4;
+impl CameraMatrices {
+    pub fn view_projection(&self) -> Mat4 {
+        self.projection * self.view
+    }
 
-    fn position_world(&self) -> Vec3;
+    pub fn inv_view_projection(&self) -> Mat4 {
+        self.view_projection().inverse()
+    }
 }
 
 impl CameraBuffer {
@@ -55,8 +64,7 @@ impl CameraBuffer {
         Ok(Self {
             raw_data: [0; Self::BYTE_SIZE],
             gpu_dirty: true,
-            last_view_matrix: None,
-            last_proj_matrix: None,
+            last_matrices: None,
             camera_moved: false,
             gpu_buffer,
         })
@@ -66,17 +74,16 @@ impl CameraBuffer {
     // it will only update the data in the buffer once per frame, at render time
     pub(crate) fn update(
         &mut self,
-        camera: &impl CameraExt,
+        camera_matrices_orig: CameraMatrices,
         render_textures: &RenderTextures,
         apply_jitter: bool,
         screen_width: f32,
         screen_height: f32,
     ) -> Result<()> {
-        let view = camera.view_matrix(); // 16 floats
-        let mut proj = camera.projection_matrix(); // 16 floats
+        let mut camera_matrices = camera_matrices_orig.clone();
 
-        self.camera_moved = match (&self.last_view_matrix, &self.last_proj_matrix) {
-            (Some(last_view), Some(last_proj)) => {
+        self.camera_moved = match (&self.last_matrices) {
+            (Some(last_matrices)) => {
                 fn matrices_equal(a: Mat4, b: Mat4, epsilon: f32) -> bool {
                     for i in 0..16 {
                         if (a.to_cols_array()[i] - b.to_cols_array()[i]).abs() > epsilon {
@@ -86,7 +93,7 @@ impl CameraBuffer {
                     true
                 }
                 // Check if matrices changed (with small epsilon for floating point comparison)
-                !matrices_equal(*last_view, view, 1e-6) || !matrices_equal(*last_proj, proj, 1e-6)
+                !matrices_equal(last_matrices.view, camera_matrices.view, 1e-6) || !matrices_equal(last_matrices.projection, camera_matrices.projection, 1e-6)
             }
             _ => true, // First frame, assume movement
         };
@@ -106,15 +113,15 @@ impl CameraBuffer {
             let jitter_matrix = Mat4::from_translation(Vec3::new(jitter_ndc_x, jitter_ndc_y, 0.0));
 
             // Apply to your projection matrix
-            proj = jitter_matrix * proj;
+            camera_matrices.projection = jitter_matrix * camera_matrices.projection;
         }
 
-        let view_proj = proj * view; // 16 floats
-        let inv_view_proj = view_proj.inverse(); // 16 floats
-        let inv_view = view.inverse(); // 16 floats
-
-        let position = camera.position_world(); // 3 floats
-
+        // View: 16 floats
+        // Projection: 16 floats
+        // ViewProjection: 16 floats
+        // Inverse ViewProjection: 16 floats
+        // Inverse View: 16 floats
+        // Position: 3 floats
         // altogether that's 83 floats: (16*5) + 3
         // or 332 bytes: 83 * 4
         // however, we need to pad it to a multiple of 16 (https://www.w3.org/TR/WGSL/#address-space-layout-constraints)
@@ -134,20 +141,19 @@ impl CameraBuffer {
             offset += len;
         };
 
-        write_to_data(&view.to_cols_array());
-        write_to_data(&proj.to_cols_array());
-        write_to_data(&view_proj.to_cols_array());
-        write_to_data(&inv_view_proj.to_cols_array());
-        write_to_data(&inv_view.to_cols_array());
-        write_to_data(&position.to_array());
+        write_to_data(&camera_matrices.view.to_cols_array());
+        write_to_data(&camera_matrices.projection.to_cols_array());
+        write_to_data(&camera_matrices.view_projection().to_cols_array());
+        write_to_data(&camera_matrices.inv_view_projection().to_cols_array());
+        write_to_data(&camera_matrices.view.inverse().to_cols_array());
+        write_to_data(&camera_matrices.position_world.to_array());
         self.raw_data[offset..offset + 4]
             .copy_from_slice(&render_textures.frame_count().to_ne_bytes());
 
         self.gpu_dirty = true;
 
         // Store for next frame (unjittered versions)
-        self.last_view_matrix = Some(camera.view_matrix());
-        self.last_proj_matrix = Some(camera.projection_matrix());
+        self.last_matrices = Some(camera_matrices_orig);
 
         Ok(())
     }

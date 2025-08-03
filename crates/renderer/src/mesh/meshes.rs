@@ -1,10 +1,14 @@
+use std::collections::HashMap;
+
 use awsm_renderer_core::buffers::{BufferDescriptor, BufferUsage};
 use awsm_renderer_core::pipeline::primitive::IndexFormat;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+use glam::Mat4;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
 use crate::buffer::dynamic_storage::DynamicStorageBuffer;
 use crate::mesh::skins::Skins;
+use crate::transforms::TransformKey;
 use crate::AwsmRendererLogging;
 
 use super::error::{AwsmMeshError, Result};
@@ -13,6 +17,7 @@ use super::{Mesh, MeshBufferIndexInfo, MeshBufferVertexInfo};
 
 pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
+    transform_to_meshes: SecondaryMap<TransformKey, Vec<MeshKey>>,
     vertex_buffers: DynamicStorageBuffer<MeshKey>,
     index_buffers: DynamicStorageBuffer<MeshKey>,
     vertex_infos: SecondaryMap<MeshKey, MeshBufferVertexInfo>,
@@ -39,6 +44,7 @@ impl Meshes {
                 Self::VERTICES_INITIAL_SIZE,
                 Some("MeshVertexBuffer".to_string()),
             ),
+            transform_to_meshes: SecondaryMap::new(),
             gpu_vertex_buffer: gpu_create_vertex_buffer(gpu, Self::VERTICES_INITIAL_SIZE)?,
             gpu_index_buffer: gpu_create_index_buffer(gpu, Self::INDICES_INITIAL_SIZE)?,
             vertex_infos: SecondaryMap::new(),
@@ -57,11 +63,15 @@ impl Meshes {
         vertex_info: MeshBufferVertexInfo,
         index: Option<(&[u8], MeshBufferIndexInfo)>,
     ) -> MeshKey {
+        let transform_key = mesh.transform_key;
         let key = self.list.insert(mesh);
+
+        self.transform_to_meshes.entry(transform_key).unwrap().or_default().push(key);
 
         self.vertex_buffers.update(key, vertex_values);
         self.vertex_infos.insert(key, vertex_info);
         self.vertex_dirty = true;
+
 
         if let Some((index_values, index_info)) = index {
             self.index_buffers.update(key, index_values);
@@ -71,6 +81,23 @@ impl Meshes {
 
         key
     }
+
+    pub fn update_world(&mut self, dirty_transforms: HashMap<TransformKey, &Mat4>) {
+        // This doesn't mark anything as dirty, it just updates the world AABB for frustum culling and depth sorting
+        for (transform_key, world_mat) in dirty_transforms.iter() {
+            if let Some(mesh_keys) = self.transform_to_meshes.get(*transform_key) {
+                for mesh_key in mesh_keys {
+                    if let Some(world_aabb) = self.list.get_mut(*mesh_key).and_then(|m| m.world_aabb.as_mut()) {
+                        world_aabb.transform(world_mat);
+                    }
+                }
+            }
+        }
+
+        // This does update the GPU as dirty, bit skins manage their own GPU dirty state
+        self.skins.update_world(dirty_transforms);
+    }
+
 
     pub fn keys(&self) -> impl Iterator<Item = MeshKey> + '_ {
         self.list.keys()
@@ -135,6 +162,10 @@ impl Meshes {
             if let Some(morph_key) = mesh.morph_key {
                 self.morphs.remove(morph_key);
             }
+
+            self.transform_to_meshes
+                .get_mut(mesh.transform_key)
+                .map(|meshes| meshes.retain(|&key| key != mesh_key));
             Some(mesh)
         } else {
             None

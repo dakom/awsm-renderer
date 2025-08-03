@@ -1,7 +1,7 @@
 use glam::{Mat4, Quat, Vec3};
 use thiserror::Error;
 
-use std::{collections::HashSet, sync::LazyLock};
+use std::{collections::{HashMap, HashSet}, sync::LazyLock};
 
 use awsm_renderer_core::{buffers::{BufferDescriptor, BufferUsage}, error::AwsmCoreError, renderer::AwsmRendererWebGpu};
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
@@ -13,6 +13,7 @@ use crate::{
 impl AwsmRenderer {
     pub fn update_transforms(&mut self) {
         self.transforms.update_world();
+        self.meshes.update_world(self.transforms.take_dirty_meshes());
     }
 }
 
@@ -21,9 +22,13 @@ pub struct Transforms {
     world_matrices: SecondaryMap<TransformKey, glam::Mat4>,
     children: SecondaryMap<TransformKey, Vec<TransformKey>>,
     parents: SecondaryMap<TransformKey, TransformKey>,
+    // These are the transforms that are dirtied from the outside
+    // e.g. may be set multiples times by the user or randomly in the hierarchy 
     dirties: HashSet<TransformKey>,
-    // not every transform here is definitely a skin joint, just in potential
-    dirty_skin_joints: HashSet<TransformKey>,
+    // While we calculate the dirties, we can know if meshes need to be updated
+    // this is set internally
+    // not every transform here is definitely a mesh, just in potential
+    dirty_meshes: Vec<TransformKey>,
     gpu_dirty: bool,
     root_node: TransformKey,
     buffer: DynamicUniformBuffer<TransformKey>,
@@ -50,8 +55,8 @@ impl Transforms {
             Self::BYTE_ALIGNMENT,
             Some("Transforms".to_string()),
         );
-        let mut locals = SlotMap::with_key();
-        let mut world_matrices = SecondaryMap::new();
+        let mut locals = SlotMap::with_capacity_and_key(Self::INITIAL_CAPACITY);
+        let mut world_matrices = SecondaryMap::with_capacity(Self::INITIAL_CAPACITY);
         let mut children = SecondaryMap::new();
 
         let root_node = locals.insert(Transform::default());
@@ -64,7 +69,7 @@ impl Transforms {
             children,
             parents: SecondaryMap::new(),
             dirties: HashSet::new(),
-            dirty_skin_joints: HashSet::new(),
+            dirty_meshes: Vec::with_capacity(Self::INITIAL_CAPACITY),
             gpu_dirty: true,
             root_node,
             buffer,
@@ -169,7 +174,7 @@ impl Transforms {
     pub(crate) fn update_world(&mut self) {
         self.gpu_dirty = self.gpu_dirty || !self.dirties.is_empty();
 
-        self.update_inner(self.root_node, false);
+        self.update_inner_recursively(self.root_node, false);
 
         self.dirties.clear();
     }
@@ -206,8 +211,13 @@ impl Transforms {
         Ok(())
     }
 
-    pub fn take_dirty_skin_joints(&mut self) -> HashSet<TransformKey> {
-        std::mem::take(&mut self.dirty_skin_joints)
+    pub fn take_dirty_meshes(&mut self) -> HashMap<TransformKey, &Mat4> {
+        self.dirty_meshes.drain(..).map(|key| {
+            // this for sure exists since we just drained the key
+            let world_matrix = self.world_matrices.get(key).unwrap();
+            (key, world_matrix)
+        })
+        .collect()
     }
 
     pub fn buffer_offset(&self, key: TransformKey) -> Result<usize> {
@@ -229,7 +239,7 @@ impl Transforms {
     // or in other words, it's the local transform, offset by its parent in world space
     //
     // we also update the CPU-side buffer as needed so it will be ready for the GPU
-    fn update_inner(&mut self, key: TransformKey, dirty_tracker: bool) -> bool {
+    fn update_inner_recursively(&mut self, key: TransformKey, dirty_tracker: bool) -> bool {
         let dirty = self.dirties.contains(&key) | dirty_tracker;
 
         if dirty {
@@ -251,13 +261,14 @@ impl Transforms {
             };
             self.buffer.update(key, values_u8);
 
-            self.dirty_skin_joints.insert(key);
+            self.dirty_meshes.push(key);
         }
 
         // safety: can't keep a mutable reference to self while it has a borrow of the iterator
+        // TODO: maybe split this function into a pure function that takes the deps?
         let children = self.children[key].clone();
         for child in children {
-            self.update_inner(child, dirty);
+            self.update_inner_recursively(child, dirty);
         }
 
         dirty

@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::LazyLock};
+use std::{collections::{HashMap, HashSet}, sync::LazyLock};
 
 use awsm_renderer_core::{buffers::{BufferDescriptor, BufferUsage}, error::AwsmCoreError, renderer::AwsmRendererWebGpu};
 use glam::Mat4;
@@ -11,16 +11,6 @@ use crate::{
     transforms::{TransformKey, Transforms},
     AwsmRenderer, AwsmRendererLogging,
 };
-
-impl AwsmRenderer {
-    pub fn update_skins(&mut self) {
-        let dirty_skin_joints = self.transforms.take_dirty_skin_joints();
-        if !dirty_skin_joints.is_empty() {
-            self.meshes.skins.update(dirty_skin_joints, &self.transforms);
-            self.meshes.skins.gpu_dirty = true;
-        }
-    }
-}
 
 pub struct Skins {
     skeleton_transforms: DenseSlotMap<SkinKey, Vec<TransformKey>>,
@@ -106,19 +96,16 @@ impl Skins {
             .ok_or(AwsmSkinError::SkinNotFound(skin_key))
     }
 
-    pub fn update(&mut self, dirty_skin_joints: HashSet<TransformKey>, transforms: &Transforms) {
+    pub fn update_world(&mut self, dirty_skin_joints: HashMap<TransformKey, &Mat4>) {
         // different skins can theoretically share the same joint, so, iterate over them all
-        for (skin_key, skeleton_joints) in self.skeleton_transforms.iter() {
-            for (index, skeleton_joint) in skeleton_joints.iter().enumerate() {
-                if dirty_skin_joints.contains(skeleton_joint) {
+        for (skin_key, transform_keys) in self.skeleton_transforms.iter() {
+            for (index, transform_key) in transform_keys.iter().enumerate() {
+                if let Some(world_mat) = dirty_skin_joints.get(transform_key) {
                     // could cache this for revisited joints, but, it's not a huge deal - might even be faster to redo the math
                     let world_matrix =
-                        match self.inverse_bind_matrices.get(*skeleton_joint).cloned() {
-                            Some(inverse_bind_matrix) => transforms
-                                .get_world(*skeleton_joint)
-                                .map(|m| *m * inverse_bind_matrix)
-                                .unwrap(),
-                            None => transforms.get_world(*skeleton_joint).cloned().unwrap(),
+                        match self.inverse_bind_matrices.get(*transform_key).cloned() {
+                            Some(inverse_bind_matrix) => *world_mat * inverse_bind_matrix,
+                            None => *world_mat.clone()
                         };
 
                     // just overwrite this one matrix
@@ -134,6 +121,8 @@ impl Skins {
                             let start = index * 16 * 4;
                             matrices[start..start + (16 * 4)].copy_from_slice(bytes);
                         });
+
+                    self.gpu_dirty = true;
                 }
             }
 

@@ -81,6 +81,8 @@ impl AwsmRenderer {
             bind_groups: &self.bind_groups,
         };
 
+        let renderables = self.collect_renderables()?;
+
         {
             let _maybe_span_guard = if self.logging.render_timings {
                 Some(tracing::span!(tracing::Level::INFO, "Geometry RenderPass").entered())
@@ -88,8 +90,7 @@ impl AwsmRenderer {
                 None
             };
 
-            let renderables = self.collect_renderables(false);
-            self.render_passes.geometry.render(&ctx, renderables)?;
+            self.render_passes.geometry.render(&ctx, renderables.opaque)?;
         }
 
         {
@@ -119,8 +120,7 @@ impl AwsmRenderer {
                 None
             };
 
-            let renderables = self.collect_renderables(false);
-            self.render_passes.material_transparent.render(&ctx, renderables)?;
+            self.render_passes.material_transparent.render(&ctx, renderables.transparent)?;
         }
 
         {

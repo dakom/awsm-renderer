@@ -1,4 +1,4 @@
-use crate::{camera::CameraExt, AwsmRenderer};
+use crate::{camera::CameraMatrices, AwsmRenderer};
 
 impl AwsmRenderer {
     // just a convenience function to update non-GPU properties
@@ -7,12 +7,11 @@ impl AwsmRenderer {
     pub fn update_all(
         &mut self,
         global_time_delta: f64,
-        camera: &impl CameraExt,
+        camera_matrices: CameraMatrices,
     ) -> crate::error::Result<()> {
         self.update_animations(global_time_delta)?;
         self.update_transforms();
-        self.update_skins();
-        self.update_camera(camera)?;
+        self.update_camera(camera_matrices)?;
 
         Ok(())
     }

@@ -27,6 +27,7 @@ pub struct Mesh {
     pub render_pipeline_key: RenderPipelineKey,
     pub draw_count: usize, // indices or vertices
     pub aabb: Option<Aabb>,
+    pub world_aabb: Option<Aabb>, // this is the transformed AABB, used for frustum culling and depth sorting
     pub transform_key: TransformKey,
     pub material_key: MaterialKey,
     pub morph_key: Option<MorphKey>,
@@ -62,13 +63,15 @@ impl Mesh {
             transform_key,
             material_key,
             aabb: None,
+            world_aabb: None,
             morph_key: None,
             skin_key: None,
         }
     }
 
     pub fn with_aabb(mut self, aabb: Aabb) -> Self {
-        self.aabb = Some(aabb);
+        self.aabb = Some(aabb.clone());
+        self.world_aabb = Some(aabb); // initially, world_aabb is the same as aabb
         self
     }
 

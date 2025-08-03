@@ -270,7 +270,7 @@ impl AppScene {
             self.renderer
                 .lock()
                 .await
-                .update_all(global_time_delta, &camera)?;
+                .update_all(global_time_delta, camera.matrices())?;
         }
 
         Ok(())

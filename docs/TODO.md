@@ -13,8 +13,6 @@
 2. Use in opaque material pass
 
 
-
-
 # World Position Reconstruction Math: 
 
 A common way to implement this is to reconstruct the view-space position first, then transform it to world space. In your shading shader:

@@ -87,6 +87,8 @@ If it's supported here, corresponding core functionality is also supported
 - [x] Transforms
     - One dynamic uniform bind group
     - Dirty flag
+- [ ] AABB
+    - Only update when transform changes
 - [x] Morphs
     - One dynamic uniform bind group for weights
         - gpu gating on dirty flag
