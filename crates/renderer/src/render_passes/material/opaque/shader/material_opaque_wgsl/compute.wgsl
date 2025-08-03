@@ -15,11 +15,16 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
 
-    let material_offset = textureLoad(material_offset_tex, coords, 0);
+    let material_offset = textureLoad(material_offset_tex, coords, 0).r;
     let world_normal = textureLoad(world_normal_tex, coords, 0);
     let screen_pos = textureLoad(screen_pos_tex, coords, 0);
+
+
+    var color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    if (material_offset == 1u) {
+        color = vec4<f32>(1.0, 0.0, 0.0, 1.0); // Temp color for testing
+    }
     
-    let color = vec4<f32>(1.0, 0.0, 0.0, 1.0); // Temp color for testing
     
     // Write to output texture
     textureStore(opaque_tex, coords, color);
