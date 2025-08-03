@@ -1,5 +1,8 @@
 use crate::{
-    atoms::checkbox::{Checkbox, CheckboxStyle}, models::collections::{GltfId, GLTF_SETS}, pages::app::{context::AppContext, scene::camera::CameraId, sidebar::current_model_signal}, prelude::*
+    atoms::checkbox::{Checkbox, CheckboxStyle},
+    models::collections::{GltfId, GLTF_SETS},
+    pages::app::{context::AppContext, scene::camera::CameraId, sidebar::current_model_signal},
+    prelude::*,
 };
 
 use super::render_dropdown_label;

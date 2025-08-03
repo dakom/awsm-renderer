@@ -1,18 +1,19 @@
 use askama::Template;
 
-use crate::{render_passes::composite::shader::cache_key::ShaderCacheKeyComposite, shaders::{AwsmShaderError, Result}};
+use crate::{
+    render_passes::composite::shader::cache_key::ShaderCacheKeyComposite,
+    shaders::{AwsmShaderError, Result},
+};
 
 #[derive(Template, Debug)]
 #[template(path = "composite_wgsl/compute.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateComposite {
-}
+pub struct ShaderTemplateComposite {}
 
 impl TryFrom<&ShaderCacheKeyComposite> for ShaderTemplateComposite {
     type Error = AwsmShaderError;
 
     fn try_from(value: &ShaderCacheKeyComposite) -> Result<Self> {
-        Ok(Self {
-        })
+        Ok(Self {})
     }
 }
 

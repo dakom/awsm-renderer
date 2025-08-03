@@ -115,7 +115,7 @@ impl GltfMeshBufferMorphInfo {
                          data: Option<&Cow<'_, [u8]>>| {
                             let stride_size = match attribute_kind {
                                 ShaderCacheKeyGeometryAttribute::Positions => 12, // vec3 of floats
-                                ShaderCacheKeyGeometryAttribute::Normals => 12, // vec3 of floats
+                                ShaderCacheKeyGeometryAttribute::Normals => 12,   // vec3 of floats
                                 ShaderCacheKeyGeometryAttribute::Tangents => 12, // vec3 of floats (yes, not a vec4, morph targets do not include w component)
                                 _ => unreachable!(),
                             };

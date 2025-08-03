@@ -204,27 +204,21 @@ impl GltfMeshBufferVertexInfo {
                             TempAttributeKind::Positions => {
                                 ShaderCacheKeyGeometryAttribute::Positions
                             }
-                            TempAttributeKind::Normals => {
-                                ShaderCacheKeyGeometryAttribute::Normals
-                            }
+                            TempAttributeKind::Normals => ShaderCacheKeyGeometryAttribute::Normals,
                             TempAttributeKind::Tangents => {
                                 ShaderCacheKeyGeometryAttribute::Tangents
                             }
-                            TempAttributeKind::Colors => {
-                                ShaderCacheKeyGeometryAttribute::Colors {
-                                    count: attribute_kind_count,
-                                }
-                            }
+                            TempAttributeKind::Colors => ShaderCacheKeyGeometryAttribute::Colors {
+                                count: attribute_kind_count,
+                            },
                             TempAttributeKind::TexCoords => {
                                 ShaderCacheKeyGeometryAttribute::TexCoords {
                                     count: attribute_kind_count,
                                 }
                             }
-                            TempAttributeKind::Joints => {
-                                ShaderCacheKeyGeometryAttribute::Joints {
-                                    count: attribute_kind_count,
-                                }
-                            }
+                            TempAttributeKind::Joints => ShaderCacheKeyGeometryAttribute::Joints {
+                                count: attribute_kind_count,
+                            },
                             TempAttributeKind::Weights => {
                                 ShaderCacheKeyGeometryAttribute::Weights {
                                     count: attribute_kind_count,

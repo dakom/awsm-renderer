@@ -175,7 +175,7 @@ impl From<ComputePipelineDescriptor<'_, '_>> for web_sys::GpuComputePipelineDesc
     }
 }
 
-impl From<ProgrammableStage<'_,'_>> for web_sys::GpuProgrammableStage {
+impl From<ProgrammableStage<'_, '_>> for web_sys::GpuProgrammableStage {
     fn from(compute: ProgrammableStage) -> web_sys::GpuProgrammableStage {
         let compute_js = web_sys::GpuProgrammableStage::new(&compute.module);
 

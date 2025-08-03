@@ -6,5 +6,5 @@ pub struct ShaderCacheKeyMaterialPbr {
     pub occlusion_uv_index: Option<u32>,
     pub emissive_uv_index: Option<u32>,
     pub has_alpha_mask: bool,
-    pub has_normals: bool
+    pub has_normals: bool,
 }

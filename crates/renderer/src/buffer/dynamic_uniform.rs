@@ -81,7 +81,7 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
     // * grow the buffer if needed
 
     // It does not touch the GPU, and can be called many times a frame
-    // first param is the offset into the buffer 
+    // first param is the offset into the buffer
     pub fn update_with(&mut self, key: K, f: impl FnOnce(usize, &mut [u8])) {
         // If we don't have a slot, set one
         let slot = match self.slot_indices.get(key) {
@@ -110,7 +110,10 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         let offset_bytes = slot * self.aligned_slice_size;
 
         // we can mutate the slice directly
-        f(offset_bytes, &mut self.raw_data[offset_bytes..offset_bytes + self.byte_size]);
+        f(
+            offset_bytes,
+            &mut self.raw_data[offset_bytes..offset_bytes + self.byte_size],
+        );
     }
 
     // Inserts or updates an item in the buffer

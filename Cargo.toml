@@ -229,5 +229,6 @@ features = [
     "GpuCanvasAlphaMode",
     "GpuCanvasToneMappingMode",
     "GpuCanvasToneMapping",
+    "GpuSupportedLimits",
     "gpu_color_write"
 ]

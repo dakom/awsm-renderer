@@ -39,7 +39,8 @@ impl AwsmRenderer {
         self.lights
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
         self.instances.write_gpu(&self.logging, &self.gpu)?;
-        self.meshes.skins
+        self.meshes
+            .skins
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
         self.meshes
             .morphs
@@ -51,14 +52,15 @@ impl AwsmRenderer {
         let render_texture_views = self.render_textures.views(&self.gpu)?;
 
         if render_texture_views.size_changed {
-            self.bind_groups.mark_create(BindGroupCreate::TextureViewResize);
+            self.bind_groups
+                .mark_create(BindGroupCreate::TextureViewResize);
         }
 
         self.bind_groups.recreate(
             BindGroupRecreateContext {
                 gpu: &self.gpu,
                 render_texture_views: &render_texture_views,
-                textures: &self.textures, 
+                textures: &self.textures,
                 materials: &self.materials,
                 bind_group_layouts: &mut self.bind_group_layouts,
                 meshes: &self.meshes,
@@ -66,7 +68,7 @@ impl AwsmRenderer {
                 lights: &self.lights,
                 transforms: &self.transforms,
             },
-            &mut self.render_passes
+            &mut self.render_passes,
         )?;
 
         let ctx = RenderContext {
@@ -90,7 +92,9 @@ impl AwsmRenderer {
                 None
             };
 
-            self.render_passes.geometry.render(&ctx, renderables.opaque)?;
+            self.render_passes
+                .geometry
+                .render(&ctx, renderables.opaque)?;
         }
 
         {
@@ -115,12 +119,17 @@ impl AwsmRenderer {
 
         {
             let _maybe_span_guard = if self.logging.render_timings {
-                Some(tracing::span!(tracing::Level::INFO, "Material Transparent RenderPass").entered())
+                Some(
+                    tracing::span!(tracing::Level::INFO, "Material Transparent RenderPass")
+                        .entered(),
+                )
             } else {
                 None
             };
 
-            self.render_passes.material_transparent.render(&ctx, renderables.transparent)?;
+            self.render_passes
+                .material_transparent
+                .render(&ctx, renderables.transparent)?;
         }
 
         {
@@ -144,7 +153,6 @@ impl AwsmRenderer {
         }
 
         self.gpu.submit_commands(&ctx.command_encoder.finish());
-
 
         Ok(())
     }

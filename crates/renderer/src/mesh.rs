@@ -4,14 +4,16 @@ mod meshes;
 pub mod morphs;
 pub mod skins;
 
-use awsm_renderer_core::{command::render_pass::RenderPassEncoder, pipeline::primitive::IndexFormat};
+use awsm_renderer_core::{
+    command::render_pass::RenderPassEncoder, pipeline::primitive::IndexFormat,
+};
 
-use crate::render_passes::geometry::bind_group::GeometryBindGroups;
-use crate::{bounds::Aabb, pipelines::render_pipeline::RenderPipelineKey};
 use crate::materials::MaterialKey;
 use crate::render::RenderContext;
-use skins::SkinKey;
+use crate::render_passes::geometry::bind_group::GeometryBindGroups;
 use crate::transforms::TransformKey;
+use crate::{bounds::Aabb, pipelines::render_pipeline::RenderPipelineKey};
+use skins::SkinKey;
 
 pub use buffer_info::*;
 pub use error::AwsmMeshError;
@@ -85,7 +87,13 @@ impl Mesh {
         self
     }
 
-    pub fn push_geometry_pass_commands(&self, ctx: &RenderContext, mesh_key: MeshKey, render_pass: &RenderPassEncoder, geometry_bind_groups: &GeometryBindGroups) -> Result<()> {
+    pub fn push_geometry_pass_commands(
+        &self,
+        ctx: &RenderContext,
+        mesh_key: MeshKey,
+        render_pass: &RenderPassEncoder,
+        geometry_bind_groups: &GeometryBindGroups,
+    ) -> Result<()> {
         let transform_offset = ctx.transforms.buffer_offset(self.transform_key)? as u32;
         let pbr_material_offset = ctx
             .materials
@@ -162,8 +170,7 @@ impl Mesh {
                 render_pass.draw_indexed(self.draw_count as u32);
             }
             (false, Some(instance_count)) => {
-                render_pass
-                    .draw_with_instance_count(self.draw_count as u32, instance_count as u32);
+                render_pass.draw_with_instance_count(self.draw_count as u32, instance_count as u32);
             }
             (true, Some(instance_count)) => {
                 render_pass.draw_indexed_with_instance_count(

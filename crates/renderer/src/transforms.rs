@@ -1,19 +1,30 @@
 use glam::{Mat4, Quat, Vec3};
 use thiserror::Error;
 
-use std::{collections::{HashMap, HashSet}, sync::LazyLock};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
-use awsm_renderer_core::{buffers::{BufferDescriptor, BufferUsage}, error::AwsmCoreError, renderer::AwsmRendererWebGpu};
+use awsm_renderer_core::{
+    buffers::{BufferDescriptor, BufferUsage},
+    error::AwsmCoreError,
+    renderer::AwsmRendererWebGpu,
+};
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::{
-    bind_groups::{AwsmBindGroupError, BindGroupCreate, BindGroups}, buffer::dynamic_uniform::DynamicUniformBuffer, mesh::skins::AwsmSkinError, AwsmRenderer, AwsmRendererLogging
+    bind_groups::{AwsmBindGroupError, BindGroupCreate, BindGroups},
+    buffer::dynamic_uniform::DynamicUniformBuffer,
+    mesh::skins::AwsmSkinError,
+    AwsmRenderer, AwsmRendererLogging,
 };
 
 impl AwsmRenderer {
     pub fn update_transforms(&mut self) {
         self.transforms.update_world();
-        self.meshes.update_world(self.transforms.take_dirty_meshes());
+        self.meshes
+            .update_world(self.transforms.take_dirty_meshes());
     }
 }
 
@@ -23,7 +34,7 @@ pub struct Transforms {
     children: SecondaryMap<TransformKey, Vec<TransformKey>>,
     parents: SecondaryMap<TransformKey, TransformKey>,
     // These are the transforms that are dirtied from the outside
-    // e.g. may be set multiples times by the user or randomly in the hierarchy 
+    // e.g. may be set multiples times by the user or randomly in the hierarchy
     dirties: HashSet<TransformKey>,
     // While we calculate the dirties, we can know if meshes need to be updated
     // this is set internally
@@ -35,7 +46,8 @@ pub struct Transforms {
     pub(crate) gpu_buffer: web_sys::GpuBuffer,
 }
 
-static BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| BufferUsage::new().with_uniform().with_copy_dst());
+static BUFFER_USAGE: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_uniform().with_copy_dst());
 
 impl Transforms {
     pub const INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
@@ -43,11 +55,14 @@ impl Transforms {
     pub const BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment
 
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
-            Some("Transforms"),
-            Transforms::INITIAL_CAPACITY * Transforms::BYTE_ALIGNMENT,
-            *BUFFER_USAGE,
-        ).into())?;
+        let gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Transforms"),
+                Transforms::INITIAL_CAPACITY * Transforms::BYTE_ALIGNMENT,
+                *BUFFER_USAGE,
+            )
+            .into(),
+        )?;
 
         let buffer = DynamicUniformBuffer::new(
             Self::INITIAL_CAPACITY,
@@ -195,11 +210,9 @@ impl Transforms {
             };
 
             if let Some(new_size) = self.buffer.take_gpu_needs_resize() {
-                self.gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
-                    Some("Transforms"),
-                    new_size,
-                    *BUFFER_USAGE,
-                ).into())?;
+                self.gpu_buffer = gpu.create_buffer(
+                    &BufferDescriptor::new(Some("Transforms"), new_size, *BUFFER_USAGE).into(),
+                )?;
 
                 bind_groups.mark_create(BindGroupCreate::TransformsResize);
             }
@@ -212,12 +225,14 @@ impl Transforms {
     }
 
     pub fn take_dirty_meshes(&mut self) -> HashMap<TransformKey, &Mat4> {
-        self.dirty_meshes.drain(..).map(|key| {
-            // this for sure exists since we just drained the key
-            let world_matrix = self.world_matrices.get(key).unwrap();
-            (key, world_matrix)
-        })
-        .collect()
+        self.dirty_meshes
+            .drain(..)
+            .map(|key| {
+                // this for sure exists since we just drained the key
+                let world_matrix = self.world_matrices.get(key).unwrap();
+                (key, world_matrix)
+            })
+            .collect()
     }
 
     pub fn buffer_offset(&self, key: TransformKey) -> Result<usize> {
@@ -285,7 +300,6 @@ impl Transforms {
     }
 }
 
-
 #[derive(Clone, Debug)]
 pub struct Transform {
     pub translation: Vec3,
@@ -336,7 +350,6 @@ impl Transform {
 new_key_type! {
     pub struct TransformKey;
 }
-
 
 pub type Result<T> = std::result::Result<T, AwsmTransformError>;
 

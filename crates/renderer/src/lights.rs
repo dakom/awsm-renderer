@@ -1,11 +1,17 @@
 use std::sync::LazyLock;
 
-use awsm_renderer_core::{buffers::{BufferDescriptor, BufferUsage}, error::AwsmCoreError, renderer::AwsmRendererWebGpu};
+use awsm_renderer_core::{
+    buffers::{BufferDescriptor, BufferUsage},
+    error::AwsmCoreError,
+    renderer::AwsmRendererWebGpu,
+};
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
 use crate::{
-    bind_groups::{BindGroupCreate, BindGroups}, buffer::dynamic_uniform::DynamicUniformBuffer, AwsmRendererLogging
+    bind_groups::{BindGroupCreate, BindGroups},
+    buffer::dynamic_uniform::DynamicUniformBuffer,
+    AwsmRendererLogging,
 };
 
 pub struct Lights {
@@ -168,7 +174,8 @@ impl Light {
     }
 }
 
-static BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
+static BUFFER_USAGE: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
 
 impl Lights {
     pub const INITIAL_ELEMENTS: usize = 8; // 8 lights is a decent baseline
@@ -176,11 +183,14 @@ impl Lights {
     pub const BYTE_SIZE: usize = 64;
 
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
-            Some("Lights"),
-            Self::INITIAL_ELEMENTS * Self::BYTE_ALIGNMENT,
-            *BUFFER_USAGE,
-        ).into())?;
+        let gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Lights"),
+                Self::INITIAL_ELEMENTS * Self::BYTE_ALIGNMENT,
+                *BUFFER_USAGE,
+            )
+            .into(),
+        )?;
 
         Ok(Lights {
             lights: SlotMap::with_key(),
@@ -237,16 +247,20 @@ impl Lights {
             };
 
             if let Some(new_size) = self.storage_buffer.take_gpu_needs_resize() {
-                self.gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
-                    Some("Lights"),
-                    new_size,
-                    *BUFFER_USAGE,
-                ).into())?;
+                self.gpu_buffer = gpu.create_buffer(
+                    &BufferDescriptor::new(Some("Lights"), new_size, *BUFFER_USAGE).into(),
+                )?;
 
                 bind_groups.mark_create(BindGroupCreate::LightsResize);
             }
 
-            gpu.write_buffer(&self.gpu_buffer, None, self.storage_buffer.raw_slice(), None, None)?;
+            gpu.write_buffer(
+                &self.gpu_buffer,
+                None,
+                self.storage_buffer.raw_slice(),
+                None,
+                None,
+            )?;
 
             // for (index, chunk) in self.storage_buffer.raw_slice().chunks_exact(64).enumerate() {
             //     let values = unsafe {
@@ -256,7 +270,6 @@ impl Lights {
             // }
 
             // tracing::info!("n_lights should be {}", self.storage_buffer.raw_slice().len() / (4 * 16));
-
 
             self.gpu_dirty = false;
         }

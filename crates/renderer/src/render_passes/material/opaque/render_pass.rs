@@ -1,9 +1,21 @@
-use awsm_renderer_core::{command::compute_pass::ComputePassDescriptor, renderer::AwsmRendererWebGpu};
-use crate::{error::Result, render::RenderContext, render_passes::{material::opaque::{bind_group::MaterialOpaqueBindGroups, pipeline::MaterialOpaquePipelines}, RenderPassInitContext}, AwsmRenderer};
+use crate::{
+    error::Result,
+    render::RenderContext,
+    render_passes::{
+        material::opaque::{
+            bind_group::MaterialOpaqueBindGroups, pipeline::MaterialOpaquePipelines,
+        },
+        RenderPassInitContext,
+    },
+    AwsmRenderer,
+};
+use awsm_renderer_core::{
+    command::compute_pass::ComputePassDescriptor, renderer::AwsmRendererWebGpu,
+};
 
 pub struct MaterialOpaqueRenderPass {
     pub bind_groups: MaterialOpaqueBindGroups,
-    pub pipelines: MaterialOpaquePipelines
+    pub pipelines: MaterialOpaquePipelines,
 }
 
 impl MaterialOpaqueRenderPass {
@@ -22,8 +34,13 @@ impl MaterialOpaqueRenderPass {
             &ComputePassDescriptor::new(Some("Material Opaque Pass")).into(),
         ));
 
-        let bind_group = self.bind_groups.get_bind_group(ctx.render_texture_views.curr_index)?;
-        let compute_pipeline = ctx.pipelines.compute.get(self.pipelines.compute_pipeline_key)?;
+        let bind_group = self
+            .bind_groups
+            .get_bind_group(ctx.render_texture_views.curr_index)?;
+        let compute_pipeline = ctx
+            .pipelines
+            .compute
+            .get(self.pipelines.compute_pipeline_key)?;
 
         compute_pass.set_pipeline(&compute_pipeline);
         compute_pass.set_bind_group(0, &bind_group, None)?;
@@ -32,7 +49,6 @@ impl MaterialOpaqueRenderPass {
         let workgroup_size_y = ctx.render_texture_views.height.div_ceil(8);
         compute_pass.dispatch_workgroups(workgroup_size_x, Some(workgroup_size_y), Some(1));
         compute_pass.end();
-
 
         Ok(())
     }

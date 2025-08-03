@@ -97,14 +97,11 @@ pub enum AwsmCoreError {
         largest_img_height: usize,
         atlas_width: usize,
         atlas_height: usize,
-        padding: usize
+        padding: usize,
     },
     #[cfg(feature = "atlas")]
     #[error("[gpu] Atlast depth {provided} is too small, required at least {required}")]
-    ImageAtlasDepthTooSmall {
-        provided: usize,
-        required: usize,
-    },
+    ImageAtlasDepthTooSmall { provided: usize, required: usize },
 
     #[error("[gpu] Failed to get Shader compilation info: {0}")]
     ShaderCompilationInfo(String),

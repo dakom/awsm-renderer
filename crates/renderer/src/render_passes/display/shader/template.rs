@@ -2,8 +2,18 @@ use std::collections::HashSet;
 
 use askama::Template;
 
-use crate::{render_passes::{display::shader::cache_key::ShaderCacheKeyDisplay, geometry::shader::cache_key::{ShaderCacheKeyGeometry, ShaderCacheKeyGeometryAttribute, ShaderCacheKeyGeometryMorphs}, material::template::{ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment}}, shaders::{print_shader_source, AwsmShaderError, Result}};
-
+use crate::{
+    render_passes::{
+        display::shader::cache_key::ShaderCacheKeyDisplay,
+        geometry::shader::cache_key::{
+            ShaderCacheKeyGeometry, ShaderCacheKeyGeometryAttribute, ShaderCacheKeyGeometryMorphs,
+        },
+        material::template::{
+            ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment,
+        },
+    },
+    shaders::{print_shader_source, AwsmShaderError, Result},
+};
 
 #[derive(Debug)]
 pub struct ShaderTemplateDisplay {
@@ -13,28 +23,23 @@ pub struct ShaderTemplateDisplay {
 
 #[derive(Template, Debug)]
 #[template(path = "display_wgsl/vertex.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateDisplayVertex {
-}
+pub struct ShaderTemplateDisplayVertex {}
 
 impl ShaderTemplateDisplayVertex {
     pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
-        Self {
-        }
+        Self {}
     }
 }
 
 #[derive(Template, Debug)]
 #[template(path = "display_wgsl/fragment.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateDisplayFragment {
-}
+pub struct ShaderTemplateDisplayFragment {}
 
 impl ShaderTemplateDisplayFragment {
     pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
-        Self {
-        }
+        Self {}
     }
 }
-
 
 impl TryFrom<&ShaderCacheKeyDisplay> for ShaderTemplateDisplay {
     type Error = AwsmShaderError;
@@ -46,7 +51,6 @@ impl TryFrom<&ShaderCacheKeyDisplay> for ShaderTemplateDisplay {
         })
     }
 }
-
 
 impl ShaderTemplateDisplay {
     pub fn into_source(self) -> Result<String> {

@@ -2,8 +2,17 @@ use std::collections::HashSet;
 
 use askama::Template;
 
-use crate::{render_passes::{geometry::shader::cache_key::{ShaderCacheKeyGeometry, ShaderCacheKeyGeometryAttribute, ShaderCacheKeyGeometryMorphs}, material::template::{ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment}}, shaders::{print_shader_source, AwsmShaderError, Result}};
-
+use crate::{
+    render_passes::{
+        geometry::shader::cache_key::{
+            ShaderCacheKeyGeometry, ShaderCacheKeyGeometryAttribute, ShaderCacheKeyGeometryMorphs,
+        },
+        material::template::{
+            ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment,
+        },
+    },
+    shaders::{print_shader_source, AwsmShaderError, Result},
+};
 
 #[derive(Debug)]
 pub struct ShaderTemplateGeometry {
@@ -28,7 +37,7 @@ pub struct ShaderTemplateGeometryVertex {
 
 impl ShaderTemplateGeometryVertex {
     pub fn new(cache_key: &ShaderCacheKeyGeometry) -> Self {
-                let mut has_normals = false;
+        let mut has_normals = false;
         let mut skins = None;
         let mut vertex_input_locations = Vec::new();
 
@@ -88,9 +97,7 @@ impl ShaderTemplateGeometryVertex {
                             "vec2<f32>".to_string()
                         }
                         ShaderCacheKeyGeometryAttribute::Joints { .. } => "vec4<u32>".to_string(),
-                        ShaderCacheKeyGeometryAttribute::Weights { .. } => {
-                            "vec4<f32>".to_string()
-                        }
+                        ShaderCacheKeyGeometryAttribute::Weights { .. } => "vec4<f32>".to_string(),
                     },
                 });
             }
@@ -114,24 +121,24 @@ impl ShaderTemplateGeometryVertex {
             has_normals,
             has_instance_transforms: cache_key.has_instance_transforms,
         }
-
     }
 }
 
 #[derive(Template, Debug)]
 #[template(path = "geometry_wgsl/fragment.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateGeometryFragment {
-    pub has_normals: bool
+    pub has_normals: bool,
 }
 
 impl ShaderTemplateGeometryFragment {
     pub fn new(cache_key: &ShaderCacheKeyGeometry) -> Self {
         Self {
-            has_normals: cache_key.attributes.contains(&ShaderCacheKeyGeometryAttribute::Normals),
+            has_normals: cache_key
+                .attributes
+                .contains(&ShaderCacheKeyGeometryAttribute::Normals),
         }
     }
 }
-
 
 impl TryFrom<&ShaderCacheKeyGeometry> for ShaderTemplateGeometry {
     type Error = AwsmShaderError;
@@ -143,7 +150,6 @@ impl TryFrom<&ShaderCacheKeyGeometry> for ShaderTemplateGeometry {
         })
     }
 }
-
 
 impl ShaderTemplateGeometry {
     pub fn into_source(self) -> Result<String> {

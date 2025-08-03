@@ -1,10 +1,26 @@
 use std::collections::{BTreeMap, HashMap};
 
-use awsm_renderer_core::{error::AwsmCoreError, pipeline::{constants::{ConstantOverrideKey, ConstantOverrideValue}, depth_stencil::DepthStencilState, fragment::{ColorTargetState, FragmentState}, layout::PipelineLayoutKind, primitive::PrimitiveState, vertex::{VertexBufferLayout, VertexState}, ComputePipelineDescriptor, ProgrammableStage, RenderPipelineDescriptor}, renderer::AwsmRendererWebGpu};
+use awsm_renderer_core::{
+    error::AwsmCoreError,
+    pipeline::{
+        constants::{ConstantOverrideKey, ConstantOverrideValue},
+        depth_stencil::DepthStencilState,
+        fragment::{ColorTargetState, FragmentState},
+        layout::PipelineLayoutKind,
+        primitive::PrimitiveState,
+        vertex::{VertexBufferLayout, VertexState},
+        ComputePipelineDescriptor, ProgrammableStage, RenderPipelineDescriptor,
+    },
+    renderer::AwsmRendererWebGpu,
+};
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
-use crate::{bind_groups::AwsmBindGroupError, pipeline_layouts::{AwsmPipelineLayoutError, PipelineLayoutKey, PipelineLayouts}, shaders::{ShaderKey, Shaders}};
+use crate::{
+    bind_groups::AwsmBindGroupError,
+    pipeline_layouts::{AwsmPipelineLayoutError, PipelineLayoutKey, PipelineLayouts},
+    shaders::{ShaderKey, Shaders},
+};
 
 pub struct ComputePipelines {
     lookup: SlotMap<ComputePipelineKey, web_sys::GpuComputePipeline>,
@@ -32,31 +48,35 @@ impl ComputePipelines {
 
         let cache_key_clone = cache_key.clone();
 
-        let shader_module = shaders
-            .get(cache_key.shader_key)
-            .ok_or(AwsmComputePipelineError::MissingShader(cache_key.shader_key))?;
+        let shader_module =
+            shaders
+                .get(cache_key.shader_key)
+                .ok_or(AwsmComputePipelineError::MissingShader(
+                    cache_key.shader_key,
+                ))?;
 
         let layout = pipeline_layouts.get(cache_key.layout_key)?;
 
         let mut programmable_stage = ProgrammableStage::new(shader_module, None);
         programmable_stage.constant_overrides = cache_key.constant_overrides;
 
-        let mut descriptor = ComputePipelineDescriptor::new(programmable_stage, PipelineLayoutKind::Custom(layout), None);
+        let mut descriptor = ComputePipelineDescriptor::new(
+            programmable_stage,
+            PipelineLayoutKind::Custom(layout),
+            None,
+        );
 
-        let pipeline = gpu
-            .create_compute_pipeline(&descriptor.into())
-            .await?;
+        let pipeline = gpu.create_compute_pipeline(&descriptor.into()).await?;
 
         let key = self.lookup.insert(pipeline);
         self.cache.insert(cache_key_clone, key);
         Ok(key)
     }
 
-    pub fn get(
-        &self,
-        key: ComputePipelineKey,
-    ) -> Result<&web_sys::GpuComputePipeline> {
-        self.lookup.get(key).ok_or(AwsmComputePipelineError::NotFound(key))
+    pub fn get(&self, key: ComputePipelineKey) -> Result<&web_sys::GpuComputePipeline> {
+        self.lookup
+            .get(key)
+            .ok_or(AwsmComputePipelineError::NotFound(key))
     }
 }
 
@@ -114,5 +134,5 @@ pub enum AwsmComputePipelineError {
     Core(#[from] AwsmCoreError),
 
     #[error("[compute pipeline] {0:?}")]
-    Layout(#[from] AwsmPipelineLayoutError)
+    Layout(#[from] AwsmPipelineLayoutError),
 }

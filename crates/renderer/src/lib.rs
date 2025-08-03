@@ -1,7 +1,7 @@
 #![allow(warnings)]
 
-pub mod bind_groups;
 pub mod bind_group_layout;
+pub mod bind_groups;
 pub mod bounds;
 pub mod buffer;
 pub mod camera;
@@ -10,11 +10,11 @@ pub mod instances;
 pub mod lights;
 pub mod materials;
 pub mod mesh;
-pub mod pipelines;
 pub mod pipeline_layouts;
+pub mod pipelines;
 pub mod render;
-pub mod render_textures;
 pub mod render_passes;
+pub mod render_textures;
 pub mod renderable;
 pub mod shaders;
 pub mod textures;
@@ -38,15 +38,21 @@ use camera::CameraBuffer;
 use instances::Instances;
 use lights::Lights;
 use materials::Materials;
+use mesh::skins::Skins;
 use mesh::Meshes;
 use pipelines::Pipelines;
 use shaders::Shaders;
-use mesh::skins::Skins;
 use textures::Textures;
 use transforms::Transforms;
 
-use crate::{bind_group_layout::BindGroupLayouts, pipeline_layouts::PipelineLayouts, render_passes::{geometry::bind_group::GeometryBindGroups, RenderPassInitContext, RenderPasses}, render_textures::{RenderTextureFormats, RenderTextures}};
-
+use crate::{
+    bind_group_layout::BindGroupLayouts,
+    pipeline_layouts::PipelineLayouts,
+    render_passes::{
+        geometry::bind_group::GeometryBindGroups, RenderPassInitContext, RenderPasses,
+    },
+    render_textures::{RenderTextureFormats, RenderTextures},
+};
 
 pub struct AwsmRenderer {
     pub gpu: core::renderer::AwsmRendererWebGpu,
@@ -178,7 +184,15 @@ impl AwsmRendererBuilder {
             textures,
         };
         let render_passes = RenderPasses::new(&mut render_pass_init).await?;
-        let RenderPassInitContext { gpu, bind_group_layouts, pipeline_layouts, pipelines, shaders, render_texture_formats, textures} = render_pass_init;
+        let RenderPassInitContext {
+            gpu,
+            bind_group_layouts,
+            pipeline_layouts,
+            pipelines,
+            shaders,
+            render_texture_formats,
+            textures,
+        } = render_pass_init;
 
         let bind_groups = BindGroups::new();
         let render_textures = RenderTextures::new(render_texture_formats);

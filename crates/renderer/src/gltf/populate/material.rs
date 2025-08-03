@@ -4,10 +4,25 @@ use crate::{
     gltf::{
         buffers::GltfMeshBufferInfo,
         error::{AwsmGltfError, Result},
-    }, materials::{
-        pbr::PbrMaterial, 
-        MaterialAlphaMode,
-    }, render_passes::{geometry::shader::cache_key::ShaderCacheKeyGeometryAttribute, material::{cache_key::ShaderCacheKeyMaterial, looks::{pbr::{bind_group::{PbrMaterialBindGroupCacheKey, PbrMaterialTextureCacheKey}, shader::cache_key::ShaderCacheKeyMaterialPbr}, shader_cache_key::ShaderCacheKeyMaterialLook}, opaque::shader::cache_key::ShaderCacheKeyMaterialOpaque, transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent}}, textures::{SamplerCacheKey, SamplerKey, TextureKey}, AwsmRenderer
+    },
+    materials::{pbr::PbrMaterial, MaterialAlphaMode},
+    render_passes::{
+        geometry::shader::cache_key::ShaderCacheKeyGeometryAttribute,
+        material::{
+            cache_key::ShaderCacheKeyMaterial,
+            looks::{
+                pbr::{
+                    bind_group::{PbrMaterialBindGroupCacheKey, PbrMaterialTextureCacheKey},
+                    shader::cache_key::ShaderCacheKeyMaterialPbr,
+                },
+                shader_cache_key::ShaderCacheKeyMaterialLook,
+            },
+            opaque::shader::cache_key::ShaderCacheKeyMaterialOpaque,
+            transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent,
+        },
+    },
+    textures::{SamplerCacheKey, SamplerKey, TextureKey},
+    AwsmRenderer,
 };
 
 use super::GltfPopulateContext;
@@ -110,16 +125,16 @@ impl GltfMaterialInfo {
         Ok(Self {
             bind_group_cache_key,
             shader_cache_key: match gltf_material.alpha_mode() {
-                gltf::material::AlphaMode::Opaque | gltf::material::AlphaMode::Mask => ShaderCacheKeyMaterial::Opaque(
-                    ShaderCacheKeyMaterialOpaque {
+                gltf::material::AlphaMode::Opaque | gltf::material::AlphaMode::Mask => {
+                    ShaderCacheKeyMaterial::Opaque(ShaderCacheKeyMaterialOpaque {
                         look: ShaderCacheKeyMaterialLook::Pbr(shader_cache_key),
-                    },
-                ),
-                gltf::material::AlphaMode::Blend => ShaderCacheKeyMaterial::Transparent(
-                    ShaderCacheKeyMaterialTransparent {
+                    })
+                }
+                gltf::material::AlphaMode::Blend => {
+                    ShaderCacheKeyMaterial::Transparent(ShaderCacheKeyMaterialTransparent {
                         look: ShaderCacheKeyMaterialLook::Pbr(shader_cache_key),
-                    },
-                ),
+                    })
+                }
             },
             material,
         })
@@ -148,57 +163,47 @@ impl GltfTextureInfo {
         renderer: &mut AwsmRenderer,
         ctx: &GltfPopulateContext,
     ) -> Result<(UvIndex, PbrMaterialTextureCacheKey)> {
-        let texture_cache_key = {
-            let lock = ctx.textures.lock().unwrap();
-            lock.get(&self.index).cloned()
+        let cache_key = {
+            let image_atlas = ctx.image_atlas.lock().unwrap();
+            image_atlas.lookup.get(&self.index).cloned()
         };
 
-        let (texture_key, sampler_key) = match texture_cache_key {
-            Some((texture_key, sampler_key)) => (texture_key, sampler_key),
+        let (atlas_layer_index, atlas_entry_index) = match cache_key {
+            Some((layer_index, entry_index)) => (layer_index, entry_index),
             None => {
-                let texture_key = self.create_texture_key(renderer, ctx).await?;
-                let sampler_key = self.create_sampler_key(renderer, ctx)?;
-                ctx.textures
-                    .lock()
-                    .unwrap()
-                    .insert(self.index, (texture_key, sampler_key));
-                (texture_key, sampler_key)
+                let gltf_texture = ctx
+                    .data
+                    .doc
+                    .textures()
+                    .nth(self.index)
+                    .ok_or(AwsmGltfError::MissingTextureDocIndex(self.index))?;
+                let texture_index = gltf_texture.source().index();
+                let image_data = ctx
+                    .data
+                    .images
+                    .get(texture_index)
+                    .ok_or(AwsmGltfError::MissingTextureIndex(texture_index))?;
+
+                let mut image_atlas = ctx.image_atlas.lock().unwrap();
+                let custom_id = image_atlas.counter;
+                image_atlas.counter += 1;
+
+                image_atlas
+                    .atlas
+                    .add_entries(vec![(image_data.clone(), Some(custom_id))])
+                    .map_err(AwsmGltfError::TextureAtlas)?;
+
+                image_atlas.atlas.find_custom_id_index(custom_id).unwrap() // safe, we just added it or errored already
             }
         };
 
         Ok((
             self.tex_coord_index,
             PbrMaterialTextureCacheKey {
-                texture_key,
-                sampler_key,
+                atlas_layer_index,
+                atlas_entry_index,
             },
         ))
-    }
-
-    async fn create_texture_key(
-        &self,
-        renderer: &mut AwsmRenderer,
-        ctx: &GltfPopulateContext,
-    ) -> Result<TextureKey> {
-        let gltf_texture = ctx
-            .data
-            .doc
-            .textures()
-            .nth(self.index)
-            .ok_or(AwsmGltfError::MissingTextureDocIndex(self.index))?;
-        let texture_index = gltf_texture.source().index();
-        let image = ctx
-            .data
-            .images
-            .get(texture_index)
-            .ok_or(AwsmGltfError::MissingTextureIndex(texture_index))?;
-
-        let texture = image
-            .create_texture(&renderer.gpu, None, ctx.generate_mipmaps)
-            .await
-            .map_err(AwsmGltfError::CreateTexture)?;
-
-        Ok(renderer.textures.add_texture(texture))
     }
 
     fn create_sampler_key(
@@ -286,6 +291,8 @@ impl GltfTextureInfo {
             }
         }
 
-        Ok(renderer.textures.get_sampler_key(&renderer.gpu, sampler_cache_key)?)
+        Ok(renderer
+            .textures
+            .get_sampler_key(&renderer.gpu, sampler_cache_key)?)
     }
 }

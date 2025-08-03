@@ -1,5 +1,13 @@
-use crate::{render_passes::{composite::shader::template::ShaderTemplateComposite, display::shader::template::ShaderTemplateDisplay, geometry::shader::template::ShaderTemplateGeometry, light_culling::shader::template::ShaderTemplateLightCulling, material::template::ShaderTemplateMaterial, shader_cache_key::ShaderCacheKeyRenderPass}, shaders::AwsmShaderError};
-
+use crate::{
+    render_passes::{
+        composite::shader::template::ShaderTemplateComposite,
+        display::shader::template::ShaderTemplateDisplay,
+        geometry::shader::template::ShaderTemplateGeometry,
+        light_culling::shader::template::ShaderTemplateLightCulling,
+        material::template::ShaderTemplateMaterial, shader_cache_key::ShaderCacheKeyRenderPass,
+    },
+    shaders::AwsmShaderError,
+};
 
 pub enum ShaderTemplateRenderPass {
     Geometry(ShaderTemplateGeometry),
@@ -14,11 +22,21 @@ impl TryFrom<&ShaderCacheKeyRenderPass> for ShaderTemplateRenderPass {
 
     fn try_from(value: &ShaderCacheKeyRenderPass) -> std::result::Result<Self, Self::Error> {
         match value {
-            ShaderCacheKeyRenderPass::Geometry(cache_key) => Ok(ShaderTemplateRenderPass::Geometry(cache_key.try_into()?)),
-            ShaderCacheKeyRenderPass::LightCulling(cache_key) => Ok(ShaderTemplateRenderPass::LightCulling(cache_key.try_into()?)),
-            ShaderCacheKeyRenderPass::Material(cache_key) => Ok(ShaderTemplateRenderPass::Material(cache_key.try_into()?)),
-            ShaderCacheKeyRenderPass::Composite(cache_key) => Ok(ShaderTemplateRenderPass::Composite(cache_key.try_into()?)),
-            ShaderCacheKeyRenderPass::Display(cache_key) => Ok(ShaderTemplateRenderPass::Display(cache_key.try_into()?)),
+            ShaderCacheKeyRenderPass::Geometry(cache_key) => {
+                Ok(ShaderTemplateRenderPass::Geometry(cache_key.try_into()?))
+            }
+            ShaderCacheKeyRenderPass::LightCulling(cache_key) => Ok(
+                ShaderTemplateRenderPass::LightCulling(cache_key.try_into()?),
+            ),
+            ShaderCacheKeyRenderPass::Material(cache_key) => {
+                Ok(ShaderTemplateRenderPass::Material(cache_key.try_into()?))
+            }
+            ShaderCacheKeyRenderPass::Composite(cache_key) => {
+                Ok(ShaderTemplateRenderPass::Composite(cache_key.try_into()?))
+            }
+            ShaderCacheKeyRenderPass::Display(cache_key) => {
+                Ok(ShaderTemplateRenderPass::Display(cache_key.try_into()?))
+            }
         }
     }
 }

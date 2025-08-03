@@ -1,13 +1,19 @@
 use std::collections::HashMap;
 
-use awsm_renderer_core::{error::AwsmCoreError, renderer::AwsmRendererWebGpu, shaders::ShaderModuleDescriptor};
+use awsm_renderer_core::{
+    error::AwsmCoreError, renderer::AwsmRendererWebGpu, shaders::ShaderModuleDescriptor,
+};
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
 use awsm_renderer_core::shaders::ShaderModuleExt;
 
-use crate::{render_passes::{shader_cache_key::ShaderCacheKeyRenderPass, shader_template::ShaderTemplateRenderPass}, AwsmRenderer};
-
+use crate::{
+    render_passes::{
+        shader_cache_key::ShaderCacheKeyRenderPass, shader_template::ShaderTemplateRenderPass,
+    },
+    AwsmRenderer,
+};
 
 pub struct Shaders {
     lookup: SlotMap<ShaderKey, web_sys::GpuShaderModule>,
@@ -21,13 +27,18 @@ impl Shaders {
         }
     }
 
-    pub async fn get_key(&mut self, gpu: &AwsmRendererWebGpu, cache_key: impl Into<ShaderCacheKey>) -> Result<ShaderKey> {
+    pub async fn get_key(
+        &mut self,
+        gpu: &AwsmRendererWebGpu,
+        cache_key: impl Into<ShaderCacheKey>,
+    ) -> Result<ShaderKey> {
         let cache_key: ShaderCacheKey = cache_key.into();
         if let Some(shader_key) = self.cache.get(&cache_key) {
             return Ok(shader_key.clone());
         }
 
-        let shader_module = gpu.compile_shader(&ShaderTemplate::try_from(&cache_key)?.into_descriptor()?);
+        let shader_module =
+            gpu.compile_shader(&ShaderTemplate::try_from(&cache_key)?.into_descriptor()?);
 
         shader_module
             .validate_shader()
@@ -57,7 +68,6 @@ pub enum ShaderCacheKey {
     RenderPass(ShaderCacheKeyRenderPass),
 }
 
-
 pub enum ShaderTemplate {
     RenderPass(ShaderTemplateRenderPass),
 }
@@ -67,7 +77,9 @@ impl TryFrom<&ShaderCacheKey> for ShaderTemplate {
 
     fn try_from(value: &ShaderCacheKey) -> Result<Self> {
         match value {
-            ShaderCacheKey::RenderPass(cache_key) => Ok(ShaderTemplate::RenderPass(cache_key.try_into()?)),
+            ShaderCacheKey::RenderPass(cache_key) => {
+                Ok(ShaderTemplate::RenderPass(cache_key.try_into()?))
+            }
         }
     }
 }
@@ -83,7 +95,6 @@ impl ShaderTemplate {
     pub fn into_descriptor(self) -> Result<web_sys::GpuShaderModuleDescriptor> {
         Ok(ShaderModuleDescriptor::new(&self.into_source()?, None).into())
     }
-
 
     #[cfg(debug_assertions)]
     pub fn debug_label(&self) -> Option<&str> {

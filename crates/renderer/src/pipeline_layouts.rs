@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use awsm_renderer_core::{error::AwsmCoreError, pipeline::layout::PipelineLayoutDescriptor, renderer::AwsmRendererWebGpu};
+use awsm_renderer_core::{
+    error::AwsmCoreError, pipeline::layout::PipelineLayoutDescriptor, renderer::AwsmRendererWebGpu,
+};
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
@@ -40,18 +42,19 @@ impl PipelineLayouts {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let pipeline_layout = gpu.create_pipeline_layout(&PipelineLayoutDescriptor::new(None, pipeline_bind_group_layouts).into());
+        let pipeline_layout = gpu.create_pipeline_layout(
+            &PipelineLayoutDescriptor::new(None, pipeline_bind_group_layouts).into(),
+        );
 
         let key = self.lookup.insert(pipeline_layout);
         self.cache.insert(cache_key, key);
         Ok(key)
     }
 
-    pub fn get(
-        &self,
-        key: PipelineLayoutKey,
-    ) -> Result<&web_sys::GpuPipelineLayout> {
-        self.lookup.get(key).ok_or(AwsmPipelineLayoutError::NotFound(key))
+    pub fn get(&self, key: PipelineLayoutKey) -> Result<&web_sys::GpuPipelineLayout> {
+        self.lookup
+            .get(key)
+            .ok_or(AwsmPipelineLayoutError::NotFound(key))
     }
 }
 
@@ -72,7 +75,6 @@ impl PipelineLayoutCacheKey {
     }
 }
 
-
 new_key_type! {
     pub struct PipelineLayoutKey;
 }
@@ -88,5 +90,5 @@ pub enum AwsmPipelineLayoutError {
     NotFound(PipelineLayoutKey),
 
     #[error("[pipeline layout] {0:?}")]
-    BindGroupLayout(#[from] AwsmBindGroupLayoutError)
+    BindGroupLayout(#[from] AwsmBindGroupLayoutError),
 }

@@ -1,7 +1,9 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::{bind_groups::AwsmBindGroupError, mesh::skins::AwsmSkinError, transforms::AwsmTransformError};
+use crate::{
+    bind_groups::AwsmBindGroupError, mesh::skins::AwsmSkinError, transforms::AwsmTransformError,
+};
 
 use super::{morphs::MorphKey, MeshKey};
 

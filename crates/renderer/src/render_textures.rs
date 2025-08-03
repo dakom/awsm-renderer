@@ -1,5 +1,8 @@
 use awsm_renderer_core::{
-    error::AwsmCoreError, pipeline::fragment::ColorTargetState, renderer::AwsmRendererWebGpu, texture::{Extent3d, TextureDescriptor, TextureFormat, TextureUsage}
+    error::AwsmCoreError,
+    pipeline::fragment::ColorTargetState,
+    renderer::AwsmRendererWebGpu,
+    texture::{Extent3d, TextureDescriptor, TextureFormat, TextureUsage},
 };
 use thiserror::Error;
 
@@ -32,7 +35,6 @@ pub struct RenderTextureFormats {
 
     // For depth testing and OIT
     pub depth: TextureFormat,
-
     // note - output from the composite pass will be whatever the gpu texture format is
 }
 
@@ -41,13 +43,13 @@ impl Default for RenderTextureFormats {
         Self {
             material_offset: TextureFormat::R32uint,
             world_normal: TextureFormat::Rgba16float,
-            screen_pos: TextureFormat::Rgba16float, // just xy, z is for depth 
+            screen_pos: TextureFormat::Rgba16float, // just xy, z is for depth
             motion_vector: TextureFormat::Rg32float, // just xy, z is not needed
             opaque_color: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
-            oit_rgb: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
-            oit_alpha: TextureFormat::R32float, // Alpha channel for OIT
-            composite: TextureFormat::Rgba8unorm, // Final composite output format 
-            depth: TextureFormat::Depth24plus, // Depth format for depth testing
+            oit_rgb: TextureFormat::Rgba16float,    // HDR format for bloom/tonemapping
+            oit_alpha: TextureFormat::R32float,     // Alpha channel for OIT
+            composite: TextureFormat::Rgba8unorm,   // Final composite output format
+            depth: TextureFormat::Depth24plus,      // Depth format for depth testing
         }
     }
 }
@@ -74,13 +76,13 @@ impl RenderTextures {
     }
 
     pub fn views(&mut self, gpu: &AwsmRendererWebGpu) -> Result<RenderTextureViews> {
-        let current_size = gpu.current_context_texture_size().map_err(AwsmRenderTextureError::CurrentScreenSize)?;
+        let current_size = gpu
+            .current_context_texture_size()
+            .map_err(AwsmRenderTextureError::CurrentScreenSize)?;
 
         let size_changed = match self.inner.as_ref() {
-            Some(inner) => {
-                (inner.width, inner.height) != current_size
-            },
-            None => true
+            Some(inner) => (inner.width, inner.height) != current_size,
+            None => true,
         };
 
         if size_changed {
@@ -88,12 +90,22 @@ impl RenderTextures {
                 inner.destroy();
             }
 
-            let inner =
-                RenderTexturesInner::new(gpu, self.formats.clone(), current_size.0, current_size.1)?;
+            let inner = RenderTexturesInner::new(
+                gpu,
+                self.formats.clone(),
+                current_size.0,
+                current_size.1,
+            )?;
             self.inner = Some(inner);
         }
 
-        Ok(RenderTextureViews::new(self.inner.as_ref().unwrap(), self.ping_pong(), current_size.0, current_size.1, size_changed))
+        Ok(RenderTextureViews::new(
+            self.inner.as_ref().unwrap(),
+            self.ping_pong(),
+            current_size.0,
+            current_size.1,
+            size_changed,
+        ))
     }
 }
 
@@ -123,13 +135,22 @@ pub struct RenderTextureViews {
 }
 
 impl RenderTextureViews {
-    pub fn new(inner: &RenderTexturesInner, ping_pong: bool, width: u32, height: u32, size_changed: bool) -> Self {
+    pub fn new(
+        inner: &RenderTexturesInner,
+        ping_pong: bool,
+        width: u32,
+        height: u32,
+        size_changed: bool,
+    ) -> Self {
         let curr_index = if ping_pong { 0 } else { 1 };
         let prev_index = if ping_pong { 1 } else { 0 };
         Self {
             material_offset: inner.material_offset_view.clone(),
             world_normal: inner.world_normal_view.clone(),
-            screen_pos: [inner.screen_pos_views[0].clone(), inner.screen_pos_views[1].clone()],
+            screen_pos: [
+                inner.screen_pos_views[0].clone(),
+                inner.screen_pos_views[1].clone(),
+            ],
             motion_vector: inner.motion_vector_view.clone(),
             opaque_color: inner.opaque_color_view.clone(),
             oit_rgb: inner.oit_rgb_view.clone(),
@@ -153,8 +174,8 @@ pub struct RenderTexturesInner {
     pub world_normal: web_sys::GpuTexture,
     pub world_normal_view: web_sys::GpuTextureView,
 
-    pub screen_pos: [web_sys::GpuTexture;2],
-    pub screen_pos_views: [web_sys::GpuTextureView;2],
+    pub screen_pos: [web_sys::GpuTexture; 2],
+    pub screen_pos_views: [web_sys::GpuTextureView; 2],
 
     pub motion_vector: web_sys::GpuTexture,
     pub motion_vector_view: web_sys::GpuTextureView,
@@ -185,31 +206,34 @@ impl RenderTexturesInner {
         width: u32,
         height: u32,
     ) -> Result<Self> {
-
         // 1. Create all textures
-        let material_offset = gpu.create_texture(
-            &TextureDescriptor::new(
-                render_texture_formats.material_offset,
-                Extent3d::new(width, Some(height), Some(1)),
-                TextureUsage::new()
-                    .with_render_attachment()
-                    .with_texture_binding(),
+        let material_offset = gpu
+            .create_texture(
+                &TextureDescriptor::new(
+                    render_texture_formats.material_offset,
+                    Extent3d::new(width, Some(height), Some(1)),
+                    TextureUsage::new()
+                        .with_render_attachment()
+                        .with_texture_binding(),
+                )
+                .with_label("Material Offset")
+                .into(),
             )
-            .with_label("Material Offset")
-            .into(),
-        ).map_err(AwsmRenderTextureError::CreateTexture)?;
+            .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let world_normal = gpu.create_texture(
-            &TextureDescriptor::new(
-                render_texture_formats.world_normal,
-                Extent3d::new(width, Some(height), Some(1)),
-                TextureUsage::new()
-                    .with_render_attachment()
-                    .with_texture_binding(),
+        let world_normal = gpu
+            .create_texture(
+                &TextureDescriptor::new(
+                    render_texture_formats.world_normal,
+                    Extent3d::new(width, Some(height), Some(1)),
+                    TextureUsage::new()
+                        .with_render_attachment()
+                        .with_texture_binding(),
+                )
+                .with_label("World Normal")
+                .into(),
             )
-            .with_label("World Normal")
-            .into(),
-        ).map_err(AwsmRenderTextureError::CreateTexture)?;
+            .map_err(AwsmRenderTextureError::CreateTexture)?;
 
         let screen_pos = [
             gpu.create_texture(
@@ -222,7 +246,8 @@ impl RenderTexturesInner {
                 )
                 .with_label("Screen Position (0)")
                 .into(),
-            ).map_err(AwsmRenderTextureError::CreateTexture)?,
+            )
+            .map_err(AwsmRenderTextureError::CreateTexture)?,
             gpu.create_texture(
                 &TextureDescriptor::new(
                     render_texture_formats.screen_pos,
@@ -233,79 +258,91 @@ impl RenderTexturesInner {
                 )
                 .with_label("Screen Position (1)")
                 .into(),
-            ).map_err(AwsmRenderTextureError::CreateTexture)?,
+            )
+            .map_err(AwsmRenderTextureError::CreateTexture)?,
         ];
 
-        let motion_vector = gpu.create_texture(
-            &TextureDescriptor::new(
-                render_texture_formats.motion_vector,
-                Extent3d::new(width, Some(height), Some(1)),
-                TextureUsage::new()
-                    .with_render_attachment()
-                    .with_texture_binding(),
+        let motion_vector = gpu
+            .create_texture(
+                &TextureDescriptor::new(
+                    render_texture_formats.motion_vector,
+                    Extent3d::new(width, Some(height), Some(1)),
+                    TextureUsage::new()
+                        .with_render_attachment()
+                        .with_texture_binding(),
+                )
+                .with_label("Motion Vector")
+                .into(),
             )
-            .with_label("Motion Vector")
-            .into(),
-        ).map_err(AwsmRenderTextureError::CreateTexture)?;
+            .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let opaque_color = gpu.create_texture(
-            &TextureDescriptor::new(
-                render_texture_formats.opaque_color,
-                Extent3d::new(width, Some(height), Some(1)),
-                TextureUsage::new()
-                    .with_storage_binding()
-                    .with_texture_binding(),
+        let opaque_color = gpu
+            .create_texture(
+                &TextureDescriptor::new(
+                    render_texture_formats.opaque_color,
+                    Extent3d::new(width, Some(height), Some(1)),
+                    TextureUsage::new()
+                        .with_storage_binding()
+                        .with_texture_binding(),
+                )
+                .with_label("Opaque Color")
+                .into(),
             )
-            .with_label("Opaque Color")
-            .into(),
-        ).map_err(AwsmRenderTextureError::CreateTexture)?;
+            .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let oit_rgb = gpu.create_texture(
-            &TextureDescriptor::new(
-                render_texture_formats.oit_rgb,
-                Extent3d::new(width, Some(height), Some(1)),
-                TextureUsage::new()
-                    .with_render_attachment()
-                    .with_texture_binding(),
+        let oit_rgb = gpu
+            .create_texture(
+                &TextureDescriptor::new(
+                    render_texture_formats.oit_rgb,
+                    Extent3d::new(width, Some(height), Some(1)),
+                    TextureUsage::new()
+                        .with_render_attachment()
+                        .with_texture_binding(),
+                )
+                .with_label("OIT RGB")
+                .into(),
             )
-            .with_label("OIT RGB")
-            .into(),
-        ).map_err(AwsmRenderTextureError::CreateTexture)?;
+            .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let oit_alpha = gpu.create_texture(
-            &TextureDescriptor::new(
-                render_texture_formats.oit_alpha,
-                Extent3d::new(width, Some(height), Some(1)),
-                TextureUsage::new()
-                    .with_render_attachment()
-                    .with_texture_binding(),
+        let oit_alpha = gpu
+            .create_texture(
+                &TextureDescriptor::new(
+                    render_texture_formats.oit_alpha,
+                    Extent3d::new(width, Some(height), Some(1)),
+                    TextureUsage::new()
+                        .with_render_attachment()
+                        .with_texture_binding(),
+                )
+                .with_label("OIT Alpha")
+                .into(),
             )
-            .with_label("OIT Alpha")
-            .into(),
-        ).map_err(AwsmRenderTextureError::CreateTexture)?;
+            .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let depth = gpu.create_texture(
-            &TextureDescriptor::new(
-                render_texture_formats.depth,
-                Extent3d::new(width, Some(height), Some(1)),
-                TextureUsage::new()
-                    .with_render_attachment()
+        let depth = gpu
+            .create_texture(
+                &TextureDescriptor::new(
+                    render_texture_formats.depth,
+                    Extent3d::new(width, Some(height), Some(1)),
+                    TextureUsage::new().with_render_attachment(),
+                )
+                .with_label("Depth")
+                .into(),
             )
-            .with_label("Depth")
-            .into(),
-        ).map_err(AwsmRenderTextureError::CreateTexture)?;
+            .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let composite = gpu.create_texture(
-            &TextureDescriptor::new(
-                render_texture_formats.composite,
-                Extent3d::new(width, Some(height), Some(1)),
-                TextureUsage::new()
-                    .with_storage_binding()
-                    .with_texture_binding()
+        let composite = gpu
+            .create_texture(
+                &TextureDescriptor::new(
+                    render_texture_formats.composite,
+                    Extent3d::new(width, Some(height), Some(1)),
+                    TextureUsage::new()
+                        .with_storage_binding()
+                        .with_texture_binding(),
+                )
+                .with_label("Composite")
+                .into(),
             )
-            .with_label("Composite")
-            .into(),
-        ).map_err(AwsmRenderTextureError::CreateTexture)?;
+            .map_err(AwsmRenderTextureError::CreateTexture)?;
 
         // 2. Create views for all textures
 
@@ -334,21 +371,21 @@ impl RenderTexturesInner {
             AwsmRenderTextureError::CreateTextureView(format!("opaque_color: {e:?}"))
         })?;
 
-        let oit_rgb_view = oit_rgb.create_view().map_err(|e| {
-            AwsmRenderTextureError::CreateTextureView(format!("oit_rgb: {e:?}"))
-        })?;
+        let oit_rgb_view = oit_rgb
+            .create_view()
+            .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("oit_rgb: {e:?}")))?;
 
-        let oit_alpha_view = oit_alpha.create_view().map_err(|e| {
-            AwsmRenderTextureError::CreateTextureView(format!("oit_alpha: {e:?}"))
-        })?;
+        let oit_alpha_view = oit_alpha
+            .create_view()
+            .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("oit_alpha: {e:?}")))?;
 
-        let depth_view = depth.create_view().map_err(|e| {
-            AwsmRenderTextureError::CreateTextureView(format!("depth: {e:?}"))
-        })?;
+        let depth_view = depth
+            .create_view()
+            .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("depth: {e:?}")))?;
 
-        let composite_view = composite.create_view().map_err(|e| {
-            AwsmRenderTextureError::CreateTextureView(format!("composite: {e:?}"))
-        })?;
+        let composite_view = composite
+            .create_view()
+            .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("composite: {e:?}")))?;
 
         Ok(Self {
             material_offset,
@@ -381,13 +418,12 @@ impl RenderTexturesInner {
             width,
             height,
         })
-
     }
 
     pub fn destroy(self) {
         self.material_offset.destroy();
         self.world_normal.destroy();
-        for texture in self.screen_pos{
+        for texture in self.screen_pos {
             texture.destroy();
         }
         self.motion_vector.destroy();

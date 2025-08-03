@@ -1,6 +1,9 @@
 use askama::Template;
 
-use crate::{render_passes::material::transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent, shaders::{Result, AwsmShaderError}};
+use crate::{
+    render_passes::material::transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent,
+    shaders::{AwsmShaderError, Result},
+};
 
 #[derive(Debug)]
 pub struct ShaderTemplateMaterialTransparent {
@@ -9,14 +12,18 @@ pub struct ShaderTemplateMaterialTransparent {
 }
 
 #[derive(Template, Debug)]
-#[template(path = "material_transparent_wgsl/vertex.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateTransparentMaterialVertex {
-}
+#[template(
+    path = "material_transparent_wgsl/vertex.wgsl",
+    whitespace = "minimize"
+)]
+pub struct ShaderTemplateTransparentMaterialVertex {}
 
 #[derive(Template, Debug)]
-#[template(path = "material_transparent_wgsl/fragment.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateTransparentMaterialFragment {
-}
+#[template(
+    path = "material_transparent_wgsl/fragment.wgsl",
+    whitespace = "minimize"
+)]
+pub struct ShaderTemplateTransparentMaterialFragment {}
 
 impl TryFrom<&ShaderCacheKeyMaterialTransparent> for ShaderTemplateMaterialTransparent {
     type Error = AwsmShaderError;

@@ -6,11 +6,11 @@ use mipmap::generate_mipmaps;
 use std::borrow::Cow;
 use wasm_bindgen::prelude::*;
 
+#[cfg(feature = "atlas")]
+pub mod atlas;
 pub mod bitmap;
 #[cfg(feature = "exr")]
 pub mod exr;
-#[cfg(feature = "atlas")]
-pub mod atlas;
 pub mod mipmap;
 
 #[derive(Clone, Debug)]
@@ -170,8 +170,7 @@ impl ImageData {
         let mipmap_levels = if generate_mipmap {
             let (width, height) = self.size();
 
-            let mipmap_levels =
-                mipmap::calculate_mipmap_levels(width, height);
+            let mipmap_levels = mipmap::calculate_mipmap_levels(width, height);
 
             descriptor = descriptor.with_mip_level_count(mipmap_levels);
 
@@ -192,14 +191,7 @@ impl ImageData {
 
         if let Some(mipmap_levels) = mipmap_levels {
             let (width, height) = self.size();
-            generate_mipmaps(
-                gpu,
-                &texture,
-                width,
-                height,
-                mipmap_levels,
-            )
-            .await?;
+            generate_mipmaps(gpu, &texture, width, height, mipmap_levels).await?;
         }
 
         Ok(texture)

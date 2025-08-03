@@ -10,8 +10,11 @@ use awsm_renderer_core::{
 use strum::{EnumIter, IntoEnumIterator};
 use thiserror::Error;
 
-use crate::{bind_group_layout::BindGroupLayouts, camera::CameraBuffer, lights::Lights, materials::Materials, mesh::Meshes, render_passes::RenderPasses, render_textures::RenderTextureViews, textures::Textures, transforms::Transforms};
-
+use crate::{
+    bind_group_layout::BindGroupLayouts, camera::CameraBuffer, lights::Lights,
+    materials::Materials, mesh::Meshes, render_passes::RenderPasses,
+    render_textures::RenderTextureViews, textures::Textures, transforms::Transforms,
+};
 
 // There are no cache keys for bind groups, they are created on demand
 // Since changes to storages, uniforms, and textures are the reason to recreate bind groups,
@@ -44,18 +47,18 @@ pub enum BindGroupCreate {
     MorphTargetValuesResize,
     SkinJointMatricesResize,
     PbrMaterialUniformResize,
-    TextureViewResize
+    TextureViewResize,
 }
 
 pub struct BindGroups {
-    create_list: HashSet<BindGroupCreate>
+    create_list: HashSet<BindGroupCreate>,
 }
 
 impl BindGroups {
     pub fn new() -> Self {
         Self {
             // startup means all bind groups are "re"created
-            create_list: BindGroupCreate::iter().collect::<HashSet<_>>()
+            create_list: BindGroupCreate::iter().collect::<HashSet<_>>(),
         }
     }
 
@@ -63,26 +66,62 @@ impl BindGroups {
         self.create_list.insert(create);
     }
 
-
-    pub fn recreate(&mut self, ctx: BindGroupRecreateContext<'_>, render_passes: &mut RenderPasses) -> crate::error::Result<()> {
-        if self.create_list.contains(&BindGroupCreate::CameraInitOnly) || self.create_list.contains(&BindGroupCreate::LightsResize) {
-            render_passes.geometry.bind_groups.camera_lights.recreate(&ctx)?;
+    pub fn recreate(
+        &mut self,
+        ctx: BindGroupRecreateContext<'_>,
+        render_passes: &mut RenderPasses,
+    ) -> crate::error::Result<()> {
+        if self.create_list.contains(&BindGroupCreate::CameraInitOnly)
+            || self.create_list.contains(&BindGroupCreate::LightsResize)
+        {
+            render_passes
+                .geometry
+                .bind_groups
+                .camera_lights
+                .recreate(&ctx)?;
         }
 
-        if self.create_list.contains(&BindGroupCreate::TransformsResize) || self.create_list.contains(&BindGroupCreate::PbrMaterialUniformResize) {
-            render_passes.geometry.bind_groups.transform_materials.recreate(&ctx)?;
+        if self
+            .create_list
+            .contains(&BindGroupCreate::TransformsResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::PbrMaterialUniformResize)
+        {
+            render_passes
+                .geometry
+                .bind_groups
+                .transform_materials
+                .recreate(&ctx)?;
         }
 
-        if self.create_list.contains(&BindGroupCreate::MorphTargetWeightsResize) 
-        || self.create_list.contains(&BindGroupCreate::MorphTargetValuesResize) 
-        || self.create_list.contains(&BindGroupCreate::SkinJointMatricesResize) {
-            render_passes.geometry.bind_groups.vertex_animation.recreate(&ctx)?;
+        if self
+            .create_list
+            .contains(&BindGroupCreate::MorphTargetWeightsResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::MorphTargetValuesResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::SkinJointMatricesResize)
+        {
+            render_passes
+                .geometry
+                .bind_groups
+                .vertex_animation
+                .recreate(&ctx)?;
         }
 
-        if self.create_list.contains(&BindGroupCreate::TextureViewResize) {
+        if self
+            .create_list
+            .contains(&BindGroupCreate::TextureViewResize)
+        {
             render_passes.light_culling.bind_groups.recreate(&ctx)?;
             render_passes.material_opaque.bind_groups.recreate(&ctx)?;
-            render_passes.material_transparent.bind_groups.recreate(&ctx)?;
+            render_passes
+                .material_transparent
+                .bind_groups
+                .recreate(&ctx)?;
             render_passes.composite.bind_groups.recreate(&ctx)?;
             render_passes.display.bind_groups.recreate(&ctx)?;
         }

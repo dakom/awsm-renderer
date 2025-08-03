@@ -1,9 +1,20 @@
+use crate::{
+    error::Result,
+    render::RenderContext,
+    render_passes::{
+        material::transparent::{
+            bind_group::MaterialTransparentBindGroups, pipeline::MaterialTransparentPipelines,
+        },
+        RenderPassInitContext,
+    },
+    renderable::{self, Renderable},
+    AwsmRenderer,
+};
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
-use crate::{error::Result, render::RenderContext, render_passes::{material::transparent::{bind_group::MaterialTransparentBindGroups, pipeline::MaterialTransparentPipelines}, RenderPassInitContext}, renderable::{self, Renderable}, AwsmRenderer};
 
 pub struct MaterialTransparentRenderPass {
     pub bind_groups: MaterialTransparentBindGroups,
-    pub pipelines: MaterialTransparentPipelines
+    pub pipelines: MaterialTransparentPipelines,
 }
 
 impl MaterialTransparentRenderPass {

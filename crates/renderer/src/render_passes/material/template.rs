@@ -1,6 +1,16 @@
 use askama::Template;
 
-use crate::{render_passes::material::{cache_key::ShaderCacheKeyMaterial, opaque::shader::template::ShaderTemplateMaterialOpaque, transparent::shader::{cache_key::ShaderCacheKeyMaterialTransparent, template::ShaderTemplateMaterialTransparent}}, shaders::{AwsmShaderError, Result}};
+use crate::{
+    render_passes::material::{
+        cache_key::ShaderCacheKeyMaterial,
+        opaque::shader::template::ShaderTemplateMaterialOpaque,
+        transparent::shader::{
+            cache_key::ShaderCacheKeyMaterialTransparent,
+            template::ShaderTemplateMaterialTransparent,
+        },
+    },
+    shaders::{AwsmShaderError, Result},
+};
 
 #[derive(Debug)]
 pub enum ShaderTemplateMaterial {
@@ -13,8 +23,12 @@ impl TryFrom<&ShaderCacheKeyMaterial> for ShaderTemplateMaterial {
 
     fn try_from(value: &ShaderCacheKeyMaterial) -> Result<Self> {
         match value {
-            ShaderCacheKeyMaterial::Opaque(cache_key) => Ok(ShaderTemplateMaterial::Opaque(cache_key.try_into()?)),
-            ShaderCacheKeyMaterial::Transparent(cache_key) => Ok(ShaderTemplateMaterial::Transparent(cache_key.try_into()?)),
+            ShaderCacheKeyMaterial::Opaque(cache_key) => {
+                Ok(ShaderTemplateMaterial::Opaque(cache_key.try_into()?))
+            }
+            ShaderCacheKeyMaterial::Transparent(cache_key) => {
+                Ok(ShaderTemplateMaterial::Transparent(cache_key.try_into()?))
+            }
         }
     }
 }

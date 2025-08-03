@@ -1,13 +1,31 @@
 use awsm_renderer_core::{renderer::AwsmRendererWebGpu, texture::TextureFormat};
 
-use crate::{bind_group_layout::BindGroupLayouts, bind_groups::BindGroups, pipeline_layouts::PipelineLayouts, pipelines::Pipelines, render_passes::{composite::render_pass::CompositeRenderPass, display::render_pass::DisplayRenderPass, geometry::render_pass::GeometryRenderPass, light_culling::render_pass::LightCullingRenderPass, material::{opaque::render_pass::MaterialOpaqueRenderPass, transparent::render_pass::MaterialTransparentRenderPass}}, render_textures::{RenderTextureFormats, RenderTextureViews}, shaders::Shaders, textures::Textures};
 use crate::error::Result;
+use crate::{
+    bind_group_layout::BindGroupLayouts,
+    bind_groups::BindGroups,
+    pipeline_layouts::PipelineLayouts,
+    pipelines::Pipelines,
+    render_passes::{
+        composite::render_pass::CompositeRenderPass,
+        display::render_pass::DisplayRenderPass,
+        geometry::render_pass::GeometryRenderPass,
+        light_culling::render_pass::LightCullingRenderPass,
+        material::{
+            opaque::render_pass::MaterialOpaqueRenderPass,
+            transparent::render_pass::MaterialTransparentRenderPass,
+        },
+    },
+    render_textures::{RenderTextureFormats, RenderTextureViews},
+    shaders::Shaders,
+    textures::Textures,
+};
 
+pub mod composite;
+pub mod display;
 pub mod geometry;
 pub mod light_culling;
 pub mod material;
-pub mod composite;
-pub mod display;
 pub mod shader_cache_key;
 pub mod shader_template;
 
@@ -34,8 +52,8 @@ impl RenderPasses {
 }
 
 pub struct RenderPassInitContext {
-    pub gpu: AwsmRendererWebGpu, 
-    pub bind_group_layouts: BindGroupLayouts, 
+    pub gpu: AwsmRendererWebGpu,
+    pub bind_group_layouts: BindGroupLayouts,
     pub textures: Textures,
     pub pipeline_layouts: PipelineLayouts,
     pub pipelines: Pipelines,

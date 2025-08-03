@@ -78,13 +78,15 @@ pub async fn generate_mipmaps(
 
         // Create bind group
         // Input texture binding
-        let input_binding = BindGroupEntry::new(0, BindGroupResource::TextureView(Cow::Owned(input_view)));
+        let input_binding =
+            BindGroupEntry::new(0, BindGroupResource::TextureView(Cow::Owned(input_view)));
 
         // Sampler binding
         let sampler_binding = BindGroupEntry::new(1, BindGroupResource::Sampler(&sampler));
 
         // Output texture binding
-        let output_binding = BindGroupEntry::new(2, BindGroupResource::TextureView(Cow::Owned(output_view)));
+        let output_binding =
+            BindGroupEntry::new(2, BindGroupResource::TextureView(Cow::Owned(output_view)));
 
         let bind_group = gpu.create_bind_group(
             &BindGroupDescriptor::new(
@@ -135,8 +137,11 @@ async fn get_mipmap_pipeline(
         Some(module) => module,
         None => {
             let shader_module = gpu.compile_shader(
-                &ShaderModuleDescriptor::new(include_str!("./mipmap_shader.wgsl"), Some("Mipmap Shader"))
-                    .into(),
+                &ShaderModuleDescriptor::new(
+                    include_str!("./mipmap_shader.wgsl"),
+                    Some("Mipmap Shader"),
+                )
+                .into(),
             );
 
             shader_module.validate_shader().await?;
@@ -148,7 +153,6 @@ async fn get_mipmap_pipeline(
             shader_module
         }
     };
-
 
     let compute = ProgrammableStage::new(&shader_module, None);
 

@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use awsm_renderer_core::{compare::CompareFunction, renderer::AwsmRendererWebGpu, sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor}};
+use awsm_renderer_core::{
+    compare::CompareFunction,
+    renderer::AwsmRendererWebGpu,
+    sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor},
+};
 use ordered_float::OrderedFloat;
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
@@ -60,7 +64,9 @@ impl Textures {
     }
 
     pub fn get_texture(&self, key: TextureKey) -> Result<&web_sys::GpuTexture> {
-        self.textures.get(key).ok_or(AwsmTextureError::TextureNotFound(key))
+        self.textures
+            .get(key)
+            .ok_or(AwsmTextureError::TextureNotFound(key))
     }
 
     pub fn remove_texture(&mut self, key: TextureKey) {
@@ -69,9 +75,13 @@ impl Textures {
         }
     }
 
-    pub fn get_sampler_key(&mut self, gpu: &AwsmRendererWebGpu, cache_key: SamplerCacheKey) -> Result<SamplerKey> {
+    pub fn get_sampler_key(
+        &mut self,
+        gpu: &AwsmRendererWebGpu,
+        cache_key: SamplerCacheKey,
+    ) -> Result<SamplerKey> {
         if let Some(sampler_key) = self.sampler_cache.get(&cache_key) {
-            return Ok(*sampler_key); 
+            return Ok(*sampler_key);
         }
 
         let descriptor = SamplerDescriptor {
@@ -97,7 +107,9 @@ impl Textures {
     }
 
     pub fn get_sampler(&self, key: SamplerKey) -> Result<&web_sys::GpuSampler> {
-        self.samplers.get(key).ok_or(AwsmTextureError::SamplerNotFound(key))
+        self.samplers
+            .get(key)
+            .ok_or(AwsmTextureError::SamplerNotFound(key))
     }
 
     pub fn remove_sampler(&mut self, key: SamplerKey) {

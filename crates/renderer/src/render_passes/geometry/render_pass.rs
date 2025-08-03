@@ -1,6 +1,22 @@
-use awsm_renderer_core::{command::{render_pass::{ColorAttachment, DepthStencilAttachment, RenderPassDescriptor}, LoadOp, StoreOp}, renderer::AwsmRendererWebGpu};
+use awsm_renderer_core::{
+    command::{
+        render_pass::{ColorAttachment, DepthStencilAttachment, RenderPassDescriptor},
+        LoadOp, StoreOp,
+    },
+    renderer::AwsmRendererWebGpu,
+};
 
-use crate::{bind_group_layout::BindGroupLayoutCacheKey, error::Result, render::RenderContext, render_passes::{geometry::{bind_group::GeometryBindGroups, pipeline::GeometryPipelines}, RenderPassInitContext}, renderable::Renderable, AwsmRenderer};
+use crate::{
+    bind_group_layout::BindGroupLayoutCacheKey,
+    error::Result,
+    render::RenderContext,
+    render_passes::{
+        geometry::{bind_group::GeometryBindGroups, pipeline::GeometryPipelines},
+        RenderPassInitContext,
+    },
+    renderable::Renderable,
+    AwsmRenderer,
+};
 
 pub struct GeometryRenderPass {
     pub bind_groups: GeometryBindGroups,
@@ -23,10 +39,26 @@ impl GeometryRenderPass {
             &RenderPassDescriptor {
                 label: Some("Geometry Render Pass"),
                 color_attachments: vec![
-                    ColorAttachment::new(&ctx.render_texture_views.material_offset, LoadOp::Clear, StoreOp::Store),
-                    ColorAttachment::new(&ctx.render_texture_views.world_normal, LoadOp::Clear, StoreOp::Store),
-                    ColorAttachment::new(&ctx.render_texture_views.screen_pos[ctx.render_texture_views.curr_index], LoadOp::Clear, StoreOp::Store),
-                    ColorAttachment::new(&ctx.render_texture_views.motion_vector, LoadOp::Clear, StoreOp::Store),
+                    ColorAttachment::new(
+                        &ctx.render_texture_views.material_offset,
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    ),
+                    ColorAttachment::new(
+                        &ctx.render_texture_views.world_normal,
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    ),
+                    ColorAttachment::new(
+                        &ctx.render_texture_views.screen_pos[ctx.render_texture_views.curr_index],
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    ),
+                    ColorAttachment::new(
+                        &ctx.render_texture_views.motion_vector,
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    ),
                 ],
                 depth_stencil_attachment: Some(
                     DepthStencilAttachment::new(&ctx.render_texture_views.depth)
@@ -39,18 +71,13 @@ impl GeometryRenderPass {
             .into(),
         )?;
 
-        render_pass.set_bind_group(
-            0,
-            self.bind_groups.camera_lights.get_bind_group()?,
-            None,
-        )?;
+        render_pass.set_bind_group(0, self.bind_groups.camera_lights.get_bind_group()?, None)?;
 
         let mut last_render_pipeline_key = None;
         for renderable in renderables {
             let render_pipeline_key = renderable.render_pipeline_key();
             if last_render_pipeline_key != Some(render_pipeline_key) {
-                render_pass
-                    .set_pipeline(ctx.pipelines.render.get(render_pipeline_key)?);
+                render_pass.set_pipeline(ctx.pipelines.render.get(render_pipeline_key)?);
                 last_render_pipeline_key = Some(render_pipeline_key);
             }
 
@@ -61,5 +88,4 @@ impl GeometryRenderPass {
 
         Ok(())
     }
-
 }

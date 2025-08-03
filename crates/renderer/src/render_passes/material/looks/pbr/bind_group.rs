@@ -1,8 +1,22 @@
 use std::borrow::Cow;
 
-use awsm_renderer_core::{bind_groups::{BindGroupDescriptor, BindGroupEntry, BindGroupLayoutResource, BindGroupResource, SamplerBindingLayout, SamplerBindingType, TextureBindingLayout}, renderer::AwsmRendererWebGpu, texture::{TextureSampleType, TextureViewDimension}};
+use awsm_renderer_core::{
+    bind_groups::{
+        BindGroupDescriptor, BindGroupEntry, BindGroupLayoutResource, BindGroupResource,
+        SamplerBindingLayout, SamplerBindingType, TextureBindingLayout,
+    },
+    renderer::AwsmRendererWebGpu,
+    texture::{TextureSampleType, TextureViewDimension},
+};
 
-use crate::{bind_group_layout::{BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey}, bind_groups::AwsmBindGroupError, materials::{AwsmMaterialError, Result}, textures::{SamplerKey, TextureKey, Textures}};
+use crate::{
+    bind_group_layout::{
+        BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey,
+    },
+    bind_groups::AwsmBindGroupError,
+    materials::{AwsmMaterialError, Result},
+    textures::{SamplerKey, TextureKey, Textures},
+};
 
 // This stuff will likely go away, and instead we'll index into an array of textures
 // just a cache key for re-using the bind groups
@@ -16,48 +30,53 @@ pub struct PbrMaterialBindGroupCacheKey {
 }
 
 impl PbrMaterialBindGroupCacheKey {
-    pub fn into_bind_group(self, gpu: &AwsmRendererWebGpu, layout: &web_sys::GpuBindGroupLayout, textures: &Textures) -> Result<web_sys::GpuBindGroup> {
+    pub fn into_bind_group(
+        self,
+        gpu: &AwsmRendererWebGpu,
+        layout: &web_sys::GpuBindGroupLayout,
+        textures: &Textures,
+    ) -> Result<web_sys::GpuBindGroup> {
         let mut entries = Vec::new();
 
-        let mut push_texture = |dep: PbrMaterialTextureCacheKey| -> Result<()> {
-            let texture = textures.get_texture(dep.texture_key)?;
+        // let mut push_texture = |dep: PbrMaterialTextureCacheKey| -> Result<()> {
+        //     let texture = textures.get_texture(dep.texture_key)?;
 
-            let texture_view = texture.create_view().map_err(|err| {
-                AwsmMaterialError::CreateTextureView(format!("{:?}: {:?}", dep.texture_key, err))
-            })?;
+        //     let texture_view = texture.create_view().map_err(|err| {
+        //         AwsmMaterialError::CreateTextureView(format!("{:?}: {:?}", dep.texture_key, err))
+        //     })?;
 
-            let entry = BindGroupEntry::new(entries.len() as u32, BindGroupResource::TextureView(Cow::Owned(texture_view)));
-            entries.push(entry);
+        //     let entry = BindGroupEntry::new(entries.len() as u32, BindGroupResource::TextureView(Cow::Owned(texture_view)));
+        //     entries.push(entry);
 
-            let sampler = textures.get_sampler(dep.sampler_key)?;
+        //     let sampler = textures.get_sampler(dep.sampler_key)?;
 
-            let entry = BindGroupEntry::new(entries.len() as u32, BindGroupResource::Sampler(sampler));
-            entries.push(entry);
+        //     let entry = BindGroupEntry::new(entries.len() as u32, BindGroupResource::Sampler(sampler));
+        //     entries.push(entry);
 
-            Ok(())
-        };
+        //     Ok(())
+        // };
 
-        if let Some(tex) = self.base_color_tex {
-            push_texture(tex)?;
-        }
+        // if let Some(tex) = self.base_color_tex {
+        //     push_texture(tex)?;
+        // }
 
-        if let Some(tex) = self.metallic_roughness_tex {
-            push_texture(tex)?;
-        }
-        if let Some(tex) = self.normal_tex {
-            push_texture(tex)?;
-        }
-        if let Some(tex) = self.occlusion_tex {
-            push_texture(tex)?;
-        }
-        if let Some(tex) = self.emissive_tex {
-            push_texture(tex)?;
-        }
+        // if let Some(tex) = self.metallic_roughness_tex {
+        //     push_texture(tex)?;
+        // }
+        // if let Some(tex) = self.normal_tex {
+        //     push_texture(tex)?;
+        // }
+        // if let Some(tex) = self.occlusion_tex {
+        //     push_texture(tex)?;
+        // }
+        // if let Some(tex) = self.emissive_tex {
+        //     push_texture(tex)?;
+        // }
 
         let descriptor = BindGroupDescriptor {
             label: Some("PbrMaterialBindGroup"),
             layout,
-            entries
+            entries,
         };
 
         Ok(gpu.create_bind_group(&descriptor.into()))
@@ -71,7 +90,6 @@ impl From<&PbrMaterialBindGroupCacheKey> for BindGroupLayoutCacheKey {
         let mut push_simple = || {
             let entry = TextureBindingLayout::new()
                 .with_view_dimension(TextureViewDimension::N2d)
-
                 .with_sample_type(TextureSampleType::Float);
 
             entries.push(BindGroupLayoutCacheKeyEntry {
@@ -109,12 +127,12 @@ impl From<&PbrMaterialBindGroupCacheKey> for BindGroupLayoutCacheKey {
             push_simple();
         }
 
-        BindGroupLayoutCacheKey{ entries }
+        BindGroupLayoutCacheKey { entries }
     }
 }
 
 #[derive(Default, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PbrMaterialTextureCacheKey {
-    pub texture_key: TextureKey,
-    pub sampler_key: SamplerKey,
+    pub atlas_layer_index: usize,
+    pub atlas_entry_index: usize,
 }

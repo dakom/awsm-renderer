@@ -1,12 +1,12 @@
 use crate::bind_groups::{AwsmBindGroupError, BindGroupRecreateContext};
-use crate::{bind_group_layout::BindGroupLayoutKey, render_passes::RenderPassInitContext};
 use crate::error::Result;
+use crate::{bind_group_layout::BindGroupLayoutKey, render_passes::RenderPassInitContext};
 
 pub struct LightCullingBindGroups {
     //pub bind_group_layout_key: BindGroupLayoutKey,
     // this is set via `recreate` mechanism
     _bind_group: Option<web_sys::GpuBindGroup>,
-} 
+}
 
 impl LightCullingBindGroups {
     pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
@@ -16,8 +16,12 @@ impl LightCullingBindGroups {
         })
     }
 
-    pub fn get_bind_group(&self) -> std::result::Result<&web_sys::GpuBindGroup, AwsmBindGroupError> {
-        self._bind_group.as_ref().ok_or_else(|| AwsmBindGroupError::NotFound("Light Culling".to_string()))
+    pub fn get_bind_group(
+        &self,
+    ) -> std::result::Result<&web_sys::GpuBindGroup, AwsmBindGroupError> {
+        self._bind_group
+            .as_ref()
+            .ok_or_else(|| AwsmBindGroupError::NotFound("Light Culling".to_string()))
     }
 
     pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {

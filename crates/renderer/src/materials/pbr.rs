@@ -1,17 +1,28 @@
 use std::{collections::HashMap, sync::LazyLock};
 
 use awsm_renderer_core::{
-    bind_groups::{BindGroupLayoutResource, SamplerBindingLayout, SamplerBindingType, TextureBindingLayout}, buffers::{BufferDescriptor, BufferUsage}, renderer::AwsmRendererWebGpu, texture::{TextureSampleType, TextureViewDimension}
+    bind_groups::{
+        BindGroupLayoutResource, SamplerBindingLayout, SamplerBindingType, TextureBindingLayout,
+    },
+    buffers::{BufferDescriptor, BufferUsage},
+    renderer::AwsmRendererWebGpu,
+    texture::{TextureSampleType, TextureViewDimension},
 };
 
 use super::{AwsmMaterialError, Result};
 use crate::{
-    bind_group_layout::{BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey}, bind_groups::{BindGroupCreate, BindGroups}, buffer::dynamic_uniform::DynamicUniformBuffer, materials::{MaterialAlphaMode, MaterialKey}, textures::{SamplerKey, TextureKey, Textures}, AwsmRenderer, AwsmRendererLogging
+    bind_group_layout::{
+        BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey,
+    },
+    bind_groups::{BindGroupCreate, BindGroups},
+    buffer::dynamic_uniform::DynamicUniformBuffer,
+    materials::{MaterialAlphaMode, MaterialKey},
+    textures::{SamplerKey, TextureKey, Textures},
+    AwsmRenderer, AwsmRendererLogging,
 };
 
-static BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| {
-    BufferUsage::new().with_uniform().with_copy_dst()
-});
+static BUFFER_USAGE: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_uniform().with_copy_dst());
 
 pub struct PbrMaterials {
     uniform_buffer: DynamicUniformBuffer<MaterialKey>,
@@ -21,11 +32,14 @@ pub struct PbrMaterials {
 
 impl PbrMaterials {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
-            Some("Pbr Materials"),
-            PbrMaterial::INITIAL_ELEMENTS * PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT,
-            *BUFFER_USAGE,
-        ).into())?;
+        let gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Pbr Materials"),
+                PbrMaterial::INITIAL_ELEMENTS * PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT,
+                *BUFFER_USAGE,
+            )
+            .into(),
+        )?;
 
         Ok(Self {
             uniform_buffer: DynamicUniformBuffer::new(
@@ -67,16 +81,20 @@ impl PbrMaterials {
             };
 
             if let Some(new_size) = self.uniform_buffer.take_gpu_needs_resize() {
-                self.gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
-                    Some("Pbr Material"),
-                    new_size,
-                    *BUFFER_USAGE,
-                ).into())?;
+                self.gpu_buffer = gpu.create_buffer(
+                    &BufferDescriptor::new(Some("Pbr Material"), new_size, *BUFFER_USAGE).into(),
+                )?;
 
                 bind_groups.mark_create(BindGroupCreate::PbrMaterialUniformResize);
             }
 
-            gpu.write_buffer(&self.gpu_buffer, None, self.uniform_buffer.raw_slice(), None, None)?;
+            gpu.write_buffer(
+                &self.gpu_buffer,
+                None,
+                self.uniform_buffer.raw_slice(),
+                None,
+                None,
+            )?;
 
             self.uniform_buffer_gpu_dirty = false;
         }
@@ -187,7 +205,11 @@ impl PbrMaterial {
         write((self.uniform_buffer_offset.unwrap_or(0) as u32).into());
         write(self.alpha_mode.variant_as_u32().into()); // 4 bytes, offset 4 -> offset 8
         write(self.alpha_cutoff().unwrap_or(0.0f32).into()); // 4 bytes, offset 8 -> offset 12
-        write(if self.double_sided { 1u32.into() } else { 0u32.into() }); // 4 bytes, offset 12 -> offset 16
+        write(if self.double_sided {
+            1u32.into()
+        } else {
+            0u32.into()
+        }); // 4 bytes, offset 12 -> offset 16
 
         // 16 bytes (4 * 4 byte (32 bit) floats)
         write(self.base_color_factor[0].into());
@@ -212,5 +234,3 @@ impl PbrMaterial {
         data
     }
 }
-
-

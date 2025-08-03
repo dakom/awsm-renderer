@@ -1,9 +1,19 @@
-use awsm_renderer_core::{command::compute_pass::ComputePassDescriptor, renderer::AwsmRendererWebGpu};
+use awsm_renderer_core::{
+    command::compute_pass::ComputePassDescriptor, renderer::AwsmRendererWebGpu,
+};
 
-use crate::{error::Result, render::RenderContext, render_passes::{composite::{bind_group::CompositeBindGroups, pipeline::CompositePipelines}, RenderPassInitContext}, AwsmRenderer};
+use crate::{
+    error::Result,
+    render::RenderContext,
+    render_passes::{
+        composite::{bind_group::CompositeBindGroups, pipeline::CompositePipelines},
+        RenderPassInitContext,
+    },
+    AwsmRenderer,
+};
 
 pub struct CompositeRenderPass {
-    pub pipelines: CompositePipelines, 
+    pub pipelines: CompositePipelines,
     pub bind_groups: CompositeBindGroups,
 }
 
@@ -24,7 +34,10 @@ impl CompositeRenderPass {
         ));
 
         let bind_group = self.bind_groups.get_bind_group()?;
-        let compute_pipeline = ctx.pipelines.compute.get(self.pipelines.compute_pipeline_key)?;
+        let compute_pipeline = ctx
+            .pipelines
+            .compute
+            .get(self.pipelines.compute_pipeline_key)?;
 
         compute_pass.set_pipeline(&compute_pipeline);
         compute_pass.set_bind_group(0, &bind_group, None)?;

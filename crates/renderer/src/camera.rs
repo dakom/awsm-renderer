@@ -10,9 +10,7 @@ use crate::{AwsmRenderer, AwsmRendererLogging};
 
 impl AwsmRenderer {
     pub fn update_camera(&mut self, camera_matrices: CameraMatrices) -> Result<()> {
-        let (current_width, current_height) = self
-            .gpu
-            .current_context_texture_size()?;
+        let (current_width, current_height) = self.gpu.current_context_texture_size()?;
 
         self.camera.update(
             camera_matrices,
@@ -55,11 +53,14 @@ impl CameraBuffer {
     pub const BYTE_SIZE: usize = 336; // see `update()` for details
 
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
-            Some("Camera"),
-            Self::BYTE_SIZE,
-            BufferUsage::new().with_uniform().with_copy_dst()
-        ).into())?;
+        let gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Camera"),
+                Self::BYTE_SIZE,
+                BufferUsage::new().with_uniform().with_copy_dst(),
+            )
+            .into(),
+        )?;
 
         Ok(Self {
             raw_data: [0; Self::BYTE_SIZE],
@@ -93,17 +94,14 @@ impl CameraBuffer {
                     true
                 }
                 // Check if matrices changed (with small epsilon for floating point comparison)
-                !matrices_equal(last_matrices.view, camera_matrices.view, 1e-6) || !matrices_equal(last_matrices.projection, camera_matrices.projection, 1e-6)
+                !matrices_equal(last_matrices.view, camera_matrices.view, 1e-6)
+                    || !matrices_equal(last_matrices.projection, camera_matrices.projection, 1e-6)
             }
             _ => true, // First frame, assume movement
         };
 
         if apply_jitter {
-            let jitter_strength = if self.camera_moved {
-                0.2
-            } else {
-                0.8
-            };
+            let jitter_strength = if self.camera_moved { 0.2 } else { 0.8 };
             // TAA jitter
             let jitter = get_halton_jitter(render_textures.frame_count());
             let jitter_ndc_x = (jitter.x / screen_width) * jitter_strength;

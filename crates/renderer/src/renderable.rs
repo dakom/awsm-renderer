@@ -2,10 +2,17 @@ use awsm_renderer_core::command::render_pass::RenderPassEncoder;
 use glam::Mat4;
 
 use crate::{
-    bounds::Aabb, error::AwsmError, mesh::{Mesh, MeshKey}, pipelines::render_pipeline::RenderPipelineKey, render::RenderContext, render_passes::geometry::bind_group::GeometryBindGroups, transforms::TransformKey, AwsmRenderer
+    bounds::Aabb,
+    error::AwsmError,
+    mesh::{Mesh, MeshKey},
+    pipelines::render_pipeline::RenderPipelineKey,
+    render::RenderContext,
+    render_passes::geometry::bind_group::GeometryBindGroups,
+    transforms::TransformKey,
+    AwsmRenderer,
 };
 
-pub struct Renderables <'a> {
+pub struct Renderables<'a> {
     pub opaque: Vec<Renderable<'a>>,
     pub transparent: Vec<Renderable<'a>>,
 }
@@ -29,17 +36,15 @@ impl AwsmRenderer {
                 // }
             }
 
-            if self.materials.has_alpha_blend(mesh.material_key).unwrap_or(false) {
-                transparent.push(Renderable::Mesh {
-                    key,
-                    mesh,
-                });
+            if self
+                .materials
+                .has_alpha_blend(mesh.material_key)
+                .unwrap_or(false)
+            {
+                transparent.push(Renderable::Mesh { key, mesh });
             } else {
-                opaque.push(Renderable::Mesh {
-                    key,
-                    mesh,
-                });
-            } 
+                opaque.push(Renderable::Mesh { key, mesh });
+            }
         }
 
         if let Some(camera_matrices) = self.camera.last_matrices.as_ref() {
@@ -48,16 +53,19 @@ impl AwsmRenderer {
             transparent.sort_by(|a, b| sort_renderable(a, b, &view_proj, true));
         }
 
-
         Ok(Renderables {
             opaque,
             transparent,
         })
     }
-
 }
 
-fn sort_renderable(a: &Renderable, b: &Renderable, view_proj: &Mat4, transparent: bool) -> std::cmp::Ordering {
+fn sort_renderable(
+    a: &Renderable,
+    b: &Renderable,
+    view_proj: &Mat4,
+    transparent: bool,
+) -> std::cmp::Ordering {
     // Criteria 1: group by render_pipeline_key.
     let pipeline_ordering = a.render_pipeline_key().cmp(&b.render_pipeline_key());
     if pipeline_ordering != std::cmp::Ordering::Equal {
@@ -84,12 +92,12 @@ fn sort_renderable(a: &Renderable, b: &Renderable, view_proj: &Mat4, transparent
                     .unwrap_or(std::cmp::Ordering::Equal)
             } else {
                 // Sort front-to-back for opaque objects.
-                // (smaller z is closer, and we want that to come first) 
+                // (smaller z is closer, and we want that to come first)
                 a_closest_depth
                     .partial_cmp(&b_closest_depth)
                     .unwrap_or(std::cmp::Ordering::Equal)
             }
-        },
+        }
         _ => {
             // no AABBs, fallback to equality
             // TODO - maybe try to use the world matrix? Like:
@@ -98,15 +106,12 @@ fn sort_renderable(a: &Renderable, b: &Renderable, view_proj: &Mat4, transparent
             // let a_depth = a_world_mat.w_axis.z;
             // let b_depth = b_world_mat.w_axis.z;
             std::cmp::Ordering::Equal
-        },
+        }
     }
 }
 
 pub enum Renderable<'a> {
-    Mesh {
-        key: MeshKey,
-        mesh: &'a Mesh,
-    },
+    Mesh { key: MeshKey, mesh: &'a Mesh },
 }
 
 impl Renderable<'_> {
@@ -118,13 +123,20 @@ impl Renderable<'_> {
 
     pub fn world_aabb(&self) -> Option<&'_ Aabb> {
         match self {
-            Self::Mesh { mesh, ..} => mesh.world_aabb.as_ref(), 
+            Self::Mesh { mesh, .. } => mesh.world_aabb.as_ref(),
         }
     }
 
-    pub fn push_geometry_pass_commands(&self, ctx: &RenderContext, render_pass: &RenderPassEncoder, geometry_bind_groups: &GeometryBindGroups) -> Result<()> {
+    pub fn push_geometry_pass_commands(
+        &self,
+        ctx: &RenderContext,
+        render_pass: &RenderPassEncoder,
+        geometry_bind_groups: &GeometryBindGroups,
+    ) -> Result<()> {
         match self {
-            Self::Mesh { mesh, key, .. } => mesh.push_geometry_pass_commands(ctx, *key, render_pass, geometry_bind_groups),
+            Self::Mesh { mesh, key, .. } => {
+                mesh.push_geometry_pass_commands(ctx, *key, render_pass, geometry_bind_groups)
+            }
         }
     }
 }

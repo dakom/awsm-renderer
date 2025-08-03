@@ -3,6 +3,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use awsm_renderer_core::{image::atlas::ImageAtlas, renderer::AwsmRendererWebGpu};
+
 use crate::{
     mesh::skins::SkinKey,
     textures::{SamplerKey, TextureKey},
@@ -21,7 +23,7 @@ mod transforms;
 
 pub(crate) struct GltfPopulateContext {
     pub data: Arc<GltfData>,
-    pub textures: Mutex<HashMap<GltfIndex, (TextureKey, SamplerKey)>>,
+    pub image_atlas: Mutex<GltfImageAtlas>,
     pub node_to_transform: Mutex<HashMap<GltfIndex, TransformKey>>,
     pub node_to_skin: Mutex<HashMap<GltfIndex, SkinKey>>,
     pub transform_is_joint: Mutex<HashSet<TransformKey>>,
@@ -30,6 +32,32 @@ pub(crate) struct GltfPopulateContext {
 }
 
 type GltfIndex = usize;
+type LayerIndex = usize;
+type EntryIndex = usize;
+pub struct GltfImageAtlas {
+    pub atlas: ImageAtlas,
+    pub lookup: HashMap<GltfIndex, (LayerIndex, EntryIndex)>,
+    pub counter: u64,
+}
+
+impl GltfImageAtlas {
+    pub async fn new(gpu: &AwsmRendererWebGpu) -> Self {
+        let max_dimension_2d = gpu.device.limits().max_texture_dimension_2d();
+        let max_depth_2d_array = gpu.device.limits().max_texture_array_layers();
+
+        tracing::info!(
+            "Creating GLTF image atlas with max texture dimension 2D: {}, max depth 2D array: {}",
+            max_dimension_2d,
+            max_depth_2d_array
+        );
+
+        Self {
+            atlas: ImageAtlas::new(max_dimension_2d, max_dimension_2d, 8),
+            lookup: HashMap::new(),
+            counter: 0,
+        }
+    }
+}
 
 impl AwsmRenderer {
     pub async fn populate_gltf(
@@ -44,7 +72,7 @@ impl AwsmRenderer {
 
         let ctx = GltfPopulateContext {
             data: gltf_data,
-            textures: Mutex::new(HashMap::new()),
+            image_atlas: Mutex::new(GltfImageAtlas::new(&self.gpu).await),
             node_to_transform: Mutex::new(HashMap::new()),
             node_to_skin: Mutex::new(HashMap::new()),
             transform_is_joint: Mutex::new(HashSet::new()),
@@ -84,6 +112,22 @@ impl AwsmRenderer {
 
         for node in scene.nodes() {
             self.populate_gltf_node_mesh(&ctx, &node).await?;
+        }
+
+        {
+            // let atlas = ctx.image_atlas.lock().unwrap();
+            // tracing::info!("Image Atlas populated with {} layers and {} entries",
+            //     atlas.atlas.layers.len(),
+            //     atlas.atlas.layers.iter().map(|l| l.entries.len()).sum::<usize>()
+            // );
+            // for (layer_index, layer) in atlas.atlas.layers.iter().enumerate() {
+            //     for (entry_index, entry) in layer.entries.iter().enumerate() {
+            //         tracing::info!(
+            //             "Image Atlas Entry: Layer: {}, Entry: {}, Pixel Offset: ({}, {}), size: ({}, {})",
+            //             layer_index, entry_index, entry.pixel_offset.0, entry.pixel_offset.1, entry.image_data.size().0, entry.image_data.size().1
+            //         );
+            //     }
+            // }
         }
 
         Ok(())

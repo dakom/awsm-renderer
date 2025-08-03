@@ -7,7 +7,6 @@ pub struct ShaderCacheKeyGeometry {
     pub has_instance_transforms: bool,
 }
 
-
 impl From<ShaderCacheKeyGeometry> for ShaderCacheKey {
     fn from(key: ShaderCacheKeyGeometry) -> Self {
         ShaderCacheKey::RenderPass(ShaderCacheKeyRenderPass::Geometry(key))

@@ -1,6 +1,14 @@
 use std::collections::HashMap;
 
-use awsm_renderer_core::{bind_groups::{BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindGroupLayoutResource, BufferBindingLayout, SamplerBindingLayout, StorageTextureBindingLayout, TextureBindingLayout}, error::AwsmCoreError, renderer::AwsmRendererWebGpu};
+use awsm_renderer_core::{
+    bind_groups::{
+        BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindGroupLayoutResource,
+        BufferBindingLayout, SamplerBindingLayout, StorageTextureBindingLayout,
+        TextureBindingLayout,
+    },
+    error::AwsmCoreError,
+    renderer::AwsmRendererWebGpu,
+};
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
@@ -27,40 +35,38 @@ impl BindGroupLayouts {
         if let Some(key) = self.cache.get(&cache_key) {
             return Ok(*key);
         }
-        
+
         let entries = cache_key
             .entries
             .iter()
             .cloned()
             .enumerate()
-            .map(|(index, entry)| {
-                BindGroupLayoutEntry {
-                    binding: index as u32,
-                    visibility_compute: entry.visibility_compute,
-                    visibility_vertex: entry.visibility_vertex,
-                    visibility_fragment: entry.visibility_fragment,
-                    resource: entry.resource
-                }
+            .map(|(index, entry)| BindGroupLayoutEntry {
+                binding: index as u32,
+                visibility_compute: entry.visibility_compute,
+                visibility_vertex: entry.visibility_vertex,
+                visibility_fragment: entry.visibility_fragment,
+                resource: entry.resource,
             })
             .collect();
 
-        let bind_group_layout = gpu.create_bind_group_layout(
-            &BindGroupLayoutDescriptor::new(None)
-                .with_entries(entries)
-                .into(),
-        )
-        .map_err(AwsmBindGroupLayoutError::Create)?;
+        let bind_group_layout = gpu
+            .create_bind_group_layout(
+                &BindGroupLayoutDescriptor::new(None)
+                    .with_entries(entries)
+                    .into(),
+            )
+            .map_err(AwsmBindGroupLayoutError::Create)?;
 
         let key = self.lookup.insert(bind_group_layout);
         self.cache.insert(cache_key, key);
         Ok(key)
     }
 
-    pub fn get(
-        &self,
-        key: BindGroupLayoutKey,
-    ) -> Result<&web_sys::GpuBindGroupLayout> {
-        self.lookup.get(key).ok_or(AwsmBindGroupLayoutError::NotFound(key))
+    pub fn get(&self, key: BindGroupLayoutKey) -> Result<&web_sys::GpuBindGroupLayout> {
+        self.lookup
+            .get(key)
+            .ok_or(AwsmBindGroupLayoutError::NotFound(key))
     }
 }
 
@@ -99,5 +105,5 @@ pub enum AwsmBindGroupLayoutError {
     Create(AwsmCoreError),
 
     #[error("[bind group layout] Not found: {0:?}")]
-    NotFound(BindGroupLayoutKey)
+    NotFound(BindGroupLayoutKey),
 }

@@ -24,29 +24,33 @@ pub struct Morphs {
     pub(crate) gpu_buffer_values: web_sys::GpuBuffer,
 }
 
-static BUFFER_USAGE_WEIGHTS: LazyLock<BufferUsage> = LazyLock::new(|| {
-    BufferUsage::new().with_storage().with_copy_dst()
-});
-static BUFFER_USAGE_VALUES: LazyLock<BufferUsage> = LazyLock::new(|| {
-    BufferUsage::new().with_storage().with_copy_dst()
-});
+static BUFFER_USAGE_WEIGHTS: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
+static BUFFER_USAGE_VALUES: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
 
 impl Morphs {
     pub const WEIGHTS_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
     pub const VALUES_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
 
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let gpu_buffer_weights = gpu.create_buffer(&BufferDescriptor::new(
-            Some("Morph Weights"),
-            Self::WEIGHTS_INITIAL_SIZE,
-            *BUFFER_USAGE_WEIGHTS,
-        ).into())?;
+        let gpu_buffer_weights = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Morph Weights"),
+                Self::WEIGHTS_INITIAL_SIZE,
+                *BUFFER_USAGE_WEIGHTS,
+            )
+            .into(),
+        )?;
 
-        let gpu_buffer_values = gpu.create_buffer(&BufferDescriptor::new(
-            Some("Morph Values"),
-            Self::VALUES_INITIAL_SIZE,
-            *BUFFER_USAGE_VALUES,
-        ).into())?;
+        let gpu_buffer_values = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Morph Values"),
+                Self::VALUES_INITIAL_SIZE,
+                *BUFFER_USAGE_VALUES,
+            )
+            .into(),
+        )?;
 
         Ok(Self {
             weights: DynamicStorageBuffer::new(
@@ -161,16 +165,20 @@ impl Morphs {
             };
 
             if let Some(new_size) = self.weights.take_gpu_needs_resize() {
-                self.gpu_buffer_weights = gpu.create_buffer(&BufferDescriptor::new(
-                    Some("Morph Weights"),
-                    new_size,
-                    *BUFFER_USAGE_WEIGHTS,
-                ).into())?;
+                self.gpu_buffer_weights = gpu.create_buffer(
+                    &BufferDescriptor::new(Some("Morph Weights"), new_size, *BUFFER_USAGE_WEIGHTS)
+                        .into(),
+                )?;
 
                 bind_groups.mark_create(BindGroupCreate::MorphTargetWeightsResize);
-
             }
-            gpu.write_buffer(&self.gpu_buffer_weights, None, self.weights.raw_slice(), None, None)?;
+            gpu.write_buffer(
+                &self.gpu_buffer_weights,
+                None,
+                self.weights.raw_slice(),
+                None,
+                None,
+            )?;
 
             self.weights_dirty = false;
         }
@@ -182,15 +190,20 @@ impl Morphs {
             };
 
             if let Some(new_size) = self.values.take_gpu_needs_resize() {
-                self.gpu_buffer_values = gpu.create_buffer(&BufferDescriptor::new(
-                    Some("Morph Values"),
-                    new_size,
-                    *BUFFER_USAGE_VALUES,
-                ).into())?;
+                self.gpu_buffer_values = gpu.create_buffer(
+                    &BufferDescriptor::new(Some("Morph Values"), new_size, *BUFFER_USAGE_VALUES)
+                        .into(),
+                )?;
 
                 bind_groups.mark_create(BindGroupCreate::MorphTargetValuesResize);
             }
-            gpu.write_buffer(&self.gpu_buffer_values, None, self.values.raw_slice(), None, None)?;
+            gpu.write_buffer(
+                &self.gpu_buffer_values,
+                None,
+                self.values.raw_slice(),
+                None,
+                None,
+            )?;
 
             self.values_dirty = false;
         }

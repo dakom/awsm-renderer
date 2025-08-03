@@ -3,7 +3,16 @@ use gltf::Semantic;
 use thiserror::Error;
 
 use crate::{
-    animation::AwsmAnimationError, bind_group_layout::AwsmBindGroupLayoutError, bind_groups::AwsmBindGroupError, materials::AwsmMaterialError, mesh::{skins::AwsmSkinError, AwsmMeshError}, pipeline_layouts::AwsmPipelineLayoutError, pipelines::render_pipeline::AwsmRenderPipelineError, shaders::AwsmShaderError, textures::AwsmTextureError, transforms::AwsmTransformError
+    animation::AwsmAnimationError,
+    bind_group_layout::AwsmBindGroupLayoutError,
+    bind_groups::AwsmBindGroupError,
+    materials::AwsmMaterialError,
+    mesh::{skins::AwsmSkinError, AwsmMeshError},
+    pipeline_layouts::AwsmPipelineLayoutError,
+    pipelines::render_pipeline::AwsmRenderPipelineError,
+    shaders::AwsmShaderError,
+    textures::AwsmTextureError,
+    transforms::AwsmTransformError,
 };
 
 #[derive(Error, Debug)]
@@ -73,6 +82,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] {0:?}")]
     BindGroup(#[from] AwsmBindGroupError),
+
+    #[error("[gltf] {0:?}")]
+    TextureAtlas(AwsmCoreError),
 
     #[error("[gltf] {0:?}")]
     BindGroupLayout(#[from] AwsmBindGroupLayoutError),

@@ -1,6 +1,13 @@
-use std::{collections::{HashMap, HashSet}, sync::LazyLock};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
-use awsm_renderer_core::{buffers::{BufferDescriptor, BufferUsage}, error::AwsmCoreError, renderer::AwsmRendererWebGpu};
+use awsm_renderer_core::{
+    buffers::{BufferDescriptor, BufferUsage},
+    error::AwsmCoreError,
+    renderer::AwsmRendererWebGpu,
+};
 use glam::Mat4;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 use thiserror::Error;
@@ -21,16 +28,20 @@ pub struct Skins {
     pub(crate) gpu_buffer: web_sys::GpuBuffer,
 }
 
-static BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
+static BUFFER_USAGE: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
 impl Skins {
     pub const SKIN_MATRICES_INITIAL_SIZE: usize = 16 * 4 * 32; // 32 elements is a good starting point
 
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
-            Some("Skins"),
-            Self::SKIN_MATRICES_INITIAL_SIZE,
-            *BUFFER_USAGE,
-        ).into())?;
+        let gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Skins"),
+                Self::SKIN_MATRICES_INITIAL_SIZE,
+                *BUFFER_USAGE,
+            )
+            .into(),
+        )?;
 
         Ok(Self {
             skeleton_transforms: DenseSlotMap::with_key(),
@@ -40,7 +51,7 @@ impl Skins {
                 Some("Skins".to_string()),
             ),
             gpu_dirty: true,
-            gpu_buffer
+            gpu_buffer,
         })
     }
 
@@ -102,11 +113,11 @@ impl Skins {
             for (index, transform_key) in transform_keys.iter().enumerate() {
                 if let Some(world_mat) = dirty_skin_joints.get(transform_key) {
                     // could cache this for revisited joints, but, it's not a huge deal - might even be faster to redo the math
-                    let world_matrix =
-                        match self.inverse_bind_matrices.get(*transform_key).cloned() {
-                            Some(inverse_bind_matrix) => *world_mat * inverse_bind_matrix,
-                            None => *world_mat.clone()
-                        };
+                    let world_matrix = match self.inverse_bind_matrices.get(*transform_key).cloned()
+                    {
+                        Some(inverse_bind_matrix) => *world_mat * inverse_bind_matrix,
+                        None => *world_mat.clone(),
+                    };
 
                     // just overwrite this one matrix
                     let bytes = unsafe {
@@ -144,16 +155,20 @@ impl Skins {
             };
 
             if let Some(new_size) = self.skin_matrices.take_gpu_needs_resize() {
-                self.gpu_buffer = gpu.create_buffer(&BufferDescriptor::new(
-                    Some("Skins"),
-                    new_size,
-                    *BUFFER_USAGE,
-                ).into())?;
+                self.gpu_buffer = gpu.create_buffer(
+                    &BufferDescriptor::new(Some("Skins"), new_size, *BUFFER_USAGE).into(),
+                )?;
 
                 bind_groups.mark_create(BindGroupCreate::SkinJointMatricesResize);
             }
 
-            gpu.write_buffer(&self.gpu_buffer, None, self.skin_matrices.raw_slice(), None, None)?;
+            gpu.write_buffer(
+                &self.gpu_buffer,
+                None,
+                self.skin_matrices.raw_slice(),
+                None,
+                None,
+            )?;
 
             self.gpu_dirty = false;
         }

@@ -17,7 +17,6 @@ pub struct SamplerDescriptor<'a> {
     pub mipmap_filter: Option<MipmapFilterMode>,
 }
 
-
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuAddressMode.html
 pub type AddressMode = web_sys::GpuAddressMode;
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuFilterMode.html

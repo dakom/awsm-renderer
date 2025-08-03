@@ -1,10 +1,26 @@
 use std::collections::{BTreeMap, HashMap};
 
-use awsm_renderer_core::{error::AwsmCoreError, pipeline::{constants::{ConstantOverrideKey, ConstantOverrideValue}, depth_stencil::DepthStencilState, fragment::{ColorTargetState, FragmentState}, layout::PipelineLayoutKind, primitive::PrimitiveState, vertex::{VertexBufferLayout, VertexState}, RenderPipelineDescriptor}, renderer::AwsmRendererWebGpu};
+use awsm_renderer_core::{
+    error::AwsmCoreError,
+    pipeline::{
+        constants::{ConstantOverrideKey, ConstantOverrideValue},
+        depth_stencil::DepthStencilState,
+        fragment::{ColorTargetState, FragmentState},
+        layout::PipelineLayoutKind,
+        primitive::PrimitiveState,
+        vertex::{VertexBufferLayout, VertexState},
+        RenderPipelineDescriptor,
+    },
+    renderer::AwsmRendererWebGpu,
+};
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
-use crate::{bind_groups::AwsmBindGroupError, pipeline_layouts::{AwsmPipelineLayoutError, PipelineLayoutKey, PipelineLayouts}, shaders::{ShaderKey, Shaders}};
+use crate::{
+    bind_groups::AwsmBindGroupError,
+    pipeline_layouts::{AwsmPipelineLayoutError, PipelineLayoutKey, PipelineLayouts},
+    shaders::{ShaderKey, Shaders},
+};
 
 pub struct RenderPipelines {
     lookup: SlotMap<RenderPipelineKey, web_sys::GpuRenderPipeline>,
@@ -53,20 +69,17 @@ impl RenderPipelines {
             descriptor = descriptor.with_depth_stencil(depth_stencil);
         }
 
-        let pipeline = gpu
-            .create_render_pipeline(&descriptor.into())
-            .await?;
+        let pipeline = gpu.create_render_pipeline(&descriptor.into()).await?;
 
         let key = self.lookup.insert(pipeline);
         self.cache.insert(cache_key_clone, key);
         Ok(key)
     }
 
-    pub fn get(
-        &self,
-        key: RenderPipelineKey,
-    ) -> Result<&web_sys::GpuRenderPipeline> {
-        self.lookup.get(key).ok_or(AwsmRenderPipelineError::NotFound(key))
+    pub fn get(&self, key: RenderPipelineKey) -> Result<&web_sys::GpuRenderPipeline> {
+        self.lookup
+            .get(key)
+            .ok_or(AwsmRenderPipelineError::NotFound(key))
     }
 }
 
@@ -156,5 +169,5 @@ pub enum AwsmRenderPipelineError {
     Core(#[from] AwsmCoreError),
 
     #[error("[render pipeline] {0:?}")]
-    Layout(#[from] AwsmPipelineLayoutError)
+    Layout(#[from] AwsmPipelineLayoutError),
 }

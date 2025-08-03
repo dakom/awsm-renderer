@@ -66,12 +66,15 @@ impl Meshes {
         let transform_key = mesh.transform_key;
         let key = self.list.insert(mesh);
 
-        self.transform_to_meshes.entry(transform_key).unwrap().or_default().push(key);
+        self.transform_to_meshes
+            .entry(transform_key)
+            .unwrap()
+            .or_default()
+            .push(key);
 
         self.vertex_buffers.update(key, vertex_values);
         self.vertex_infos.insert(key, vertex_info);
         self.vertex_dirty = true;
-
 
         if let Some((index_values, index_info)) = index {
             self.index_buffers.update(key, index_values);
@@ -87,7 +90,11 @@ impl Meshes {
         for (transform_key, world_mat) in dirty_transforms.iter() {
             if let Some(mesh_keys) = self.transform_to_meshes.get(*transform_key) {
                 for mesh_key in mesh_keys {
-                    if let Some(world_aabb) = self.list.get_mut(*mesh_key).and_then(|m| m.world_aabb.as_mut()) {
+                    if let Some(world_aabb) = self
+                        .list
+                        .get_mut(*mesh_key)
+                        .and_then(|m| m.world_aabb.as_mut())
+                    {
                         world_aabb.transform(world_mat);
                     }
                 }
@@ -97,7 +104,6 @@ impl Meshes {
         // This does update the GPU as dirty, bit skins manage their own GPU dirty state
         self.skins.update_world(dirty_transforms);
     }
-
 
     pub fn keys(&self) -> impl Iterator<Item = MeshKey> + '_ {
         self.list.keys()

@@ -1,4 +1,6 @@
 # Finish texture atlas writer
+ - upload the uniform with layer_index etc.
+ - generate mipmap (have a flag on texture_atlas, use same code as ImageData::create_texture)
 
 # Get started with opaque material pass 
 
