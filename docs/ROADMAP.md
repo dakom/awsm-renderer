@@ -2,6 +2,7 @@
 
 - Rewrite entire pipeline to match README doc (Visiblity+)
     - move shaders to passes (template and cache_key stuff should be ported)
+    - get down to one draw call for geometry using new shader
 
 - materials cont'd
     - normal texture
@@ -10,10 +11,6 @@
 - IBL
 
 - Is it right that specular isn't moving across sphere test when camera moves?
-
-- Instancing with different materials
-  - just write a storage buffer before draw call and use instance_index
-
 
 - fix "dev-release" mode (just base path?)
 
@@ -77,6 +74,11 @@ If it's supported here, corresponding core functionality is also supported
 
 ## Optimizations
 
+- [ ] Reduce draw calls
+  - Instancing everywhere
+    - [ ] Geometry pass is one call
+    - [ ] Transparent pass is one call per-render-pipeline
+
 - [x] Dynamic buffer primitives
     - Single gpu binding
     - Offset-driven
@@ -87,7 +89,7 @@ If it's supported here, corresponding core functionality is also supported
 - [x] Transforms
     - One dynamic uniform bind group
     - Dirty flag
-- [ ] AABB
+- [x] AABB
     - Only update when transform changes
 - [x] Morphs
     - One dynamic uniform bind group for weights

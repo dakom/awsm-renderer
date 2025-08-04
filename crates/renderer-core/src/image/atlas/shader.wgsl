@@ -22,7 +22,7 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
     
     // Calculate source coordinate with edge clamping for padding
     let src_coord = clamp(
-        vec2<i32>(gid.xy) - vec2<i32>(entry.padding),
+        vec2<i32>(gid.xy) - vec2<i32>(i32(entry.padding)),
         vec2<i32>(0),
         vec2<i32>(src_size - vec2<u32>(1u))
     );

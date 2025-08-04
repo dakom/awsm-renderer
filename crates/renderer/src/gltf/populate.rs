@@ -130,6 +130,9 @@ impl AwsmRenderer {
             // }
         }
 
+        let atlas = ctx.image_atlas.into_inner().unwrap();
+        atlas.atlas.write_texture_array(&self.gpu, None).await?;
+
         Ok(())
     }
 }
