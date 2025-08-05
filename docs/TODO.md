@@ -1,11 +1,9 @@
 # Finish texture atlas writer
- - upload the uniform with layer_index etc.
  - generate mipmap (have a flag on texture_atlas, use same code as ImageData::create_texture)
 
 # Start texture atlas propogator
 
 maybe it should live on `AwsmRenderer`, not in Gltf, gets passed in as a dependency?
-    - need to support recreating
     - probably a materials thing
 
 # Get started with opaque material pass 

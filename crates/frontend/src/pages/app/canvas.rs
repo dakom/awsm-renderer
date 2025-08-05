@@ -2,7 +2,7 @@ use awsm_renderer::{
     core::{
         command::color::Color,
         configuration::{CanvasAlphaMode, CanvasConfiguration, CanvasToneMappingMode},
-        renderer::AwsmRendererWebGpuBuilder,
+        renderer::{AwsmRendererWebGpuBuilder, DeviceRequestLimits},
         texture::TextureFormat,
     },
     AwsmRendererBuilder, AwsmRendererLogging,
@@ -67,10 +67,13 @@ impl AppCanvas {
                 .after_inserted(clone!(state => move |canvas| {
                     spawn_local(clone!(state => async move {
                         let gpu = web_sys::window().unwrap().navigator().gpu();
-                        let gpu_builder = AwsmRendererWebGpuBuilder::new(gpu, canvas).with_configuration(CanvasConfiguration::default()
-                            .with_alpha_mode(CanvasAlphaMode::Opaque)
-                            .with_tone_mapping(CanvasToneMappingMode::Standard)
-                        );
+                        let gpu_builder = AwsmRendererWebGpuBuilder::new(gpu, canvas)
+                            .with_configuration(CanvasConfiguration::default()
+                                .with_alpha_mode(CanvasAlphaMode::Opaque)
+                                .with_tone_mapping(CanvasToneMappingMode::Standard)
+                            )
+                            .with_device_request_limits(DeviceRequestLimits::max_all());
+
                         let renderer = AwsmRendererBuilder::new(gpu_builder)
                             .with_logging(AwsmRendererLogging { render_timings: true })
                             .with_clear_color(Color::MID_GREY)

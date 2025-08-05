@@ -9,9 +9,17 @@ use binpack2d::{
 
 use crate::image::ImageData;
 
+pub struct MultiImageAtlas {
+    pub atlases: Vec<ImageAtlas>,
+    pub texture_size: u32,
+    pub max_depth_per_atlas: u32,
+    pub padding: u32,
+    pub max_bindings_per_group: u32
+}
 
 pub struct ImageAtlas {
     pub layers: Vec<ImageAtlasLayer>,
+    pub max_depth: Option<u32>,
 }
 
 pub struct ImageAtlasLayer {
@@ -30,17 +38,83 @@ pub struct ImageAtlasEntry {
     pub custom_id: Option<u64>,
 }
 
+impl MultiImageAtlas {
+    pub fn new(limits: &web_sys::GpuSupportedLimits, padding: u32) -> Self {
+        let (texture_size, max_depth) = max_dimensions(limits);
+
+        let max_bindings_per_group = limits.max_sampled_textures_per_shader_stage();
+
+        // These are some really interesting metrics, they let us know our wiggle room for textures
+        // tracing::info!("Creating multi-atlas {}x{} w/ max depth: {} and max bindings per group: {}", texture_size, texture_size, max_depth, max_bindings_per_group);
+
+        // tracing::info!("Total material image size per bind group: {}x{}",
+        //     texture_size * max_depth * max_bindings_per_group,
+        //     texture_size * max_depth * max_bindings_per_group,
+        // );
+
+        // tracing::info!("Absolute total material image size: {}x{}",
+        //     texture_size * max_depth * max_bindings_per_group * limits.max_bind_groups(),
+        //     texture_size * max_depth * max_bindings_per_group * limits.max_bind_groups(),
+        // );
+
+        Self {
+            atlases: vec![ImageAtlas::new(texture_size, texture_size, padding, Some(max_depth))],
+            texture_size,
+            max_depth_per_atlas: max_depth,
+            padding,
+            max_bindings_per_group
+        }
+    }
+
+    pub fn add_entries(&mut self, mut images: Vec<(ImageData, Option<u64>)>) -> Result<()> {
+        loop {
+            let rejected_images = self
+                .atlases
+                .last_mut()
+                .unwrap()
+                .add_entries(images)?;
+
+            if rejected_images.is_empty() {
+                return Ok(());
+            }
+
+            images = rejected_images;
+
+            self.atlases.push(ImageAtlas::new(
+                self.texture_size,
+                self.texture_size,
+                self.padding,
+                Some(self.max_depth_per_atlas),
+            ));
+
+        }
+    }
+
+    // returns atlas_index, layer_index and entry_index
+    pub fn find_custom_id_index(&self, custom_id: u64) -> Option<(usize, usize, usize)> {
+        for (atlas_index, atlas) in self.atlases.iter().enumerate() {
+            if let Some((layer_index, entry_index)) = atlas.find_custom_id_index(custom_id) {
+                return Some((atlas_index, layer_index, entry_index));
+            }
+        }
+        None
+    }
+}
+
+
 impl ImageAtlas {
-    pub fn new(width: u32, height: u32, padding: u32) -> Self {
+    pub fn new(width: u32, height: u32, padding: u32, max_depth: Option<u32>) -> Self {
         Self {
             layers: vec![ImageAtlasLayer::new(width, height, padding)],
+            max_depth
         }
     }
 
     // second param is an optional custom id that can be used to identify the image in the atlas
-    pub fn add_entries(&mut self, images: Vec<(ImageData, Option<u64>)>) -> Result<()> {
+    // return is the rejected images that could not be placed in the atlas due to max depth
+    pub fn add_entries(&mut self, images: Vec<(ImageData, Option<u64>)>) -> Result<Vec<(ImageData, Option<u64>)>> {
         if images.is_empty() {
-            return Ok(());
+            return Ok(images);
         }
 
         // allows us to have a stable index and mutable vec that we can take from
@@ -120,6 +194,17 @@ impl ImageAtlas {
                 break;
             }
 
+            if let Some(max_depth) = self.max_depth {
+                if self.layers.len() as u32 >= max_depth {
+                    let rejected_images: Vec<(ImageData, Option<u64>)> = rejected
+                        .into_iter()
+                        .filter_map(|dim| images[dim.id() as usize].take())
+                        .collect();
+
+                    return Ok(rejected_images);
+                }
+            }
+
             self.layers.push(ImageAtlasLayer::new(
                 atlas_width as u32,
                 atlas_height as u32,
@@ -128,7 +213,7 @@ impl ImageAtlas {
             items_to_place = rejected;
         }
 
-        Ok(())
+        Ok(Vec::new())
     }
 
     // returns layer_index and entry_index
@@ -156,4 +241,36 @@ impl ImageAtlasLayer {
         }
     }
 
+}
+
+fn max_dimensions(limits: &web_sys::GpuSupportedLimits) -> (u32, u32) {
+    let max_dimension_2d = limits.max_texture_dimension_2d();
+    let max_depth_2d_array = limits.max_texture_array_layers();
+    let max_memory = limits.max_buffer_size();
+
+
+    // Rgba16Float = 4 channels * 2 bytes per channel = 8 bytes per pixel
+    let bytes_per_pixel = 8u32;
+
+    let mut texture_size = max_dimension_2d;
+
+    loop {
+        if ((texture_size * texture_size) * bytes_per_pixel) as f64 <= max_memory {
+            break;
+        }
+        tracing::warn!(
+            "Max texture size {}x{} exceeds max buffer size {}, reducing to {}x{}",
+            texture_size,texture_size,
+            max_memory,
+            texture_size / 2,texture_size / 2
+        );
+        texture_size /= 2;
+    }
+
+    let memory_per_texture = texture_size * texture_size * bytes_per_pixel;
+    let max_depth_by_memory = (max_memory / memory_per_texture as f64).floor() as u32;
+
+    let max_depth = max_depth_2d_array.min(max_depth_by_memory); 
+
+    (texture_size, max_depth) 
 }

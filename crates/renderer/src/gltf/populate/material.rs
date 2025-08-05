@@ -168,8 +168,8 @@ impl GltfTextureInfo {
             image_atlas.lookup.get(&self.index).cloned()
         };
 
-        let (atlas_layer_index, atlas_entry_index) = match cache_key {
-            Some((layer_index, entry_index)) => (layer_index, entry_index),
+        let (atlas_index, atlas_layer_index, atlas_entry_index) = match cache_key {
+            Some((atlas_index, layer_index, entry_index)) => (atlas_index, layer_index, entry_index),
             None => {
                 let gltf_texture = ctx
                     .data

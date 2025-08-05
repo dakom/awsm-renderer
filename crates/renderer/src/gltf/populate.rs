@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use awsm_renderer_core::{image::atlas::ImageAtlas, renderer::AwsmRendererWebGpu};
+use awsm_renderer_core::{image::atlas::{ImageAtlas, MultiImageAtlas}, renderer::AwsmRendererWebGpu};
 
 use crate::{
     mesh::skins::SkinKey,
@@ -32,27 +32,19 @@ pub(crate) struct GltfPopulateContext {
 }
 
 type GltfIndex = usize;
+type AtlasIndex = usize;
 type LayerIndex = usize;
 type EntryIndex = usize;
 pub struct GltfImageAtlas {
-    pub atlas: ImageAtlas,
-    pub lookup: HashMap<GltfIndex, (LayerIndex, EntryIndex)>,
+    pub atlas: MultiImageAtlas,
+    pub lookup: HashMap<GltfIndex, (AtlasIndex, LayerIndex, EntryIndex)>,
     pub counter: u64,
 }
 
 impl GltfImageAtlas {
     pub async fn new(gpu: &AwsmRendererWebGpu) -> Self {
-        let max_dimension_2d = gpu.device.limits().max_texture_dimension_2d();
-        let max_depth_2d_array = gpu.device.limits().max_texture_array_layers();
-
-        tracing::info!(
-            "Creating GLTF image atlas with max texture dimension 2D: {}, max depth 2D array: {}",
-            max_dimension_2d,
-            max_depth_2d_array
-        );
-
         Self {
-            atlas: ImageAtlas::new(max_dimension_2d, max_dimension_2d, 8),
+            atlas: MultiImageAtlas::new(&gpu.device.limits(), 8),
             lookup: HashMap::new(),
             counter: 0,
         }
@@ -131,7 +123,14 @@ impl AwsmRenderer {
         }
 
         let atlas = ctx.image_atlas.into_inner().unwrap();
-        atlas.atlas.write_texture_array(&self.gpu, None).await?;
+
+        for atlas in atlas.atlas.atlases.iter() {
+            atlas.write_texture_array(&self.gpu).await?;
+            tracing::warn!("Wrote texture atlas with {} layers and {} entries",
+                atlas.layers.len(),
+                atlas.layers.iter().map(|l| l.entries.len()).sum::<usize>()
+            );
+        }
 
         Ok(())
     }
