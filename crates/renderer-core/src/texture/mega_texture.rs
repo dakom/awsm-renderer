@@ -105,10 +105,7 @@ impl MegaTextureSize {
     }
 
     pub fn entry_per_layer_per_atlas_len(&self) -> Vec<Vec<usize>> {
-        self.inner_len
-            .iter()
-            .map(|l| l.iter().copied().collect())
-            .collect()
+        self.inner_len.iter().map(|l| l.to_vec()).collect()
     }
 
     pub fn total_entries_len(&self) -> usize {
