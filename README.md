@@ -36,6 +36,12 @@ I've taken some stabs at some variation of this sorta thing before. Some project
 * [Shipyard ECS (webgl2)](https://github.com/dakom/shipyard-webgl-renderer)
 * [WebGL1+2 Rust bindings](https://github.com/dakom/awsm-web/tree/master/crate/src/webgl)
 
+# TEXTURES
+
+We use a single "MegaTexture" (currently without streaming), which is an of texture-arrays constructed up to resource limits
+
+This allows accessing all the materials from a single shading pass (more on this below)
+
 # RENDER PIPELINE
 
 This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient shading, transparency, and TAA without the drawbacks of classic deferred or forward+ rendering.
@@ -45,7 +51,7 @@ This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient 
 ## 🎯 Pipeline Overview
 
 ### 1. Geometry Pass (Vertex + Fragment)
-- Run for each mesh with opaque material
+- One draw call (using instancing)
 - Rendering benefits from hardware occlusion culling, objects are drawn front-to-back
 - Outputs to multiple render targets (MRTs):
   - `material_offset_texture`: Encodes material reference per pixel
@@ -56,11 +62,13 @@ This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient 
 > This pass is animated/skinned, so all mesh deformations are already applied before output
 
 ### 2. Light Culling Pass (Compute Shader)
+- One draw call
 - Divides the screen into tiles (e.g., 16x16 pixels)
 - For each tile, build a list of lights that affect that region of the screen.
 - Write list of lights to storage buffer, indexed by tile
 
 ### 3. Opaque Material Shading Pass (Compute Shader)
+- One draw call
 - Single fullscreen compute dispatch (using same workgroup/tiling as Light Culling)
 - For each screen pixel:
   - Read material offset 
@@ -72,7 +80,7 @@ This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient 
 - Output: shaded color to `opaque_color_texture`
 
 ### 4. Transparent Material Shading Pass (Vertex + Fragment)
-- Run for each mesh with transparent material
+- One draw call per material-kind (pbr, unlit, etc.) 
 - Fetch the material data from a the same material uniform buffer (bound w/ dynamic offset)
 - Uses Weighted Blended Order-Independent Transparency (OIT)
 - Uses the Depth buffer from (1) to discard occluded fragments w/ depth testing (but writes are off)
@@ -161,6 +169,7 @@ Stores full material and geometric data in a G-buffer:
 - Geometry pass performs early-Z and ensures only visible fragments are shaded for opaque objects
 - Motion vectors are derived from screen-space movement (ping-ponging previous frame data)
 - Transparent objects are shaded in fragment shaders using Weighted Blended OIT to approximate correct order without sorting
+- The single draw-call with instancing in Geometry pass reduces per-mesh throughput
 
 
 # NON-GOALS

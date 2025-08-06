@@ -78,7 +78,7 @@ If it's supported here, corresponding core functionality is also supported
   - Instancing everywhere
     - [ ] Geometry pass is one call
     - [ ] Transparent pass is one call per-render-pipeline
-
+- [x] MegaTextures
 - [x] Dynamic buffer primitives
     - Single gpu binding
     - Offset-driven
