@@ -1,27 +1,71 @@
 use std::{borrow::Cow, cell::RefCell};
 
-use crate::{bind_groups::{BindGroupDescriptor, BindGroupEntry, BindGroupResource}, buffers::{BufferBinding, BufferDescriptor, BufferUsage}, command::compute_pass::ComputePassDescriptor, image::atlas::{pipeline::get_atlas_pipeline, ImageAtlas, ImageAtlasLayer}, renderer::AwsmRendererWebGpu, texture::{Extent3d, TextureDescriptor, TextureFormat, TextureUsage, TextureViewDescriptor, TextureViewDimension}};
 use crate::error::{AwsmCoreError, Result};
+use crate::{
+    bind_groups::{BindGroupDescriptor, BindGroupEntry, BindGroupResource},
+    buffers::{BufferBinding, BufferDescriptor, BufferUsage},
+    command::compute_pass::ComputePassDescriptor,
+    renderer::AwsmRendererWebGpu,
+    texture::{
+        mega_texture::{
+            pipeline::get_atlas_pipeline, MegaTexture, MegaTextureAtlas, MegaTextureLayer,
+        },
+        mipmap::{calculate_mipmap_levels, generate_mipmaps},
+        Extent3d, TextureDescriptor, TextureFormat, TextureUsage, TextureViewDescriptor,
+        TextureViewDimension,
+    },
+};
 
 thread_local! {
     // key is TextureFormat as u32
     static UNIFORM_BUFFER: RefCell<Option<web_sys::GpuBuffer>> = RefCell::new(None);
 }
 
-impl ImageAtlas {
+impl<ID> MegaTexture<ID> {
+    pub async fn write_texture_arrays(
+        &mut self,
+        gpu: &AwsmRendererWebGpu,
+    ) -> Result<Vec<web_sys::GpuTexture>> {
+        let mut textures = Vec::new();
+        for atlas in &self.atlases {
+            textures.push(atlas.write_texture_array(gpu, self.mipmap).await?);
+        }
+        Ok(textures)
+    }
+}
+
+impl<ID> MegaTextureAtlas<ID> {
+    // Will only create a texture array up to the _actual_ depth of the atlas, not maximum potential depth
     pub async fn write_texture_array(
         &self,
         gpu: &AwsmRendererWebGpu,
+        mipmap: bool,
     ) -> Result<web_sys::GpuTexture> {
-        let width = self.layers.first().map_or(0, |layer| layer.width);
-        let height = self.layers.first().map_or(0, |layer| layer.height);
+        let mipmap_levels = if mipmap {
+            calculate_mipmap_levels(self.texture_size, self.texture_size)
+        } else {
+            1
+        };
+
+        let texture_usage = if mipmap {
+            TextureUsage::new()
+                .with_storage_binding()
+                .with_texture_binding()
+        } else {
+            TextureUsage::new().with_storage_binding()
+        };
 
         let dest_tex_array = gpu.create_texture(
             &TextureDescriptor::new(
                 TextureFormat::Rgba16float,
-                Extent3d::new(width, Some(height), Some(self.layers.len() as u32)),
-                TextureUsage::new().with_storage_binding(),
+                Extent3d::new(
+                    self.texture_size,
+                    Some(self.texture_size),
+                    Some(self.layers.len() as u32),
+                ),
+                texture_usage,
             )
+            .with_mip_level_count(mipmap_levels)
             .into(),
         )?;
 
@@ -30,32 +74,47 @@ impl ImageAtlas {
                 &TextureViewDescriptor::new(Some("Atlas Dest Texture View"))
                     .with_dimension(TextureViewDimension::N2dArray)
                     .with_array_layer_count(self.layers.len() as u32)
+                    .with_mip_level_count(1) // Only access mip level 0 for writing
                     .into(),
             )
             .map_err(AwsmCoreError::create_texture_view)?;
 
+        // Write to mip level 0 of each layer
         for (index, layer) in self.layers.iter().enumerate() {
             layer
-                .write_texture_to_array(gpu, &dest_texture_view, index as u32)
+                .write_texture_to_array(gpu, &dest_texture_view, index as u32, self.padding)
                 .await?;
+        }
+
+        if mipmap {
+            generate_mipmaps(
+                gpu,
+                &dest_tex_array,
+                self.texture_size,
+                self.texture_size,
+                self.layers.len() as u32, // array_layers
+                true,
+                mipmap_levels,
+            )
+            .await?;
         }
 
         Ok(dest_tex_array)
     }
 }
 
-impl ImageAtlasLayer {
+impl<ID> MegaTextureLayer<ID> {
     pub async fn write_texture_to_array(
         &self,
         gpu: &AwsmRendererWebGpu,
         dest_texture_view: &web_sys::GpuTextureView,
         layer_index: u32,
+        padding: u32,
     ) -> Result<()> {
         let atlas_pipelines = get_atlas_pipeline(gpu).await?;
         let command_encoder = gpu.create_command_encoder(Some("Write Texture Atlas Layer"));
-        let padding_x2 = self.padding * 2;
+        let padding_x2 = padding * 2;
         let mut textures = Vec::new();
-
 
         for entry in self.entries.iter() {
             let texture = entry.image_data.create_texture(gpu, None, false).await?;
@@ -68,7 +127,6 @@ impl ImageAtlasLayer {
                 &ComputePassDescriptor::new(Some("Atlas Compute Pass")).into(),
             ));
 
-
             let needs_create = UNIFORM_BUFFER.with(|buffer_cell| buffer_cell.borrow().is_none());
 
             if needs_create {
@@ -76,35 +134,33 @@ impl ImageAtlasLayer {
                     &BufferDescriptor::new(
                         Some("Atlas Uniform Buffer"),
                         16,
-                        BufferUsage::new().with_uniform().with_copy_dst()
+                        BufferUsage::new().with_uniform().with_copy_dst(),
                     )
                     .into(),
                 )?;
-
 
                 UNIFORM_BUFFER.with(move |buffer_cell| {
                     *buffer_cell.borrow_mut() = Some(uniform_buffer);
                 });
             }
 
-            let uniform_buffer = UNIFORM_BUFFER.with(|buffer_cell| {
-                buffer_cell.borrow().clone().unwrap()
-            });
+            let uniform_buffer =
+                UNIFORM_BUFFER.with(|buffer_cell| buffer_cell.borrow().clone().unwrap());
 
             let entry_data = [
                 entry.pixel_offset.0 as f32,
                 entry.pixel_offset.1 as f32,
-                self.padding as f32,
+                padding as f32,
                 layer_index as f32,
             ];
-            let uniform_data:[u8; 16] = entry_data
+            let uniform_data: [u8; 16] = entry_data
                 .iter()
                 .flat_map(|&f| f.to_ne_bytes())
                 .collect::<Vec<u8>>()
                 .try_into()
                 .expect("Failed to convert entry data to uniform data");
-            gpu.write_buffer(&uniform_buffer, None, uniform_data.as_slice(), None, None)?;
 
+            gpu.write_buffer(&uniform_buffer, None, uniform_data.as_slice(), None, None)?;
 
             let bind_group = gpu.create_bind_group(
                 &BindGroupDescriptor::new(
@@ -121,8 +177,9 @@ impl ImageAtlasLayer {
                         ),
                         BindGroupEntry::new(
                             2,
-                            BindGroupResource::Buffer(BufferBinding::new(&uniform_buffer)
-                                .with_size(16)),
+                            BindGroupResource::Buffer(
+                                BufferBinding::new(&uniform_buffer).with_size(16),
+                            ),
                         ),
                     ],
                 )
@@ -144,7 +201,7 @@ impl ImageAtlasLayer {
         let command_buffer = command_encoder.finish();
         gpu.submit_commands(&command_buffer);
 
-        for texture in textures { 
+        for texture in textures {
             texture.destroy();
         }
 

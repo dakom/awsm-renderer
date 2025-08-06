@@ -1,14 +1,7 @@
-# Finish texture atlas writer
- - generate mipmap (have a flag on texture_atlas, use same code as ImageData::create_texture)
-
-# Start texture atlas propogator
-
-maybe it should live on `AwsmRenderer`, not in Gltf, gets passed in as a dependency?
-    - probably a materials thing
+# Set material uniform with texture ids
 
 # Get started with opaque material pass 
 
-... then
 2. Read material at material_offset
 3. Calculate world position
 4. Write basic material

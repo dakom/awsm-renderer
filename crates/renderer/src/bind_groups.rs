@@ -48,6 +48,7 @@ pub enum BindGroupCreate {
     SkinJointMatricesResize,
     PbrMaterialUniformResize,
     TextureViewResize,
+    MegaTexture,
 }
 
 pub struct BindGroups {
@@ -116,14 +117,22 @@ impl BindGroups {
             .create_list
             .contains(&BindGroupCreate::TextureViewResize)
         {
+            // material passes are also recreated on megatexture changes
             render_passes.light_culling.bind_groups.recreate(&ctx)?;
+            render_passes.composite.bind_groups.recreate(&ctx)?;
+            render_passes.display.bind_groups.recreate(&ctx)?;
+        }
+
+        if self.create_list.contains(&BindGroupCreate::MegaTexture)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::TextureViewResize)
+        {
             render_passes.material_opaque.bind_groups.recreate(&ctx)?;
             render_passes
                 .material_transparent
                 .bind_groups
                 .recreate(&ctx)?;
-            render_passes.composite.bind_groups.recreate(&ctx)?;
-            render_passes.display.bind_groups.recreate(&ctx)?;
         }
 
         self.create_list.clear();

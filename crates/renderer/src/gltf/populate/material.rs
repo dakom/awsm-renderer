@@ -12,7 +12,7 @@ use crate::{
             cache_key::ShaderCacheKeyMaterial,
             looks::{
                 pbr::{
-                    bind_group::{PbrMaterialBindGroupCacheKey, PbrMaterialTextureCacheKey},
+                    bind_group::PbrMaterialBindGroupCacheKey,
                     shader::cache_key::ShaderCacheKeyMaterialPbr,
                 },
                 shader_cache_key::ShaderCacheKeyMaterialLook,
@@ -162,14 +162,14 @@ impl GltfTextureInfo {
         &self,
         renderer: &mut AwsmRenderer,
         ctx: &GltfPopulateContext,
-    ) -> Result<(UvIndex, PbrMaterialTextureCacheKey)> {
-        let cache_key = {
-            let image_atlas = ctx.image_atlas.lock().unwrap();
-            image_atlas.lookup.get(&self.index).cloned()
+    ) -> Result<(UvIndex, TextureKey)> {
+        let texture_key = {
+            let textures = ctx.textures.lock().unwrap();
+            textures.get(&self.index).cloned()
         };
 
-        let (atlas_index, atlas_layer_index, atlas_entry_index) = match cache_key {
-            Some((atlas_index, layer_index, entry_index)) => (atlas_index, layer_index, entry_index),
+        let texture_key = match texture_key {
+            Some(texture_key) => texture_key,
             None => {
                 let gltf_texture = ctx
                     .data
@@ -184,26 +184,15 @@ impl GltfTextureInfo {
                     .get(texture_index)
                     .ok_or(AwsmGltfError::MissingTextureIndex(texture_index))?;
 
-                let mut image_atlas = ctx.image_atlas.lock().unwrap();
-                let custom_id = image_atlas.counter;
-                image_atlas.counter += 1;
+                let texture_key = renderer.textures.add_image(image_data.clone())?;
 
-                image_atlas
-                    .atlas
-                    .add_entries(vec![(image_data.clone(), Some(custom_id))])
-                    .map_err(AwsmGltfError::TextureAtlas)?;
+                ctx.textures.lock().unwrap().insert(self.index, texture_key);
 
-                image_atlas.atlas.find_custom_id_index(custom_id).unwrap() // safe, we just added it or errored already
+                texture_key
             }
         };
 
-        Ok((
-            self.tex_coord_index,
-            PbrMaterialTextureCacheKey {
-                atlas_layer_index,
-                atlas_entry_index,
-            },
-        ))
+        Ok((self.tex_coord_index, texture_key))
     }
 
     fn create_sampler_key(

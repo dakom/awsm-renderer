@@ -13,6 +13,7 @@ gltf = [
     "dep:gltf",
     "dep:gloo-net",
     "awsm-renderer-core/image",
+    "awsm-renderer-core/mega-texture",
 ]
 exr = [
     "awsm-renderer-core/exr",

@@ -163,8 +163,8 @@ impl AwsmRendererBuilder {
         let mut bind_group_layouts = BindGroupLayouts::new();
         let mut pipelines = Pipelines::new();
         let mut shaders = Shaders::new();
-        let textures = Textures::new();
 
+        let textures = Textures::new(&gpu);
         let camera = camera::CameraBuffer::new(&gpu)?;
         let lights = Lights::new(&gpu)?;
         let meshes = Meshes::new(&gpu)?;

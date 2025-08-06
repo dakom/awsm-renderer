@@ -1,4 +1,4 @@
-// Write the image atlas entry to the atlas texture
+// Write the image atlas entry to the atlas texture, with bleeding for the padding
 // dispatch with (src_width + 2*padding, src_height + 2*padding, 1)
 @group(0) @binding(0) var src_tex: texture_2d<f32>;
 @group(0) @binding(1) var dst_atlas_tex: texture_storage_2d_array<rgba16float, write>;

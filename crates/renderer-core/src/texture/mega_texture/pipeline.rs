@@ -1,10 +1,13 @@
 use std::cell::RefCell;
 
-use crate::bind_groups::{BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindGroupLayoutResource, BufferBindingLayout, BufferBindingType, StorageTextureAccess, StorageTextureBindingLayout, TextureBindingLayout};
+use crate::bind_groups::{
+    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindGroupLayoutResource, BufferBindingLayout,
+    BufferBindingType, StorageTextureAccess, StorageTextureBindingLayout, TextureBindingLayout,
+};
+use crate::error::Result;
 use crate::pipeline::layout::{PipelineLayoutDescriptor, PipelineLayoutKind};
 use crate::pipeline::{ComputePipelineDescriptor, ProgrammableStage};
 use crate::renderer::AwsmRendererWebGpu;
-use crate::error::Result;
 use crate::shaders::{ShaderModuleDescriptor, ShaderModuleExt};
 use crate::texture::{TextureFormat, TextureSampleType, TextureViewDimension};
 
@@ -33,11 +36,8 @@ pub(super) async fn get_atlas_pipeline(gpu: &AwsmRendererWebGpu) -> Result<Atlas
         Some(module) => module,
         None => {
             let shader_module = gpu.compile_shader(
-                &ShaderModuleDescriptor::new(
-                    include_str!("./shader.wgsl"),
-                    Some("Atlas Shader"),
-                )
-                .into(),
+                &ShaderModuleDescriptor::new(include_str!("./shader.wgsl"), Some("Atlas Shader"))
+                    .into(),
             );
 
             shader_module.validate_shader().await?;
@@ -76,8 +76,7 @@ pub(super) async fn get_atlas_pipeline(gpu: &AwsmRendererWebGpu) -> Result<Atlas
                 BindGroupLayoutEntry::new(
                     2,
                     BindGroupLayoutResource::Buffer(
-                        BufferBindingLayout::new()
-                            .with_binding_type(BufferBindingType::Uniform)
+                        BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
                     ),
                 )
                 .with_visibility_compute(),

@@ -1,3 +1,7 @@
+#[cfg(feature = "mega-texture")]
+pub mod mega_texture;
+pub mod mipmap;
+
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuTextureFormat.html
 pub type TextureFormat = web_sys::GpuTextureFormat;
 pub type TextureAspect = web_sys::GpuTextureAspect;

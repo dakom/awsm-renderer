@@ -1,17 +1,16 @@
 use crate::command::copy_texture::Origin3d;
 use crate::error::Result;
 use crate::renderer::AwsmRendererWebGpu;
-use crate::texture::{Extent3d, TextureAspect, TextureDescriptor, TextureFormat, TextureUsage};
-use mipmap::generate_mipmaps;
+use crate::texture::mipmap::generate_mipmaps;
+use crate::texture::{
+    mipmap, Extent3d, TextureAspect, TextureDescriptor, TextureFormat, TextureUsage,
+};
 use std::borrow::Cow;
 use wasm_bindgen::prelude::*;
 
-#[cfg(feature = "atlas")]
-pub mod atlas;
 pub mod bitmap;
 #[cfg(feature = "exr")]
 pub mod exr;
-pub mod mipmap;
 
 #[derive(Clone, Debug)]
 pub enum ImageData {
@@ -191,7 +190,7 @@ impl ImageData {
 
         if let Some(mipmap_levels) = mipmap_levels {
             let (width, height) = self.size();
-            generate_mipmaps(gpu, &texture, width, height, mipmap_levels).await?;
+            generate_mipmaps(gpu, &texture, width, height, 1, false, mipmap_levels).await?;
         }
 
         Ok(texture)

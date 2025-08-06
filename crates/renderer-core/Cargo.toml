@@ -8,10 +8,10 @@ authors.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["exr", "atlas"]
+default = ["exr", "mega-texture"]
 exr = ["dep:exr", "image"]
 image = ["dep:gloo-net"]
-atlas = ["dep:binpack2d"]
+mega-texture = ["dep:binpack2d"]
 
 [dependencies]
 anyhow = {workspace = true} 

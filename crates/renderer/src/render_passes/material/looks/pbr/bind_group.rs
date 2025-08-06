@@ -22,11 +22,11 @@ use crate::{
 // just a cache key for re-using the bind groups
 #[derive(Default, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PbrMaterialBindGroupCacheKey {
-    pub base_color_tex: Option<PbrMaterialTextureCacheKey>,
-    pub metallic_roughness_tex: Option<PbrMaterialTextureCacheKey>,
-    pub normal_tex: Option<PbrMaterialTextureCacheKey>,
-    pub occlusion_tex: Option<PbrMaterialTextureCacheKey>,
-    pub emissive_tex: Option<PbrMaterialTextureCacheKey>,
+    pub base_color_tex: Option<TextureKey>,
+    pub metallic_roughness_tex: Option<TextureKey>,
+    pub normal_tex: Option<TextureKey>,
+    pub occlusion_tex: Option<TextureKey>,
+    pub emissive_tex: Option<TextureKey>,
 }
 
 impl PbrMaterialBindGroupCacheKey {
@@ -129,10 +129,4 @@ impl From<&PbrMaterialBindGroupCacheKey> for BindGroupLayoutCacheKey {
 
         BindGroupLayoutCacheKey { entries }
     }
-}
-
-#[derive(Default, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PbrMaterialTextureCacheKey {
-    pub atlas_layer_index: usize,
-    pub atlas_entry_index: usize,
 }

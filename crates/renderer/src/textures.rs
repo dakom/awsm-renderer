@@ -2,17 +2,28 @@ use std::collections::HashMap;
 
 use awsm_renderer_core::{
     compare::CompareFunction,
+    error::AwsmCoreError,
+    image::ImageData,
     renderer::AwsmRendererWebGpu,
     sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor},
+    texture::mega_texture::{self, MegaTexture, MegaTextureEntry, MegaTextureEntryInfo},
 };
 use ordered_float::OrderedFloat;
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
+use crate::{
+    bind_groups::{BindGroupCreate, BindGroups},
+    AwsmRendererLogging,
+};
+
 pub struct Textures {
-    textures: SlotMap<TextureKey, web_sys::GpuTexture>,
+    pub texture_arrays: Vec<web_sys::GpuTexture>,
+    pub mega_texture: MegaTexture<TextureKey>,
+    textures: SlotMap<TextureKey, MegaTextureEntryInfo<TextureKey>>,
     samplers: SlotMap<SamplerKey, web_sys::GpuSampler>,
     sampler_cache: HashMap<SamplerCacheKey, SamplerKey>,
+    gpu_dirty: bool,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -44,35 +55,59 @@ impl std::hash::Hash for SamplerCacheKey {
     }
 }
 
-impl Default for Textures {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Textures {
-    pub fn new() -> Self {
+    pub fn new(gpu: &AwsmRendererWebGpu) -> Self {
         Self {
+            texture_arrays: Vec::new(),
+            mega_texture: MegaTexture::new(&gpu.device.limits(), 8),
             textures: SlotMap::with_key(),
             samplers: SlotMap::with_key(),
             sampler_cache: HashMap::new(),
+            gpu_dirty: false,
         }
     }
 
-    pub fn add_texture(&mut self, texture: web_sys::GpuTexture) -> TextureKey {
-        self.textures.insert(texture)
+    pub fn add_image(&mut self, image_data: ImageData) -> Result<TextureKey> {
+        let key = self.textures.try_insert_with_key(|key| {
+            self.mega_texture
+                .add_entries(vec![(image_data, key)])
+                .map_err(AwsmTextureError::from)
+                .and_then(|mut entries| entries.pop().ok_or(AwsmTextureError::MegaTexture))
+        })?;
+
+        self.gpu_dirty = true;
+
+        Ok(key)
     }
 
-    pub fn get_texture(&self, key: TextureKey) -> Result<&web_sys::GpuTexture> {
+    pub async fn write_gpu_textures(
+        &mut self,
+        logging: &AwsmRendererLogging,
+        gpu: &AwsmRendererWebGpu,
+        bind_groups: &mut BindGroups,
+    ) -> Result<()> {
+        if self.gpu_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Textures GPU write").entered())
+            } else {
+                None
+            };
+
+            // TODO - only need to write _new_ arrays, not all of them...
+            self.texture_arrays = self.mega_texture.write_texture_arrays(gpu).await?;
+
+            bind_groups.mark_create(BindGroupCreate::MegaTexture);
+
+            self.gpu_dirty = false;
+        }
+
+        Ok(())
+    }
+
+    pub fn get_entry(&self, key: TextureKey) -> Result<&MegaTextureEntryInfo<TextureKey>> {
         self.textures
             .get(key)
             .ok_or(AwsmTextureError::TextureNotFound(key))
-    }
-
-    pub fn remove_texture(&mut self, key: TextureKey) {
-        if let Some(texture) = self.textures.remove(key) {
-            texture.destroy();
-        }
     }
 
     pub fn get_sampler_key(
@@ -129,9 +164,15 @@ pub type Result<T> = std::result::Result<T, AwsmTextureError>;
 
 #[derive(Error, Debug)]
 pub enum AwsmTextureError {
-    #[error("[shader] sampler not found: {0:?}")]
+    #[error("[texture] {0:?}")]
+    Core(#[from] AwsmCoreError),
+
+    #[error("[texture] mega-texture failure")]
+    MegaTexture,
+
+    #[error("[texture] sampler not found: {0:?}")]
     SamplerNotFound(SamplerKey),
 
-    #[error("[shader] texture not found: {0:?}")]
+    #[error("[texture] texture not found: {0:?}")]
     TextureNotFound(TextureKey),
 }

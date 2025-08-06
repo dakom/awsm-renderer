@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use awsm_renderer_core::{image::atlas::{ImageAtlas, MultiImageAtlas}, renderer::AwsmRendererWebGpu};
+use awsm_renderer_core::{renderer::AwsmRendererWebGpu, texture::mega_texture::MegaTexture};
 
 use crate::{
     mesh::skins::SkinKey,
@@ -23,7 +23,7 @@ mod transforms;
 
 pub(crate) struct GltfPopulateContext {
     pub data: Arc<GltfData>,
-    pub image_atlas: Mutex<GltfImageAtlas>,
+    pub textures: Mutex<HashMap<GltfIndex, TextureKey>>,
     pub node_to_transform: Mutex<HashMap<GltfIndex, TransformKey>>,
     pub node_to_skin: Mutex<HashMap<GltfIndex, SkinKey>>,
     pub transform_is_joint: Mutex<HashSet<TransformKey>>,
@@ -32,24 +32,6 @@ pub(crate) struct GltfPopulateContext {
 }
 
 type GltfIndex = usize;
-type AtlasIndex = usize;
-type LayerIndex = usize;
-type EntryIndex = usize;
-pub struct GltfImageAtlas {
-    pub atlas: MultiImageAtlas,
-    pub lookup: HashMap<GltfIndex, (AtlasIndex, LayerIndex, EntryIndex)>,
-    pub counter: u64,
-}
-
-impl GltfImageAtlas {
-    pub async fn new(gpu: &AwsmRendererWebGpu) -> Self {
-        Self {
-            atlas: MultiImageAtlas::new(&gpu.device.limits(), 8),
-            lookup: HashMap::new(),
-            counter: 0,
-        }
-    }
-}
 
 impl AwsmRenderer {
     pub async fn populate_gltf(
@@ -64,7 +46,7 @@ impl AwsmRenderer {
 
         let ctx = GltfPopulateContext {
             data: gltf_data,
-            image_atlas: Mutex::new(GltfImageAtlas::new(&self.gpu).await),
+            textures: Mutex::new(HashMap::new()),
             node_to_transform: Mutex::new(HashMap::new()),
             node_to_skin: Mutex::new(HashMap::new()),
             transform_is_joint: Mutex::new(HashSet::new()),
@@ -106,31 +88,11 @@ impl AwsmRenderer {
             self.populate_gltf_node_mesh(&ctx, &node).await?;
         }
 
-        {
-            // let atlas = ctx.image_atlas.lock().unwrap();
-            // tracing::info!("Image Atlas populated with {} layers and {} entries",
-            //     atlas.atlas.layers.len(),
-            //     atlas.atlas.layers.iter().map(|l| l.entries.len()).sum::<usize>()
-            // );
-            // for (layer_index, layer) in atlas.atlas.layers.iter().enumerate() {
-            //     for (entry_index, entry) in layer.entries.iter().enumerate() {
-            //         tracing::info!(
-            //             "Image Atlas Entry: Layer: {}, Entry: {}, Pixel Offset: ({}, {}), size: ({}, {})",
-            //             layer_index, entry_index, entry.pixel_offset.0, entry.pixel_offset.1, entry.image_data.size().0, entry.image_data.size().1
-            //         );
-            //     }
-            // }
-        }
+        self.textures
+            .write_gpu_textures(&self.logging, &self.gpu, &mut self.bind_groups)
+            .await?;
 
-        let atlas = ctx.image_atlas.into_inner().unwrap();
-
-        for atlas in atlas.atlas.atlases.iter() {
-            atlas.write_texture_array(&self.gpu).await?;
-            tracing::warn!("Wrote texture atlas with {} layers and {} entries",
-                atlas.layers.len(),
-                atlas.layers.iter().map(|l| l.entries.len()).sum::<usize>()
-            );
-        }
+        //tracing::info!("{:#?}", self.textures.mega_texture.size(&self.gpu.device.limits()));
 
         Ok(())
     }
