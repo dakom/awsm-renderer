@@ -46,10 +46,10 @@ impl From<SamplerDescriptor<'_>> for web_sys::GpuSamplerDescriptor {
             sampler_js.set_label(label);
         }
         if let Some(lod_min_clamp) = descriptor.lod_min_clamp {
-            sampler_js.set_lod_min_clamp(lod_min_clamp.into());
+            sampler_js.set_lod_min_clamp(lod_min_clamp);
         }
         if let Some(lod_max_clamp) = descriptor.lod_max_clamp {
-            sampler_js.set_lod_max_clamp(lod_max_clamp.into());
+            sampler_js.set_lod_max_clamp(lod_max_clamp);
         }
         if let Some(max_anisotropy) = descriptor.max_anisotropy {
             sampler_js.set_max_anisotropy(max_anisotropy);

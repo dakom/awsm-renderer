@@ -107,14 +107,14 @@ impl MegaTextureSize {
     pub fn entry_per_layer_per_atlas_len(&self) -> Vec<Vec<usize>> {
         self.inner_len
             .iter()
-            .map(|l| l.iter().map(|e| *e).collect())
+            .map(|l| l.iter().copied().collect())
             .collect()
     }
 
     pub fn total_entries_len(&self) -> usize {
         self.inner_len
             .iter()
-            .map(|l| l.iter().map(|e| *e).sum::<usize>())
+            .map(|l| l.iter().copied().sum::<usize>())
             .sum()
     }
 
@@ -518,7 +518,7 @@ where
                     image_data,
                 };
 
-                new_entries.push((&entry).into_info(index));
+                new_entries.push(entry.into_info(index));
 
                 current_layer.entries.push(entry);
             }

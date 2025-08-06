@@ -13,8 +13,8 @@ use crate::texture::{TextureFormat, TextureSampleType, TextureViewDimension};
 
 thread_local! {
     // key is TextureFormat as u32
-    static ATLAS_PIPELINE: RefCell<Option<AtlasPipeline>> = RefCell::new(None);
-    static ATLAS_SHADER_MODULE: RefCell<Option<web_sys::GpuShaderModule>> = RefCell::new(None);
+    static ATLAS_PIPELINE: RefCell<Option<AtlasPipeline>> = const { RefCell::new(None) };
+    static ATLAS_SHADER_MODULE: RefCell<Option<web_sys::GpuShaderModule>> = const { RefCell::new(None) };
 }
 
 #[derive(Clone)]

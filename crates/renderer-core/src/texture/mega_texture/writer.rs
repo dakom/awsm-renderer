@@ -18,7 +18,7 @@ use crate::{
 
 thread_local! {
     // key is TextureFormat as u32
-    static UNIFORM_BUFFER: RefCell<Option<web_sys::GpuBuffer>> = RefCell::new(None);
+    static UNIFORM_BUFFER: RefCell<Option<web_sys::GpuBuffer>> = const { RefCell::new(None) };
 }
 
 impl<ID> MegaTexture<ID> {

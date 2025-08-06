@@ -180,7 +180,7 @@ impl DeviceRequestLimits {
             js_sys::Reflect::set(
                 &obj,
                 &"maxBufferSize".into(),
-                &JsValue::from_f64(limits.max_buffer_size() as f64),
+                &JsValue::from_f64(limits.max_buffer_size()),
             )
             .unwrap();
         }

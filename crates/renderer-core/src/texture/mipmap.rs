@@ -31,7 +31,7 @@ struct MipmapPipeline {
 thread_local! {
     // key is TextureFormat and is_array
     static MIPMAP_PIPELINE: RefCell<HashMap<u32, MipmapPipeline>> = RefCell::new(HashMap::new());
-    static MIPMAP_SHADER_MODULE: RefCell<Option<web_sys::GpuShaderModule>> = RefCell::new(None);
+    static MIPMAP_SHADER_MODULE: RefCell<Option<web_sys::GpuShaderModule>> = const { RefCell::new(None) };
 }
 
 pub async fn generate_mipmaps(

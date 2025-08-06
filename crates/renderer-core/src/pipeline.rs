@@ -177,7 +177,7 @@ impl From<ComputePipelineDescriptor<'_, '_>> for web_sys::GpuComputePipelineDesc
 
 impl From<ProgrammableStage<'_, '_>> for web_sys::GpuProgrammableStage {
     fn from(compute: ProgrammableStage) -> web_sys::GpuProgrammableStage {
-        let compute_js = web_sys::GpuProgrammableStage::new(&compute.module);
+        let compute_js = web_sys::GpuProgrammableStage::new(compute.module);
 
         if let Some(entry_point) = compute.entry_point {
             compute_js.set_entry_point(entry_point);
