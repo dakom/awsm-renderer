@@ -1,10 +1,14 @@
-# Set material uniform with texture ids
+# Set material uniform
+- write full material (right now it's just values)
+- Textures need to be index into the MegaTexture bindings
+- may need to coordinate with MegaTexture bindings generate first
 
 # Get started with opaque material pass 
 
-2. Read material at material_offset
 3. Calculate world position
 4. Write basic material
+
+# Change transform and material binding to storage in geometry pass (prepare for unified draw call)
 
 # Get started with light culling pass
 

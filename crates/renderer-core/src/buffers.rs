@@ -124,6 +124,14 @@ impl BufferUsage {
     }
 }
 
+// https://docs.rs/web-sys/latest/src/web_sys/features/gen_gpu_map_mode.rs.html#5
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum MapMode {
+    Read = web_sys::gpu_map_mode::READ,
+    Write = web_sys::gpu_map_mode::WRITE,
+}
+
 // js conversion
 
 impl From<BufferDescriptor<'_>> for web_sys::GpuBufferDescriptor {

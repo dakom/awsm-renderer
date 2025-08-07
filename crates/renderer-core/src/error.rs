@@ -64,6 +64,15 @@ pub enum AwsmCoreError {
     #[error("[gpu] failed create buffer: {0}")]
     BufferCreation(String),
 
+    #[error("[gpu] failed map buffer: {0}")]
+    BufferMap(String),
+
+    #[error("[gpu] failed map buffer range: {0}")]
+    BufferMapRange(String),
+
+    #[error("[gpu] failed map buffer copy: {0}")]
+    BufferCopy(String),
+
     #[error("[gpu] failed write buffer: {0}")]
     BufferWrite(String),
 
@@ -215,6 +224,18 @@ impl AwsmCoreError {
 
     pub fn buffer_creation(err: JsValue) -> Self {
         Self::BufferCreation(format_err(err))
+    }
+
+    pub fn buffer_map(err: JsValue) -> Self {
+        Self::BufferMap(format_err(err))
+    }
+
+    pub fn buffer_map_range(err: JsValue) -> Self {
+        Self::BufferMapRange(format_err(err))
+    }
+
+    pub fn buffer_copy(err: JsValue) -> Self {
+        Self::BufferCopy(format_err(err))
     }
 
     pub fn buffer_write(err: JsValue) -> Self {

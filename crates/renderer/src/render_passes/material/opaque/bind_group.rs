@@ -2,13 +2,18 @@ use std::borrow::Cow;
 
 use awsm_renderer_core::bind_groups::{
     BindGroupDescriptor, BindGroupEntry, BindGroupLayoutResource, BindGroupResource,
-    StorageTextureAccess, StorageTextureBindingLayout, TextureBindingLayout,
+    BufferBindingLayout, BufferBindingType, StorageTextureAccess, StorageTextureBindingLayout,
+    TextureBindingLayout,
 };
+use awsm_renderer_core::buffers::BufferBinding;
+use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use awsm_renderer_core::texture::{TextureSampleType, TextureViewDimension};
 
 use crate::bind_group_layout::{BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry};
 use crate::bind_groups::{AwsmBindGroupError, BindGroupRecreateContext};
 use crate::error::Result;
+use crate::materials::pbr::PbrMaterial;
+use crate::materials::MaterialBufferKind;
 use crate::{bind_group_layout::BindGroupLayoutKey, render_passes::RenderPassInitContext};
 
 pub struct MaterialOpaqueBindGroups {
@@ -56,6 +61,15 @@ impl MaterialOpaqueBindGroups {
                         StorageTextureBindingLayout::new(ctx.render_texture_formats.opaque_color)
                             .with_view_dimension(TextureViewDimension::N2d)
                             .with_access(StorageTextureAccess::WriteOnly),
+                    ),
+                    visibility_vertex: false,
+                    visibility_fragment: false,
+                    visibility_compute: true,
+                },
+                BindGroupLayoutCacheKeyEntry {
+                    resource: BindGroupLayoutResource::Buffer(
+                        BufferBindingLayout::new()
+                            .with_binding_type(BufferBindingType::ReadOnlyStorage),
                     ),
                     visibility_vertex: false,
                     visibility_fragment: false,
@@ -113,6 +127,12 @@ impl MaterialOpaqueBindGroups {
                         &ctx.render_texture_views.opaque_color,
                     )),
                 ),
+                BindGroupEntry::new(
+                    4,
+                    BindGroupResource::Buffer(BufferBinding::new(
+                        &ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
+                    )),
+                ),
             ],
         );
 
@@ -142,6 +162,12 @@ impl MaterialOpaqueBindGroups {
                     3,
                     BindGroupResource::TextureView(Cow::Borrowed(
                         &ctx.render_texture_views.opaque_color,
+                    )),
+                ),
+                BindGroupEntry::new(
+                    4,
+                    BindGroupResource::Buffer(BufferBinding::new(
+                        &ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
                     )),
                 ),
             ],

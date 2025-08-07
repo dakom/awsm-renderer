@@ -152,9 +152,9 @@ pub enum MaterialAlphaMode {
 impl MaterialAlphaMode {
     pub fn variant_as_u32(&self) -> u32 {
         match self {
-            Self::Opaque => 0,
-            Self::Mask { .. } => 1,
-            Self::Blend => 2,
+            Self::Opaque => 1,
+            Self::Mask { .. } => 2,
+            Self::Blend => 3,
         }
     }
 }

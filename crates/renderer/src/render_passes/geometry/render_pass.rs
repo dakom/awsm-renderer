@@ -1,5 +1,6 @@
 use awsm_renderer_core::{
     command::{
+        color::Color,
         render_pass::{ColorAttachment, DepthStencilAttachment, RenderPassDescriptor},
         LoadOp, StoreOp,
     },
@@ -43,7 +44,15 @@ impl GeometryRenderPass {
                         &ctx.render_texture_views.material_offset,
                         LoadOp::Clear,
                         StoreOp::Store,
-                    ),
+                    )
+                    .with_clear_color(Color {
+                        // this will correctly propogate it to the u32::MAX in the channel
+                        // see https://www.w3.org/TR/webgpu/#abstract-opdef-to-a-texel-value-of-texture-format
+                        r: u32::MAX as f64,
+                        g: 0.0,
+                        b: 0.0,
+                        a: 0.0,
+                    }),
                     ColorAttachment::new(
                         &ctx.render_texture_views.world_normal,
                         LoadOp::Clear,

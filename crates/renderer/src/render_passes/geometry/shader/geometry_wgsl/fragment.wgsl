@@ -32,8 +32,7 @@ fn frag_main(input: FragmentInput) -> FragmentOutput {
     {% endif %}
 
     output.screen_pos = input.clip_position;
-    //output.material_offset = material_header.material_offset;
-    output.material_offset = 1;
+    output.material_offset = material_header.material_offset;
 
     return output;
 }

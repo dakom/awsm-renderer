@@ -21,8 +21,13 @@ use crate::{
     AwsmRenderer, AwsmRendererLogging,
 };
 
-static BUFFER_USAGE: LazyLock<BufferUsage> =
-    LazyLock::new(|| BufferUsage::new().with_uniform().with_copy_dst());
+// copy_src is just for debugging
+static BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| {
+    BufferUsage::new()
+        .with_uniform()
+        .with_copy_dst()
+        .with_storage()
+});
 
 pub struct PbrMaterialBuffers {
     uniform_buffer: DynamicUniformBuffer<MaterialKey>,

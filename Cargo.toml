@@ -232,5 +232,6 @@ features = [
     "GpuCanvasToneMapping",
     "GpuSupportedLimits",
     "GpuDeviceDescriptor",
-    "gpu_color_write"
+    "gpu_color_write",
+    "gpu_map_mode",
 ]
