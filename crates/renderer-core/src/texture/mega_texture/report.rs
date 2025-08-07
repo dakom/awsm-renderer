@@ -92,7 +92,7 @@ impl MegaTextureSize {
             for entries in layer {
                 let mut out_e = Vec::new();
                 for entry in entries {
-                    out_e.push(MegaTextureWidthHeight::from(*entry));
+                    out_e.push((*entry));
                 }
                 out_l.push(out_e);
             }
@@ -132,7 +132,7 @@ impl MegaTextureSize {
                     MegaTextureWidthHeight::new(acc.width + size.width, acc.height + size.height)
                 });
 
-        let total_area = MegaTextureSizeReportArea::new(self.max_size, total_used_size.into());
+        let total_area = MegaTextureSizeReportArea::new(self.max_size, total_used_size);
 
         let max_atlas_size: MegaTextureWidthHeight = (
             self.max_depth * self.texture_size,
@@ -141,7 +141,7 @@ impl MegaTextureSize {
             .into();
         let atlas_areas = atlas_sizes
             .iter()
-            .map(|&size| MegaTextureSizeReportArea::new(max_atlas_size, size.into()))
+            .map(|&size| MegaTextureSizeReportArea::new(max_atlas_size, size))
             .collect::<Vec<_>>();
 
         let max_layer_size: MegaTextureWidthHeight = (self.texture_size, self.texture_size).into();
@@ -149,7 +149,7 @@ impl MegaTextureSize {
             .iter()
             .map(|l| {
                 l.iter()
-                    .map(|&size| MegaTextureSizeReportArea::new(max_layer_size, size.into()))
+                    .map(|&size| MegaTextureSizeReportArea::new(max_layer_size, size))
                     .collect()
             })
             .collect();
