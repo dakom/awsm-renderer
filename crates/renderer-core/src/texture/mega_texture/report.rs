@@ -92,7 +92,7 @@ impl MegaTextureSize {
             for entries in layer {
                 let mut out_e = Vec::new();
                 for entry in entries {
-                    out_e.push((*entry));
+                    out_e.push(*entry);
                 }
                 out_l.push(out_e);
             }
