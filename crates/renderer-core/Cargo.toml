@@ -8,10 +8,11 @@ authors.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["exr", "mega-texture"]
+default = ["exr", "mega-texture", "serde"]
 exr = ["dep:exr", "image"]
 image = ["dep:gloo-net"]
 mega-texture = ["dep:binpack2d"]
+serde = ["dep:serde", "dep:serde-wasm-bindgen"]
 
 [dependencies]
 anyhow = {workspace = true} 
@@ -28,3 +29,5 @@ ordered-float = { workspace = true}
 gloo-net = {workspace = true, optional = true}
 exr = {workspace = true, optional = true}
 binpack2d = {workspace = true, optional = true}
+serde = {workspace = true, optional = true}
+serde-wasm-bindgen = {workspace = true, optional = true}

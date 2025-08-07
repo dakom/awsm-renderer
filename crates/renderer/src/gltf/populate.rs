@@ -92,6 +92,10 @@ impl AwsmRenderer {
             .write_gpu_textures(&self.logging, &self.gpu, &mut self.bind_groups)
             .await?;
 
+        self.textures
+            .mega_texture
+            .size_report(&self.gpu.device.limits())
+            .console_log();
         //tracing::info!("{:#?}", self.textures.mega_texture.size(&self.gpu.device.limits()));
 
         Ok(())

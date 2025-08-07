@@ -102,6 +102,8 @@ dependencies = [
  "gloo-net",
  "js-sys",
  "ordered-float",
+ "serde",
+ "serde-wasm-bindgen",
  "thiserror 2.0.12",
  "tracing",
  "wasm-bindgen",
