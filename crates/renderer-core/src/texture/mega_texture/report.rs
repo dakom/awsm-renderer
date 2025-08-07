@@ -72,10 +72,6 @@ pub struct MegaTextureSize {
 
 impl MegaTextureSize {
     pub fn into_report(self) -> MegaTextureSizeReport {
-        let atlas_len = self.inner_len.len();
-        let layer_per_atlas_len: Vec<usize> = self.inner_len.iter().map(|l| l.len()).collect();
-        let entry_per_layer_per_atlas_len: Vec<Vec<usize>> =
-            self.inner_len.iter().map(|l| l.to_vec()).collect();
         let total_entries_len: usize = self
             .inner_len
             .iter()
@@ -84,8 +80,7 @@ impl MegaTextureSize {
 
         let total_layers_len: usize = self.inner_len.iter().map(|l| l.len()).sum();
 
-        let mut entries_size_per_layer_per_atlas: Vec<Vec<Vec<MegaTextureWidthHeight>>> =
-            Vec::new();
+        let mut atlas_layer_entry_sizes: Vec<Vec<Vec<MegaTextureWidthHeight>>> = Vec::new();
 
         for layer in &self.inner_size {
             let mut out_l = Vec::new();
@@ -96,25 +91,24 @@ impl MegaTextureSize {
                 }
                 out_l.push(out_e);
             }
-            entries_size_per_layer_per_atlas.push(out_l);
+            atlas_layer_entry_sizes.push(out_l);
         }
 
-        let layer_per_atlas_size: Vec<Vec<MegaTextureWidthHeight>> =
-            entries_size_per_layer_per_atlas
-                .iter()
-                .map(|l| {
-                    l.iter()
-                        .map(|e| {
-                            e.iter().fold(MegaTextureWidthHeight::ZERO, |acc, &size| {
-                                MegaTextureWidthHeight::new(
-                                    acc.width + size.width,
-                                    acc.height + size.height,
-                                )
-                            })
+        let layer_per_atlas_size: Vec<Vec<MegaTextureWidthHeight>> = atlas_layer_entry_sizes
+            .iter()
+            .map(|l| {
+                l.iter()
+                    .map(|e| {
+                        e.iter().fold(MegaTextureWidthHeight::ZERO, |acc, &size| {
+                            MegaTextureWidthHeight::new(
+                                acc.width + size.width,
+                                acc.height + size.height,
+                            )
                         })
-                        .collect()
-                })
-                .collect();
+                    })
+                    .collect()
+            })
+            .collect();
 
         let atlas_sizes: Vec<MegaTextureWidthHeight> = layer_per_atlas_size
             .iter()
@@ -145,7 +139,7 @@ impl MegaTextureSize {
             .collect::<Vec<_>>();
 
         let max_layer_size: MegaTextureWidthHeight = (self.texture_size, self.texture_size).into();
-        let layer_per_atlas_area: Vec<Vec<MegaTextureSizeReportArea>> = layer_per_atlas_size
+        let atlas_layer_areas: Vec<Vec<MegaTextureSizeReportArea>> = layer_per_atlas_size
             .iter()
             .map(|l| {
                 l.iter()
@@ -155,14 +149,11 @@ impl MegaTextureSize {
             .collect();
 
         MegaTextureSizeReport {
-            atlas_len,
-            layer_per_atlas_len,
-            entry_per_layer_per_atlas_len,
             total_entries_len,
             total_layers_len,
-            entries_size_per_layer_per_atlas,
+            atlas_layer_entry_sizes,
             atlas_areas,
-            layer_per_atlas_area,
+            atlas_layer_areas,
             total_area,
             max_size_per_bind_group: self.max_size_per_bind_group,
         }
@@ -198,15 +189,12 @@ impl From<(u32, u32)> for MegaTextureWidthHeight {
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MegaTextureSizeReport {
-    pub atlas_len: usize,
-    pub layer_per_atlas_len: Vec<usize>,
-    pub entry_per_layer_per_atlas_len: Vec<Vec<usize>>,
     pub total_entries_len: usize,
     pub total_layers_len: usize,
-    pub entries_size_per_layer_per_atlas: Vec<Vec<Vec<MegaTextureWidthHeight>>>,
     pub total_area: MegaTextureSizeReportArea,
-    pub layer_per_atlas_area: Vec<Vec<MegaTextureSizeReportArea>>,
     pub atlas_areas: Vec<MegaTextureSizeReportArea>,
+    pub atlas_layer_areas: Vec<Vec<MegaTextureSizeReportArea>>,
+    pub atlas_layer_entry_sizes: Vec<Vec<Vec<MegaTextureWidthHeight>>>,
     pub max_size_per_bind_group: MegaTextureWidthHeight,
 }
 
