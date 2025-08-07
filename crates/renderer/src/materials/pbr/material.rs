@@ -9,7 +9,7 @@ use awsm_renderer_core::{
     texture::{TextureSampleType, TextureViewDimension},
 };
 
-use super::{AwsmMaterialError, Result};
+use crate::materials::{AwsmMaterialError, Result};
 use crate::{
     bind_group_layout::{
         BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey,
@@ -21,95 +21,24 @@ use crate::{
     AwsmRenderer, AwsmRendererLogging,
 };
 
-static BUFFER_USAGE: LazyLock<BufferUsage> =
-    LazyLock::new(|| BufferUsage::new().with_uniform().with_copy_dst());
-
-pub struct PbrMaterials {
-    uniform_buffer: DynamicUniformBuffer<MaterialKey>,
-    uniform_buffer_gpu_dirty: bool,
-    pub(crate) gpu_buffer: web_sys::GpuBuffer,
-}
-
-impl PbrMaterials {
-    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let gpu_buffer = gpu.create_buffer(
-            &BufferDescriptor::new(
-                Some("Pbr Materials"),
-                PbrMaterial::INITIAL_ELEMENTS * PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT,
-                *BUFFER_USAGE,
-            )
-            .into(),
-        )?;
-
-        Ok(Self {
-            uniform_buffer: DynamicUniformBuffer::new(
-                PbrMaterial::INITIAL_ELEMENTS,
-                PbrMaterial::BYTE_SIZE,
-                PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT,
-                Some("PbrUniformBuffer".to_string()),
-            ),
-            uniform_buffer_gpu_dirty: false,
-            gpu_buffer,
-        })
-    }
-
-    pub fn buffer_offset(&self, key: MaterialKey) -> Option<usize> {
-        self.uniform_buffer.offset(key)
-    }
-
-    pub fn update(&mut self, key: MaterialKey, pbr_material: &mut PbrMaterial) {
-        self.uniform_buffer.update_with(key, |offset, data| {
-            pbr_material.uniform_buffer_offset = Some(offset);
-            let values = pbr_material.uniform_buffer_data();
-            data[..values.len()].copy_from_slice(&values);
-        });
-
-        self.uniform_buffer_gpu_dirty = true;
-    }
-
-    pub fn write_gpu(
-        &mut self,
-        logging: &AwsmRendererLogging,
-        gpu: &AwsmRendererWebGpu,
-        bind_groups: &mut BindGroups,
-    ) -> Result<()> {
-        if self.uniform_buffer_gpu_dirty {
-            let _maybe_span_guard = if logging.render_timings {
-                Some(tracing::span!(tracing::Level::INFO, "PBR Uniform Buffer GPU write").entered())
-            } else {
-                None
-            };
-
-            if let Some(new_size) = self.uniform_buffer.take_gpu_needs_resize() {
-                self.gpu_buffer = gpu.create_buffer(
-                    &BufferDescriptor::new(Some("Pbr Material"), new_size, *BUFFER_USAGE).into(),
-                )?;
-
-                bind_groups.mark_create(BindGroupCreate::PbrMaterialUniformResize);
-            }
-
-            gpu.write_buffer(
-                &self.gpu_buffer,
-                None,
-                self.uniform_buffer.raw_slice(),
-                None,
-                None,
-            )?;
-
-            self.uniform_buffer_gpu_dirty = false;
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct PbrMaterial {
     pub uniform_buffer_offset: Option<usize>,
+    pub base_color_tex: Option<TextureKey>,
+    pub base_color_uv_index: Option<u32>,
     pub base_color_factor: [f32; 4],
+    pub metallic_roughness_tex: Option<TextureKey>,
+    pub metallic_roughness_uv_index: Option<u32>,
     pub metallic_factor: f32,
     pub roughness_factor: f32,
+    pub normal_tex: Option<TextureKey>,
+    pub normal_uv_index: Option<u32>,
     pub normal_scale: f32,
+    pub occlusion_tex: Option<TextureKey>,
+    pub occlusion_uv_index: Option<u32>,
     pub occlusion_strength: f32,
+    pub emissive_tex: Option<TextureKey>,
+    pub emissive_uv_index: Option<u32>,
     pub emissive_factor: [f32; 3],
     // these come from initial settings which affects bind group, mesh pipeline etc.
     // so the only way to change them is to create a new material
@@ -121,11 +50,21 @@ impl Default for PbrMaterial {
     fn default() -> Self {
         Self {
             uniform_buffer_offset: None,
+            base_color_tex: None,
+            base_color_uv_index: None,
             base_color_factor: [1.0, 1.0, 1.0, 1.0],
+            metallic_roughness_tex: None,
+            metallic_roughness_uv_index: None,
             metallic_factor: 1.0,
             roughness_factor: 1.0,
+            normal_tex: None,
+            normal_uv_index: None,
             normal_scale: 1.0,
+            occlusion_tex: None,
+            occlusion_uv_index: None,
             occlusion_strength: 1.0,
+            emissive_tex: None,
+            emissive_uv_index: None,
             emissive_factor: [0.0, 0.0, 0.0],
             alpha_mode: MaterialAlphaMode::Opaque,
             double_sided: false,

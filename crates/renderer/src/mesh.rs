@@ -97,7 +97,6 @@ impl Mesh {
         let transform_offset = ctx.transforms.buffer_offset(self.transform_key)? as u32;
         let pbr_material_offset = ctx
             .materials
-            .pbr
             .buffer_offset(self.material_key)
             .unwrap_or_default() as u32;
 

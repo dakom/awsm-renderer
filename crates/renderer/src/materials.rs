@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{
     bind_groups::{AwsmBindGroupError, BindGroups},
-    materials::pbr::{PbrMaterial, PbrMaterials},
+    materials::pbr::{PbrMaterial, PbrMaterialBuffers},
     textures::{AwsmTextureError, SamplerKey, TextureKey},
     AwsmRendererLogging,
 };
@@ -15,7 +15,33 @@ pub struct Materials {
     lookup: SlotMap<MaterialKey, Material>,
     // optimization to avoid loading whole material to check if it has alpha blend
     alpha_blend: SecondaryMap<MaterialKey, bool>,
-    pub pbr: PbrMaterials,
+    buffers: MaterialBuffers,
+}
+
+struct MaterialBuffers {
+    pbr: PbrMaterialBuffers,
+    // optimization to avoid loading whole material to find the correct buffer
+    buffer_kind: SecondaryMap<MaterialKey, MaterialBufferKind>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MaterialBufferKind {
+    Pbr,
+}
+
+impl MaterialBuffers {
+    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
+        Ok(MaterialBuffers {
+            pbr: PbrMaterialBuffers::new(gpu)?,
+            buffer_kind: SecondaryMap::new(),
+        })
+    }
+
+    pub fn buffer_offset(&self, key: MaterialKey) -> Option<usize> {
+        match self.buffer_kind.get(key)? {
+            MaterialBufferKind::Pbr => self.pbr.buffer_offset(key),
+        }
+    }
 }
 
 impl Materials {
@@ -23,7 +49,7 @@ impl Materials {
         Ok(Materials {
             lookup: SlotMap::with_key(),
             alpha_blend: SecondaryMap::new(),
-            pbr: PbrMaterials::new(gpu)?,
+            buffers: MaterialBuffers::new(gpu)?,
         })
     }
 
@@ -32,24 +58,43 @@ impl Materials {
     }
 
     pub fn insert(&mut self, material: Material) -> MaterialKey {
-        let key = self.lookup.insert(material.clone());
-        self.alpha_blend.insert(key, material.has_alpha_blend());
+        let has_alpha_blend = material.has_alpha_blend();
+        let buffer_kind = material.buffer_kind();
+
+        let key = self.lookup.insert(material);
+        self.alpha_blend.insert(key, has_alpha_blend);
+        self.buffers.buffer_kind.insert(key, buffer_kind);
         self.update(key, |_| {});
 
         key
     }
 
+    pub fn buffer_offset(&self, key: MaterialKey) -> Option<usize> {
+        self.buffers.buffer_offset(key)
+    }
+
+    pub fn gpu_buffer(&self, kind: MaterialBufferKind) -> &web_sys::GpuBuffer {
+        match kind {
+            MaterialBufferKind::Pbr => &self.buffers.pbr.gpu_buffer,
+        }
+    }
+
     pub fn update(&mut self, key: MaterialKey, mut f: impl FnMut(&mut Material)) {
         if let Some(material) = self.lookup.get_mut(key) {
             let old_has_alpha_blend = material.has_alpha_blend();
+            let old_buffer_kind = material.buffer_kind();
             f(material);
             let new_has_alpha_blend = material.has_alpha_blend();
+            let new_buffer_kind = material.buffer_kind();
             if old_has_alpha_blend != new_has_alpha_blend {
                 self.alpha_blend.insert(key, new_has_alpha_blend);
             }
+            if old_buffer_kind != new_buffer_kind {
+                self.buffers.buffer_kind.insert(key, new_buffer_kind);
+            }
             match material {
                 Material::Pbr(pbr_material) => {
-                    self.pbr.update(key, pbr_material);
+                    self.buffers.pbr.update(key, pbr_material);
                 }
             }
         }
@@ -68,7 +113,7 @@ impl Materials {
         gpu: &AwsmRendererWebGpu,
         bind_groups: &mut BindGroups,
     ) -> Result<()> {
-        self.pbr.write_gpu(logging, gpu, bind_groups)?;
+        self.buffers.pbr.write_gpu(logging, gpu, bind_groups)?;
 
         Ok(())
     }
@@ -84,6 +129,12 @@ impl Material {
     pub fn has_alpha_blend(&self) -> bool {
         match self {
             Material::Pbr(pbr_material) => pbr_material.has_alpha_blend(),
+        }
+    }
+
+    pub fn buffer_kind(&self) -> MaterialBufferKind {
+        match self {
+            Material::Pbr(_) => MaterialBufferKind::Pbr,
         }
     }
 }

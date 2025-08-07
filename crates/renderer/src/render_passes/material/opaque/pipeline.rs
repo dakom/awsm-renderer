@@ -1,9 +1,7 @@
 use crate::error::Result;
 use crate::pipeline_layouts::PipelineLayoutCacheKey;
 use crate::pipelines::compute_pipeline::{ComputePipelineCacheKey, ComputePipelineKey};
-use crate::render_passes::material::looks::pbr::shader::cache_key::ShaderCacheKeyMaterialPbr;
-use crate::render_passes::material::looks::shader_cache_key::ShaderCacheKeyMaterialLook;
-use crate::render_passes::material::opaque::shader::cache_key::ShaderCacheKeyMaterialOpaque;
+use crate::render_passes::material::cache_key::ShaderCacheKeyMaterial;
 use crate::render_passes::{
     material::opaque::bind_group::MaterialOpaqueBindGroups, RenderPassInitContext,
 };
@@ -25,10 +23,10 @@ impl MaterialOpaquePipelines {
             pipeline_layout_cache_key,
         )?;
 
-        let shader_cache_key = ShaderCacheKeyMaterialOpaque {
-            look: ShaderCacheKeyMaterialLook::Pbr(ShaderCacheKeyMaterialPbr::default()),
-        };
-        let shader_key = ctx.shaders.get_key(&ctx.gpu, shader_cache_key).await?;
+        let shader_key = ctx
+            .shaders
+            .get_key(&ctx.gpu, ShaderCacheKeyMaterial::Opaque)
+            .await?;
 
         let compute_pipeline_cache_key =
             ComputePipelineCacheKey::new(shader_key, pipeline_layout_key);

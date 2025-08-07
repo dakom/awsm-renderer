@@ -46,7 +46,7 @@ pub enum BindGroupCreate {
     MorphTargetWeightsResize,
     MorphTargetValuesResize,
     SkinJointMatricesResize,
-    PbrMaterialUniformResize,
+    PbrMaterialResize,
     TextureViewResize,
     MegaTexture,
 }
@@ -87,7 +87,7 @@ impl BindGroups {
             .contains(&BindGroupCreate::TransformsResize)
             || self
                 .create_list
-                .contains(&BindGroupCreate::PbrMaterialUniformResize)
+                .contains(&BindGroupCreate::PbrMaterialResize)
         {
             render_passes
                 .geometry
@@ -117,7 +117,7 @@ impl BindGroups {
             .create_list
             .contains(&BindGroupCreate::TextureViewResize)
         {
-            // material passes are also recreated on megatexture changes
+            // material passes are also recreated on megatexture and material changes
             render_passes.light_culling.bind_groups.recreate(&ctx)?;
             render_passes.composite.bind_groups.recreate(&ctx)?;
             render_passes.display.bind_groups.recreate(&ctx)?;
@@ -127,6 +127,9 @@ impl BindGroups {
             || self
                 .create_list
                 .contains(&BindGroupCreate::TextureViewResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::PbrMaterialResize)
         {
             render_passes.material_opaque.bind_groups.recreate(&ctx)?;
             render_passes

@@ -1,5 +1,12 @@
 use slotmap::{Key, SecondaryMap};
 
+// This dynamic storage buffer allows for flexible allocations of fixed sizes
+// that are power-of-two aligned.
+//
+// It can be used to power either uniform or storage buffers on the gpu
+// the choice of which will depend more on the total size of the buffer than anything else
+// since uniform buffers are a valid choice here
+
 //-------------------------------- PERFORMANCE SUMMARY ------------------------//
 //
 // • insert/update/remove:   O(1)  (amortized, ignoring rare growth)
@@ -12,6 +19,7 @@ use slotmap::{Key, SecondaryMap};
 // • Ideal usage:
 //    Thousands of items with identical sizes, like:
 //      - Transforms
+//      - Lights
 //      - PBR Materials
 //
 //----------------------------------------------------------------------------//

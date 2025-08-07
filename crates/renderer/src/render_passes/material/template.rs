@@ -15,7 +15,7 @@ use crate::{
 #[derive(Debug)]
 pub enum ShaderTemplateMaterial {
     Transparent(ShaderTemplateMaterialTransparent),
-    Opaque(ShaderTemplateMaterialOpaque),
+    Opaque,
 }
 
 impl TryFrom<&ShaderCacheKeyMaterial> for ShaderTemplateMaterial {
@@ -23,9 +23,7 @@ impl TryFrom<&ShaderCacheKeyMaterial> for ShaderTemplateMaterial {
 
     fn try_from(value: &ShaderCacheKeyMaterial) -> Result<Self> {
         match value {
-            ShaderCacheKeyMaterial::Opaque(cache_key) => {
-                Ok(ShaderTemplateMaterial::Opaque(cache_key.try_into()?))
-            }
+            ShaderCacheKeyMaterial::Opaque => Ok(ShaderTemplateMaterial::Opaque),
             ShaderCacheKeyMaterial::Transparent(cache_key) => {
                 Ok(ShaderTemplateMaterial::Transparent(cache_key.try_into()?))
             }
@@ -36,7 +34,7 @@ impl TryFrom<&ShaderCacheKeyMaterial> for ShaderTemplateMaterial {
 impl ShaderTemplateMaterial {
     pub fn into_source(self) -> Result<String> {
         match self {
-            ShaderTemplateMaterial::Opaque(tmpl) => tmpl.into_source(),
+            ShaderTemplateMaterial::Opaque => Ok(ShaderTemplateMaterialOpaque {}.into_source()?),
             ShaderTemplateMaterial::Transparent(tmpl) => tmpl.into_source(),
         }
     }
@@ -44,7 +42,7 @@ impl ShaderTemplateMaterial {
     #[cfg(debug_assertions)]
     pub fn debug_label(&self) -> Option<&str> {
         match self {
-            ShaderTemplateMaterial::Opaque(tmpl) => tmpl.debug_label(),
+            ShaderTemplateMaterial::Opaque => Some("Material Opaque"),
             ShaderTemplateMaterial::Transparent(tmpl) => tmpl.debug_label(),
         }
     }

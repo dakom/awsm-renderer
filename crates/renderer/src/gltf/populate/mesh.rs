@@ -147,10 +147,6 @@ impl AwsmRenderer {
             .materials
             .insert(Material::Pbr(material_info.material.clone()));
 
-        let material_bind_group_layout_key = self
-            .bind_group_layouts
-            .get_key(&self.gpu, (&material_info.bind_group_cache_key).into())?;
-
         let mut pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
             self.render_passes
                 .geometry

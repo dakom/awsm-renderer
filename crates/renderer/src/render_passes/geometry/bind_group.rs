@@ -7,7 +7,6 @@ use awsm_renderer_core::{
     renderer::AwsmRendererWebGpu,
 };
 
-use crate::error::Result;
 use crate::{
     bind_group_layout::{
         BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey, BindGroupLayouts,
@@ -19,6 +18,7 @@ use crate::{
     render_passes::{composite::bind_group, RenderPassInitContext},
     transforms::Transforms,
 };
+use crate::{error::Result, materials::MaterialBufferKind};
 
 pub struct GeometryBindGroups {
     pub camera_lights: GeometryBindGroupCameraLights,
@@ -171,7 +171,7 @@ impl GeometryBindGroupTransformMaterials {
                 BindGroupEntry::new(
                     1,
                     BindGroupResource::Buffer(
-                        BufferBinding::new(&ctx.materials.pbr.gpu_buffer)
+                        BufferBinding::new(&ctx.materials.gpu_buffer(MaterialBufferKind::Pbr))
                             .with_size(PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT),
                     ),
                 ),
