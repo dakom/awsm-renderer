@@ -18,7 +18,7 @@ pub struct CompositeRenderPass {
 }
 
 impl CompositeRenderPass {
-    pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
+    pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_groups = CompositeBindGroups::new(ctx).await?;
         let pipelines = CompositePipelines::new(ctx, &bind_groups).await?;
 

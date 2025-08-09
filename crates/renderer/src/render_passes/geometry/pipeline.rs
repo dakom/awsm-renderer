@@ -5,7 +5,7 @@ pub struct GeometryPipelines {}
 
 impl GeometryPipelines {
     pub async fn new(
-        ctx: &mut RenderPassInitContext,
+        ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &GeometryBindGroups,
     ) -> Result<Self> {
         Ok(Self {})

@@ -9,7 +9,7 @@ use awsm_renderer_core::{
     texture::{TextureSampleType, TextureViewDimension},
 };
 
-use crate::materials::{pbr::PbrMaterial, AwsmMaterialError, Result};
+use crate::materials::{pbr::PbrMaterial, AwsmMaterialError, Materials, Result};
 use crate::{
     bind_group_layout::{
         BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey,
@@ -40,7 +40,7 @@ impl PbrMaterialBuffers {
         let gpu_buffer = gpu.create_buffer(
             &BufferDescriptor::new(
                 Some("Pbr Materials"),
-                PbrMaterial::INITIAL_ELEMENTS * PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT,
+                PbrMaterial::INITIAL_ELEMENTS * Materials::MAX_SIZE,
                 *BUFFER_USAGE,
             )
             .into(),
@@ -50,7 +50,7 @@ impl PbrMaterialBuffers {
             uniform_buffer: DynamicUniformBuffer::new(
                 PbrMaterial::INITIAL_ELEMENTS,
                 PbrMaterial::BYTE_SIZE,
-                PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT,
+                Materials::MAX_SIZE,
                 Some("PbrUniformBuffer".to_string()),
             ),
             uniform_buffer_gpu_dirty: false,
@@ -62,10 +62,15 @@ impl PbrMaterialBuffers {
         self.uniform_buffer.offset(key)
     }
 
-    pub fn update(&mut self, key: MaterialKey, pbr_material: &mut PbrMaterial) {
+    pub fn update(
+        &mut self,
+        key: MaterialKey,
+        pbr_material: &mut PbrMaterial,
+        textures: &Textures,
+    ) {
         self.uniform_buffer.update_with(key, |offset, data| {
             pbr_material.uniform_buffer_offset = Some(offset);
-            let values = pbr_material.uniform_buffer_data();
+            let values = pbr_material.uniform_buffer_data(textures);
             data[..values.len()].copy_from_slice(&values);
         });
 

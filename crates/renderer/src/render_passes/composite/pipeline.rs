@@ -14,7 +14,7 @@ pub struct CompositePipelines {
 
 impl CompositePipelines {
     pub async fn new(
-        ctx: &mut RenderPassInitContext,
+        ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &CompositeBindGroups,
     ) -> Result<Self> {
         let pipeline_layout_cache_key =

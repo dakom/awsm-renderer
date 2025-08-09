@@ -7,7 +7,7 @@ pub struct LightCullingPipelines {}
 
 impl LightCullingPipelines {
     pub async fn new(
-        ctx: &mut RenderPassInitContext,
+        ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &LightCullingBindGroups,
     ) -> Result<Self> {
         Ok(Self {})

@@ -19,7 +19,7 @@ pub struct MaterialOpaqueRenderPass {
 }
 
 impl MaterialOpaqueRenderPass {
-    pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
+    pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_groups = MaterialOpaqueBindGroups::new(ctx).await?;
         let pipelines = MaterialOpaquePipelines::new(ctx, &bind_groups).await?;
 
@@ -29,21 +29,34 @@ impl MaterialOpaqueRenderPass {
         })
     }
 
+    pub async fn update_texture_bindings(
+        &mut self,
+        ctx: &mut RenderPassInitContext<'_>,
+    ) -> Result<()> {
+        let bind_groups = MaterialOpaqueBindGroups::new(ctx).await?;
+        let pipelines = MaterialOpaquePipelines::new(ctx, &bind_groups).await?;
+
+        self.bind_groups = bind_groups;
+        self.pipelines = pipelines;
+
+        Ok(())
+    }
+
     pub fn render(&self, ctx: &RenderContext) -> Result<()> {
         let compute_pass = ctx.command_encoder.begin_compute_pass(Some(
             &ComputePassDescriptor::new(Some("Material Opaque Pass")).into(),
         ));
 
-        let bind_group = self
-            .bind_groups
-            .get_bind_group(ctx.render_texture_views.curr_index)?;
+        let bind_groups = self.bind_groups.get_bind_groups()?;
         let compute_pipeline = ctx
             .pipelines
             .compute
             .get(self.pipelines.compute_pipeline_key)?;
 
         compute_pass.set_pipeline(&compute_pipeline);
-        compute_pass.set_bind_group(0, &bind_group, None)?;
+        for (index, bind_group) in bind_groups.iter().enumerate() {
+            compute_pass.set_bind_group(index as u32, &bind_group, None)?;
+        }
 
         let workgroup_size_x = ctx.render_texture_views.width.div_ceil(8);
         let workgroup_size_y = ctx.render_texture_views.height.div_ceil(8);

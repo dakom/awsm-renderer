@@ -8,6 +8,8 @@
 3. Calculate world position
 4. Write basic material
 
+# Load mip level in compute shader pass
+
 # Change transform and material binding to storage in geometry pass (prepare for unified draw call)
 
 # Get started with light culling pass

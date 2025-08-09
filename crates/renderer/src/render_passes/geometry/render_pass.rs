@@ -25,7 +25,7 @@ pub struct GeometryRenderPass {
 }
 
 impl GeometryRenderPass {
-    pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
+    pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_groups = GeometryBindGroups::new(ctx).await?;
         let pipelines = GeometryPipelines::new(ctx, &bind_groups).await?;
 

@@ -29,7 +29,10 @@ pub mod writer;
 
 use std::collections::HashMap;
 
-use crate::error::{AwsmCoreError, Result};
+use crate::{
+    error::{AwsmCoreError, Result},
+    texture::mipmap::calculate_mipmap_levels,
+};
 use binpack2d::{
     maxrects::{Heuristic, MaxRectsBin},
     Dimension,
@@ -54,9 +57,9 @@ pub struct MegaTexture<ID> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MegaTextureIndex {
-    pub atlas_index: usize,
-    pub layer_index: usize,
-    pub entry_index: usize,
+    pub atlas: u16,
+    pub layer: u16,
+    pub entry: u16,
 }
 
 pub(super) struct MegaTextureAtlas<ID> {
@@ -72,9 +75,7 @@ pub(super) struct MegaTextureLayer<ID> {
 }
 
 pub struct MegaTextureEntry<ID> {
-    pub pixel_offset: (u32, u32),
-    pub uv_offset: [f32; 2],
-    pub uv_scale: [f32; 2],
+    pub pixel_offset: [u32; 2],
     pub image_data: ImageData,
     pub id: ID,
 }
@@ -84,10 +85,10 @@ where
     ID: Clone,
 {
     pub fn into_info(&self, index: MegaTextureIndex) -> MegaTextureEntryInfo<ID> {
+        let (width, height) = self.image_data.size();
         MegaTextureEntryInfo {
             pixel_offset: self.pixel_offset,
-            uv_offset: self.uv_offset,
-            uv_scale: self.uv_scale,
+            size: [width, height],
             id: self.id.clone(),
             index,
         }
@@ -96,11 +97,18 @@ where
 
 // Does not include ImageData
 pub struct MegaTextureEntryInfo<ID> {
-    pub pixel_offset: (u32, u32),
-    pub uv_offset: [f32; 2],
-    pub uv_scale: [f32; 2],
+    pub pixel_offset: [u32; 2],
+    pub size: [u32; 2],
     pub index: MegaTextureIndex,
     pub id: ID,
+}
+
+// Just a convenience to help generate a sane list of bind group bindings
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
+pub struct MegaTextureBindings {
+    pub start_group: u32,
+    pub start_binding: u32,
+    pub bind_group_bindings_len: Vec<u32>,
 }
 
 impl<ID> MegaTexture<ID>
@@ -109,21 +117,6 @@ where
 {
     pub fn new(limits: &web_sys::GpuSupportedLimits, padding: u32) -> Self {
         let (texture_size, max_depth) = max_dimensions(limits);
-
-        // let max_bindings_per_group = limits.max_sampled_textures_per_shader_stage();
-
-        // These are some really interesting metrics, they let us know our wiggle room for textures
-        // tracing::info!("Creating multi-atlas {}x{} w/ max depth: {} and max bindings per group: {}", texture_size, texture_size, max_depth, max_bindings_per_group);
-
-        // tracing::info!("Total material image size per bind group: {}x{}",
-        //     texture_size * max_depth * max_bindings_per_group,
-        //     texture_size * max_depth * max_bindings_per_group,
-        // );
-
-        // tracing::info!("Absolute total material image size: {}x{}",
-        //     texture_size * max_depth * max_bindings_per_group * limits.max_bind_groups(),
-        //     texture_size * max_depth * max_bindings_per_group * limits.max_bind_groups(),
-        // );
 
         Self {
             atlases: Vec::new(),
@@ -142,14 +135,14 @@ where
     pub fn get_entry(&self, custom_id: &ID) -> Option<&MegaTextureEntry<ID>> {
         self.get_index(custom_id).and_then(
             |MegaTextureIndex {
-                 atlas_index,
-                 layer_index,
-                 entry_index,
+                 atlas: atlas_index,
+                 layer: layer_index,
+                 entry: entry_index,
              }| {
                 self.atlases
-                    .get(atlas_index)
-                    .and_then(|atlas| atlas.layers.get(layer_index))
-                    .and_then(|layer| layer.entries.get(entry_index))
+                    .get(atlas_index as usize)
+                    .and_then(|atlas| atlas.layers.get(layer_index as usize))
+                    .and_then(|layer| layer.entries.get(entry_index as usize))
             },
         )
     }
@@ -158,6 +151,35 @@ where
         let index = self.get_index(custom_id)?;
         self.get_entry(custom_id)
             .map(|entry| entry.into_info(index))
+    }
+
+    pub fn get_bindings(
+        &self,
+        limits: &web_sys::GpuSupportedLimits,
+        start_group: u32,
+        start_binding: u32,
+    ) -> MegaTextureBindings {
+        let max_bindings_per_group = limits.max_sampled_textures_per_shader_stage();
+        let total_textures = self.atlases.len() as u32;
+
+        let mut bind_group_bindings_len = Vec::new();
+        let mut remaining_textures = total_textures;
+        let mut current_binding = start_binding;
+
+        while remaining_textures > 0 {
+            let available_slots = max_bindings_per_group - current_binding;
+            let textures_in_this_group = remaining_textures.min(available_slots);
+
+            bind_group_bindings_len.push(textures_in_this_group);
+            remaining_textures -= textures_in_this_group;
+            current_binding = 0; // Reset for subsequent groups
+        }
+
+        MegaTextureBindings {
+            start_group,
+            start_binding,
+            bind_group_bindings_len,
+        }
     }
 
     pub fn add_entries(
@@ -174,10 +196,10 @@ where
 
         let mut new_entries = Vec::new();
 
-        loop {
-            let atlas_index = self.atlases.len() - 1;
+        let mut atlas_index = 0;
 
-            let rejected_images = self.atlases.last_mut().unwrap().add_entries(
+        loop {
+            let rejected_images = self.atlases[atlas_index].add_entries(
                 &mut self.lookup,
                 atlas_index,
                 images,
@@ -191,12 +213,27 @@ where
             // If we got rejected images, we need to create a new atlas (all layers are full up to max depth)
             images = rejected_images;
 
-            self.atlases.push(MegaTextureAtlas::new(
-                self.texture_size,
-                self.atlas_depth,
-                self.padding,
-            ));
+            if atlas_index == self.atlases.len() - 1 {
+                // If we are at the last atlas, we need to create a new one
+                self.atlases.push(MegaTextureAtlas::new(
+                    self.texture_size,
+                    self.atlas_depth,
+                    self.padding,
+                ));
+            }
+
+            atlas_index += 1;
         }
+    }
+
+    pub fn layer_len(&self, atlas_index: usize) -> usize {
+        self.atlases
+            .get(atlas_index)
+            .map_or(0, |atlas| atlas.layers.len())
+    }
+
+    pub fn mipmap_levels(&self) -> u32 {
+        calculate_mipmap_levels(self.texture_size, self.texture_size)
     }
 }
 
@@ -251,9 +288,10 @@ where
                 .push(MegaTextureLayer::new(self.texture_size, self.texture_size));
         }
 
+        let mut layer_index = 0;
+
         loop {
-            let layer_index = self.layers.len() - 1;
-            let current_layer = self.layers.last_mut().unwrap();
+            let current_layer = &mut self.layers[layer_index];
             let atlas_width = self.texture_size as i32;
             let atlas_height = self.texture_size as i32;
 
@@ -284,9 +322,17 @@ where
                 let (image_data, id) = images[rect.id() as usize].take().unwrap();
 
                 let index = MegaTextureIndex {
-                    atlas_index,
-                    layer_index,
-                    entry_index: current_layer.entries.len(),
+                    atlas: atlas_index
+                        .try_into()
+                        .map_err(AwsmCoreError::MegaTextureIndexSize)?,
+                    layer: layer_index
+                        .try_into()
+                        .map_err(AwsmCoreError::MegaTextureIndexSize)?,
+                    entry: current_layer
+                        .entries
+                        .len()
+                        .try_into()
+                        .map_err(AwsmCoreError::MegaTextureIndexSize)?,
                 };
 
                 if lookup.insert(id.clone(), index).is_some() {
@@ -295,19 +341,10 @@ where
                     });
                 }
 
-                let (img_width, img_height) = image_data.size();
                 let pixel_offset = (rect.x() + padding, rect.y() + padding);
 
                 let entry = MegaTextureEntry {
-                    pixel_offset: (pixel_offset.0 as u32, pixel_offset.1 as u32),
-                    uv_offset: [
-                        pixel_offset.0 as f32 / atlas_width as f32,
-                        pixel_offset.1 as f32 / atlas_height as f32,
-                    ],
-                    uv_scale: [
-                        img_width as f32 / atlas_width as f32,
-                        img_height as f32 / atlas_height as f32,
-                    ],
+                    pixel_offset: [pixel_offset.0 as u32, pixel_offset.1 as u32],
                     id,
                     image_data,
                 };
@@ -322,7 +359,7 @@ where
                 break;
             }
 
-            if self.layers.len() as u32 >= self.max_depth {
+            if layer_index as u32 >= self.max_depth {
                 let rejected_images: Vec<(ImageData, ID)> = rejected
                     .into_iter()
                     .filter_map(|dim| images[dim.id() as usize].take())
@@ -331,11 +368,17 @@ where
                 return Ok(rejected_images);
             }
 
-            self.layers.push(MegaTextureLayer::new(
-                atlas_width as u32,
-                atlas_height as u32,
-            ));
+            if layer_index == self.layers.len() - 1 {
+                // If we are at the last layer, we need to create a new one
+                self.layers.push(MegaTextureLayer::new(
+                    atlas_width as u32,
+                    atlas_height as u32,
+                ));
+            }
+
             items_to_place = rejected;
+
+            layer_index += 1;
         }
 
         Ok(Vec::new())

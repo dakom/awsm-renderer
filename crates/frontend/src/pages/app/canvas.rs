@@ -5,7 +5,8 @@ use awsm_renderer::{
         renderer::{AwsmRendererWebGpuBuilder, DeviceRequestLimits},
         texture::TextureFormat,
     },
-    AwsmRendererBuilder, AwsmRendererLogging,
+    debug::AwsmRendererLogging,
+    AwsmRendererBuilder,
 };
 use awsm_web::dom::resize::{self, ResizeObserver};
 use wasm_bindgen_futures::spawn_local;
@@ -71,8 +72,8 @@ impl AppCanvas {
                             .with_configuration(CanvasConfiguration::default()
                                 .with_alpha_mode(CanvasAlphaMode::Opaque)
                                 .with_tone_mapping(CanvasToneMappingMode::Standard)
-                            )
-                            .with_device_request_limits(DeviceRequestLimits::max_all());
+                            );
+                            //.with_device_request_limits(DeviceRequestLimits::max_all());
 
                         let renderer = AwsmRendererBuilder::new(gpu_builder)
                             .with_logging(AwsmRendererLogging { render_timings: true })

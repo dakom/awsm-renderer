@@ -20,7 +20,6 @@ use crate::{
 use super::GltfPopulateContext;
 
 pub struct GltfMaterialInfo {
-    pub shader_cache_key: ShaderCacheKeyMaterial,
     pub material: PbrMaterial,
 }
 
@@ -31,7 +30,14 @@ impl GltfMaterialInfo {
         primitive_buffer_info: &GltfMeshBufferInfo,
         gltf_material: gltf::Material<'_>,
     ) -> Result<Self> {
-        let mut material = PbrMaterial::default();
+        let alpha_mode = match gltf_material.alpha_mode() {
+            gltf::material::AlphaMode::Opaque => MaterialAlphaMode::Opaque,
+            gltf::material::AlphaMode::Mask => MaterialAlphaMode::Mask {
+                cutoff: gltf_material.alpha_cutoff().unwrap_or(0.5),
+            },
+            gltf::material::AlphaMode::Blend => MaterialAlphaMode::Blend,
+        };
+        let mut material = PbrMaterial::new(alpha_mode, gltf_material.double_sided());
 
         let pbr = gltf_material.pbr_metallic_roughness();
 
@@ -79,15 +85,6 @@ impl GltfMaterialInfo {
             material.emissive_uv_index = Some(uv_index as u32);
         }
 
-        let alpha_mode = match gltf_material.alpha_mode() {
-            gltf::material::AlphaMode::Opaque => MaterialAlphaMode::Opaque,
-            gltf::material::AlphaMode::Mask => MaterialAlphaMode::Mask {
-                cutoff: gltf_material.alpha_cutoff().unwrap_or(0.5),
-            },
-            gltf::material::AlphaMode::Blend => MaterialAlphaMode::Blend,
-        };
-        let mut material = PbrMaterial::new(alpha_mode, gltf_material.double_sided());
-
         if let Some(normal_tex) = gltf_material.normal_texture() {
             material.normal_scale = normal_tex.scale();
         }
@@ -102,17 +99,7 @@ impl GltfMaterialInfo {
         material.metallic_factor = pbr.metallic_factor();
         material.roughness_factor = pbr.roughness_factor();
 
-        Ok(Self {
-            shader_cache_key: match gltf_material.alpha_mode() {
-                gltf::material::AlphaMode::Opaque | gltf::material::AlphaMode::Mask => {
-                    ShaderCacheKeyMaterial::Opaque
-                }
-                gltf::material::AlphaMode::Blend => {
-                    ShaderCacheKeyMaterial::Transparent(ShaderCacheKeyMaterialTransparent {})
-                }
-            },
-            material,
-        })
+        Ok(Self { material })
     }
 }
 

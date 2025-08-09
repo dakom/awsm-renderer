@@ -17,7 +17,7 @@ pub struct DisplayPipelines {
 
 impl DisplayPipelines {
     pub async fn new(
-        ctx: &mut RenderPassInitContext,
+        ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &DisplayBindGroups,
     ) -> Result<Self> {
         let pipeline_layout_cache_key =

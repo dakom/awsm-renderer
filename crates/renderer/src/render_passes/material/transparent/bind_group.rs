@@ -9,7 +9,7 @@ pub struct MaterialTransparentBindGroups {
 }
 
 impl MaterialTransparentBindGroups {
-    pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
+    pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         Ok(Self {
             //bind_group_layout_key,
             _bind_group: None,

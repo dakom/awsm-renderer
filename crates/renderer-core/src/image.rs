@@ -31,14 +31,8 @@ pub enum ImageData {
 //
 // Color space handling:
 // - EXR: Uses `TextureFormat::Rgba32Float` - data is already linear from the file format
-// - Bitmap images: Uses `TextureFormat::Rgba8Unorm` - we manually convert sRGB→linear in shaders
+// - Bitmap images: Uses `TextureFormat::Rgba8Unorm` - we convert sRGB→linear in shaders
 //
-// We use Rgba8Unorm instead of Rgba8UnormSrgb because sRGB formats don't support STORAGE usage,
-// which is required for compute-based mipmap generation. The manual conversion gives us full control
-// and allows us to handle mixed content (some textures might not be sRGB).
-//
-// The browser loads bitmap data in whatever color space it thinks is appropriate (usually sRGB),
-// then we handle the sRGB→linear conversion explicitly in our shaders using srgb_to_linear().
 // See:
 // https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-imagebitmapoptions-premultiplyalpha
 // https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-imagebitmapoptions-colorspaceconversion

@@ -14,7 +14,7 @@ use crate::{
     bind_groups::{AwsmBindGroupError, BindGroupRecreateContext},
     camera::CameraBuffer,
     lights::Lights,
-    materials::pbr::PbrMaterial,
+    materials::{pbr::PbrMaterial, Materials},
     render_passes::{composite::bind_group, RenderPassInitContext},
     transforms::Transforms,
 };
@@ -27,7 +27,7 @@ pub struct GeometryBindGroups {
 }
 
 impl GeometryBindGroups {
-    pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
+    pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let camera_lights = GeometryBindGroupCameraLights::new(ctx).await?;
         let transform_materials = GeometryBindGroupTransformMaterials::new(ctx).await?;
         let vertex_animation = GeometryBindGroupVertexAnimation::new(ctx).await?;
@@ -47,7 +47,7 @@ pub struct GeometryBindGroupCameraLights {
 }
 
 impl GeometryBindGroupCameraLights {
-    pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
+    pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
             entries: vec![
                 BindGroupLayoutCacheKeyEntry {
@@ -119,7 +119,7 @@ pub struct GeometryBindGroupTransformMaterials {
 }
 
 impl GeometryBindGroupTransformMaterials {
-    pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
+    pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
             entries: vec![
                 // Transform
@@ -172,7 +172,7 @@ impl GeometryBindGroupTransformMaterials {
                     1,
                     BindGroupResource::Buffer(
                         BufferBinding::new(&ctx.materials.gpu_buffer(MaterialBufferKind::Pbr))
-                            .with_size(PbrMaterial::UNIFORM_BUFFER_BYTE_ALIGNMENT),
+                            .with_size(Materials::MAX_SIZE),
                     ),
                 ),
             ],
@@ -201,7 +201,7 @@ pub struct GeometryBindGroupVertexAnimation {
 }
 
 impl GeometryBindGroupVertexAnimation {
-    pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
+    pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
             entries: vec![
                 BindGroupLayoutCacheKeyEntry {

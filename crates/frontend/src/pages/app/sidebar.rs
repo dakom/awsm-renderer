@@ -2,6 +2,7 @@ mod camera;
 mod gltf;
 pub mod material;
 mod post_processing;
+mod textures;
 
 use camera::SidebarCamera;
 use gltf::SidebarGltf;
@@ -9,7 +10,7 @@ use material::SidebarMaterial;
 
 use crate::{
     models::collections::{GltfId, GLTF_SETS},
-    pages::app::sidebar::post_processing::SidebarPostProcessing,
+    pages::app::sidebar::{post_processing::SidebarPostProcessing, textures::SidebarTextures},
     prelude::*,
 };
 
@@ -28,6 +29,7 @@ pub enum SidebarSection {
     Lighting,
     PostProcessing,
     Camera,
+    Textures,
 }
 
 impl AppSidebar {
@@ -59,6 +61,7 @@ impl AppSidebar {
                 self.render_section(SidebarSection::Lighting),
                 self.render_section(SidebarSection::PostProcessing),
                 self.render_section(SidebarSection::Camera),
+                self.render_section(SidebarSection::Textures),
             ])
         })
     }
@@ -88,6 +91,7 @@ impl AppSidebar {
                                     }),
                                     SidebarSection::PostProcessing => SidebarPostProcessing::new(state.ctx.clone()).render(),
                                     SidebarSection::Camera => SidebarCamera::new(state.ctx.clone()).render(),
+                                    SidebarSection::Textures => SidebarTextures::new(state.ctx.clone()).render(),
                                 })
                             }))
                         } else {
@@ -188,6 +192,34 @@ impl AppSidebar {
                                     }),
                                 ]
                             },
+                            SidebarSection::Textures => {
+                                vec![
+                                    svg!("rect", {
+                                        .attrs!{
+                                            "x": "2", "y": "2", "width": "8", "height": "8",
+                                            "fill": "currentColor"
+                                        }
+                                    }),
+                                    svg!("rect", {
+                                        .attrs!{
+                                            "x": "10", "y": "2", "width": "8", "height": "8",
+                                            "fill": "none", "stroke": "currentColor", "stroke-width": "1"
+                                        }
+                                    }),
+                                    svg!("rect", {
+                                        .attrs!{
+                                            "x": "2", "y": "10", "width": "8", "height": "8",
+                                            "fill": "none", "stroke": "currentColor", "stroke-width": "1"
+                                        }
+                                    }),
+                                    svg!("rect", {
+                                        .attrs!{
+                                            "x": "10", "y": "10", "width": "8", "height": "8",
+                                            "fill": "currentColor"
+                                        }
+                                    }),
+                                ]
+                            },
                         }
                     )
                 })
@@ -201,6 +233,7 @@ impl AppSidebar {
                         SidebarSection::Lighting => "Lighting",
                         SidebarSection::PostProcessing => "Post Processing",
                         SidebarSection::Camera => "Camera",
+                        SidebarSection::Textures => "Textures",
                     })
                 })
             )

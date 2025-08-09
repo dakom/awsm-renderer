@@ -10,6 +10,32 @@ pub struct TexelCopyBufferInfo<'a> {
     pub rows_per_image: Option<u32>,
 }
 
+impl<'a> TexelCopyBufferInfo<'a> {
+    pub fn new(buffer: &'a web_sys::GpuBuffer) -> Self {
+        Self {
+            buffer,
+            bytes_per_row: None,
+            offset: None,
+            rows_per_image: None,
+        }
+    }
+
+    pub fn with_bytes_per_row(mut self, bytes_per_row: u32) -> Self {
+        self.bytes_per_row = Some(bytes_per_row);
+        self
+    }
+
+    pub fn with_offset(mut self, offset: u64) -> Self {
+        self.offset = Some(offset);
+        self
+    }
+
+    pub fn with_rows_per_image(mut self, rows_per_image: u32) -> Self {
+        self.rows_per_image = Some(rows_per_image);
+        self
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TexelCopyTextureInfo<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/copyBufferToTexture#destination
@@ -20,13 +46,60 @@ pub struct TexelCopyTextureInfo<'a> {
     pub origin: Option<Origin3d>,
 }
 
-#[derive(Debug, Clone)]
+impl<'a> TexelCopyTextureInfo<'a> {
+    pub fn new(texture: &'a web_sys::GpuTexture) -> Self {
+        Self {
+            texture,
+            aspect: None,
+            mip_level: None,
+            origin: None,
+        }
+    }
+
+    pub fn with_aspect(mut self, aspect: TextureAspect) -> Self {
+        self.aspect = Some(aspect);
+        self
+    }
+
+    pub fn with_mip_level(mut self, mip_level: u32) -> Self {
+        self.mip_level = Some(mip_level);
+        self
+    }
+
+    pub fn with_origin(mut self, origin: Origin3d) -> Self {
+        self.origin = Some(origin);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct TexelCopyBufferLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/writeTexture#datalayout
     // https://docs.rs/web-sys/latest/web_sys/struct.GpuTexelCopyBufferLayout.html
     pub bytes_per_row: Option<u32>,
     pub rows_per_image: Option<u32>,
     pub offset: Option<u64>,
+}
+
+impl TexelCopyBufferLayout {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_bytes_per_row(mut self, bytes_per_row: u32) -> Self {
+        self.bytes_per_row = Some(bytes_per_row);
+        self
+    }
+
+    pub fn with_rows_per_image(mut self, rows_per_image: u32) -> Self {
+        self.rows_per_image = Some(rows_per_image);
+        self
+    }
+
+    pub fn with_offset(mut self, offset: u64) -> Self {
+        self.offset = Some(offset);
+        self
+    }
 }
 
 #[derive(Debug, Clone, Default)]

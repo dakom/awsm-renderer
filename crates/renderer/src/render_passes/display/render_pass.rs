@@ -44,7 +44,7 @@ pub struct DisplayRenderPass {
 }
 
 impl DisplayRenderPass {
-    pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
+    pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_groups = DisplayBindGroups::new(ctx).await?;
         let pipelines = DisplayPipelines::new(ctx, &bind_groups).await?;
 

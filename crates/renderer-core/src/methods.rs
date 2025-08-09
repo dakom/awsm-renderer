@@ -225,7 +225,10 @@ impl AwsmRendererWebGpu {
     }
 
     /// See [create_command_encoder](create_command_encoder) for usage.
-    pub fn submit_commands_batch(&self, command_buffers: &[&web_sys::GpuCommandBuffer]) {
+    pub fn submit_commands_batch<'a>(
+        &self,
+        command_buffers: impl IntoIterator<Item = &'a web_sys::GpuCommandBuffer>,
+    ) {
         let command_buffers_js = js_sys::Array::new();
         for command_buffer in command_buffers {
             command_buffers_js.push(command_buffer);

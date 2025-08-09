@@ -27,7 +27,7 @@ pub struct DisplayBindGroups {
 }
 
 impl DisplayBindGroups {
-    pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
+    pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
             entries: vec![BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::Texture(

@@ -1,6 +1,9 @@
 use crate::{
     render_passes::{
-        material::transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent,
+        material::{
+            opaque::shader::cache_key::ShaderCacheKeyMaterialOpaque,
+            transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent,
+        },
         shader_cache_key::ShaderCacheKeyRenderPass,
     },
     shaders::ShaderCacheKey,
@@ -8,7 +11,7 @@ use crate::{
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum ShaderCacheKeyMaterial {
-    Opaque,
+    Opaque(ShaderCacheKeyMaterialOpaque),
     Transparent(ShaderCacheKeyMaterialTransparent),
 }
 

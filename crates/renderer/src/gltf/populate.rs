@@ -88,15 +88,7 @@ impl AwsmRenderer {
             self.populate_gltf_node_mesh(&ctx, &node).await?;
         }
 
-        self.textures
-            .write_gpu_textures(&self.logging, &self.gpu, &mut self.bind_groups)
-            .await?;
-
-        self.textures
-            .mega_texture
-            .size_report(&self.gpu.device.limits())
-            .console_log();
-        //tracing::info!("{:#?}", self.textures.mega_texture.size(&self.gpu.device.limits()));
+        self.finalize_gpu_textures().await?;
 
         Ok(())
     }

@@ -5,6 +5,7 @@ pub mod bind_groups;
 pub mod bounds;
 pub mod buffer;
 pub mod camera;
+pub mod debug;
 pub mod error;
 pub mod instances;
 pub mod lights;
@@ -47,6 +48,7 @@ use transforms::Transforms;
 
 use crate::{
     bind_group_layout::BindGroupLayouts,
+    debug::AwsmRendererLogging,
     pipeline_layouts::PipelineLayouts,
     render_passes::{
         geometry::bind_group::GeometryBindGroups, RenderPassInitContext, RenderPasses,
@@ -150,11 +152,11 @@ impl AwsmRendererBuilder {
         let Self {
             gpu,
             logging,
-            render_texture_formats,
+            mut render_texture_formats,
             clear_color,
         } = self;
 
-        let gpu = match gpu {
+        let mut gpu = match gpu {
             AwsmRendererGpuBuilderKind::WebGpuBuilder(builder) => builder.build().await?,
             AwsmRendererGpuBuilderKind::WebGpuBuilt(gpu) => gpu,
         };
@@ -164,35 +166,26 @@ impl AwsmRendererBuilder {
         let mut pipelines = Pipelines::new();
         let mut shaders = Shaders::new();
 
-        let textures = Textures::new(&gpu);
-        let camera = camera::CameraBuffer::new(&gpu)?;
-        let lights = Lights::new(&gpu)?;
-        let meshes = Meshes::new(&gpu)?;
-        let transforms = Transforms::new(&gpu)?;
-        let instances = Instances::new(&gpu)?;
-        let materials = Materials::new(&gpu)?;
+        let mut textures = Textures::new(&gpu);
+        let mut camera = camera::CameraBuffer::new(&gpu)?;
+        let mut lights = Lights::new(&gpu)?;
+        let mut meshes = Meshes::new(&gpu)?;
+        let mut transforms = Transforms::new(&gpu)?;
+        let mut instances = Instances::new(&gpu)?;
+        let mut materials = Materials::new(&gpu)?;
 
         // temporarily push into an init struct for creating render passes
         // we'll then destructure it to get our values back
         let mut render_pass_init = RenderPassInitContext {
-            gpu,
-            bind_group_layouts,
-            pipeline_layouts,
-            pipelines,
-            shaders,
-            render_texture_formats,
-            textures,
+            gpu: &mut gpu,
+            bind_group_layouts: &mut bind_group_layouts,
+            pipeline_layouts: &mut pipeline_layouts,
+            pipelines: &mut pipelines,
+            shaders: &mut shaders,
+            render_texture_formats: &mut render_texture_formats,
+            textures: &mut textures,
         };
         let render_passes = RenderPasses::new(&mut render_pass_init).await?;
-        let RenderPassInitContext {
-            gpu,
-            bind_group_layouts,
-            pipeline_layouts,
-            pipelines,
-            shaders,
-            render_texture_formats,
-            textures,
-        } = render_pass_init;
 
         let bind_groups = BindGroups::new();
         let render_textures = RenderTextures::new(render_texture_formats);
@@ -228,9 +221,4 @@ impl AwsmRendererBuilder {
 
         Ok(_self)
     }
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct AwsmRendererLogging {
-    pub render_timings: bool,
 }

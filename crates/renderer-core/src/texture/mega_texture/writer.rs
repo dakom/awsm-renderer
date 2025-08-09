@@ -1,6 +1,9 @@
+#[cfg(feature = "texture-export")]
+use std::sync::LazyLock;
 use std::{borrow::Cow, cell::RefCell};
 
 use crate::error::{AwsmCoreError, Result};
+use crate::texture::TextureDimension;
 use crate::{
     bind_groups::{BindGroupDescriptor, BindGroupEntry, BindGroupResource},
     buffers::{BufferBinding, BufferDescriptor, BufferUsage},
@@ -34,6 +37,29 @@ impl<ID> MegaTexture<ID> {
     }
 }
 
+#[cfg(feature = "texture-export")]
+static TEXTURE_USAGE_MIPMAP: LazyLock<TextureUsage> = LazyLock::new(|| {
+    TextureUsage::new()
+        .with_storage_binding()
+        .with_texture_binding()
+        .with_copy_src()
+});
+
+#[cfg(not(feature = "texture-export"))]
+static TEXTURE_USAGE_MIPMAP: LazyLock<TextureUsage> = LazyLock::new(|| {
+    TextureUsage::new()
+        .with_storage_binding()
+        .with_texture_binding()
+});
+
+#[cfg(feature = "texture-export")]
+static TEXTURE_USAGE_NO_MIPMAP: LazyLock<TextureUsage> =
+    LazyLock::new(|| TextureUsage::new().with_storage_binding().with_copy_src());
+
+#[cfg(not(feature = "texture-export"))]
+static TEXTURE_USAGE_NO_MIPMAP: LazyLock<TextureUsage> =
+    LazyLock::new(|| TextureUsage::new().with_storage_binding());
+
 impl<ID> MegaTextureAtlas<ID> {
     // Will only create a texture array up to the _actual_ depth of the atlas, not maximum potential depth
     pub async fn write_texture_array(
@@ -48,11 +74,9 @@ impl<ID> MegaTextureAtlas<ID> {
         };
 
         let texture_usage = if mipmap {
-            TextureUsage::new()
-                .with_storage_binding()
-                .with_texture_binding()
+            TEXTURE_USAGE_MIPMAP.clone()
         } else {
-            TextureUsage::new().with_storage_binding()
+            TEXTURE_USAGE_NO_MIPMAP.clone()
         };
 
         let dest_tex_array = gpu.create_texture(
@@ -66,6 +90,7 @@ impl<ID> MegaTextureAtlas<ID> {
                 texture_usage,
             )
             .with_mip_level_count(mipmap_levels)
+            .with_dimension(TextureDimension::N2d)
             .into(),
         )?;
 
@@ -112,11 +137,13 @@ impl<ID> MegaTextureLayer<ID> {
         padding: u32,
     ) -> Result<()> {
         let atlas_pipelines = get_atlas_pipeline(gpu).await?;
-        let command_encoder = gpu.create_command_encoder(Some("Write Texture Atlas Layer"));
         let padding_x2 = padding * 2;
-        let mut textures = Vec::new();
 
+        // WebGPU in browsers don't have synchroniztion primitives like barriers
+        // so we need to do each pass with a separate command encoder
         for entry in self.entries.iter() {
+            let command_encoder = gpu.create_command_encoder(Some("Write Texture Atlas Layer"));
+
             let texture = entry.image_data.create_texture(gpu, None, false).await?;
             let texture_view = texture
                 .create_view()
@@ -148,11 +175,12 @@ impl<ID> MegaTextureLayer<ID> {
                 UNIFORM_BUFFER.with(|buffer_cell| buffer_cell.borrow().clone().unwrap());
 
             let entry_data = [
-                entry.pixel_offset.0 as f32,
-                entry.pixel_offset.1 as f32,
-                padding as f32,
-                layer_index as f32,
+                entry.pixel_offset[0],
+                entry.pixel_offset[1],
+                padding,
+                layer_index,
             ];
+
             let uniform_data: [u8; 16] = entry_data
                 .iter()
                 .flat_map(|&f| f.to_ne_bytes())
@@ -192,18 +220,18 @@ impl<ID> MegaTextureLayer<ID> {
             let (image_width, image_height) = entry.image_data.size();
             let workgroup_size_x = (image_width + padding_x2).div_ceil(8);
             let workgroup_size_y = (image_height + padding_x2).div_ceil(8);
+
             compute_pass.dispatch_workgroups(workgroup_size_x, Some(workgroup_size_y), Some(1));
             compute_pass.end();
 
-            textures.push(texture);
-        }
+            gpu.submit_commands(&command_encoder.finish());
 
-        let command_buffer = command_encoder.finish();
-        gpu.submit_commands(&command_buffer);
-
-        for texture in textures {
             texture.destroy();
         }
+
+        // for texture in textures {
+        //     texture.destroy();
+        // }
 
         Ok(())
     }

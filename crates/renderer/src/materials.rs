@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::{
     bind_groups::{AwsmBindGroupError, BindGroups},
     materials::pbr::{PbrMaterial, PbrMaterialBuffers},
-    textures::{AwsmTextureError, SamplerKey, TextureKey},
+    textures::{AwsmTextureError, SamplerKey, TextureKey, Textures},
     AwsmRendererLogging,
 };
 
@@ -45,6 +45,7 @@ impl MaterialBuffers {
 }
 
 impl Materials {
+    pub const MAX_SIZE: usize = 256; // minUniformBufferOffsetAlignment (also, largest possible material size)
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Materials {
             lookup: SlotMap::with_key(),
@@ -57,14 +58,14 @@ impl Materials {
         self.lookup.get(key)
     }
 
-    pub fn insert(&mut self, material: Material) -> MaterialKey {
+    pub fn insert(&mut self, material: Material, textures: &Textures) -> MaterialKey {
         let has_alpha_blend = material.has_alpha_blend();
         let buffer_kind = material.buffer_kind();
 
         let key = self.lookup.insert(material);
         self.alpha_blend.insert(key, has_alpha_blend);
         self.buffers.buffer_kind.insert(key, buffer_kind);
-        self.update(key, |_| {});
+        self.update(key, |_| {}, textures);
 
         key
     }
@@ -79,7 +80,12 @@ impl Materials {
         }
     }
 
-    pub fn update(&mut self, key: MaterialKey, mut f: impl FnMut(&mut Material)) {
+    pub fn update(
+        &mut self,
+        key: MaterialKey,
+        mut f: impl FnMut(&mut Material),
+        textures: &Textures,
+    ) {
         if let Some(material) = self.lookup.get_mut(key) {
             let old_has_alpha_blend = material.has_alpha_blend();
             let old_buffer_kind = material.buffer_kind();
@@ -94,7 +100,7 @@ impl Materials {
             }
             match material {
                 Material::Pbr(pbr_material) => {
-                    self.buffers.pbr.update(key, pbr_material);
+                    self.buffers.pbr.update(key, pbr_material, textures);
                 }
             }
         }
@@ -152,9 +158,9 @@ pub enum MaterialAlphaMode {
 impl MaterialAlphaMode {
     pub fn variant_as_u32(&self) -> u32 {
         match self {
-            Self::Opaque => 1,
-            Self::Mask { .. } => 2,
-            Self::Blend => 3,
+            Self::Opaque => 0,
+            Self::Mask { .. } => 1,
+            Self::Blend => 2,
         }
     }
 }

@@ -77,11 +77,13 @@ askama = {version = "0.14.0", default-features = false, features = ["config", "d
 
 # Math
 glam = {version = "0.30.4", features = ["bytemuck"]}
+half = "2.6.0"
 
 # Media
 gltf = {version = "1.4.1", features = ["KHR_lights_punctual", "extensions"]}
 exr = "1.73.0"
 binpack2d = "1.0.1"
+image = {version = "0.25.6", default-features = false, features = ["png"]}
 
 # Browser bindings and helpers
 wasm-bindgen = "0.2.100"

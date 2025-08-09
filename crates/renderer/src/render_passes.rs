@@ -39,7 +39,7 @@ pub struct RenderPasses {
 }
 
 impl RenderPasses {
-    pub async fn new(ctx: &mut RenderPassInitContext) -> Result<Self> {
+    pub async fn new<'a>(ctx: &mut RenderPassInitContext<'a>) -> Result<Self> {
         Ok(Self {
             geometry: GeometryRenderPass::new(ctx).await?,
             light_culling: LightCullingRenderPass::new(ctx).await?,
@@ -49,14 +49,25 @@ impl RenderPasses {
             display: DisplayRenderPass::new(ctx).await?,
         })
     }
+
+    pub async fn update_texture_bindings(
+        &mut self,
+        ctx: &mut RenderPassInitContext<'_>,
+    ) -> Result<()> {
+        self.material_opaque.update_texture_bindings(ctx).await?;
+        self.material_transparent
+            .update_texture_bindings(ctx)
+            .await?;
+        Ok(())
+    }
 }
 
-pub struct RenderPassInitContext {
-    pub gpu: AwsmRendererWebGpu,
-    pub bind_group_layouts: BindGroupLayouts,
-    pub textures: Textures,
-    pub pipeline_layouts: PipelineLayouts,
-    pub pipelines: Pipelines,
-    pub shaders: Shaders,
-    pub render_texture_formats: RenderTextureFormats,
+pub struct RenderPassInitContext<'a> {
+    pub gpu: &'a mut AwsmRendererWebGpu,
+    pub bind_group_layouts: &'a mut BindGroupLayouts,
+    pub textures: &'a mut Textures,
+    pub pipeline_layouts: &'a mut PipelineLayouts,
+    pub pipelines: &'a mut Pipelines,
+    pub shaders: &'a mut Shaders,
+    pub render_texture_formats: &'a mut RenderTextureFormats,
 }

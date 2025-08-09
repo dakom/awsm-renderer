@@ -8,11 +8,13 @@ authors.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["exr", "mega-texture", "serde"]
+default = ["all"]
+all = ["exr", "mega-texture", "serde", "texture-export"]
 exr = ["dep:exr", "image"]
 image = ["dep:gloo-net"]
 mega-texture = ["dep:binpack2d"]
 serde = ["dep:serde", "dep:serde-wasm-bindgen"]
+texture-export = ["dep:image", "dep:half"]
 
 [dependencies]
 anyhow = {workspace = true} 
@@ -31,3 +33,5 @@ exr = {workspace = true, optional = true}
 binpack2d = {workspace = true, optional = true}
 serde = {workspace = true, optional = true}
 serde-wasm-bindgen = {workspace = true, optional = true}
+half = {workspace = true, optional = true}
+image = {workspace = true, optional = true}

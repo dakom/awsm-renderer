@@ -143,9 +143,10 @@ impl AwsmRenderer {
             }
         };
 
-        let material_key = self
-            .materials
-            .insert(Material::Pbr(material_info.material.clone()));
+        let material_key = self.materials.insert(
+            Material::Pbr(material_info.material.clone()),
+            &self.textures,
+        );
 
         let mut pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
             self.render_passes

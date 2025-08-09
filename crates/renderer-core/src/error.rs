@@ -2,6 +2,8 @@ use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
 use crate::shaders::ShaderCompilationMessage;
+#[cfg(feature = "texture-export")]
+use crate::texture::TextureFormat;
 
 pub type Result<T> = std::result::Result<T, AwsmCoreError>;
 
@@ -39,6 +41,9 @@ pub enum AwsmCoreError {
 
     #[error("[gpu] Failed to create Texture: {0}")]
     TextureCreation(String),
+
+    #[error("[gpu] Failed to create Texture View: {0}")]
+    TextureView(String),
 
     #[error("[gpu] Failed to create RenderPass Command: {0}")]
     CommandRenderPass(String),
@@ -116,6 +121,22 @@ pub enum AwsmCoreError {
     #[error("[gpu] mega texture duplicate id: {id}")]
     MegaTextureDuplicateId { id: String },
 
+    #[cfg(feature = "mega-texture")]
+    #[error("[gpu] mega texture index size: {0:?}")]
+    MegaTextureIndexSize(std::num::TryFromIntError),
+
+    #[cfg(feature = "texture-export")]
+    #[error("[gpu] texture export unsupported format: {0:?}")]
+    TextureExportUnsupportedFormat(TextureFormat),
+
+    #[cfg(feature = "texture-export")]
+    #[error("[gpu] texture export failed to write: {0:?}")]
+    TextureExportFailedWrite(image::ImageError),
+
+    #[cfg(feature = "texture-export")]
+    #[error("[gpu] texture export unsupported format for png encoding: {0:?}")]
+    TextureExportUnsupportedPngEncoding(TextureFormat),
+
     #[error("[gpu] Failed to get Shader compilation info: {0}")]
     ShaderCompilationInfo(String),
 
@@ -192,6 +213,10 @@ impl AwsmCoreError {
 
     pub fn texture_creation(err: JsValue) -> Self {
         Self::TextureCreation(format_err(err))
+    }
+
+    pub fn texture_view(err: JsValue) -> Self {
+        Self::TextureView(format_err(err))
     }
 
     pub fn command_render_pass(err: JsValue) -> Self {

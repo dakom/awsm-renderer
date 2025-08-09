@@ -7,7 +7,7 @@ pub struct MaterialTransparentPipelines {}
 
 impl MaterialTransparentPipelines {
     pub async fn new(
-        ctx: &mut RenderPassInitContext,
+        ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &MaterialTransparentBindGroups,
     ) -> Result<Self> {
         Ok(Self {})

@@ -156,11 +156,18 @@ impl MegaTextureSize {
             atlas_layer_areas,
             total_area,
             max_size_per_bind_group: self.max_size_per_bind_group,
+            atlas_size: (self.texture_size, self.texture_size).into(),
+            max_depth: self.max_depth,
+            atlas_size_with_all_depth: (
+                self.texture_size * self.max_depth,
+                self.texture_size * self.max_depth,
+            )
+                .into(),
         }
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MegaTextureWidthHeight {
     pub width: u32,
@@ -186,7 +193,7 @@ impl From<(u32, u32)> for MegaTextureWidthHeight {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MegaTextureSizeReport {
     pub total_entries_len: usize,
@@ -196,9 +203,12 @@ pub struct MegaTextureSizeReport {
     pub atlas_layer_areas: Vec<Vec<MegaTextureSizeReportArea>>,
     pub atlas_layer_entry_sizes: Vec<Vec<Vec<MegaTextureWidthHeight>>>,
     pub max_size_per_bind_group: MegaTextureWidthHeight,
+    pub atlas_size: MegaTextureWidthHeight,
+    pub max_depth: u32,
+    pub atlas_size_with_all_depth: MegaTextureWidthHeight,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MegaTextureSizeReportArea {
     pub perc_free: f64,

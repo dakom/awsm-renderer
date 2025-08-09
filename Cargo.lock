@@ -100,6 +100,8 @@ dependencies = [
  "exr",
  "futures",
  "gloo-net",
+ "half",
+ "image",
  "js-sys",
  "ordered-float",
  "serde",
@@ -135,6 +137,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
 ]
 
