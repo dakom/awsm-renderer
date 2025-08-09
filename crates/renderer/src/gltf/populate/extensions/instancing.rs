@@ -1,6 +1,6 @@
 use crate::gltf::buffers::accessor::{accessor_to_vec, AccessorVec};
 use crate::gltf::error::{AwsmGltfError, Result};
-use crate::transform::Transform;
+use crate::transforms::Transform;
 use crate::{gltf::populate::GltfPopulateContext, AwsmRenderer};
 use anyhow::anyhow;
 use glam::{Quat, Vec3};

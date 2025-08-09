@@ -1,5 +1,4 @@
-pub mod material_textures;
-pub mod uniform_storage;
+use std::collections::{HashMap, HashSet};
 
 use awsm_renderer_core::{
     bind_groups::{
@@ -8,84 +7,147 @@ use awsm_renderer_core::{
     error::AwsmCoreError,
     renderer::AwsmRendererWebGpu,
 };
-use material_textures::{MaterialBindGroupLayoutKey, MaterialTextureBindGroups};
+use strum::{EnumIter, IntoEnumIterator};
 use thiserror::Error;
-use uniform_storage::UniformStorageBindGroups;
 
-use crate::{bind_groups::material_textures::MaterialBindGroupKey, materials::MaterialKey};
+use crate::{
+    bind_group_layout::BindGroupLayouts, camera::CameraBuffer, lights::Lights,
+    materials::Materials, mesh::Meshes, render_passes::RenderPasses,
+    render_textures::RenderTextureViews, textures::Textures, transforms::Transforms,
+};
+
+// There are no cache keys for bind groups, they are created on demand
+// Since changes to storages, uniforms, and textures are the reason to recreate bind groups,
+// and these may be shared across multiple bind groups, we use a "create list" to track which bind groups need to be recreated
+//
+// Specifically, typical causes of change are:
+// 1. A change in raw buffer size which causes a reallocation
+// 2. A change in texture view size which causes new textures to be created
+//
+// That conscpicuously does not include changes to material textures
+// since those are looked up via the material key and do not require a bind group recreation
+pub struct BindGroupRecreateContext<'a> {
+    pub gpu: &'a AwsmRendererWebGpu,
+    pub render_texture_views: &'a RenderTextureViews,
+    pub textures: &'a Textures,
+    pub materials: &'a Materials,
+    pub bind_group_layouts: &'a BindGroupLayouts,
+    pub meshes: &'a Meshes,
+    pub camera: &'a CameraBuffer,
+    pub lights: &'a Lights,
+    pub transforms: &'a Transforms,
+}
+
+#[derive(Hash, Debug, Clone, PartialEq, Eq, EnumIter)]
+pub enum BindGroupCreate {
+    CameraInitOnly,
+    LightsResize,
+    TransformsResize,
+    MorphTargetWeightsResize,
+    MorphTargetValuesResize,
+    SkinJointMatricesResize,
+    PbrMaterialResize,
+    TextureViewResize,
+    MegaTexture,
+}
 
 pub struct BindGroups {
-    pub uniform_storages: UniformStorageBindGroups,
-    pub material_textures: MaterialTextureBindGroups,
+    create_list: HashSet<BindGroupCreate>,
 }
 
 impl BindGroups {
-    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let buffers = UniformStorageBindGroups::new(gpu)?;
-        let materials = MaterialTextureBindGroups::new();
-
-        Ok(Self {
-            uniform_storages: buffers,
-            material_textures: materials,
-        })
+    pub fn new() -> Self {
+        Self {
+            // startup means all bind groups are "re"created
+            create_list: BindGroupCreate::iter().collect::<HashSet<_>>(),
+        }
     }
-}
 
-pub(super) fn gpu_create_layout(
-    gpu: &AwsmRendererWebGpu,
-    label: &'static str,
-    entries: Vec<BindGroupLayoutEntry>,
-) -> Result<web_sys::GpuBindGroupLayout> {
-    gpu.create_bind_group_layout(
-        &BindGroupLayoutDescriptor::new(Some(label))
-            .with_entries(entries)
-            .into(),
-    )
-    .map_err(|err| AwsmBindGroupError::Layout {
-        bind_group: label,
-        err,
-    })
-}
+    pub fn mark_create(&mut self, create: BindGroupCreate) {
+        self.create_list.insert(create);
+    }
 
-pub(super) fn gpu_create_bind_group(
-    gpu: &AwsmRendererWebGpu,
-    label: &'static str,
-    layout: &web_sys::GpuBindGroupLayout,
-    entries: Vec<BindGroupEntry>,
-) -> web_sys::GpuBindGroup {
-    gpu.create_bind_group(&BindGroupDescriptor::new(layout, Some(label), entries).into())
+    pub fn recreate(
+        &mut self,
+        ctx: BindGroupRecreateContext<'_>,
+        render_passes: &mut RenderPasses,
+    ) -> crate::error::Result<()> {
+        if self.create_list.contains(&BindGroupCreate::CameraInitOnly)
+            || self.create_list.contains(&BindGroupCreate::LightsResize)
+        {
+            render_passes
+                .geometry
+                .bind_groups
+                .camera_lights
+                .recreate(&ctx)?;
+        }
+
+        if self
+            .create_list
+            .contains(&BindGroupCreate::TransformsResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::PbrMaterialResize)
+        {
+            render_passes
+                .geometry
+                .bind_groups
+                .transform_materials
+                .recreate(&ctx)?;
+        }
+
+        if self
+            .create_list
+            .contains(&BindGroupCreate::MorphTargetWeightsResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::MorphTargetValuesResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::SkinJointMatricesResize)
+        {
+            render_passes
+                .geometry
+                .bind_groups
+                .vertex_animation
+                .recreate(&ctx)?;
+        }
+
+        if self
+            .create_list
+            .contains(&BindGroupCreate::TextureViewResize)
+        {
+            // material passes are also recreated on megatexture and material changes
+            render_passes.light_culling.bind_groups.recreate(&ctx)?;
+            render_passes.composite.bind_groups.recreate(&ctx)?;
+            render_passes.display.bind_groups.recreate(&ctx)?;
+        }
+
+        if self.create_list.contains(&BindGroupCreate::MegaTexture)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::TextureViewResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::PbrMaterialResize)
+        {
+            render_passes.material_opaque.bind_groups.recreate(&ctx)?;
+            render_passes
+                .material_transparent
+                .bind_groups
+                .recreate(&ctx)?;
+        }
+
+        self.create_list.clear();
+
+        Ok(())
+    }
 }
 
 pub(super) type Result<T> = std::result::Result<T, AwsmBindGroupError>;
 
 #[derive(Error, Debug)]
 pub enum AwsmBindGroupError {
-    #[error("[bind group] Error creating buffer for {label}: {err:?}")]
-    CreateBuffer {
-        label: &'static str,
-        err: AwsmCoreError,
-    },
-    #[error("[bind group] Error creating bind group layout for group {bind_group}: {err:?}")]
-    Layout {
-        bind_group: &'static str,
-        err: AwsmCoreError,
-    },
-
-    #[error("[bind group] Error writing buffer for {label}: {err:?}")]
-    WriteBuffer {
-        label: &'static str,
-        err: AwsmCoreError,
-    },
-
-    #[error("[bind group] missing material for {0:?}")]
-    MissingMaterialBindGroup(MaterialBindGroupKey),
-
-    #[error("[bind group] missing material layout for {0:?}")]
-    MissingMaterialLayout(MaterialBindGroupLayoutKey),
-
-    #[error("[bind group] missing material layout for material {0:?}")]
-    MissingMaterialLayoutForMaterial(MaterialKey),
-
-    #[error("[bind group] missing material bind group for material {0:?}")]
-    MissingMaterialBindGroupForMaterial(MaterialKey),
+    #[error("[bind group] bind group not found for {0}")]
+    NotFound(String),
 }

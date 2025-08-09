@@ -8,20 +8,19 @@ use crate::{
         populate::material::GltfMaterialInfo,
     },
     materials::Material,
-    mesh::{Mesh, MeshBufferInfo},
-    pipeline::{PipelineLayoutCacheKey, RenderPipelineCacheKey},
-    shaders::{
-        fragment::cache_key::ShaderCacheKeyFragment,
-        vertex::{entry::mesh::ShaderCacheKeyVertexMesh, ShaderCacheKeyVertex},
-        ShaderCacheKey,
+    mesh::{skins::SkinKey, Mesh, MeshBufferInfo},
+    pipeline_layouts::PipelineLayoutCacheKey,
+    pipelines::render_pipeline::RenderPipelineCacheKey,
+    render_passes::geometry::{
+        color_targets::geometry_fragment_color_targets, shader::cache_key::ShaderCacheKeyGeometry,
     },
-    skin::SkinKey,
-    transform::{Transform, TransformKey},
+    transforms::{Transform, TransformKey},
     AwsmRenderer,
 };
 use awsm_renderer_core::{
     compare::CompareFunction,
     pipeline::{
+        self,
         depth_stencil::DepthStencilState,
         fragment::{BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState},
         primitive::{CullMode, FrontFace, PrimitiveState, PrimitiveTopology},
@@ -105,27 +104,24 @@ impl AwsmRenderer {
             GltfMaterialInfo::new(self, ctx, primitive_buffer_info, gltf_primitive.material())
                 .await?;
 
-        let shader_cache_key = ShaderCacheKey::new(
-            ShaderCacheKeyVertex::Mesh(ShaderCacheKeyVertexMesh {
-                attributes: primitive_buffer_info
-                    .vertex
-                    .attributes
-                    .iter()
-                    .map(|s| s.shader_key_kind)
-                    .collect(),
-                morphs: primitive_buffer_info
-                    .morph
-                    .as_ref()
-                    .map(|m| m.shader_key)
-                    .unwrap_or_default(),
-                has_instance_transforms: ctx
-                    .transform_is_instanced
-                    .lock()
-                    .unwrap()
-                    .contains(&transform_key),
-            }),
-            ShaderCacheKeyFragment::Pbr(material_info.shader_cache_key),
-        );
+        let shader_cache_key = ShaderCacheKeyGeometry {
+            attributes: primitive_buffer_info
+                .vertex
+                .attributes
+                .iter()
+                .map(|s| s.shader_key_kind)
+                .collect(),
+            morphs: primitive_buffer_info
+                .morph
+                .as_ref()
+                .map(|m| m.shader_key)
+                .unwrap_or_default(),
+            has_instance_transforms: ctx
+                .transform_is_instanced
+                .lock()
+                .unwrap()
+                .contains(&transform_key),
+        };
 
         let morph_key = match primitive_buffer_info.morph.clone() {
             None => None,
@@ -147,35 +143,44 @@ impl AwsmRenderer {
             }
         };
 
-        let material_key = self
-            .materials
-            .insert(Material::Pbr(material_info.material.clone()));
-        let material_bind_group_layout_key = self.add_material_pbr_bind_group_layout(
-            material_key,
-            &material_info.bind_group_layout_cache_key,
-        )?;
-        self.add_material_pbr_bind_group(
-            material_key,
-            material_bind_group_layout_key,
-            &material_info.bind_group_cache_key,
-        )?;
-
-        let pipeline_layout_cache_key = PipelineLayoutCacheKey::new_mesh(
-            material_bind_group_layout_key,
-            morph_key.is_some(),
-            skin_key.is_some(),
+        let material_key = self.materials.insert(
+            Material::Pbr(material_info.material.clone()),
+            &self.textures,
         );
+
+        let mut pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
+            self.render_passes
+                .geometry
+                .bind_groups
+                .camera_lights
+                .bind_group_layout_key,
+            self.render_passes
+                .geometry
+                .bind_groups
+                .transform_materials
+                .bind_group_layout_key,
+        ]);
+
+        if morph_key.is_some() || skin_key.is_some() {
+            pipeline_layout_cache_key.bind_group_layouts.push(
+                self.render_passes
+                    .geometry
+                    .bind_groups
+                    .vertex_animation
+                    .bind_group_layout_key,
+            );
+        }
 
         // we only need one vertex buffer per-mesh, because we've already constructed our buffers
         // to be one contiguous buffer of interleaved vertex data.
         // the attributes of this one vertex buffer layout contain all the info needed for the shader locations
         let (vertex_buffer_layout, shader_location) =
             primitive_vertex_buffer_layout(primitive_buffer_info)?;
-        let instance_transform_vertex_buffer_layout =
-            match shader_cache_key.vertex.as_mesh().has_instance_transforms {
-                true => Some(instance_transform_vertex_buffer_layout(shader_location)),
-                false => None,
-            };
+        let instance_transform_vertex_buffer_layout = match shader_cache_key.has_instance_transforms
+        {
+            true => Some(instance_transform_vertex_buffer_layout(shader_location)),
+            false => None,
+        };
 
         // tracing::info!("indices: {:?}", debug_slice_to_u16(ctx.data.buffers.index_bytes.as_ref().unwrap()));
         // tracing::info!("positions: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[0].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
@@ -209,46 +214,29 @@ impl AwsmRenderer {
                 false => CullMode::Back,
             });
 
-        let mut color_target_state = ColorTargetState::new(self.renderable_texture_formats().scene);
-        let mut depth_stencil_state =
-            DepthStencilState::new(self.scene_target_depth_texture_format());
-        // https://www.khronos.org/opengl/wiki/Blending#Blend_Equations
-        if material_info.material.has_alpha_blend() {
-            color_target_state.blend = Some(BlendState {
-                color: BlendComponent::new()
-                    .with_operation(BlendOperation::Add)
-                    .with_src_factor(BlendFactor::SrcAlpha)
-                    .with_dst_factor(BlendFactor::OneMinusSrcAlpha),
-                alpha: BlendComponent::new()
-                    .with_operation(BlendOperation::Add)
-                    .with_src_factor(BlendFactor::One)
-                    .with_dst_factor(BlendFactor::OneMinusSrcAlpha),
-            });
-            depth_stencil_state = depth_stencil_state
-                .with_depth_write_enabled(false)
-                .with_depth_compare(CompareFunction::LessEqual);
-        } else {
-            // This is also for cutoff materials, which are not alpha blended
-            // but rather discarded if the alpha is below a threshold
-            color_target_state.blend = None;
-            depth_stencil_state = depth_stencil_state
-                .with_depth_write_enabled(true)
-                .with_depth_compare(CompareFunction::LessEqual);
-        }
+        let shader_key = self.shaders.get_key(&self.gpu, shader_cache_key).await?;
 
-        let shader_key = self.add_shader(shader_cache_key.clone()).await?;
-
-        let pipeline_layout_key =
-            self.add_pipeline_layout(Some("gltf mesh primitive"), pipeline_layout_cache_key)?;
+        let pipeline_layout_key = self.pipeline_layouts.get_key(
+            &self.gpu,
+            &self.bind_group_layouts,
+            pipeline_layout_cache_key,
+        )?;
 
         let mut pipeline_cache_key = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
             .with_primitive(primitive_state)
             .with_push_vertex_buffer_layout(vertex_buffer_layout)
-            .with_push_fragment_target(color_target_state)
-            .with_push_fragment_target(ColorTargetState::new(
-                self.renderable_texture_formats().clip_position,
-            ))
-            .with_depth_stencil(depth_stencil_state);
+            .with_depth_stencil(
+                DepthStencilState::new(self.render_textures.formats.depth)
+                    .with_depth_write_enabled(true)
+                    .with_depth_compare(match material_info.material.has_alpha_blend() {
+                        true => CompareFunction::Always,     // OIT doesn't use depth testing
+                        false => CompareFunction::LessEqual, // Opaque materials render front-to-back and use depth testing to avoid overdraw
+                    }),
+            );
+
+        for color_target in geometry_fragment_color_targets(&self.render_textures.formats) {
+            pipeline_cache_key = pipeline_cache_key.with_push_fragment_target(color_target);
+        }
 
         if let Some(instance_transform_vertex_buffer_layout) =
             instance_transform_vertex_buffer_layout
@@ -258,7 +246,14 @@ impl AwsmRenderer {
         }
 
         let render_pipeline_key = self
-            .add_render_pipeline(Some("gltf mesh primitive"), pipeline_cache_key)
+            .pipelines
+            .render
+            .get_key(
+                &self.gpu,
+                &self.shaders,
+                &self.pipeline_layouts,
+                pipeline_cache_key,
+            )
             .await?;
 
         let native_primitive_buffer_info = MeshBufferInfo::from(primitive_buffer_info.clone());

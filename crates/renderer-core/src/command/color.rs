@@ -30,6 +30,20 @@ impl Color {
         a: 1.0,
     };
 
+    pub const RED: Self = Self {
+        r: 1.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    };
+
+    pub const RED_U32: Self = Self {
+        r: u32::MAX as f64,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    };
+
     pub fn new_values(r: f64, g: f64, b: f64, a: f64) -> Self {
         Self { r, g, b, a }
     }

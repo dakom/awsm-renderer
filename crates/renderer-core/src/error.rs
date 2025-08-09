@@ -2,6 +2,8 @@ use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
 use crate::shaders::ShaderCompilationMessage;
+#[cfg(feature = "texture-export")]
+use crate::texture::TextureFormat;
 
 pub type Result<T> = std::result::Result<T, AwsmCoreError>;
 
@@ -40,6 +42,9 @@ pub enum AwsmCoreError {
     #[error("[gpu] Failed to create Texture: {0}")]
     TextureCreation(String),
 
+    #[error("[gpu] Failed to create Texture View: {0}")]
+    TextureView(String),
+
     #[error("[gpu] Failed to create RenderPass Command: {0}")]
     CommandRenderPass(String),
 
@@ -63,6 +68,15 @@ pub enum AwsmCoreError {
 
     #[error("[gpu] failed create buffer: {0}")]
     BufferCreation(String),
+
+    #[error("[gpu] failed map buffer: {0}")]
+    BufferMap(String),
+
+    #[error("[gpu] failed map buffer range: {0}")]
+    BufferMapRange(String),
+
+    #[error("[gpu] failed map buffer copy: {0}")]
+    BufferCopy(String),
 
     #[error("[gpu] failed write buffer: {0}")]
     BufferWrite(String),
@@ -89,6 +103,39 @@ pub enum AwsmCoreError {
     #[cfg(feature = "exr")]
     #[error("[gpu] Failed to create js value from exr image data: {0}")]
     ExrImageToJsValue(String),
+
+    #[cfg(feature = "mega-texture")]
+    #[error("[gpu] Largest Image {largest_img_width}x{largest_img_height} (padding {padding}) was too large to fit in mega texture atlas {atlas_width}x{atlas_height}")]
+    MegaTextureAtlasSize {
+        largest_img_width: usize,
+        largest_img_height: usize,
+        atlas_width: usize,
+        atlas_height: usize,
+        padding: usize,
+    },
+    #[cfg(feature = "mega-texture")]
+    #[error("[gpu] mega texture depth {provided} is too small, required at least {required}")]
+    MegaTextureAtlasDepthTooSmall { provided: usize, required: usize },
+
+    #[cfg(feature = "mega-texture")]
+    #[error("[gpu] mega texture duplicate id: {id}")]
+    MegaTextureDuplicateId { id: String },
+
+    #[cfg(feature = "mega-texture")]
+    #[error("[gpu] mega texture index size: {0:?}")]
+    MegaTextureIndexSize(std::num::TryFromIntError),
+
+    #[cfg(feature = "texture-export")]
+    #[error("[gpu] texture export unsupported format: {0:?}")]
+    TextureExportUnsupportedFormat(TextureFormat),
+
+    #[cfg(feature = "texture-export")]
+    #[error("[gpu] texture export failed to write: {0:?}")]
+    TextureExportFailedWrite(image::ImageError),
+
+    #[cfg(feature = "texture-export")]
+    #[error("[gpu] texture export unsupported format for png encoding: {0:?}")]
+    TextureExportUnsupportedPngEncoding(TextureFormat),
 
     #[error("[gpu] Failed to get Shader compilation info: {0}")]
     ShaderCompilationInfo(String),
@@ -168,6 +215,10 @@ impl AwsmCoreError {
         Self::TextureCreation(format_err(err))
     }
 
+    pub fn texture_view(err: JsValue) -> Self {
+        Self::TextureView(format_err(err))
+    }
+
     pub fn command_render_pass(err: JsValue) -> Self {
         Self::CommandRenderPass(format_err(err))
     }
@@ -198,6 +249,18 @@ impl AwsmCoreError {
 
     pub fn buffer_creation(err: JsValue) -> Self {
         Self::BufferCreation(format_err(err))
+    }
+
+    pub fn buffer_map(err: JsValue) -> Self {
+        Self::BufferMap(format_err(err))
+    }
+
+    pub fn buffer_map_range(err: JsValue) -> Self {
+        Self::BufferMapRange(format_err(err))
+    }
+
+    pub fn buffer_copy(err: JsValue) -> Self {
+        Self::BufferCopy(format_err(err))
     }
 
     pub fn buffer_write(err: JsValue) -> Self {

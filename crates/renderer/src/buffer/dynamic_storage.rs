@@ -1,5 +1,8 @@
 use slotmap::{Key, SecondaryMap};
 
+// This dynamic storage buffer allows for flexible allocations of arbitrary sizes
+// It can be used to power gpu storage buffers, but not ideal for fixed-size uniform buffers
+
 //-------------------------------- PERFORMANCE SUMMARY ------------------------//
 //
 // • insert/update/remove:   O(log N) (amortized, ignoring rare growth)
@@ -15,6 +18,8 @@ use slotmap::{Key, SecondaryMap};
 //    matters more than perfect memory efficiency, like:
 //      - Heterogeneous UBO/SBO payloads (i.e. not all items are the same size)
 //      - Variable-sized dynamic allocations (i.e. varying number of items per draw call)
+//
+// For example, vertex data that changes per-mesh
 //
 //----------------------------------------------------------------------------//
 

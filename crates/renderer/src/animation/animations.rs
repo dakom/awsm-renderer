@@ -1,6 +1,6 @@
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
-use crate::{mesh::MorphKey, transform::TransformKey, AwsmRenderer};
+use crate::{mesh::MorphKey, transforms::TransformKey, AwsmRenderer};
 
 use super::{data::AnimationData, error::Result, player::AnimationPlayer, AwsmAnimationError};
 
@@ -11,6 +11,7 @@ new_key_type! {
 #[derive(Debug, Clone, Default)]
 pub struct Animations {
     players: DenseSlotMap<AnimationKey, AnimationPlayer>,
+    // Different kinds of animations:
     transforms: SecondaryMap<AnimationKey, TransformKey>,
     morphs: SecondaryMap<AnimationKey, MorphKey>,
 }

@@ -49,7 +49,7 @@ impl GltfMeshBufferIndexInfo {
                 let accessor_bytes = accessor_to_bytes(&accessor, buffers)?;
 
                 let format = match accessor.data_type() {
-                    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuIndexFormat.html
+                    // https://docs.rs/web-sys/latest/web_sys/enum.GpuIndexFormat.html
                     gltf::accessor::DataType::U16 => IndexFormat::Uint16,
                     gltf::accessor::DataType::U32 => IndexFormat::Uint32,
                     // Only Uint16 and Uint16 are supported for indices

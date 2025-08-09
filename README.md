@@ -36,6 +36,12 @@ I've taken some stabs at some variation of this sorta thing before. Some project
 * [Shipyard ECS (webgl2)](https://github.com/dakom/shipyard-webgl-renderer)
 * [WebGL1+2 Rust bindings](https://github.com/dakom/awsm-web/tree/master/crate/src/webgl)
 
+# TEXTURES
+
+We use a single "MegaTexture" (currently without streaming), which is an of texture-arrays constructed up to resource limits
+
+This allows accessing all the materials from a single shading pass (more on this below)
+
 # RENDER PIPELINE
 
 This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient shading, transparency, and TAA without the drawbacks of classic deferred or forward+ rendering.
@@ -45,42 +51,52 @@ This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient 
 ## 🎯 Pipeline Overview
 
 ### 1. Geometry Pass (Vertex + Fragment)
-- Run for each object with opaque material
+- One draw call (using instancing)
 - Rendering benefits from hardware occlusion culling, objects are drawn front-to-back
 - Outputs to multiple render targets (MRTs):
-  - `object_id_texture`: Encodes geometry/material reference per pixel
+  - `material_offset_texture`: Encodes material reference per pixel
   - `world_normal_texture`: Interpolated world-space normal
-  - `screen_pos_texture`: Clip-space/NDC position for TAA (post-skinning/morphs)
+  - `screen_pos_texture`: Clip-space/NDC position for TAA (post-skinning/morphs) _and linear eye_space depth_ in z coordinate
   - `motion_vector_texture`: Computed as difference between current and previous `screen_pos_texture`
 
 > This pass is animated/skinned, so all mesh deformations are already applied before output
 
-### 2. Opaque Shading Pass (Compute Shader)
-- Single fullscreen compute dispatch
+### 2. Light Culling Pass (Compute Shader)
+- One draw call
+- Divides the screen into tiles (e.g., 16x16 pixels)
+- For each tile, build a list of lights that affect that region of the screen.
+- Write list of lights to storage buffer, indexed by tile
+
+### 3. Opaque Material Shading Pass (Compute Shader)
+- One draw call
+- Single fullscreen compute dispatch (using same workgroup/tiling as Light Culling)
 - For each screen pixel:
-  - Read object ID
-  - Fetch the material data from a single, large storage buffer
+  - Read material offset 
+  - Fetch the material data from a single, large uniform buffer (via material offset)
+  - Fetch the relevant light list from the associated tile
   - Sample the `world_normal_texture` and `screen_pos_texture`
-  - Calculate world position by multiplying screen_pos and inverse view-projection
+  - Calculate world position by using (screen_pos,depth), inverse view matrix, and 
   - Calculate lighting as needed (may use Camera world position etc.)
 - Output: shaded color to `opaque_color_texture`
 
-### 3. Transparent Shading Pass (Vertex + Fragment)
-- Run for each object with transparent material
+### 4. Transparent Material Shading Pass (Vertex + Fragment)
+- One draw call per material-kind (pbr, unlit, etc.) 
+- Fetch the material data from a the same material uniform buffer (bound w/ dynamic offset)
 - Uses Weighted Blended Order-Independent Transparency (OIT)
-- Outputs to multiple render targets (MRTs):
+- Uses the Depth buffer from (1) to discard occluded fragments w/ depth testing (but writes are off)
+- Outputs to multiple textures:
   - `oit_rgb_texture`: accumulated weighted sum of colors
   - `oit_alpha_texture`: accumulated weighted product of transparencies
 
-### 4. Composition (Compute Shader)
+### 5. Composition (Compute Shader)
 - Single fullscreen compute dispatch
 - Resolve OIT: Read from `oit_rgb_texture` and `oit_alpha_texture` and calculate the final transparent color.
 - Composite: Blend the resolved transparent color over the `opaque_color_texture`.
 - Apply TAA: Use `motion_vector_texture` to blend the current, composited frame with the previous frame's history buffer.
 - Tonemapping, gamma-correction, etc.
-- Outputs final resolved frame 
+- Outputs final resolved frame to `composite_texture`
 
-### 5. Final draw
+### 6. Display 
 - Blits the output to screen texture view
 
 ---
@@ -88,11 +104,12 @@ This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient 
 ## 🚦 Render Pass Order
 
 ```
-1. Geometry Pass         → MRTs (object ID, normals, screen pos, motion vec)
-2. Opaque Shading (CS)   → shaded opaque color
-3. Transparent Shading   → blended with Weighted Blended OIT
-4. Composition (CS)      → final post-processed image
-5. Final draw
+1. Geometry Pass            → MRTs (object ID, normals, screen pos, motion vec)
+2. Light culling Pass (CS)  → Per-tile light lists 
+3. Opaque Shading (CS)      → shaded opaque color
+4. Transparent Shading      → blended with Weighted Blended OIT
+5. Composition (CS)         → final post-processed image
+6. Display 
 ```
 
 ---
@@ -152,6 +169,7 @@ Stores full material and geometric data in a G-buffer:
 - Geometry pass performs early-Z and ensures only visible fragments are shaded for opaque objects
 - Motion vectors are derived from screen-space movement (ping-ponging previous frame data)
 - Transparent objects are shaded in fragment shaders using Weighted Blended OIT to approximate correct order without sorting
+- The single draw-call with instancing in Geometry pass reduces per-mesh throughput
 
 
 # NON-GOALS
@@ -165,4 +183,4 @@ This really depends on the specific needs of a project. Some examples:
 * space partitiong (e.g. in an open world game).
 * quadtrees (e.g. in top-down view)
 
-However, due to the visibility buffer optimization, the impact of rendering unnecessary geometry does not reach the shading stage.
+However, due to the visibility buffer optimization, the impact of rendering unnecessary geometry does not reach the shading stage. Also, frustum culling will eliminate other game world objects... so the only optimization would really be to reduce the frustum culling tests which are already very cheap.

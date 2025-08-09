@@ -2,7 +2,7 @@ use crate::texture::{TextureFormat, TextureUsage};
 
 // device is _not_ included in the configuration, we get that at build time
 // https://developer.mozilla.org/en-US/docs/Web/API/GPUCanvasContext/configure#configuration
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuCanvasConfiguration.html
+// https://docs.rs/web-sys/latest/web_sys/struct.GpuCanvasConfiguration.html
 #[derive(Default)]
 pub struct CanvasConfiguration {
     // if not set, will be derived at build time via get_preferred_canvas_format()
@@ -37,13 +37,13 @@ impl CanvasConfiguration {
     }
 }
 
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuCanvasAlphaMode.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuCanvasAlphaMode.html
 pub type CanvasAlphaMode = web_sys::GpuCanvasAlphaMode;
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuCanvasToneMappingMode.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuCanvasToneMappingMode.html
 pub type CanvasToneMappingMode = web_sys::GpuCanvasToneMappingMode;
 
 impl CanvasConfiguration {
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuCanvasConfiguration.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuCanvasConfiguration.html
     pub fn into_js(
         self,
         gpu: &web_sys::Gpu,
