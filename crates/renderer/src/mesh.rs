@@ -108,26 +108,24 @@ impl Mesh {
 
         // if _any_ shapes are used, set the bind group
         // unused shapes will simply be ignored (so 0 offset is fine)
-        if self.morph_key.is_some() || self.skin_key.is_some() {
-            let (morph_weights_offset, morph_values_offset) = match self.morph_key {
-                Some(morph_key) => (
-                    ctx.meshes.morphs.weights_buffer_offset(morph_key)? as u32,
-                    ctx.meshes.morphs.values_buffer_offset(morph_key)? as u32,
-                ),
-                None => (0, 0),
-            };
+        let (morph_weights_offset, morph_values_offset) = match self.morph_key {
+            Some(morph_key) => (
+                ctx.meshes.morphs.weights_buffer_offset(morph_key)? as u32,
+                ctx.meshes.morphs.values_buffer_offset(morph_key)? as u32,
+            ),
+            None => (0, 0),
+        };
 
-            let skin_offset = match self.skin_key {
-                Some(skin_key) => ctx.meshes.skins.joint_matrices_offset(skin_key)? as u32,
-                None => 0,
-            };
+        let skin_offset = match self.skin_key {
+            Some(skin_key) => ctx.meshes.skins.joint_matrices_offset(skin_key)? as u32,
+            None => 0,
+        };
 
-            render_pass.set_bind_group(
-                2,
-                geometry_bind_groups.vertex_animation.get_bind_group()?,
-                Some(&[morph_weights_offset, morph_values_offset, skin_offset]),
-            )?;
-        }
+        render_pass.set_bind_group(
+            2,
+            geometry_bind_groups.vertex_animation.get_bind_group()?,
+            Some(&[morph_weights_offset, morph_values_offset, skin_offset]),
+        )?;
 
         render_pass.set_vertex_buffer(
             0,
@@ -145,10 +143,10 @@ impl Mesh {
             );
         }
 
-        let indexed = match ctx.meshes.index_buffer_offset_format(mesh_key).ok() {
+        let indexed = match ctx.meshes.draw_index_buffer_offset_format(mesh_key).ok() {
             Some((offset, format)) => {
                 render_pass.set_index_buffer(
-                    ctx.meshes.gpu_index_buffer(),
+                    ctx.meshes.gpu_draw_index_buffer(),
                     format,
                     Some(offset as u64),
                     None,

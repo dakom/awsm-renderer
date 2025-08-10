@@ -11,6 +11,28 @@ pub fn debug_chunks_to_f32(slice: &[u8], chunk_size: usize) -> Vec<Vec<f32>> {
         .collect()
 }
 
+// From gltf spec:
+// "All buffer data defined in this specification (i.e., geometry attributes, geometry indices, sparse accessor data, animation inputs and outputs, inverse bind matrices) 
+// MUST use little endian byte order."
+
+pub fn u16_to_u32_vec(v: &[u8]) -> Vec<u8> {
+    let mut output = Vec::with_capacity(v.len() * 2);
+    for chunk in v.chunks_exact(2) {
+        let value = u16::from_le_bytes([chunk[0], chunk[1]]);
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+    output
+}
+
+pub fn i16_to_i32_vec(v: &[u8]) -> Vec<u8> {
+    let mut output = Vec::with_capacity(v.len() * 2);
+    for chunk in v.chunks_exact(2) {
+        let value = i16::from_le_bytes([chunk[0], chunk[1]]);
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+    output
+}
+
 pub fn u8_to_f32_vec(v: &[u8]) -> Vec<f32> {
     v.chunks_exact(4)
         .map(TryInto::try_into)

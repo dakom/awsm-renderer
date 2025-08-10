@@ -134,7 +134,7 @@ impl Morphs {
     ) -> Result<()> {
         let len = self.get_info(key).map(|info| info.targets_len)?;
 
-        self.weights.update_with_unchecked(key, |slice_u8| {
+        self.weights.update_with_unchecked(key, |_, slice_u8| {
             let weights_f32 =
                 unsafe { std::slice::from_raw_parts_mut(slice_u8.as_ptr() as *mut f32, len + 1) };
 

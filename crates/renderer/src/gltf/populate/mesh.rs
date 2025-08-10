@@ -3,17 +3,12 @@ use std::{future::Future, pin::Pin};
 use crate::{
     bounds::Aabb,
     gltf::{
-        error::{AwsmGltfError, Result},
-        layout::{instance_transform_vertex_buffer_layout, primitive_vertex_buffer_layout},
-        populate::material::GltfMaterialInfo,
+        buffers::helpers::transform_to_winding_order, error::{AwsmGltfError, Result}, populate::material::GltfMaterialInfo
     },
     materials::Material,
     mesh::{skins::SkinKey, Mesh, MeshBufferInfo},
     pipeline_layouts::PipelineLayoutCacheKey,
     pipelines::render_pipeline::RenderPipelineCacheKey,
-    render_passes::geometry::{
-        color_targets::geometry_fragment_color_targets, shader::cache_key::ShaderCacheKeyGeometry,
-    },
     transforms::{Transform, TransformKey},
     AwsmRenderer,
 };
@@ -104,30 +99,11 @@ impl AwsmRenderer {
             GltfMaterialInfo::new(self, ctx, primitive_buffer_info, gltf_primitive.material())
                 .await?;
 
-        let shader_cache_key = ShaderCacheKeyGeometry {
-            attributes: primitive_buffer_info
-                .vertex
-                .attributes
-                .iter()
-                .map(|s| s.shader_key_kind)
-                .collect(),
-            morphs: primitive_buffer_info
-                .morph
-                .as_ref()
-                .map(|m| m.shader_key)
-                .unwrap_or_default(),
-            has_instance_transforms: ctx
-                .transform_is_instanced
-                .lock()
-                .unwrap()
-                .contains(&transform_key),
-        };
-
         let morph_key = match primitive_buffer_info.morph.clone() {
             None => None,
             Some(morph_buffer_info) => {
                 // safe, can't have morph info without backing bytes
-                let values = ctx.data.buffers.morph_bytes.as_ref().unwrap();
+                let values = ctx.data.buffers.triangle_morph_bytes.as_ref().unwrap();
                 let values = &values[morph_buffer_info.values_offset
                     ..morph_buffer_info.values_offset + morph_buffer_info.values_size];
 
@@ -148,113 +124,7 @@ impl AwsmRenderer {
             &self.textures,
         );
 
-        let mut pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
-            self.render_passes
-                .geometry
-                .bind_groups
-                .camera_lights
-                .bind_group_layout_key,
-            self.render_passes
-                .geometry
-                .bind_groups
-                .transform_materials
-                .bind_group_layout_key,
-        ]);
-
-        if morph_key.is_some() || skin_key.is_some() {
-            pipeline_layout_cache_key.bind_group_layouts.push(
-                self.render_passes
-                    .geometry
-                    .bind_groups
-                    .vertex_animation
-                    .bind_group_layout_key,
-            );
-        }
-
-        // we only need one vertex buffer per-mesh, because we've already constructed our buffers
-        // to be one contiguous buffer of interleaved vertex data.
-        // the attributes of this one vertex buffer layout contain all the info needed for the shader locations
-        let (vertex_buffer_layout, shader_location) =
-            primitive_vertex_buffer_layout(primitive_buffer_info)?;
-        let instance_transform_vertex_buffer_layout = match shader_cache_key.has_instance_transforms
-        {
-            true => Some(instance_transform_vertex_buffer_layout(shader_location)),
-            false => None,
-        };
-
-        // tracing::info!("indices: {:?}", debug_slice_to_u16(ctx.data.buffers.index_bytes.as_ref().unwrap()));
-        // tracing::info!("positions: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[0].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
-        //tracing::info!("normals: {:?}", debug_slice_to_f32(&ctx.data.buffers.vertex_bytes[vertex_buffer_layout.attributes[1].offset as usize..]).chunks(3).take(3).collect::<Vec<_>>());
-
-        let primitive_state = PrimitiveState::new()
-            .with_topology(match gltf_primitive.mode() {
-                gltf::mesh::Mode::Points => PrimitiveTopology::PointList,
-                gltf::mesh::Mode::Lines => PrimitiveTopology::LineList,
-                gltf::mesh::Mode::LineLoop => {
-                    return Err(AwsmGltfError::UnsupportedPrimitiveMode(
-                        gltf_primitive.mode(),
-                    ))
-                }
-                gltf::mesh::Mode::LineStrip => PrimitiveTopology::LineStrip,
-                gltf::mesh::Mode::Triangles => PrimitiveTopology::TriangleList,
-                gltf::mesh::Mode::TriangleStrip => PrimitiveTopology::TriangleStrip,
-                gltf::mesh::Mode::TriangleFan => {
-                    return Err(AwsmGltfError::UnsupportedPrimitiveMode(
-                        gltf_primitive.mode(),
-                    ))
-                }
-            })
-            .with_front_face(transform_to_winding_order(
-                self.transforms
-                    .get_world(transform_key)
-                    .map_err(AwsmGltfError::TransformToWindingOrder)?,
-            ))
-            .with_cull_mode(match gltf_primitive.material().double_sided() {
-                true => CullMode::None,
-                false => CullMode::Back,
-            });
-
-        let shader_key = self.shaders.get_key(&self.gpu, shader_cache_key).await?;
-
-        let pipeline_layout_key = self.pipeline_layouts.get_key(
-            &self.gpu,
-            &self.bind_group_layouts,
-            pipeline_layout_cache_key,
-        )?;
-
-        let mut pipeline_cache_key = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
-            .with_primitive(primitive_state)
-            .with_push_vertex_buffer_layout(vertex_buffer_layout)
-            .with_depth_stencil(
-                DepthStencilState::new(self.render_textures.formats.depth)
-                    .with_depth_write_enabled(true)
-                    .with_depth_compare(match material_info.material.has_alpha_blend() {
-                        true => CompareFunction::Always,     // OIT doesn't use depth testing
-                        false => CompareFunction::LessEqual, // Opaque materials render front-to-back and use depth testing to avoid overdraw
-                    }),
-            );
-
-        for color_target in geometry_fragment_color_targets(&self.render_textures.formats) {
-            pipeline_cache_key = pipeline_cache_key.with_push_fragment_target(color_target);
-        }
-
-        if let Some(instance_transform_vertex_buffer_layout) =
-            instance_transform_vertex_buffer_layout
-        {
-            pipeline_cache_key = pipeline_cache_key
-                .with_push_vertex_buffer_layout(instance_transform_vertex_buffer_layout);
-        }
-
-        let render_pipeline_key = self
-            .pipelines
-            .render
-            .get_key(
-                &self.gpu,
-                &self.shaders,
-                &self.pipeline_layouts,
-                pipeline_cache_key,
-            )
-            .await?;
+        let render_pipeline_key = self.render_passes.geometry.pipelines.get_render_pipeline_key(material_info.material.double_sided());
 
         let native_primitive_buffer_info = MeshBufferInfo::from(primitive_buffer_info.clone());
         let mut mesh = Mesh::new(
@@ -277,26 +147,20 @@ impl AwsmRenderer {
         }
 
         let _mesh_key = {
-            let index = match primitive_buffer_info.index.clone() {
-                None => None,
-                Some(index_buffer_info) => {
-                    // safe, can't have info without backing bytes
-                    let index_values = ctx.data.buffers.index_bytes.as_ref().unwrap();
-                    let index_values = &index_values[index_buffer_info.offset
-                        ..index_buffer_info.offset + index_buffer_info.total_size()];
-                    Some((index_values, index_buffer_info.into()))
-                }
-            };
+            let vertex_start = primitive_buffer_info.vertex.offset;
+            let vertex_end = vertex_start + primitive_buffer_info.vertex.size;
+            let vertex_values = &ctx.data.buffers.visibility_vertex_bytes[vertex_start..vertex_end];
 
-            let vertex_values = &ctx.data.buffers.vertex_bytes;
-            let vertex_values = &vertex_values[primitive_buffer_info.vertex.offset
-                ..primitive_buffer_info.vertex.offset + primitive_buffer_info.vertex.size];
+            let index_start = primitive_buffer_info.triangles.indices.offset;
+            let index_end = index_start + primitive_buffer_info.triangles.indices.total_size();
+            let index_values = &ctx.data.buffers.index_bytes[index_start..index_end];
 
             self.meshes.insert(
                 mesh,
+                primitive_buffer_info.vertex.clone().into(),
                 vertex_values,
-                native_primitive_buffer_info.vertex,
-                index,
+                primitive_buffer_info.triangles.indices.clone().into(),
+                index_values,
             )
         };
 
@@ -362,18 +226,4 @@ fn try_position_aabb(gltf_primitive: &gltf::Primitive<'_>) -> Option<Aabb> {
         min: Vec3::new(min_x as f32, min_y as f32, min_z as f32),
         max: Vec3::new(max_x as f32, max_y as f32, max_z as f32),
     })
-}
-
-fn transform_to_winding_order(world_matrix: &Mat4) -> FrontFace {
-    /*
-     From spec: "When a mesh primitive uses any triangle-based topology (i.e., triangles, triangle strip, or triangle fan),
-     the determinant of the node’s global transform defines the winding order of that primitive.
-     If the determinant is a positive value, the winding order triangle faces is counterclockwise;
-     in the opposite case, the winding order is clockwise.
-    */
-    if world_matrix.determinant() > 0.0 {
-        FrontFace::Ccw
-    } else {
-        FrontFace::Cw
-    }
 }

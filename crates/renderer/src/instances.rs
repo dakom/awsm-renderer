@@ -55,7 +55,7 @@ impl Instances {
     }
 
     pub fn transform_update(&mut self, key: TransformKey, index: usize, transform: &Transform) {
-        self.transform_buffer.update_with_unchecked(key, |bytes| {
+        self.transform_buffer.update_with_unchecked(key, |_, bytes| {
             let offset = index * Transforms::BYTE_SIZE;
             let values = transform.to_matrix().to_cols_array();
             let values_u8 = unsafe {

@@ -29,9 +29,17 @@ fn main(
     }
 
     var color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-    {% if has_atlas %}
-        color = debug_test(atlas_tex_0, 0, coords, textureDimensions(opaque_tex));
-    {% endif %}
+    let material_offset = textureLoad(material_offset_tex, coords, 0).r;
+    if (material_offset == 0xffffffffu) {
+        textureStore(opaque_tex, coords, vec4<f32>(0.0, 0.0, 0.0, 0.0));
+        return; // Skip if material offset is not set
+    }
+    color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
+
+
+    // {% if has_atlas %}
+    //     color = debug_test(atlas_tex_0, 0, coords, textureDimensions(opaque_tex));
+    // {% endif %}
 
             // let material_offset = textureLoad(material_offset_tex, coords, 0).r;
             // if (material_offset == 0xffffffffu) {

@@ -47,6 +47,9 @@ pub enum AwsmGltfError {
     #[error("[gltf] Unsupported index data type: {0:?}")]
     UnsupportedIndexDataType(gltf::accessor::DataType),
 
+    #[error("[gltf] Unsupported index mode: {0:?}")]
+    UnsupportedIndexMode(String),
+
     #[error("[gltf] Unsupported index format: {0:?}")]
     UnsupportedIndexFormat(IndexFormat),
 
@@ -158,6 +161,15 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] unable to construct normals: {0}")]
     ConstructNormals(String),
+
+    #[error("[gltf] unable to get positions: {0}")]
+    Positions(String),
+
+    #[error("[gltf] attribute data: {0}")]
+    AttributeData(String),
+
+    #[error("[gltf] extract indices: {0}")]
+    ExtractIndices(String),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

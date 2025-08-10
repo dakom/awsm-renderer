@@ -19,13 +19,19 @@ pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
     transform_to_meshes: SecondaryMap<TransformKey, Vec<MeshKey>>,
     vertex_buffers: DynamicStorageBuffer<MeshKey>,
-    index_buffers: DynamicStorageBuffer<MeshKey>,
+    // original indices for vertex attributes
+    attribute_index_buffers: DynamicStorageBuffer<MeshKey>,
+    attribute_index_infos: SecondaryMap<MeshKey, MeshBufferIndexInfo>,
+    gpu_attribute_index_buffer: web_sys::GpuBuffer,
+    // sequential indices for draw calls
+    draw_index_buffers: DynamicStorageBuffer<MeshKey>,
+    draw_index_infos: SecondaryMap<MeshKey, MeshBufferIndexInfo>,
+    gpu_draw_index_buffer: web_sys::GpuBuffer,
     vertex_infos: SecondaryMap<MeshKey, MeshBufferVertexInfo>,
-    index_infos: SecondaryMap<MeshKey, MeshBufferIndexInfo>,
     gpu_vertex_buffer: web_sys::GpuBuffer,
-    gpu_index_buffer: web_sys::GpuBuffer,
     vertex_dirty: bool,
-    index_dirty: bool,
+    draw_index_dirty: bool,
+    attribute_index_dirty: bool,
     pub morphs: Morphs,
     pub skins: Skins,
 }
@@ -36,9 +42,13 @@ impl Meshes {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Self {
             list: DenseSlotMap::with_key(),
-            index_buffers: DynamicStorageBuffer::new(
+            draw_index_buffers: DynamicStorageBuffer::new(
                 Self::INDICES_INITIAL_SIZE,
-                Some("MeshIndexBuffer".to_string()),
+                Some("MeshDrawIndexBuffer".to_string()),
+            ),
+            attribute_index_buffers: DynamicStorageBuffer::new(
+                Self::INDICES_INITIAL_SIZE,
+                Some("MeshAttributeIndexBuffer".to_string()),
             ),
             vertex_buffers: DynamicStorageBuffer::new(
                 Self::VERTICES_INITIAL_SIZE,
@@ -46,10 +56,13 @@ impl Meshes {
             ),
             transform_to_meshes: SecondaryMap::new(),
             gpu_vertex_buffer: gpu_create_vertex_buffer(gpu, Self::VERTICES_INITIAL_SIZE)?,
-            gpu_index_buffer: gpu_create_index_buffer(gpu, Self::INDICES_INITIAL_SIZE)?,
+            gpu_draw_index_buffer: gpu_create_index_buffer(gpu, Self::INDICES_INITIAL_SIZE)?,
+            gpu_attribute_index_buffer: gpu_create_index_buffer(gpu, Self::INDICES_INITIAL_SIZE)?,
             vertex_infos: SecondaryMap::new(),
-            index_infos: SecondaryMap::new(),
-            index_dirty: true,
+            attribute_index_infos: SecondaryMap::new(),
+            draw_index_infos: SecondaryMap::new(),
+            draw_index_dirty: true,
+            attribute_index_dirty: true,
             vertex_dirty: true,
             morphs: Morphs::new(gpu)?,
             skins: Skins::new(gpu)?,
@@ -59,9 +72,11 @@ impl Meshes {
     pub fn insert(
         &mut self,
         mesh: Mesh,
-        vertex_values: &[u8],
         vertex_info: MeshBufferVertexInfo,
-        index: Option<(&[u8], MeshBufferIndexInfo)>,
+        vertex_data: &[u8],
+        attribute_index_info: MeshBufferIndexInfo,
+        attribute_index_data: &[u8],
+
     ) -> MeshKey {
         let transform_key = mesh.transform_key;
         let key = self.list.insert(mesh);
@@ -72,15 +87,28 @@ impl Meshes {
             .or_default()
             .push(key);
 
-        self.vertex_buffers.update(key, vertex_values);
+
+        let mut draw_index_data = Vec::new();
+        let draw_index_info = MeshBufferIndexInfo {
+            count: vertex_info.count * 3,
+            data_size: 4, // u32 indices
+            format: IndexFormat::Uint32,
+        };
+        for i in 0..draw_index_info.count {
+            draw_index_data.extend_from_slice(&(i as u32).to_le_bytes());
+        }
+
+        self.vertex_buffers.update(key, vertex_data);
         self.vertex_infos.insert(key, vertex_info);
         self.vertex_dirty = true;
 
-        if let Some((index_values, index_info)) = index {
-            self.index_buffers.update(key, index_values);
-            self.index_infos.insert(key, index_info);
-            self.index_dirty = true;
-        }
+        self.attribute_index_buffers.update(key, &attribute_index_data);
+        self.attribute_index_infos.insert(key, attribute_index_info);
+        self.attribute_index_dirty = true;
+
+        self.draw_index_buffers.update(key, &draw_index_data);
+        self.draw_index_infos.insert(key, draw_index_info);
+        self.draw_index_dirty = true;
 
         key
     }
@@ -119,14 +147,14 @@ impl Meshes {
             .ok_or(AwsmMeshError::MeshNotFound(key))
     }
 
-    pub fn index_buffer_offset_format(&self, key: MeshKey) -> Result<(usize, IndexFormat)> {
+    pub fn draw_index_buffer_offset_format(&self, key: MeshKey) -> Result<(usize, IndexFormat)> {
         let offset = self
-            .index_buffers
+            .draw_index_buffers
             .offset(key)
             .ok_or(AwsmMeshError::MeshNotFound(key))?;
 
         let format = self
-            .index_infos
+            .draw_index_infos
             .get(key)
             .ok_or(AwsmMeshError::MeshNotFound(key))?
             .format;
@@ -134,8 +162,28 @@ impl Meshes {
         Ok((offset, format))
     }
 
-    pub fn gpu_index_buffer(&self) -> &web_sys::GpuBuffer {
-        &self.gpu_index_buffer
+    pub fn attribute_index_buffer_offset_format(&self, key: MeshKey) -> Result<(usize, IndexFormat)> {
+        let offset = self
+            .attribute_index_buffers
+            .offset(key)
+            .ok_or(AwsmMeshError::MeshNotFound(key))?;
+
+        let format = self
+            .attribute_index_infos
+            .get(key)
+            .ok_or(AwsmMeshError::MeshNotFound(key))?
+            .format;
+
+        Ok((offset, format))
+    }
+
+
+    pub fn gpu_draw_index_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.gpu_draw_index_buffer
+    }
+
+    pub fn gpu_attribute_index_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.gpu_attribute_index_buffer
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (MeshKey, &Mesh)> {
@@ -160,9 +208,14 @@ impl Meshes {
             self.vertex_infos.remove(mesh_key);
             self.vertex_dirty = true;
 
-            self.index_buffers.remove(mesh_key);
-            if self.index_infos.remove(mesh_key).is_some() {
-                self.index_dirty = true;
+            self.draw_index_buffers.remove(mesh_key);
+            if self.draw_index_infos.remove(mesh_key).is_some() {
+                self.draw_index_dirty = true;
+            }
+
+            self.attribute_index_buffers.remove(mesh_key);
+            if self.attribute_index_infos.remove(mesh_key).is_some() {
+                self.attribute_index_dirty = true;
             }
 
             if let Some(morph_key) = mesh.morph_key {
@@ -201,23 +254,42 @@ impl Meshes {
             )?;
             self.vertex_dirty = false;
         }
-        if self.index_dirty {
+        if self.draw_index_dirty {
             let _maybe_span_guard = if logging.render_timings {
-                Some(tracing::span!(tracing::Level::INFO, "Mesh index GPU write").entered())
+                Some(tracing::span!(tracing::Level::INFO, "Mesh draw index GPU write").entered())
             } else {
                 None
             };
-            if let Some(new_size) = self.index_buffers.take_gpu_needs_resize() {
-                self.gpu_index_buffer = gpu_create_index_buffer(gpu, new_size)?;
+            if let Some(new_size) = self.draw_index_buffers.take_gpu_needs_resize() {
+                self.gpu_draw_index_buffer = gpu_create_index_buffer(gpu, new_size)?;
             }
             gpu.write_buffer(
-                &self.gpu_index_buffer,
+                &self.gpu_draw_index_buffer,
                 None,
-                self.index_buffers.raw_slice(),
+                self.draw_index_buffers.raw_slice(),
                 None,
                 None,
             )?;
-            self.index_dirty = false;
+            self.draw_index_dirty = false;
+        }
+
+        if self.attribute_index_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Mesh attribute index GPU write").entered())
+            } else {
+                None
+            };
+            if let Some(new_size) = self.attribute_index_buffers.take_gpu_needs_resize() {
+                self.gpu_attribute_index_buffer = gpu_create_index_buffer(gpu, new_size)?;
+            }
+            gpu.write_buffer(
+                &self.gpu_attribute_index_buffer,
+                None,
+                self.attribute_index_buffers.raw_slice(),
+                None,
+                None,
+            )?;
+            self.attribute_index_dirty = false;
         }
         Ok(())
     }
@@ -248,7 +320,8 @@ fn gpu_create_index_buffer(gpu: &AwsmRendererWebGpu, size: usize) -> Result<web_
 impl Drop for Meshes {
     fn drop(&mut self) {
         self.gpu_vertex_buffer.destroy();
-        self.gpu_index_buffer.destroy();
+        self.gpu_draw_index_buffer.destroy();
+        self.gpu_attribute_index_buffer.destroy();
     }
 }
 

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use crate::buffer::helpers::{u8_to_i16_vec, u8_to_u16_vec};
 use crate::gltf::buffers::normals::compute_normals;
 use crate::gltf::error::AwsmGltfError;
-use crate::mesh::{MeshBufferVertexAttribute, MeshBufferVertexInfo};
+use crate::mesh::{MeshBufferIndexInfo, MeshBufferVertexInfo};
 use crate::render_passes::geometry::shader::cache_key::ShaderCacheKeyGeometryAttribute;
 
 use super::accessor::accessor_to_bytes;
@@ -45,7 +45,7 @@ impl GltfMeshBufferVertexInfo {
     pub fn new(
         primitive: &gltf::Primitive<'_>,
         buffers: &[Vec<u8>],
-        index: Option<(&GltfMeshBufferIndexInfo, &[u8])>,
+        index: (&MeshBufferIndexInfo, &[u8]),
         vertex_bytes: &mut Vec<u8>,
     ) -> Result<Self> {
         let offset = vertex_bytes.len();

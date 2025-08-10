@@ -1,11 +1,5 @@
-{% if morphs.any() %}
-    {% include "geometry_wgsl/vertex/morph.wgsl" %}
-{% endif %}
-
-{% if skins > 0 %}
-    {% include "geometry_wgsl/vertex/skin.wgsl" %}
-{% endif %}
-
+{% include "geometry_wgsl/vertex/morph.wgsl" %}
+{% include "geometry_wgsl/vertex/skin.wgsl" %}
 
 struct CameraUniform {
     view: mat4x4<f32>,
@@ -30,56 +24,41 @@ struct TransformUniform {
 
 //***** INPUT/OUTPUT *****
 struct VertexInput {
-    @builtin(vertex_index) vertex_index: u32,
-    {% for loc in vertex_input_locations %}
-        {%- match loc.interpolation %}
-            {% when Some with (interpolation) %}
-                @location({{ loc.location }}) @interpolate({{ interpolation }}) {{ loc.name }}: {{ loc.data_type }},
-            {% when _ %}
-                @location({{ loc.location }}) {{ loc.name }}: {{ loc.data_type }},
-        {% endmatch %}
-    {% endfor %}
+    @location(0) position: vec3<f32>,      // World position
+    @location(1) triangle_id: u32,        // Triangle ID for this vertex
+    @location(2) barycentric: vec2<f32>,   // Barycentric coordinates (x, y) - z = 1.0 - x - y
 };
+
+// Vertex output
+struct VertexOutput {
+    @builtin(position) screen_position: vec4<f32>,
+    @location(0) world_position: vec3<f32>, 
+    @location(1) clip_position: vec4<f32>,
+    @location(2) @interpolate(flat) triangle_id: u32,
+    @location(3) barycentric: vec3<f32>,  // Full barycentric coordinates
+}
 
 //***** MAIN *****
 @vertex
-fn vert_main(raw_input: VertexInput) -> FragmentInput {
-    var input = raw_input;
+fn vert_main(vertex: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
 
-    // morphs first: https://github.com/KhronosGroup/glTF/issues/1646#issuecomment-542815692
-    {% if morphs.any() %}
-    input = apply_morphs(input);
-    {% endif %}
-
-    {% if skins > 0 %}
-    input = apply_skin(input);
-    {% endif %}
-
-    // Transform the vertex position by the model matrix, and then by the view projection matrix
-    {% if has_instance_transforms %}
-        // Transform the vertex position by the instance transform
-        let instance_transform = mat4x4<f32>(
-            raw_input.instance_transform_row_0,
-            raw_input.instance_transform_row_1,
-            raw_input.instance_transform_row_2,
-            raw_input.instance_transform_row_3,
-        );
-
-        let model_transform = u_transform.model * instance_transform;
-    {% else %}
-        let model_transform = u_transform.model;
-    {% endif %}
-
-    var output: FragmentInput;
-
-    var pos = model_transform * vec4<f32>(input.position, 1.0);
-    output.world_position = pos.xyz;
-    {% if has_normals %}
-        output.world_normal = normalize((model_transform * vec4<f32>(input.normal, 0.0)).xyz);
-    {% endif %}
-
-    output.clip_position = camera.view_proj * pos;
-    output.screen_position = camera.view_proj * pos;
-
-    return output;
+    let model_transform = u_transform.model;
+    var pos = model_transform * vec4<f32>(vertex.position, 1.0);
+    out.world_position = pos.xyz;
+    out.clip_position = camera.view_proj * pos;
+    out.screen_position = camera.view_proj * pos;
+    
+    // Pass through triangle ID
+    out.triangle_id = vertex.triangle_id;
+    
+    // Reconstruct full barycentric coordinates
+    // Input has (x, y), we calculate z = 1.0 - x - y
+    out.barycentric = vec3<f32>(
+        vertex.barycentric.x,
+        vertex.barycentric.y,
+        1.0 - vertex.barycentric.x - vertex.barycentric.y
+    );
+    
+    return out;
 }

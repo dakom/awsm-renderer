@@ -127,6 +127,13 @@ impl RenderPipelineCacheKey {
         self
     }
 
+    pub fn with_push_fragment_targets(mut self, targets: impl IntoIterator<Item = ColorTargetState>) -> Self {
+        for target in targets.into_iter() {
+            self.fragment_targets.push(target);
+        }
+        self
+    }
+
     pub fn with_primitive(mut self, primitive: PrimitiveState) -> Self {
         self.primitive = primitive;
         self

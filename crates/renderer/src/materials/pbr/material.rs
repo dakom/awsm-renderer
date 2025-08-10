@@ -80,6 +80,14 @@ impl PbrMaterial {
         }
     }
 
+    pub fn alpha_mode(&self) -> &MaterialAlphaMode {
+        &self.alpha_mode
+    }
+
+    pub fn double_sided(&self) -> bool {
+        self.double_sided
+    }
+
     pub fn set_alpha_cutoff(&mut self, cutoff: f32) -> Result<()> {
         if let MaterialAlphaMode::Mask { .. } = self.alpha_mode {
             self.alpha_mode = MaterialAlphaMode::Mask { cutoff };

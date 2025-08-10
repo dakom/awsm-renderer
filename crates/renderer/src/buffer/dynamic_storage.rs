@@ -74,7 +74,8 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
 
     // this is used to both update and insert new data
     // it can be called many times a frame, gpu is only updated with explicit write_to_gpu() call
-    pub fn update(&mut self, key: K, bytes: &[u8]) {
+    // returns the offset of the data in the buffer
+    pub fn update(&mut self, key: K, bytes: &[u8]) -> usize {
         // remove & reinsert if new size doesn’t fit existing block
         if let Some((off, old_size)) = self.slot_indices.get(key).copied() {
             if bytes.len() <= old_size {
@@ -83,18 +84,18 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
                 if bytes.len() < old_size {
                     self.raw_data[off + bytes.len()..off + old_size].fill(ZERO);
                 }
-                return;
+                return off;
             }
             self.remove(key);
         }
-        self.insert(key, bytes);
+        self.insert(key, bytes)
     }
 
     // careful, just to update existing data that definitely will not grow (or insert)
-    pub fn update_with_unchecked(&mut self, key: K, f: impl FnOnce(&mut [u8])) {
+    pub fn update_with_unchecked(&mut self, key: K, f: impl FnOnce(usize, &mut [u8])) {
         match self.slot_indices.get(key) {
             Some((off, size)) => {
-                f(&mut self.raw_data[*off..*off + *size]);
+                f(*off, &mut self.raw_data[*off..*off + *size]);
             }
             None => {
                 panic!("Key {key:?} not found in DynamicBuddyBuffer");
@@ -102,7 +103,7 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
         }
     }
 
-    fn insert(&mut self, key: K, bytes: &[u8]) {
+    fn insert(&mut self, key: K, bytes: &[u8]) -> usize {
         let req = round_pow2(bytes.len().max(MIN_BLOCK));
         let off = self.alloc(req).unwrap_or_else(|| {
             // grow buffer & tree, then retry
@@ -111,6 +112,8 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
         });
         self.raw_data[off..off + bytes.len()].copy_from_slice(bytes);
         self.slot_indices.insert(key, (off, req));
+
+        off
     }
 
     pub fn remove(&mut self, key: K) {

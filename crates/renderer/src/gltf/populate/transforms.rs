@@ -37,7 +37,7 @@ impl AwsmRenderer {
     }
 }
 
-fn transform_gltf_node(node: &gltf::Node) -> Transform {
+pub fn transform_gltf_node(node: &gltf::Node) -> Transform {
     // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-node
     match node.transform() {
         gltf::scene::Transform::Matrix {

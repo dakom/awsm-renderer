@@ -1,20 +1,10 @@
 use awsm_renderer_core::sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor};
 
 use crate::{
-    gltf::{
-        buffers::GltfMeshBufferInfo,
-        error::{AwsmGltfError, Result},
-    },
-    materials::{pbr::PbrMaterial, MaterialAlphaMode},
-    render_passes::{
-        geometry::shader::cache_key::ShaderCacheKeyGeometryAttribute,
-        material::{
+    gltf::{buffers::MeshBufferInfoWithOffset, error::{AwsmGltfError, Result}}, materials::{pbr::PbrMaterial, MaterialAlphaMode}, mesh::MeshBufferInfo, render_passes::material::{
             cache_key::ShaderCacheKeyMaterial,
             transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent,
-        },
-    },
-    textures::{SamplerCacheKey, SamplerKey, TextureKey},
-    AwsmRenderer,
+        }, textures::{SamplerCacheKey, SamplerKey, TextureKey}, AwsmRenderer
 };
 
 use super::GltfPopulateContext;
@@ -27,7 +17,7 @@ impl GltfMaterialInfo {
     pub async fn new(
         renderer: &mut AwsmRenderer,
         ctx: &GltfPopulateContext,
-        primitive_buffer_info: &GltfMeshBufferInfo,
+        primitive_buffer_info: &MeshBufferInfoWithOffset,
         gltf_material: gltf::Material<'_>,
     ) -> Result<Self> {
         let alpha_mode = match gltf_material.alpha_mode() {

@@ -19,7 +19,7 @@ mod extensions;
 mod material;
 mod mesh;
 mod skin;
-mod transforms;
+pub(super) mod transforms;
 
 pub(crate) struct GltfPopulateContext {
     pub data: Arc<GltfData>,
