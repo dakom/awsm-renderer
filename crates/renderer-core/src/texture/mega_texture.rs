@@ -24,6 +24,7 @@
 /// Lastly, each original image is tracked with its 3d index into the MegaTexture (atlas, layer, entry)
 /// as well as the pixel offset in the layer texture, UV offset, and UV scale.
 pub mod pipeline;
+#[cfg(feature = "serde")]
 pub mod report;
 pub mod writer;
 
@@ -62,6 +63,16 @@ pub struct MegaTextureIndex {
     pub entry: u16,
 }
 
+impl MegaTextureIndex {
+    pub fn new(atlas: usize, layer: usize, entry: usize) -> Self {
+        Self {
+            atlas: atlas.try_into().expect("Atlas index out of bounds"),
+            layer: layer.try_into().expect("Layer index out of bounds"),
+            entry: entry.try_into().expect("Entry index out of bounds"),
+        }
+    }
+}
+
 pub(super) struct MegaTextureAtlas<ID> {
     pub layers: Vec<MegaTextureLayer<ID>>,
     pub texture_size: u32,
@@ -96,6 +107,7 @@ where
 }
 
 // Does not include ImageData
+#[derive(Clone, Debug)]
 pub struct MegaTextureEntryInfo<ID> {
     pub pixel_offset: [u32; 2],
     pub size: [u32; 2],
@@ -109,6 +121,18 @@ pub struct MegaTextureBindings {
     pub start_group: u32,
     pub start_binding: u32,
     pub bind_group_bindings_len: Vec<u32>,
+}
+
+#[derive(Clone, Debug)]
+pub struct MegaTextureInfo<ID>
+where
+    ID: Clone,
+{
+    entries: Vec<Vec<Vec<MegaTextureEntryInfo<ID>>>>,
+    texture_size: u32,
+    max_depth: u32,
+    max_bindings_per_group: u32,
+    max_bind_groups: u32,
 }
 
 impl<ID> MegaTexture<ID>
@@ -130,6 +154,41 @@ where
 
     pub fn get_index(&self, custom_id: &ID) -> Option<MegaTextureIndex> {
         self.lookup.get(custom_id).cloned()
+    }
+
+    pub fn info(&self, limits: &web_sys::GpuSupportedLimits) -> MegaTextureInfo<ID> {
+        let entries: Vec<Vec<Vec<MegaTextureEntryInfo<ID>>>> = self
+            .atlases
+            .iter()
+            .enumerate()
+            .map(|(atlas_index, atlas)| {
+                atlas
+                    .layers
+                    .iter()
+                    .enumerate()
+                    .map(|(layer_index, layer)| {
+                        layer
+                            .entries
+                            .iter()
+                            .enumerate()
+                            .map(|(entry_index, entry)| {
+                                let index =
+                                    MegaTextureIndex::new(atlas_index, layer_index, entry_index);
+                                entry.into_info(index)
+                            })
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect();
+
+        MegaTextureInfo {
+            texture_size: self.texture_size,
+            max_depth: self.atlas_depth,
+            entries,
+            max_bindings_per_group: limits.max_sampled_textures_per_shader_stage(),
+            max_bind_groups: limits.max_bind_groups(),
+        }
     }
 
     pub fn get_entry(&self, custom_id: &ID) -> Option<&MegaTextureEntry<ID>> {

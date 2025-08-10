@@ -50,7 +50,8 @@ impl AwsmRenderer {
 
             self.textures
                 .mega_texture
-                .size_report(&self.gpu.device.limits())
+                .info(&self.gpu.device.limits())
+                .into_report()
                 .console_log();
         }
         Ok(())

@@ -1,252 +1,213 @@
-use crate::texture::mega_texture::MegaTexture;
+use serde::{Deserialize, Serialize};
 
-impl<ID> MegaTexture<ID> {
-    pub fn size_report(&self, limits: &web_sys::GpuSupportedLimits) -> MegaTextureSizeReport {
-        self.size(limits).into_report()
-    }
+use crate::texture::mega_texture::MegaTextureInfo;
 
-    fn size(&self, limits: &web_sys::GpuSupportedLimits) -> MegaTextureSize {
-        let inner_len: Vec<Vec<usize>> = self
-            .atlases
-            .iter()
-            .map(|atlas| {
-                atlas
-                    .layers
-                    .iter()
-                    .map(|layer| layer.entries.len())
-                    .collect()
-            })
-            .collect();
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MegaTextureReport<ID> {
+    pub entries: Vec<Vec<Vec<MegaTextureReportEntry<ID>>>>,
+    pub count: MegaTextureReportCount,
+    pub size: MegaTextureReportSizes,
+}
 
-        let inner_size: Vec<Vec<Vec<MegaTextureWidthHeight>>> = self
-            .atlases
-            .iter()
-            .map(|atlas| {
-                atlas
-                    .layers
-                    .iter()
-                    .map(|layer| {
-                        layer
-                            .entries
-                            .iter()
-                            .map(|entry| entry.image_data.size().into())
-                            .collect()
-                    })
-                    .collect()
-            })
-            .collect();
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MegaTextureReportCount {
+    pub entries: u32,
+    pub layers: u32,
+    pub atlases: u32,
+    pub max_atlases: u32,
+    pub max_layers_per_atlas: u32,
+    pub max_layers_total: u32,
+}
 
-        let max_bindings_per_group = limits.max_sampled_textures_per_shader_stage();
-        let max_bind_groups = limits.max_bind_groups();
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MegaTextureReportSizes {
+    pub total: MegaTextureReportArea,
+    pub atlases: Vec<MegaTextureReportArea>,
+    pub layers: Vec<Vec<MegaTextureReportArea>>,
+    pub texture_size: MegaTextureReportSize,
+}
 
-        let max_size_per_bind_group = (
-            self.texture_size * self.atlas_depth * max_bindings_per_group,
-            self.texture_size * self.atlas_depth * max_bindings_per_group,
-        );
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MegaTextureReportEntry<ID> {
+    pub pixel_offset: MegaTextureReportCoords,
+    pub size: MegaTextureReportSize,
+    pub id: ID,
+}
 
-        let max_size = (
-            max_size_per_bind_group.0 * max_bind_groups,
-            max_size_per_bind_group.1 * max_bind_groups,
-        );
-
-        MegaTextureSize {
-            inner_len,
-            texture_size: self.texture_size,
-            max_depth: self.atlas_depth,
-            inner_size,
-            max_size: max_size.into(),
-            max_size_per_bind_group: max_size_per_bind_group.into(),
-        }
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct MegaTextureReportCoords {
+    pub x: u32,
+    pub y: u32,
+}
+impl From<(u32, u32)> for MegaTextureReportCoords {
+    fn from(coords: (u32, u32)) -> Self {
+        let (x, y) = coords;
+        Self { x, y }
     }
 }
 
-#[derive(Clone)]
-pub struct MegaTextureSize {
-    inner_len: Vec<Vec<usize>>,
-    inner_size: Vec<Vec<Vec<MegaTextureWidthHeight>>>,
-    texture_size: u32,
-    max_depth: u32,
-    max_size: MegaTextureWidthHeight,
-    max_size_per_bind_group: MegaTextureWidthHeight,
-}
-
-impl MegaTextureSize {
-    pub fn into_report(self) -> MegaTextureSizeReport {
-        let total_entries_len: usize = self
-            .inner_len
-            .iter()
-            .map(|l| l.iter().copied().sum::<usize>())
-            .sum();
-
-        let total_layers_len: usize = self.inner_len.iter().map(|l| l.len()).sum();
-
-        let mut atlas_layer_entry_sizes: Vec<Vec<Vec<MegaTextureWidthHeight>>> = Vec::new();
-
-        for layer in &self.inner_size {
-            let mut out_l = Vec::new();
-            for entries in layer {
-                let mut out_e = Vec::new();
-                for entry in entries {
-                    out_e.push(*entry);
-                }
-                out_l.push(out_e);
-            }
-            atlas_layer_entry_sizes.push(out_l);
-        }
-
-        let layer_per_atlas_size: Vec<Vec<MegaTextureWidthHeight>> = atlas_layer_entry_sizes
-            .iter()
-            .map(|l| {
-                l.iter()
-                    .map(|e| {
-                        e.iter().fold(MegaTextureWidthHeight::ZERO, |acc, &size| {
-                            MegaTextureWidthHeight::new(
-                                acc.width + size.width,
-                                acc.height + size.height,
-                            )
-                        })
-                    })
-                    .collect()
-            })
-            .collect();
-
-        let atlas_sizes: Vec<MegaTextureWidthHeight> = layer_per_atlas_size
-            .iter()
-            .map(|l| {
-                l.iter().fold(MegaTextureWidthHeight::ZERO, |acc, &size| {
-                    MegaTextureWidthHeight::new(acc.width + size.width, acc.height + size.height)
-                })
-            })
-            .collect();
-
-        let total_used_size: MegaTextureWidthHeight =
-            atlas_sizes
-                .iter()
-                .fold(MegaTextureWidthHeight::ZERO, |acc, &size| {
-                    MegaTextureWidthHeight::new(acc.width + size.width, acc.height + size.height)
-                });
-
-        let total_area = MegaTextureSizeReportArea::new(self.max_size, total_used_size);
-
-        let max_atlas_size: MegaTextureWidthHeight = (
-            self.max_depth * self.texture_size,
-            self.max_depth * self.texture_size,
-        )
-            .into();
-        let atlas_areas = atlas_sizes
-            .iter()
-            .map(|&size| MegaTextureSizeReportArea::new(max_atlas_size, size))
-            .collect::<Vec<_>>();
-
-        let max_layer_size: MegaTextureWidthHeight = (self.texture_size, self.texture_size).into();
-        let atlas_layer_areas: Vec<Vec<MegaTextureSizeReportArea>> = layer_per_atlas_size
-            .iter()
-            .map(|l| {
-                l.iter()
-                    .map(|&size| MegaTextureSizeReportArea::new(max_layer_size, size))
-                    .collect()
-            })
-            .collect();
-
-        MegaTextureSizeReport {
-            total_entries_len,
-            total_layers_len,
-            atlas_layer_entry_sizes,
-            atlas_areas,
-            atlas_layer_areas,
-            total_area,
-            max_size_per_bind_group: self.max_size_per_bind_group,
-            atlas_size: (self.texture_size, self.texture_size).into(),
-            max_depth: self.max_depth,
-            atlas_size_with_all_depth: (
-                self.texture_size * self.max_depth,
-                self.texture_size * self.max_depth,
-            )
-                .into(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct MegaTextureWidthHeight {
+#[derive(Clone, Debug, Copy, Serialize, Deserialize)]
+pub struct MegaTextureReportSize {
     pub width: u32,
     pub height: u32,
+    pub area: f64,
 }
 
-impl MegaTextureWidthHeight {
-    pub const ZERO: MegaTextureWidthHeight = MegaTextureWidthHeight {
+impl MegaTextureReportSize {
+    pub const ZERO: Self = Self {
         width: 0,
         height: 0,
+        area: 0.0,
     };
-    pub fn new(width: u32, height: u32) -> Self {
-        MegaTextureWidthHeight { width, height }
+
+    pub fn add(&mut self, width: u32, height: u32) {
+        self.width += width;
+        self.height += height;
+        self.area = (self.width as f64) * (self.height as f64);
     }
 }
-
-impl From<(u32, u32)> for MegaTextureWidthHeight {
-    fn from(size: (u32, u32)) -> Self {
-        MegaTextureWidthHeight {
-            width: size.0,
-            height: size.1,
+impl From<(u32, u32)> for MegaTextureReportSize {
+    fn from(width_height: (u32, u32)) -> Self {
+        let (width, height) = width_height;
+        let area = width as f64 * height as f64;
+        Self {
+            width,
+            height,
+            area,
         }
     }
 }
 
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct MegaTextureSizeReport {
-    pub total_entries_len: usize,
-    pub total_layers_len: usize,
-    pub total_area: MegaTextureSizeReportArea,
-    pub atlas_areas: Vec<MegaTextureSizeReportArea>,
-    pub atlas_layer_areas: Vec<Vec<MegaTextureSizeReportArea>>,
-    pub atlas_layer_entry_sizes: Vec<Vec<Vec<MegaTextureWidthHeight>>>,
-    pub max_size_per_bind_group: MegaTextureWidthHeight,
-    pub atlas_size: MegaTextureWidthHeight,
-    pub max_depth: u32,
-    pub atlas_size_with_all_depth: MegaTextureWidthHeight,
-}
-
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct MegaTextureSizeReportArea {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MegaTextureReportArea {
     pub perc_free: f64,
     pub perc_used: f64,
-    pub max_size: MegaTextureWidthHeight,
-    pub max_area: f64,
-    pub used_size: MegaTextureWidthHeight,
-    pub used_area: f64,
+    pub max_size: MegaTextureReportSize,
+    pub used_size: MegaTextureReportSize,
 }
 
-impl MegaTextureSizeReportArea {
-    pub fn new(max_size: MegaTextureWidthHeight, used_size: MegaTextureWidthHeight) -> Self {
-        let max_area = max_size.width as f64 * max_size.height as f64;
-        let used_area = used_size.width as f64 * used_size.height as f64;
-        let perc_used = (used_area / max_area) * 100.0;
+impl MegaTextureReportArea {
+    pub fn new(max_size: MegaTextureReportSize, used_size: MegaTextureReportSize) -> Self {
+        let perc_used = (used_size.area / max_size.area) * 100.0;
         let perc_free = (1.0 - perc_used / 100.0) * 100.0;
 
         Self {
             perc_free,
             perc_used,
             max_size,
-            max_area,
             used_size,
-            used_area,
         }
     }
 }
 
-#[cfg(feature = "serde")]
-impl MegaTextureSizeReport {
-    pub fn console_log(&self) {
-        let js_value = serde_wasm_bindgen::to_value(self).unwrap();
-        web_sys::console::log_1(&js_value);
+impl<ID> MegaTextureInfo<ID>
+where
+    ID: Clone,
+{
+    pub fn into_report(self) -> MegaTextureReport<ID> {
+        let Self {
+            entries,
+            texture_size,
+            max_depth,
+            max_bindings_per_group,
+            max_bind_groups,
+        } = self;
+
+        let entries: Vec<Vec<Vec<MegaTextureReportEntry<ID>>>> = entries
+            .into_iter()
+            .map(|atlas| {
+                atlas
+                    .into_iter()
+                    .map(|layer| {
+                        layer
+                            .into_iter()
+                            .map(|entry| MegaTextureReportEntry {
+                                pixel_offset: MegaTextureReportCoords::from((
+                                    entry.pixel_offset[0],
+                                    entry.pixel_offset[1],
+                                )),
+                                size: MegaTextureReportSize::from((entry.size[0], entry.size[1])),
+                                id: entry.id.clone(),
+                            })
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect();
+
+        let mut total_entries_len: u32 = 0;
+        let mut total_layers_len: u32 = 0;
+        let mut total_size = MegaTextureReportSize::ZERO;
+        let mut atlas_sizes: Vec<MegaTextureReportSize> = Vec::new();
+        let mut atlas_layer_sizes: Vec<Vec<MegaTextureReportSize>> = Vec::new();
+
+        for atlas in &entries {
+            let mut atlas_size = MegaTextureReportSize::ZERO;
+            let mut layer_sizes: Vec<MegaTextureReportSize> = Vec::new();
+            for layer in atlas {
+                total_layers_len += 1;
+                let mut layer_size = MegaTextureReportSize::ZERO;
+                for entry in layer {
+                    total_entries_len += 1;
+                    total_size.add(entry.size.width, entry.size.height);
+                    layer_size.add(entry.size.width, entry.size.height);
+                    atlas_size.add(entry.size.width, entry.size.height);
+                }
+                layer_sizes.push(layer_size);
+            }
+            atlas_layer_sizes.push(layer_sizes);
+            atlas_sizes.push(atlas_size);
+        }
+
+        let count = MegaTextureReportCount {
+            entries: total_entries_len,
+            layers: total_layers_len,
+            atlases: atlas_sizes.len() as u32,
+            max_atlases: max_bind_groups * max_bindings_per_group,
+            max_layers_per_atlas: max_depth,
+            max_layers_total: max_bindings_per_group * max_bind_groups * max_depth,
+        };
+
+        let max_total_size = MegaTextureReportSize::from((
+            texture_size * count.max_layers_total,
+            texture_size * count.max_layers_total,
+        ));
+        let max_size_per_atlas = MegaTextureReportSize::from((
+            texture_size * count.max_layers_per_atlas,
+            texture_size * count.max_layers_per_atlas,
+        ));
+        let max_size_per_layer = MegaTextureReportSize::from((texture_size, texture_size));
+
+        let size = MegaTextureReportSizes {
+            total: MegaTextureReportArea::new(max_total_size, total_size),
+            atlases: atlas_sizes
+                .into_iter()
+                .map(|size| MegaTextureReportArea::new(max_size_per_atlas, size))
+                .collect(),
+            layers: atlas_layer_sizes
+                .into_iter()
+                .map(|layer_sizes| {
+                    layer_sizes
+                        .into_iter()
+                        .map(|size| MegaTextureReportArea::new(max_size_per_layer, size))
+                        .collect()
+                })
+                .collect(),
+            texture_size: (texture_size, texture_size).into(),
+        };
+
+        MegaTextureReport {
+            entries,
+            count,
+            size,
+        }
     }
 }
 
-#[cfg(feature = "serde")]
-impl MegaTextureSizeReportArea {
+impl<ID> MegaTextureReport<ID>
+where
+    ID: Serialize,
+{
     pub fn console_log(&self) {
         let js_value = serde_wasm_bindgen::to_value(self).unwrap();
         web_sys::console::log_1(&js_value);

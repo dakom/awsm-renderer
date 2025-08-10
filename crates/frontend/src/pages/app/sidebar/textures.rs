@@ -1,4 +1,7 @@
-use awsm_renderer::core::texture::{mega_texture::report::MegaTextureSizeReport, TextureFormat};
+use awsm_renderer::{
+    core::texture::{mega_texture::report::MegaTextureReport, TextureFormat},
+    textures::TextureKey,
+};
 use awsm_web::file::save::save_file;
 use dominator_helpers::futures::{spawn_future, AsyncLoader};
 
@@ -13,7 +16,7 @@ use super::render_dropdown_label;
 pub struct SidebarTextures {
     ctx: AppContext,
     phase: Mutable<Phase>,
-    report: Mutex<Option<MegaTextureSizeReport>>,
+    report: Mutex<Option<MegaTextureReport<TextureKey>>>,
     to_export: Mutex<Option<(usize, usize)>>,
 }
 
@@ -71,7 +74,8 @@ impl SidebarTextures {
         let size_report = renderer
             .textures
             .mega_texture
-            .size_report(&renderer.gpu.device.limits());
+            .info(&renderer.gpu.device.limits())
+            .into_report();
 
         *state.report.lock().unwrap() = Some(size_report);
 
@@ -90,7 +94,7 @@ impl SidebarTextures {
                 let layer_size = {
                     let report = state.report.lock().unwrap();
                     let report = report.as_ref().unwrap();
-                    report.atlas_layer_areas[atlas_index][layer_index].max_size.clone()
+                    report.size.layers[atlas_index][layer_index].max_size.clone()
                 };
 
                 let (gpu, texture_array) = {
@@ -193,7 +197,8 @@ impl SidebarTextures {
             .unwrap()
             .as_ref()
             .unwrap()
-            .atlas_layer_areas
+            .size
+            .layers
             .iter()
             .enumerate()
             .map(|(atlas_index, atlas)| {

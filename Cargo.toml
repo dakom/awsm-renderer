@@ -67,7 +67,7 @@ tracing = "0.1.41"
 tracing-panic = "0.1.2"
 
 # Collections
-slotmap = "1.0.7"
+slotmap = {version = "1.0.7", features = ["serde"]}
 
 # Helper utils
 strum = { version = "0.27.2", features = ["derive"] }

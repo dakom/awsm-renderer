@@ -1,10 +1,8 @@
-# Set material uniform
-- write full material (right now it's just values)
-- Textures need to be index into the MegaTexture bindings
-- may need to coordinate with MegaTexture bindings generate first
-
 # Get started with opaque material pass 
 
+2. Figure out how to get UVs from vertex
+    - Visiblity+ computation?
+    - Just pass the UVs in additional MRT?
 3. Calculate world position
 4. Write basic material
 
