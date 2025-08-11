@@ -1,6 +1,7 @@
 mod buffer_info;
 mod error;
 mod meshes;
+pub mod meta;
 pub mod morphs;
 pub mod skins;
 
@@ -27,7 +28,6 @@ use super::error::Result;
 #[derive(Debug)]
 pub struct Mesh {
     pub render_pipeline_key: RenderPipelineKey,
-    pub draw_count: usize, // indices or vertices
     pub aabb: Option<Aabb>,
     pub world_aabb: Option<Aabb>, // this is the transformed AABB, used for frustum culling and depth sorting
     pub transform_key: TransformKey,
@@ -36,32 +36,14 @@ pub struct Mesh {
     pub skin_key: Option<SkinKey>,
 }
 
-#[derive(Debug, Clone)]
-pub struct MeshVertexBuffer {
-    pub buffer: web_sys::GpuBuffer,
-    pub slot: u32,
-    pub offset: Option<u64>,
-    pub size: Option<u64>,
-}
-
-#[derive(Debug, Clone)]
-pub struct MeshIndexBuffer {
-    pub buffer: web_sys::GpuBuffer,
-    pub format: IndexFormat,
-    pub offset: u64,
-    pub size: u64,
-}
-
 impl Mesh {
     pub fn new(
         render_pipeline_key: RenderPipelineKey,
-        draw_count: usize,
         transform_key: TransformKey,
         material_key: MaterialKey,
     ) -> Self {
         Self {
             render_pipeline_key,
-            draw_count,
             transform_key,
             material_key,
             aabb: None,
@@ -129,8 +111,17 @@ impl Mesh {
 
         render_pass.set_vertex_buffer(
             0,
-            ctx.meshes.gpu_vertex_buffer(),
-            Some(ctx.meshes.vertex_buffer_offset(mesh_key)? as u64),
+            ctx.meshes.visibility_data_gpu_buffer(),
+            Some(ctx.meshes.visibility_data_buffer_offset(mesh_key)? as u64),
+            None,
+        );
+
+        let buffer_info = ctx.meshes.buffer_info(mesh_key)?;
+
+        render_pass.set_index_buffer(
+            ctx.meshes.visibility_index_gpu_buffer(),
+            IndexFormat::Uint32,
+            Some(ctx.meshes.visibility_index_buffer_offset(mesh_key)? as u64),
             None,
         );
 
@@ -143,39 +134,7 @@ impl Mesh {
             );
         }
 
-        let indexed = match ctx.meshes.draw_index_buffer_offset_format(mesh_key).ok() {
-            Some((offset, format)) => {
-                render_pass.set_index_buffer(
-                    ctx.meshes.gpu_draw_index_buffer(),
-                    format,
-                    Some(offset as u64),
-                    None,
-                );
-                true
-            }
-            None => false,
-        };
-
-        match (
-            indexed,
-            ctx.instances.transform_instance_count(self.transform_key),
-        ) {
-            (false, None) => {
-                render_pass.draw(self.draw_count as u32);
-            }
-            (true, None) => {
-                render_pass.draw_indexed(self.draw_count as u32);
-            }
-            (false, Some(instance_count)) => {
-                render_pass.draw_with_instance_count(self.draw_count as u32, instance_count as u32);
-            }
-            (true, Some(instance_count)) => {
-                render_pass.draw_indexed_with_instance_count(
-                    self.draw_count as u32,
-                    instance_count as u32,
-                );
-            }
-        }
+        render_pass.draw_indexed(buffer_info.vertex.count as u32);
 
         Ok(())
     }

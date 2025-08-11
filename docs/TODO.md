@@ -1,8 +1,16 @@
+# Set MeshInfo as uniform buffer
+
+- it's all prepared, just bind!
+- get morphs working again
+    - use uniform data for presence and loop length
+- get skins working again
+    - use unform data for presence and loop length
+
+- unroll the common cases, fall back to for-loop only if those aren't met
+
 # Get started with opaque material pass 
 
-2. Figure out how to get UVs from vertex
-    - Visiblity+ computation?
-    - Just pass the UVs in additional MRT?
+2. Pass material offset from geometry pass
 3. Calculate world position
 4. Write basic material
 

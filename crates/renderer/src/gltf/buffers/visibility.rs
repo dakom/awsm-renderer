@@ -5,12 +5,25 @@ use gltf::Semantic;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use crate::buffer::helpers::{i16_to_i32_vec, slice_zeroes, u16_to_u32_vec, u8_to_i16_vec, u8_to_u16_vec};
-use crate::gltf::buffers::helpers::{extract_triangle_indices, get_attribute_components, get_position_from_buffer, normalize_triangle_winding, semantic_cmp, semantic_to_shader_key};
+use crate::buffer::helpers::{
+    i16_to_i32_vec, slice_zeroes, u16_to_u32_vec, u8_to_i16_vec, u8_to_u16_vec,
+};
+use crate::gltf::buffers::helpers::{
+    extract_triangle_indices, get_attribute_components, get_position_from_buffer,
+    normalize_triangle_winding, semantic_cmp, semantic_to_shader_key,
+};
 use crate::gltf::buffers::normals::compute_normals;
-use crate::gltf::buffers::{MeshBufferIndexInfoWithOffset, MeshBufferInfoWithOffset, MeshBufferMorphInfoWithOffset, MeshBufferTriangleDataInfoWithOffset, MeshBufferTriangleInfoWithOffset, MeshBufferVertexAttributeInfoWithOffset, MeshBufferVertexInfoWithOffset};
+use crate::gltf::buffers::{
+    MeshBufferIndexInfoWithOffset, MeshBufferInfoWithOffset, MeshBufferMorphInfoWithOffset,
+    MeshBufferTriangleDataInfoWithOffset, MeshBufferTriangleInfoWithOffset,
+    MeshBufferVertexAttributeInfoWithOffset, MeshBufferVertexInfoWithOffset,
+};
 use crate::gltf::error::AwsmGltfError;
-use crate::mesh::{MeshBufferIndexInfo, MeshBufferInfo, MeshBufferMorphAttributes, MeshBufferMorphInfo, MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo, MeshBufferVertexAttributeKind, MeshBufferVertexInfo};
+use crate::mesh::{
+    MeshBufferIndexInfo, MeshBufferInfo, MeshBufferMorphAttributes, MeshBufferMorphInfo,
+    MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo,
+    MeshBufferVertexAttributeKind, MeshBufferVertexInfo,
+};
 
 use super::accessor::accessor_to_bytes;
 use super::Result;
@@ -22,7 +35,7 @@ pub(super) fn convert_to_visibility_buffer(
     index: &MeshBufferIndexInfoWithOffset,
     index_bytes: &[u8],
     visibility_vertex_bytes: &mut Vec<u8>,
-    vertex_attribute_bytes: &mut Vec<u8>,
+    attribute_vertex_bytes: &mut Vec<u8>,
     triangle_data_bytes: &mut Vec<u8>,
     triangle_morph_bytes: &mut Vec<u8>,
 ) -> Result<MeshBufferInfoWithOffset> {
@@ -57,14 +70,12 @@ pub(super) fn convert_to_visibility_buffer(
         visibility_vertex_bytes,
     )?;
 
-    // Step 5: Pack vertex attributes 
+    // Step 5: Pack vertex attributes
     // These are the original attributes per-vertex, excluding positions
     // There is no need to repack or expand these, they are used as-is
-    let vertex_attribute_offset = vertex_attribute_bytes.len();
-    let vertex_attributes = pack_vertex_attributes(
-        &attribute_data_by_kind,
-        vertex_attribute_bytes
-    )?;
+    let attribute_vertex_offset = attribute_vertex_bytes.len();
+    let vertex_attributes =
+        pack_vertex_attributes(&attribute_data_by_kind, attribute_vertex_bytes)?;
 
     // Step 6: Pack triangle data (vertex indices + material info)
     let triangle_data_offset = triangle_data_bytes.len();
@@ -75,7 +86,7 @@ pub(super) fn convert_to_visibility_buffer(
         triangle_data_offset,
         triangle_data_bytes,
         front_face,
-        primitive.material().double_sided()
+        primitive.material().double_sided(),
     )?;
 
     // Step 7: Handle morph targets (if any)
@@ -96,14 +107,15 @@ pub(super) fn convert_to_visibility_buffer(
     Ok(MeshBufferInfoWithOffset {
         vertex: MeshBufferVertexInfoWithOffset {
             offset: visability_vertex_offset,
-            count: triangle_count * 3, // 3 vertices per triangle
+            count: triangle_count * 3,     // 3 vertices per triangle
             size: triangle_count * 3 * 24, // 24 bytes per vertex (12 pos + 4 triangle_id + 8 bary)
         },
         triangles: MeshBufferTriangleInfoWithOffset {
             count: triangle_count,
-            indices: index.clone(), 
+            indices: index.clone(),
             vertex_attributes,
-            vertex_attributes_size: vertex_attribute_bytes.len() - vertex_attribute_offset,
+            vertex_attributes_offset: attribute_vertex_offset,
+            vertex_attributes_size: attribute_vertex_bytes.len() - attribute_vertex_offset,
             triangle_data: triangle_data_info,
         },
         morph: morph_info,
@@ -111,26 +123,26 @@ pub(super) fn convert_to_visibility_buffer(
 }
 
 // Helper function to load attribute data (similar to your existing code)
-fn load_attribute_data_by_kind<'a> (
+fn load_attribute_data_by_kind<'a>(
     gltf_attributes: &[(gltf::Semantic, gltf::Accessor<'_>)],
     buffers: &'a [Vec<u8>],
 ) -> Result<HashMap<MeshBufferVertexAttributeKind, Cow<'a, [u8]>>> {
     let mut attribute_data = HashMap::new();
-    
+
     for (semantic, accessor) in gltf_attributes {
         let shader_key = semantic_to_shader_key(semantic);
         let bytes = accessor_to_bytes(accessor, buffers)?;
 
-        // wgsl doesn't work with 16-bit, so we may need to convert to 32-bit 
+        // wgsl doesn't work with 16-bit, so we may need to convert to 32-bit
         let final_bytes = match accessor.data_type() {
             DataType::U16 => Cow::Owned(u16_to_u32_vec(&bytes)),
             DataType::I16 => Cow::Owned(i16_to_i32_vec(&bytes)),
             _ => bytes,
         };
-        
+
         attribute_data.insert(shader_key, final_bytes);
     }
-    
+
     Ok(attribute_data)
 }
 
@@ -140,13 +152,17 @@ fn ensure_normals<'a>(
     index_bytes: &[u8],
 ) -> Result<HashMap<MeshBufferVertexAttributeKind, Cow<'a, [u8]>>> {
     if !attribute_data.contains_key(&MeshBufferVertexAttributeKind::Normals) {
-        let positions = attribute_data.get(&MeshBufferVertexAttributeKind::Positions)
+        let positions = attribute_data
+            .get(&MeshBufferVertexAttributeKind::Positions)
             .ok_or_else(|| AwsmGltfError::ConstructNormals("missing positions".to_string()))?;
-        
+
         let normals_bytes = compute_normals(positions, index, index_bytes)?;
-        attribute_data.insert(MeshBufferVertexAttributeKind::Normals, Cow::Owned(normals_bytes));
+        attribute_data.insert(
+            MeshBufferVertexAttributeKind::Normals,
+            Cow::Owned(normals_bytes),
+        );
     }
-    
+
     Ok(attribute_data)
 }
 
@@ -157,9 +173,9 @@ fn create_visibility_vertices(
     triangle_count: usize,
     visibility_vertex_bytes: &mut Vec<u8>,
 ) -> Result<()> {
-    static BARYCENTRICS:[[f32; 2]; 3] = [
+    static BARYCENTRICS: [[f32; 2]; 3] = [
         [1.0, 0.0], // First vertex: (1, 0, 0) - z = 1-1-0 = 0
-        [0.0, 1.0], // Second vertex: (0, 1, 0) - z = 1-0-1 = 0  
+        [0.0, 1.0], // Second vertex: (0, 1, 0) - z = 1-0-1 = 0
         [0.0, 0.0], // Third vertex: (0, 0, 1) - z = 1-0-0 = 1
     ];
     // Get positions data
@@ -186,15 +202,15 @@ fn create_visibility_vertices(
             let position = get_position_from_buffer(&positions, vertex_index)?;
 
             // Write vertex data: position (12 bytes) + triangle_id (4 bytes) + barycentric (8 bytes)
-            
+
             // Position (12 bytes)
             visibility_vertex_bytes.extend_from_slice(&position[0].to_le_bytes());
             visibility_vertex_bytes.extend_from_slice(&position[1].to_le_bytes());
             visibility_vertex_bytes.extend_from_slice(&position[2].to_le_bytes());
-            
+
             // Triangle ID (4 bytes)
             visibility_vertex_bytes.extend_from_slice(&(triangle_id as u32).to_le_bytes());
-            
+
             // Barycentric coordinates (8 bytes)
             let bary = BARYCENTRICS[vertex_in_triangle];
             visibility_vertex_bytes.extend_from_slice(&bary[0].to_le_bytes());
@@ -248,7 +264,7 @@ fn pack_triangle_data(
     double_sided: bool,
 ) -> Result<MeshBufferTriangleDataInfoWithOffset> {
     let triangle_indices = extract_triangle_indices(index, index_bytes)?;
-    
+
     for triangle in triangle_indices {
         // Normalize winding order here
         let normalized_triangle = if double_sided {
@@ -260,15 +276,15 @@ fn pack_triangle_data(
         triangle_data_bytes.extend_from_slice(&(normalized_triangle[0] as u32).to_le_bytes());
         triangle_data_bytes.extend_from_slice(&(normalized_triangle[1] as u32).to_le_bytes());
         triangle_data_bytes.extend_from_slice(&(normalized_triangle[2] as u32).to_le_bytes());
-        
+
         // Pack material_id (u32 = 4 bytes) - TODO: get actual material ID
         let material_id = 0u32; // Placeholder
         triangle_data_bytes.extend_from_slice(&material_id.to_le_bytes());
     }
-    
+
     let size_per_triangle = 16; // 3 u32 indices + 1 u32 material_id
     let total_size = triangle_count * size_per_triangle;
-    
+
     Ok(MeshBufferTriangleDataInfoWithOffset {
         size_per_triangle,
         offset,
@@ -298,7 +314,9 @@ fn convert_morph_targets(
     };
 
     if !attributes.any() {
-        return Err(AwsmGltfError::ConstructNormals("No morph targets found".to_string()));
+        return Err(AwsmGltfError::ConstructNormals(
+            "No morph targets found".to_string(),
+        ));
     }
 
     // Load all morph target data
@@ -332,13 +350,19 @@ fn convert_morph_targets(
     // Calculate triangle stride size (size of morph data per triangle across all targets)
     let mut triangle_stride_size = 0;
     let targets_len = morph_targets_buffer_data.len();
-    
+
     // For each target, calculate the size per triangle
     let size_per_target_per_triangle = {
         let mut size = 0;
-        if attributes.position { size += 36; } // 3 vertices * 12 bytes (vec3<f32>)
-        if attributes.normal { size += 36; }   // 3 vertices * 12 bytes (vec3<f32>)
-        if attributes.tangent { size += 36; }  // 3 vertices * 12 bytes (vec3<f32>) - morph tangents don't include w
+        if attributes.position {
+            size += 36;
+        } // 3 vertices * 12 bytes (vec3<f32>)
+        if attributes.normal {
+            size += 36;
+        } // 3 vertices * 12 bytes (vec3<f32>)
+        if attributes.tangent {
+            size += 36;
+        } // 3 vertices * 12 bytes (vec3<f32>) - morph tangents don't include w
         size
     };
     triangle_stride_size = size_per_target_per_triangle * targets_len;
@@ -350,11 +374,12 @@ fn convert_morph_targets(
             // For each vertex in the triangle
             for &vertex_index in &triangle {
                 let mut push_vertex_morph_data = |attribute_kind: MeshBufferVertexAttributeKind,
-                                                  data: Option<&Cow<'_, [u8]>>| -> Result<()> {
+                                                  data: Option<&Cow<'_, [u8]>>|
+                 -> Result<()> {
                     let stride_size = match attribute_kind {
                         MeshBufferVertexAttributeKind::Positions => 12, // vec3<f32>
                         MeshBufferVertexAttributeKind::Normals => 12,   // vec3<f32>
-                        MeshBufferVertexAttributeKind::Tangents => 12,  // vec3<f32> (no w component in morph targets)
+                        MeshBufferVertexAttributeKind::Tangents => 12, // vec3<f32> (no w component in morph targets)
                         _ => unreachable!(),
                     };
 
@@ -367,7 +392,8 @@ fn convert_morph_targets(
                                     vertex_index, attribute_kind
                                 )));
                             }
-                            let data_bytes = &data[data_byte_offset..data_byte_offset + stride_size];
+                            let data_bytes =
+                                &data[data_byte_offset..data_byte_offset + stride_size];
                             triangle_morph_bytes.extend_from_slice(data_bytes);
                         }
                         None => {

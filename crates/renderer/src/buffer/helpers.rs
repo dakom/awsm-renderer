@@ -12,7 +12,7 @@ pub fn debug_chunks_to_f32(slice: &[u8], chunk_size: usize) -> Vec<Vec<f32>> {
 }
 
 // From gltf spec:
-// "All buffer data defined in this specification (i.e., geometry attributes, geometry indices, sparse accessor data, animation inputs and outputs, inverse bind matrices) 
+// "All buffer data defined in this specification (i.e., geometry attributes, geometry indices, sparse accessor data, animation inputs and outputs, inverse bind matrices)
 // MUST use little endian byte order."
 
 pub fn u16_to_u32_vec(v: &[u8]) -> Vec<u8> {

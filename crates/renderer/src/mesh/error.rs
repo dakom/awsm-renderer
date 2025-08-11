@@ -2,7 +2,8 @@ use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
 use crate::{
-    bind_groups::AwsmBindGroupError, mesh::skins::AwsmSkinError, transforms::AwsmTransformError,
+    bind_groups::AwsmBindGroupError, materials::MaterialKey, mesh::skins::AwsmSkinError,
+    transforms::AwsmTransformError,
 };
 
 use super::{morphs::MorphKey, MeshKey};
@@ -13,6 +14,9 @@ pub type Result<T> = std::result::Result<T, AwsmMeshError>;
 pub enum AwsmMeshError {
     #[error("[mesh] not found: {0:?}")]
     MeshNotFound(MeshKey),
+
+    #[error("[mesh] material not found: {0:?}")]
+    MaterialNotFound(MaterialKey),
 
     #[error("[mesh] {0:?}")]
     Core(#[from] AwsmCoreError),

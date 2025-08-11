@@ -1,7 +1,9 @@
 use awsm_renderer_core::pipeline::primitive::IndexFormat;
 
 use crate::{
-    buffer::helpers::{u8_to_f32_vec, u8_to_i16_vec, u8_to_i8_vec, u8_to_u16_vec, u8_to_u32_vec}, gltf::buffers::MeshBufferIndexInfoWithOffset, mesh::MeshBufferIndexInfo
+    buffer::helpers::{u8_to_f32_vec, u8_to_i16_vec, u8_to_i8_vec, u8_to_u16_vec, u8_to_u32_vec},
+    gltf::buffers::MeshBufferIndexInfoWithOffset,
+    mesh::MeshBufferIndexInfo,
 };
 
 use super::{accessor::accessor_to_bytes, AwsmGltfError, Result};
@@ -75,7 +77,6 @@ impl GltfMeshBufferIndexInfo {
                     }
                 };
 
-
                 match accessor.data_type() {
                     gltf::accessor::DataType::U16 | gltf::accessor::DataType::U32 => {
                         index_bytes.extend_from_slice(&accessor_bytes);
@@ -84,9 +85,10 @@ impl GltfMeshBufferIndexInfo {
                         let i16_values = u8_to_i16_vec(&accessor_bytes);
                         for value in i16_values {
                             if value < 0 {
-                                return Err(AwsmGltfError::ConstructNormals(
-                                    format!("Negative index value: {}", value)
-                                ));
+                                return Err(AwsmGltfError::ConstructNormals(format!(
+                                    "Negative index value: {}",
+                                    value
+                                )));
                             }
                             index_bytes.extend_from_slice(&(value as u16).to_le_bytes());
                         }
@@ -95,9 +97,10 @@ impl GltfMeshBufferIndexInfo {
                         for byte in accessor_bytes.iter() {
                             let i8_value = *byte as i8;
                             if i8_value < 0 {
-                                return Err(AwsmGltfError::ConstructNormals(
-                                    format!("Negative index value: {}", i8_value)
-                                ));
+                                return Err(AwsmGltfError::ConstructNormals(format!(
+                                    "Negative index value: {}",
+                                    i8_value
+                                )));
                             }
                             index_bytes.extend_from_slice(&(i8_value as u16).to_le_bytes());
                         }
@@ -106,7 +109,7 @@ impl GltfMeshBufferIndexInfo {
                         for byte in accessor_bytes.iter() {
                             index_bytes.extend_from_slice(&(*byte as u16).to_le_bytes());
                         }
-                    },
+                    }
 
                     gltf::accessor::DataType::F32 => {
                         let f32_values = u8_to_f32_vec(&accessor_bytes);
@@ -116,7 +119,6 @@ impl GltfMeshBufferIndexInfo {
                         }
                     }
                 }
-
 
                 let info = Self {
                     offset,
@@ -175,13 +177,13 @@ pub fn generate_fresh_indices_from_primitive(
                     }
                     IndexFormat::Uint32 => {
                         index_bytes.extend_from_slice(&(i as u32).to_le_bytes());
-                    },
+                    }
                     _ => {
                         return Err(AwsmGltfError::UnsupportedIndexFormat(format));
                     }
                 }
             }
-            
+
             Ok(MeshBufferIndexInfoWithOffset {
                 offset,
                 count: index_count,
@@ -219,7 +221,7 @@ pub fn generate_fresh_indices_from_primitive(
                         index_bytes.extend_from_slice(&(v0 as u32).to_le_bytes());
                         index_bytes.extend_from_slice(&(v1 as u32).to_le_bytes());
                         index_bytes.extend_from_slice(&(v2 as u32).to_le_bytes());
-                    },
+                    }
                     _ => {
                         return Err(AwsmGltfError::UnsupportedIndexFormat(format));
                     }
@@ -258,7 +260,7 @@ pub fn generate_fresh_indices_from_primitive(
                         index_bytes.extend_from_slice(&(v0 as u32).to_le_bytes());
                         index_bytes.extend_from_slice(&(v1 as u32).to_le_bytes());
                         index_bytes.extend_from_slice(&(v2 as u32).to_le_bytes());
-                    },
+                    }
                     _ => {
                         return Err(AwsmGltfError::UnsupportedIndexFormat(format));
                     }

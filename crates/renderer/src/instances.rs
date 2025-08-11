@@ -55,16 +55,17 @@ impl Instances {
     }
 
     pub fn transform_update(&mut self, key: TransformKey, index: usize, transform: &Transform) {
-        self.transform_buffer.update_with_unchecked(key, |_, bytes| {
-            let offset = index * Transforms::BYTE_SIZE;
-            let values = transform.to_matrix().to_cols_array();
-            let values_u8 = unsafe {
-                std::slice::from_raw_parts(values.as_ptr() as *const u8, Transforms::BYTE_SIZE)
-            };
+        self.transform_buffer
+            .update_with_unchecked(key, |_, bytes| {
+                let offset = index * Transforms::BYTE_SIZE;
+                let values = transform.to_matrix().to_cols_array();
+                let values_u8 = unsafe {
+                    std::slice::from_raw_parts(values.as_ptr() as *const u8, Transforms::BYTE_SIZE)
+                };
 
-            let slice = &mut bytes[offset..offset + Transforms::BYTE_SIZE];
-            slice.copy_from_slice(values_u8);
-        });
+                let slice = &mut bytes[offset..offset + Transforms::BYTE_SIZE];
+                slice.copy_from_slice(values_u8);
+            });
 
         self.transform_gpu_dirty = true;
     }

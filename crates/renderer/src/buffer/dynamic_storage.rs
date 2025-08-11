@@ -47,6 +47,7 @@ pub struct DynamicStorageBuffer<K: Key, const ZERO: u8 = 0> {
 
 impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
     pub fn new(mut initial_bytes: usize, label: Option<String>) -> Self {
+        let initial_bytes_orig = initial_bytes;
         // round up to next power‑of‑two multiple of MIN_BLOCK
         initial_bytes = round_pow2(initial_bytes.max(MIN_BLOCK));
 
@@ -63,7 +64,7 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
             raw_data,
             buddy_tree,
             slot_indices: SecondaryMap::new(),
-            gpu_buffer_needs_resize: false,
+            gpu_buffer_needs_resize: initial_bytes != initial_bytes_orig,
             label,
         }
     }

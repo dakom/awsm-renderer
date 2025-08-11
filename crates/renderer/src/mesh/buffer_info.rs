@@ -23,7 +23,7 @@ pub struct MeshBufferVertexInfo {
 pub struct MeshBufferTriangleInfo {
     // Number of triangles in this primitive
     pub count: usize,
-    // Triangle indices (3 per triangle, indexing into vertex buffer) 
+    // Triangle indices (3 per triangle, indexing into vertex buffer)
     pub indices: MeshBufferIndexInfo,
     // Per-vertex attribute data (original vertex layout for indexed access)
     pub vertex_attributes: Vec<MeshBufferVertexAttributeInfo>,
@@ -84,19 +84,16 @@ pub struct MeshBufferMorphInfo {
 }
 
 impl MeshBufferInfo {
-    pub fn draw_count(&self) -> usize {
-        // For visibility buffer, we draw triangle_count * 3 indices
-        self.triangles.count * 3
-    }
-    
     // Helper to get triangle count
     pub fn triangle_count(&self) -> usize {
         self.triangles.count
     }
-    
+
     // Helper to check if we have a specific vertex attribute
     pub fn has_vertex_attribute(&self, attr: MeshBufferVertexAttributeKind) -> bool {
-        self.triangles.vertex_attributes.iter()
+        self.triangles
+            .vertex_attributes
+            .iter()
             .any(|a| a.kind == attr)
     }
 }

@@ -1,9 +1,24 @@
-use awsm_renderer_core::pipeline::{primitive::{FrontFace, IndexFormat}, vertex::VertexFormat};
-use gltf::{accessor::{DataType, Dimensions}, Semantic};
+use awsm_renderer_core::pipeline::{
+    primitive::{FrontFace, IndexFormat},
+    vertex::VertexFormat,
+};
+use gltf::{
+    accessor::{DataType, Dimensions},
+    Semantic,
+};
 
-use crate::{gltf::{buffers::MeshBufferIndexInfoWithOffset, error::{AwsmGltfError, Result}}, mesh::{MeshBufferIndexInfo, MeshBufferVertexAttributeKind}};
+use crate::{
+    gltf::{
+        buffers::MeshBufferIndexInfoWithOffset,
+        error::{AwsmGltfError, Result},
+    },
+    mesh::{MeshBufferIndexInfo, MeshBufferVertexAttributeKind},
+};
 
-pub(super) fn extract_triangle_indices(index: &MeshBufferIndexInfoWithOffset, all_index_bytes: &[u8]) -> Result<Vec<[usize; 3]>> {
+pub(super) fn extract_triangle_indices(
+    index: &MeshBufferIndexInfoWithOffset,
+    all_index_bytes: &[u8],
+) -> Result<Vec<[usize; 3]>> {
     if index.count % 3 != 0 {
         return Err(AwsmGltfError::ExtractIndices(format!(
             "Index count ({}) is not a multiple of 3, cannot form triangles.",
@@ -23,10 +38,10 @@ pub(super) fn extract_triangle_indices(index: &MeshBufferIndexInfoWithOffset, al
 
     for i in 0..num_triangles {
         let mut triangle = [0usize; 3];
-        
+
         for j in 0..3 {
             let index_offset = (i * 3 + j) * index.data_size;
-            
+
             if index_offset + index.data_size > index_bytes.len() {
                 return Err(AwsmGltfError::ExtractIndices(format!(
                     "Index data out of bounds at triangle {}, vertex {}",
@@ -35,7 +50,7 @@ pub(super) fn extract_triangle_indices(index: &MeshBufferIndexInfoWithOffset, al
             }
 
             let index_slice = &index_bytes[index_offset..index_offset + index.data_size];
-            
+
             let vertex_idx = match index.format {
                 IndexFormat::Uint16 => {
                     if index.data_size != 2 {
@@ -52,7 +67,7 @@ pub(super) fn extract_triangle_indices(index: &MeshBufferIndexInfoWithOffset, al
                         ));
                     }
                     u32::from_le_bytes(index_slice.try_into().unwrap()) as usize
-                },
+                }
                 _ => {
                     return Err(AwsmGltfError::ConstructNormals(format!(
                         "Unsupported index format: {:?}",
@@ -63,7 +78,7 @@ pub(super) fn extract_triangle_indices(index: &MeshBufferIndexInfoWithOffset, al
 
             triangle[j] = vertex_idx;
         }
-        
+
         triangles.push(triangle);
     }
 
@@ -80,32 +95,54 @@ pub(super) fn get_position_from_buffer(positions: &[u8], vertex_index: usize) ->
             vertex_index, vertex_count, positions.len(), vertex_index
         )));
     }
-    
+
     if offset + 12 > positions.len() {
         return Err(AwsmGltfError::Positions(format!(
             "Position data out of bounds for vertex {}. Offset {} + 12 > buffer size {}",
-            vertex_index, offset, positions.len()
+            vertex_index,
+            offset,
+            positions.len()
         )));
     }
-    
-    
+
     // From spec:
-    // "All buffer data defined in this specification (i.e., geometry attributes, geometry indices, sparse accessor data, animation inputs and outputs, inverse bind matrices) 
+    // "All buffer data defined in this specification (i.e., geometry attributes, geometry indices, sparse accessor data, animation inputs and outputs, inverse bind matrices)
     // MUST use little endian byte order."
-    let x = f32::from_le_bytes([positions[offset], positions[offset+1], positions[offset+2], positions[offset+3]]);
-    let y = f32::from_le_bytes([positions[offset+4], positions[offset+5], positions[offset+6], positions[offset+7]]);
-    let z = f32::from_le_bytes([positions[offset+8], positions[offset+9], positions[offset+10], positions[offset+11]]);
-    
+    let x = f32::from_le_bytes([
+        positions[offset],
+        positions[offset + 1],
+        positions[offset + 2],
+        positions[offset + 3],
+    ]);
+    let y = f32::from_le_bytes([
+        positions[offset + 4],
+        positions[offset + 5],
+        positions[offset + 6],
+        positions[offset + 7],
+    ]);
+    let z = f32::from_le_bytes([
+        positions[offset + 8],
+        positions[offset + 9],
+        positions[offset + 10],
+        positions[offset + 11],
+    ]);
+
     Ok([x, y, z])
 }
 
-pub(super) fn normalize_triangle_winding(triangle: [usize; 3], front_face: FrontFace) -> [usize; 3] {
+pub(super) fn normalize_triangle_winding(
+    triangle: [usize; 3],
+    front_face: FrontFace,
+) -> [usize; 3] {
     match front_face {
-        FrontFace::Ccw => triangle,           // Keep as-is
+        FrontFace::Ccw => triangle,                               // Keep as-is
         FrontFace::Cw => [triangle[0], triangle[2], triangle[1]], // Flip winding
         _ => {
             // unreachable, but handle just in case
-            tracing::warn!("Unexpected winding order, returning original triangle: {:?}", triangle);
+            tracing::warn!(
+                "Unexpected winding order, returning original triangle: {:?}",
+                triangle
+            );
             triangle
         }
     }
@@ -136,7 +173,6 @@ pub(super) fn semantic_to_shader_key(semantic: &gltf::Semantic) -> MeshBufferVer
         Semantic::Weights(n) => MeshBufferVertexAttributeKind::Weights { count: *n },
     }
 }
-
 
 pub(super) fn semantic_cmp(a: &gltf::Semantic, b: &gltf::Semantic) -> std::cmp::Ordering {
     fn level_1(semantic: &gltf::Semantic) -> usize {

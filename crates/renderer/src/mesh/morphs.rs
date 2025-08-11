@@ -86,6 +86,7 @@ impl Morphs {
             });
         }
 
+        // TODO - just weights, count will go on mesh info
         let mut weights_and_count: Vec<f32> = Vec::with_capacity(weights.len() + 1);
         weights_and_count.push(weights.len() as f32);
         weights_and_count.extend_from_slice(weights);

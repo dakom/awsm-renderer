@@ -7,7 +7,13 @@ use glam::Mat4;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
 use crate::buffer::dynamic_storage::DynamicStorageBuffer;
+use crate::buffer::dynamic_uniform::DynamicUniformBuffer;
+use crate::materials::Materials;
+use crate::mesh::meta::{
+    mesh_meta_data, MESH_META_BYTE_ALIGNMENT, MESH_META_BYTE_SIZE, MESH_META_INITIAL_CAPACITY,
+};
 use crate::mesh::skins::Skins;
+use crate::mesh::MeshBufferInfo;
 use crate::transforms::TransformKey;
 use crate::AwsmRendererLogging;
 
@@ -18,52 +24,114 @@ use super::{Mesh, MeshBufferIndexInfo, MeshBufferVertexInfo};
 pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
     transform_to_meshes: SecondaryMap<TransformKey, Vec<MeshKey>>,
-    vertex_buffers: DynamicStorageBuffer<MeshKey>,
-    // original indices for vertex attributes
+    buffer_infos: SecondaryMap<MeshKey, MeshBufferInfo>,
+    // visibility data buffers (position, triangle-id, barycentric)
+    visibility_data_buffers: DynamicStorageBuffer<MeshKey>,
+    visibility_data_gpu_buffer: web_sys::GpuBuffer,
+    visibility_data_dirty: bool,
+    // visibility index buffers (position, triangle-id, barycentric)
+    visibility_index_buffers: DynamicStorageBuffer<MeshKey>,
+    visibility_index_gpu_buffer: web_sys::GpuBuffer,
+    visibility_index_dirty: bool,
+    // attribute data buffers
+    attribute_data_buffers: DynamicStorageBuffer<MeshKey>,
+    attribute_data_gpu_buffer: web_sys::GpuBuffer,
+    attribute_data_dirty: bool,
+    // attribute index buffers (normals, uvs, colors, etc.)
     attribute_index_buffers: DynamicStorageBuffer<MeshKey>,
-    attribute_index_infos: SecondaryMap<MeshKey, MeshBufferIndexInfo>,
-    gpu_attribute_index_buffer: web_sys::GpuBuffer,
-    // sequential indices for draw calls
-    draw_index_buffers: DynamicStorageBuffer<MeshKey>,
-    draw_index_infos: SecondaryMap<MeshKey, MeshBufferIndexInfo>,
-    gpu_draw_index_buffer: web_sys::GpuBuffer,
-    vertex_infos: SecondaryMap<MeshKey, MeshBufferVertexInfo>,
-    gpu_vertex_buffer: web_sys::GpuBuffer,
-    vertex_dirty: bool,
-    draw_index_dirty: bool,
+    attribute_index_gpu_buffer: web_sys::GpuBuffer,
     attribute_index_dirty: bool,
+    // meta data buffers
+    meta_data_buffers: DynamicUniformBuffer<MeshKey>,
+    meta_data_gpu_buffer: web_sys::GpuBuffer,
+    meta_data_dirty: bool,
+    // morphs and skins
     pub morphs: Morphs,
     pub skins: Skins,
 }
-
 impl Meshes {
-    const INDICES_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
-    const VERTICES_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
+    // Initial sizes assume ~1000 vertices per mesh
+    // but this is just an allocation, can be divided many ways
+    const INDICES_INITIAL_SIZE: usize = MESH_META_INITIAL_CAPACITY * 3 * 1000;
+    const VERTICES_INITIAL_SIZE: usize = Self::INDICES_INITIAL_SIZE * 24;
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Self {
             list: DenseSlotMap::with_key(),
-            draw_index_buffers: DynamicStorageBuffer::new(
-                Self::INDICES_INITIAL_SIZE,
-                Some("MeshDrawIndexBuffer".to_string()),
+            transform_to_meshes: SecondaryMap::new(),
+            buffer_infos: SecondaryMap::new(),
+            // visibility data
+            visibility_data_buffers: DynamicStorageBuffer::new(
+                Self::VERTICES_INITIAL_SIZE,
+                Some("MeshVisibilityData".to_string()),
             ),
+            visibility_data_gpu_buffer: gpu.create_buffer(
+                &BufferDescriptor::new(
+                    Some("MeshVisibilityData"),
+                    Self::VERTICES_INITIAL_SIZE,
+                    BufferUsage::new().with_copy_dst().with_vertex(),
+                )
+                .into(),
+            )?,
+            visibility_data_dirty: true,
+            // visibility index
+            visibility_index_buffers: DynamicStorageBuffer::new(
+                Self::INDICES_INITIAL_SIZE,
+                Some("MeshVisibilityIndex".to_string()),
+            ),
+            visibility_index_gpu_buffer: gpu.create_buffer(
+                &BufferDescriptor::new(
+                    Some("MeshVisibilityIndex"),
+                    Self::INDICES_INITIAL_SIZE,
+                    BufferUsage::new().with_copy_dst().with_index(),
+                )
+                .into(),
+            )?,
+            visibility_index_dirty: true,
+            // attribute data
+            attribute_data_buffers: DynamicStorageBuffer::new(
+                Self::VERTICES_INITIAL_SIZE,
+                Some("MeshAttributeData".to_string()),
+            ),
+            attribute_data_gpu_buffer: gpu.create_buffer(
+                &BufferDescriptor::new(
+                    Some("MeshAttributeData"),
+                    Self::VERTICES_INITIAL_SIZE,
+                    BufferUsage::new().with_copy_dst().with_storage(),
+                )
+                .into(),
+            )?,
+            attribute_data_dirty: true,
+            // attribute index
             attribute_index_buffers: DynamicStorageBuffer::new(
                 Self::INDICES_INITIAL_SIZE,
-                Some("MeshAttributeIndexBuffer".to_string()),
+                Some("MeshAttributeIndex".to_string()),
             ),
-            vertex_buffers: DynamicStorageBuffer::new(
-                Self::VERTICES_INITIAL_SIZE,
-                Some("MeshVertexBuffer".to_string()),
-            ),
-            transform_to_meshes: SecondaryMap::new(),
-            gpu_vertex_buffer: gpu_create_vertex_buffer(gpu, Self::VERTICES_INITIAL_SIZE)?,
-            gpu_draw_index_buffer: gpu_create_index_buffer(gpu, Self::INDICES_INITIAL_SIZE)?,
-            gpu_attribute_index_buffer: gpu_create_index_buffer(gpu, Self::INDICES_INITIAL_SIZE)?,
-            vertex_infos: SecondaryMap::new(),
-            attribute_index_infos: SecondaryMap::new(),
-            draw_index_infos: SecondaryMap::new(),
-            draw_index_dirty: true,
+            attribute_index_gpu_buffer: gpu.create_buffer(
+                &BufferDescriptor::new(
+                    Some("MeshAttributeIndex"),
+                    Self::INDICES_INITIAL_SIZE,
+                    BufferUsage::new().with_copy_dst().with_storage(),
+                )
+                .into(),
+            )?,
             attribute_index_dirty: true,
-            vertex_dirty: true,
+            // meta
+            meta_data_buffers: DynamicUniformBuffer::new(
+                MESH_META_INITIAL_CAPACITY,
+                MESH_META_BYTE_SIZE,
+                MESH_META_BYTE_ALIGNMENT,
+                Some("MeshMetaData".to_string()),
+            ),
+            meta_data_gpu_buffer: gpu.create_buffer(
+                &BufferDescriptor::new(
+                    Some("MeshMetaData"),
+                    MESH_META_INITIAL_CAPACITY * MESH_META_BYTE_ALIGNMENT,
+                    BufferUsage::new().with_copy_dst().with_storage(),
+                )
+                .into(),
+            )?,
+            meta_data_dirty: true,
+            // attribute morphs and skins
             morphs: Morphs::new(gpu)?,
             skins: Skins::new(gpu)?,
         })
@@ -72,13 +140,19 @@ impl Meshes {
     pub fn insert(
         &mut self,
         mesh: Mesh,
-        vertex_info: MeshBufferVertexInfo,
-        vertex_data: &[u8],
-        attribute_index_info: MeshBufferIndexInfo,
-        attribute_index_data: &[u8],
+        buffer_info: MeshBufferInfo,
+        materials: &Materials,
+        visibility_data: &[u8],
+        // visibility index will be auto-generated
+        attribute_data: &[u8],
+        attribute_index: &[u8],
+    ) -> Result<MeshKey> {
+        // TODO - mesh info uniform buffer
 
-    ) -> MeshKey {
         let transform_key = mesh.transform_key;
+        let morph_key = mesh.morph_key;
+        let skin_key = mesh.skin_key;
+        let material_key = mesh.material_key;
         let key = self.list.insert(mesh);
 
         self.transform_to_meshes
@@ -87,30 +161,42 @@ impl Meshes {
             .or_default()
             .push(key);
 
-
-        let mut draw_index_data = Vec::new();
-        let draw_index_info = MeshBufferIndexInfo {
-            count: vertex_info.count * 3,
-            data_size: 4, // u32 indices
-            format: IndexFormat::Uint32,
-        };
-        for i in 0..draw_index_info.count {
-            draw_index_data.extend_from_slice(&(i as u32).to_le_bytes());
+        // visibility - index
+        let mut visibility_index = Vec::new();
+        for i in 0..buffer_info.vertex.count {
+            visibility_index.extend_from_slice(&(i as u32).to_le_bytes());
         }
+        self.visibility_index_buffers.update(key, &visibility_index);
+        self.visibility_index_dirty = true;
 
-        self.vertex_buffers.update(key, vertex_data);
-        self.vertex_infos.insert(key, vertex_info);
-        self.vertex_dirty = true;
+        // visibility - data
+        self.visibility_data_buffers.update(key, visibility_data);
+        self.visibility_data_dirty = true;
 
-        self.attribute_index_buffers.update(key, &attribute_index_data);
-        self.attribute_index_infos.insert(key, attribute_index_info);
+        // attributes - index
+        self.attribute_index_buffers.update(key, attribute_index);
         self.attribute_index_dirty = true;
 
-        self.draw_index_buffers.update(key, &draw_index_data);
-        self.draw_index_infos.insert(key, draw_index_info);
-        self.draw_index_dirty = true;
+        // attributes - data
+        self.attribute_data_buffers.update(key, attribute_data);
+        self.attribute_data_dirty = true;
 
-        key
+        // meta - data
+        let meta_data = mesh_meta_data(
+            key,
+            material_key,
+            morph_key,
+            skin_key,
+            materials,
+            &self.morphs,
+            &self.skins,
+        )?;
+        self.meta_data_buffers.update(key, &meta_data);
+        self.meta_data_dirty = true;
+
+        self.buffer_infos.insert(key, buffer_info);
+
+        Ok(key)
     }
 
     pub fn update_world(&mut self, dirty_transforms: HashMap<TransformKey, &Mat4>) {
@@ -137,53 +223,55 @@ impl Meshes {
         self.list.keys()
     }
 
-    pub fn gpu_vertex_buffer(&self) -> &web_sys::GpuBuffer {
-        &self.gpu_vertex_buffer
+    pub fn visibility_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.visibility_data_gpu_buffer
     }
-
-    pub fn vertex_buffer_offset(&self, key: MeshKey) -> Result<usize> {
-        self.vertex_buffers
+    pub fn visibility_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        self.visibility_data_buffers
             .offset(key)
             .ok_or(AwsmMeshError::MeshNotFound(key))
     }
 
-    pub fn draw_index_buffer_offset_format(&self, key: MeshKey) -> Result<(usize, IndexFormat)> {
-        let offset = self
-            .draw_index_buffers
+    pub fn visibility_index_gpu_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.visibility_index_gpu_buffer
+    }
+    pub fn visibility_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        self.visibility_index_buffers
             .offset(key)
-            .ok_or(AwsmMeshError::MeshNotFound(key))?;
-
-        let format = self
-            .draw_index_infos
-            .get(key)
-            .ok_or(AwsmMeshError::MeshNotFound(key))?
-            .format;
-
-        Ok((offset, format))
+            .ok_or(AwsmMeshError::MeshNotFound(key))
     }
 
-    pub fn attribute_index_buffer_offset_format(&self, key: MeshKey) -> Result<(usize, IndexFormat)> {
-        let offset = self
-            .attribute_index_buffers
+    pub fn attribute_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.attribute_data_gpu_buffer
+    }
+    pub fn attribute_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        self.attribute_data_buffers
             .offset(key)
-            .ok_or(AwsmMeshError::MeshNotFound(key))?;
+            .ok_or(AwsmMeshError::MeshNotFound(key))
+    }
 
-        let format = self
-            .attribute_index_infos
+    pub fn attribute_index_gpu_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.attribute_index_gpu_buffer
+    }
+    pub fn attribute_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        self.attribute_index_buffers
+            .offset(key)
+            .ok_or(AwsmMeshError::MeshNotFound(key))
+    }
+
+    pub fn meta_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.meta_data_gpu_buffer
+    }
+    pub fn meta_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        self.meta_data_buffers
+            .offset(key)
+            .ok_or(AwsmMeshError::MeshNotFound(key))
+    }
+
+    pub fn buffer_info(&self, key: MeshKey) -> Result<&MeshBufferInfo> {
+        self.buffer_infos
             .get(key)
-            .ok_or(AwsmMeshError::MeshNotFound(key))?
-            .format;
-
-        Ok((offset, format))
-    }
-
-
-    pub fn gpu_draw_index_buffer(&self) -> &web_sys::GpuBuffer {
-        &self.gpu_draw_index_buffer
-    }
-
-    pub fn gpu_attribute_index_buffer(&self) -> &web_sys::GpuBuffer {
-        &self.gpu_attribute_index_buffer
+            .ok_or(AwsmMeshError::MeshNotFound(key))
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (MeshKey, &Mesh)> {
@@ -204,27 +292,38 @@ impl Meshes {
 
     pub fn remove(&mut self, mesh_key: MeshKey) -> Option<Mesh> {
         if let Some(mesh) = self.list.remove(mesh_key) {
-            self.vertex_buffers.remove(mesh_key);
-            self.vertex_infos.remove(mesh_key);
-            self.vertex_dirty = true;
-
-            self.draw_index_buffers.remove(mesh_key);
-            if self.draw_index_infos.remove(mesh_key).is_some() {
-                self.draw_index_dirty = true;
-            }
-
+            self.visibility_data_buffers.remove(mesh_key);
+            self.visibility_index_buffers.remove(mesh_key);
+            self.attribute_data_buffers.remove(mesh_key);
             self.attribute_index_buffers.remove(mesh_key);
-            if self.attribute_index_infos.remove(mesh_key).is_some() {
-                self.attribute_index_dirty = true;
-            }
+            self.meta_data_buffers.remove(mesh_key);
 
-            if let Some(morph_key) = mesh.morph_key {
-                self.morphs.remove(morph_key);
+            if self.buffer_infos.remove(mesh_key).is_some() {
+                self.visibility_data_dirty = true;
+                self.visibility_index_dirty = true;
+                self.attribute_data_dirty = true;
+                self.attribute_index_dirty = true;
+                self.meta_data_dirty = true;
             }
 
             self.transform_to_meshes
                 .get_mut(mesh.transform_key)
                 .map(|meshes| meshes.retain(|&key| key != mesh_key));
+
+            let last_transform = if self.transform_to_meshes.contains_key(mesh.transform_key) {
+                None
+            } else {
+                Some(mesh.transform_key)
+            };
+
+            if let Some(morph_key) = mesh.morph_key {
+                self.morphs.remove(morph_key);
+            }
+
+            if let Some(skin_key) = mesh.skin_key {
+                self.skins.remove(skin_key, last_transform);
+            }
+
             Some(mesh)
         } else {
             None
@@ -236,92 +335,83 @@ impl Meshes {
         logging: &AwsmRendererLogging,
         gpu: &AwsmRendererWebGpu,
     ) -> Result<()> {
-        if self.vertex_dirty {
+        let to_check_dynamic = [
+            (
+                self.visibility_data_dirty,
+                &mut self.visibility_data_buffers,
+                &mut self.visibility_data_gpu_buffer,
+                BufferUsage::new().with_copy_dst().with_vertex(),
+                "MeshVisibilityData",
+            ),
+            (
+                self.visibility_index_dirty,
+                &mut self.visibility_index_buffers,
+                &mut self.visibility_index_gpu_buffer,
+                BufferUsage::new().with_copy_dst().with_index(),
+                "MeshVisibilityIndex",
+            ),
+            (
+                self.attribute_data_dirty,
+                &mut self.attribute_data_buffers,
+                &mut self.attribute_data_gpu_buffer,
+                BufferUsage::new().with_copy_dst().with_storage(),
+                "MeshAttributeData",
+            ),
+            (
+                self.attribute_index_dirty,
+                &mut self.attribute_index_buffers,
+                &mut self.attribute_index_gpu_buffer,
+                BufferUsage::new().with_copy_dst().with_storage(),
+                "MeshAttributeIndex",
+            ),
+        ];
+
+        let to_check_uniform = [(
+            self.meta_data_dirty,
+            &mut self.meta_data_buffers,
+            &mut self.meta_data_gpu_buffer,
+            BufferUsage::new().with_copy_dst().with_storage(),
+            "MeshMetaData",
+        )];
+
+        let any_dirty = to_check_dynamic.iter().any(|(dirty, _, _, _, _)| *dirty)
+            || to_check_uniform.iter().any(|(dirty, _, _, _, _)| *dirty);
+
+        if any_dirty {
             let _maybe_span_guard = if logging.render_timings {
-                Some(tracing::span!(tracing::Level::INFO, "Mesh vertex GPU write").entered())
+                Some(tracing::span!(tracing::Level::INFO, "Mesh GPU write").entered())
             } else {
                 None
             };
-            if let Some(new_size) = self.vertex_buffers.take_gpu_needs_resize() {
-                self.gpu_vertex_buffer = gpu_create_vertex_buffer(gpu, new_size)?;
+            for (dirty, buffer, gpu_buffer, usage, label) in to_check_dynamic {
+                if dirty {
+                    if let Some(new_size) = buffer.take_gpu_needs_resize() {
+                        *gpu_buffer = gpu.create_buffer(
+                            &BufferDescriptor::new(Some(label), new_size, usage).into(),
+                        )?;
+                    }
+                    gpu.write_buffer(&gpu_buffer, None, buffer.raw_slice(), None, None)?;
+                }
             }
-            gpu.write_buffer(
-                &self.gpu_vertex_buffer,
-                None,
-                self.vertex_buffers.raw_slice(),
-                None,
-                None,
-            )?;
-            self.vertex_dirty = false;
-        }
-        if self.draw_index_dirty {
-            let _maybe_span_guard = if logging.render_timings {
-                Some(tracing::span!(tracing::Level::INFO, "Mesh draw index GPU write").entered())
-            } else {
-                None
-            };
-            if let Some(new_size) = self.draw_index_buffers.take_gpu_needs_resize() {
-                self.gpu_draw_index_buffer = gpu_create_index_buffer(gpu, new_size)?;
-            }
-            gpu.write_buffer(
-                &self.gpu_draw_index_buffer,
-                None,
-                self.draw_index_buffers.raw_slice(),
-                None,
-                None,
-            )?;
-            self.draw_index_dirty = false;
+
+            self.visibility_data_dirty = false;
+            self.visibility_index_dirty = false;
+            self.attribute_data_dirty = false;
+            self.attribute_index_dirty = false;
+            self.meta_data_dirty = false;
         }
 
-        if self.attribute_index_dirty {
-            let _maybe_span_guard = if logging.render_timings {
-                Some(tracing::span!(tracing::Level::INFO, "Mesh attribute index GPU write").entered())
-            } else {
-                None
-            };
-            if let Some(new_size) = self.attribute_index_buffers.take_gpu_needs_resize() {
-                self.gpu_attribute_index_buffer = gpu_create_index_buffer(gpu, new_size)?;
-            }
-            gpu.write_buffer(
-                &self.gpu_attribute_index_buffer,
-                None,
-                self.attribute_index_buffers.raw_slice(),
-                None,
-                None,
-            )?;
-            self.attribute_index_dirty = false;
-        }
         Ok(())
     }
 }
 
-fn gpu_create_vertex_buffer(gpu: &AwsmRendererWebGpu, size: usize) -> Result<web_sys::GpuBuffer> {
-    Ok(gpu.create_buffer(
-        &BufferDescriptor::new(
-            Some("MeshVertex"),
-            size,
-            BufferUsage::new().with_copy_dst().with_vertex(),
-        )
-        .into(),
-    )?)
-}
-
-fn gpu_create_index_buffer(gpu: &AwsmRendererWebGpu, size: usize) -> Result<web_sys::GpuBuffer> {
-    Ok(gpu.create_buffer(
-        &BufferDescriptor::new(
-            Some("MeshIndex"),
-            size,
-            BufferUsage::new().with_copy_dst().with_index(),
-        )
-        .into(),
-    )?)
-}
-
 impl Drop for Meshes {
     fn drop(&mut self) {
-        self.gpu_vertex_buffer.destroy();
-        self.gpu_draw_index_buffer.destroy();
-        self.gpu_attribute_index_buffer.destroy();
+        self.visibility_data_gpu_buffer.destroy();
+        self.visibility_index_gpu_buffer.destroy();
+        self.attribute_data_gpu_buffer.destroy();
+        self.attribute_index_gpu_buffer.destroy();
+        self.meta_data_gpu_buffer.destroy();
     }
 }
 

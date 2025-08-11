@@ -101,6 +101,14 @@ impl Skins {
         Ok(skin_key)
     }
 
+    pub fn joint_len(&self, skin_key: SkinKey) -> Result<usize> {
+        Ok(self
+            .skeleton_transforms
+            .get(skin_key)
+            .ok_or(AwsmSkinError::SkinNotFound(skin_key))?
+            .len())
+    }
+
     pub fn joint_matrices_offset(&self, skin_key: SkinKey) -> Result<usize> {
         self.skin_matrices
             .offset(skin_key)
@@ -173,6 +181,15 @@ impl Skins {
             self.gpu_dirty = false;
         }
         Ok(())
+    }
+
+    pub fn remove(&mut self, key: SkinKey, transform: Option<TransformKey>) {
+        self.skeleton_transforms.remove(key);
+        self.skin_matrices.remove(key);
+        if let Some(transform) = transform {
+            self.inverse_bind_matrices.remove(transform);
+        }
+        self.gpu_dirty = true;
     }
 }
 

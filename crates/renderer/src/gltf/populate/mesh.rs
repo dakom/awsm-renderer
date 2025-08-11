@@ -3,7 +3,9 @@ use std::{future::Future, pin::Pin};
 use crate::{
     bounds::Aabb,
     gltf::{
-        buffers::helpers::transform_to_winding_order, error::{AwsmGltfError, Result}, populate::material::GltfMaterialInfo
+        buffers::helpers::transform_to_winding_order,
+        error::{AwsmGltfError, Result},
+        populate::material::GltfMaterialInfo,
     },
     materials::Material,
     mesh::{skins::SkinKey, Mesh, MeshBufferInfo},
@@ -124,15 +126,14 @@ impl AwsmRenderer {
             &self.textures,
         );
 
-        let render_pipeline_key = self.render_passes.geometry.pipelines.get_render_pipeline_key(material_info.material.double_sided());
+        let render_pipeline_key = self
+            .render_passes
+            .geometry
+            .pipelines
+            .get_render_pipeline_key(material_info.material.double_sided());
 
         let native_primitive_buffer_info = MeshBufferInfo::from(primitive_buffer_info.clone());
-        let mut mesh = Mesh::new(
-            render_pipeline_key,
-            native_primitive_buffer_info.draw_count(),
-            transform_key,
-            material_key,
-        );
+        let mut mesh = Mesh::new(render_pipeline_key, transform_key, material_key);
 
         if let Some(aabb) = try_position_aabb(&gltf_primitive) {
             mesh = mesh.with_aabb(aabb);
@@ -147,20 +148,30 @@ impl AwsmRenderer {
         }
 
         let _mesh_key = {
-            let vertex_start = primitive_buffer_info.vertex.offset;
-            let vertex_end = vertex_start + primitive_buffer_info.vertex.size;
-            let vertex_values = &ctx.data.buffers.visibility_vertex_bytes[vertex_start..vertex_end];
+            let visibility_data_start = primitive_buffer_info.vertex.offset;
+            let visibility_data_end = visibility_data_start + primitive_buffer_info.vertex.size;
+            let visibility_data = &ctx.data.buffers.visibility_vertex_bytes
+                [visibility_data_start..visibility_data_end];
 
-            let index_start = primitive_buffer_info.triangles.indices.offset;
-            let index_end = index_start + primitive_buffer_info.triangles.indices.total_size();
-            let index_values = &ctx.data.buffers.index_bytes[index_start..index_end];
+            let attribute_data_start = primitive_buffer_info.triangles.vertex_attributes_offset;
+            let attribute_data_end =
+                attribute_data_start + primitive_buffer_info.triangles.vertex_attributes_size;
+            let attribute_data =
+                &ctx.data.buffers.attribute_vertex_bytes[attribute_data_start..attribute_data_end];
+
+            let attribute_index_start = primitive_buffer_info.triangles.indices.offset;
+            let attribute_index_end =
+                attribute_index_start + primitive_buffer_info.triangles.indices.total_size();
+            let attribute_index =
+                &ctx.data.buffers.index_bytes[attribute_index_start..attribute_index_end];
 
             self.meshes.insert(
                 mesh,
-                primitive_buffer_info.vertex.clone().into(),
-                vertex_values,
-                primitive_buffer_info.triangles.indices.clone().into(),
-                index_values,
+                primitive_buffer_info.clone().into(),
+                &self.materials,
+                visibility_data,
+                attribute_data,
+                attribute_index,
             )
         };
 

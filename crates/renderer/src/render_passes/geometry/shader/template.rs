@@ -4,9 +4,7 @@ use askama::Template;
 
 use crate::{
     render_passes::{
-        geometry::shader::cache_key::{
-            ShaderCacheKeyGeometry,
-        },
+        geometry::shader::cache_key::ShaderCacheKeyGeometry,
         material::template::{
             ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment,
         },
@@ -22,8 +20,7 @@ pub struct ShaderTemplateGeometry {
 
 #[derive(Template, Debug)]
 #[template(path = "geometry_wgsl/vertex.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateGeometryVertex {
-}
+pub struct ShaderTemplateGeometryVertex {}
 
 impl ShaderTemplateGeometryVertex {
     pub fn new(cache_key: &ShaderCacheKeyGeometry) -> Self {
@@ -33,13 +30,11 @@ impl ShaderTemplateGeometryVertex {
 
 #[derive(Template, Debug)]
 #[template(path = "geometry_wgsl/fragment.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateGeometryFragment {
-}
+pub struct ShaderTemplateGeometryFragment {}
 
 impl ShaderTemplateGeometryFragment {
     pub fn new(cache_key: &ShaderCacheKeyGeometry) -> Self {
-        Self {
-        }
+        Self {}
     }
 }
 

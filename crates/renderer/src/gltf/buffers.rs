@@ -1,16 +1,27 @@
 // pub mod vertex;
 //pub mod morph;
 pub mod accessor;
+pub mod helpers;
 pub mod index;
 pub mod normals;
 pub mod visibility;
-pub mod helpers;
 
 use super::populate::transforms::transform_gltf_node;
 
 use awsm_renderer_core::pipeline::primitive::{FrontFace, IndexFormat};
 
-use crate::{gltf::buffers::{helpers::transform_to_winding_order, index::{generate_fresh_indices_from_primitive, GltfMeshBufferIndexInfo}, visibility::convert_to_visibility_buffer}, mesh::{MeshBufferIndexInfo, MeshBufferInfo, MeshBufferMorphAttributes, MeshBufferMorphInfo, MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo, MeshBufferVertexAttributeKind, MeshBufferVertexInfo}};
+use crate::{
+    gltf::buffers::{
+        helpers::transform_to_winding_order,
+        index::{generate_fresh_indices_from_primitive, GltfMeshBufferIndexInfo},
+        visibility::convert_to_visibility_buffer,
+    },
+    mesh::{
+        MeshBufferIndexInfo, MeshBufferInfo, MeshBufferMorphAttributes, MeshBufferMorphInfo,
+        MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo,
+        MeshBufferVertexAttributeKind, MeshBufferVertexInfo,
+    },
+};
 
 use super::error::{AwsmGltfError, Result};
 
@@ -28,7 +39,7 @@ pub struct GltfBuffers {
     // these always follow the same interleaving pattern
     // although, not all primitives have all the same attributes
     // it's just that when they do, they follow the same order
-    pub vertex_attribute_bytes: Vec<u8>,
+    pub attribute_vertex_bytes: Vec<u8>,
 
     // Triangle data buffer (vertex indices + material info per triangle)
     pub triangle_data_bytes: Vec<u8>,
@@ -45,7 +56,7 @@ pub struct MeshBufferInfoWithOffset {
     pub vertex: MeshBufferVertexInfoWithOffset,
     pub triangles: MeshBufferTriangleInfoWithOffset,
     pub morph: Option<MeshBufferMorphInfoWithOffset>,
-} 
+}
 
 impl From<MeshBufferInfoWithOffset> for MeshBufferInfo {
     fn from(info: MeshBufferInfoWithOffset) -> Self {
@@ -77,6 +88,7 @@ impl From<MeshBufferVertexInfoWithOffset> for MeshBufferVertexInfo {
 pub struct MeshBufferTriangleInfoWithOffset {
     pub count: usize,
     pub indices: MeshBufferIndexInfoWithOffset,
+    pub vertex_attributes_offset: usize,
     pub vertex_attributes: Vec<MeshBufferVertexAttributeInfoWithOffset>,
     pub vertex_attributes_size: usize,
     pub triangle_data: MeshBufferTriangleDataInfoWithOffset,
@@ -87,7 +99,11 @@ impl From<MeshBufferTriangleInfoWithOffset> for MeshBufferTriangleInfo {
         MeshBufferTriangleInfo {
             count: info.count,
             indices: info.indices.into(),
-            vertex_attributes: info.vertex_attributes.into_iter().map(|v| v.into()).collect(),
+            vertex_attributes: info
+                .vertex_attributes
+                .into_iter()
+                .map(|v| v.into())
+                .collect(),
             vertex_attributes_size: info.vertex_attributes_size,
             triangle_data: info.triangle_data.into(),
         }
@@ -172,7 +188,6 @@ impl From<MeshBufferTriangleDataInfoWithOffset> for MeshBufferTriangleDataInfo {
     }
 }
 
-
 impl GltfBuffers {
     pub fn new(doc: &gltf::Document, buffers: Vec<Vec<u8>>) -> Result<Self> {
         // refactor original buffers into the format we want
@@ -182,7 +197,7 @@ impl GltfBuffers {
 
         let mut index_bytes: Vec<u8> = Vec::new();
         let mut visibility_vertex_bytes: Vec<u8> = Vec::new();
-        let mut vertex_attribute_bytes: Vec<u8> = Vec::new();
+        let mut attribute_vertex_bytes: Vec<u8> = Vec::new();
         let mut triangle_data_bytes: Vec<u8> = Vec::new();
         let mut triangle_morph_bytes: Vec<u8> = Vec::new();
         let mut meshes: Vec<Vec<MeshBufferInfoWithOffset>> = Vec::new();
@@ -192,16 +207,21 @@ impl GltfBuffers {
 
             let front_face = {
                 doc.nodes()
-                    .find(|node| node.mesh().is_some() && node.mesh().unwrap().index() == mesh.index())
+                    .find(|node| {
+                        node.mesh().is_some() && node.mesh().unwrap().index() == mesh.index()
+                    })
                     .map(|node| transform_to_winding_order(&transform_gltf_node(&node).to_matrix()))
                     .unwrap_or(FrontFace::Ccw) // Default to CCW if no node found
             };
             for primitive in mesh.primitives() {
-                let index:MeshBufferIndexInfoWithOffset = match GltfMeshBufferIndexInfo::maybe_new(&primitive, &buffers, &mut index_bytes)? {
+                let index: MeshBufferIndexInfoWithOffset = match GltfMeshBufferIndexInfo::maybe_new(
+                    &primitive,
+                    &buffers,
+                    &mut index_bytes,
+                )? {
                     Some(info) => info.into(),
-                    None => generate_fresh_indices_from_primitive(&primitive, &mut index_bytes)?
+                    None => generate_fresh_indices_from_primitive(&primitive, &mut index_bytes)?,
                 };
-
 
                 // Step 2: Convert to visibility buffer format
                 let visibility_buffer_info = convert_to_visibility_buffer(
@@ -211,7 +231,7 @@ impl GltfBuffers {
                     &index,
                     &index_bytes,
                     &mut visibility_vertex_bytes,
-                    &mut vertex_attribute_bytes,
+                    &mut attribute_vertex_bytes,
                     &mut triangle_data_bytes,
                     &mut triangle_morph_bytes,
                 )?;
@@ -226,7 +246,7 @@ impl GltfBuffers {
             raw: buffers,
             index_bytes, // Always present now
             visibility_vertex_bytes,
-            vertex_attribute_bytes,
+            attribute_vertex_bytes,
             triangle_data_bytes,
             meshes,
             triangle_morph_bytes: if triangle_morph_bytes.is_empty() {

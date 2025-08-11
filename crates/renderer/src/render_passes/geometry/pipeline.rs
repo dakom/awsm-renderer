@@ -1,7 +1,9 @@
 use awsm_renderer_core::compare::CompareFunction;
 use awsm_renderer_core::pipeline::depth_stencil::DepthStencilState;
 use awsm_renderer_core::pipeline::fragment::ColorTargetState;
-use awsm_renderer_core::pipeline::primitive::{CullMode, FrontFace, PrimitiveState, PrimitiveTopology};
+use awsm_renderer_core::pipeline::primitive::{
+    CullMode, FrontFace, PrimitiveState, PrimitiveTopology,
+};
 use awsm_renderer_core::pipeline::vertex::{VertexAttribute, VertexBufferLayout, VertexFormat};
 
 use crate::error::Result;
@@ -22,15 +24,9 @@ impl GeometryPipelines {
         bind_groups: &GeometryBindGroups,
     ) -> Result<Self> {
         let pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
-            bind_groups
-                .camera_lights
-                .bind_group_layout_key,
-            bind_groups
-                .transform_materials
-                .bind_group_layout_key,
-            bind_groups
-                .vertex_animation
-                .bind_group_layout_key,
+            bind_groups.camera_lights.bind_group_layout_key,
+            bind_groups.transform_materials.bind_group_layout_key,
+            bind_groups.vertex_animation.bind_group_layout_key,
         ]);
 
         let pipeline_layout_key = ctx.pipeline_layouts.get_key(
@@ -39,9 +35,10 @@ impl GeometryPipelines {
             pipeline_layout_cache_key,
         )?;
 
-
-
-        let shader_key = ctx.shaders.get_key(&ctx.gpu, ShaderCacheKeyGeometry {}).await?;
+        let shader_key = ctx
+            .shaders
+            .get_key(&ctx.gpu, ShaderCacheKeyGeometry {})
+            .await?;
 
         let primitive_state_cull_back = PrimitiveState::new()
             .with_topology(PrimitiveTopology::TriangleList)
@@ -87,23 +84,27 @@ impl GeometryPipelines {
             ],
         };
 
-        let mut pipeline_cache_key_cull_back = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
-            .with_primitive(primitive_state_cull_back)
-            .with_push_vertex_buffer_layout(vertex_buffer_layout.clone())
-            .with_depth_stencil(DepthStencilState::new(ctx.render_texture_formats.depth)
-                    .with_depth_write_enabled(true)
-                    .with_depth_compare(CompareFunction::LessEqual)
-            )
-            .with_push_fragment_targets(color_targets.clone());
+        let mut pipeline_cache_key_cull_back =
+            RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
+                .with_primitive(primitive_state_cull_back)
+                .with_push_vertex_buffer_layout(vertex_buffer_layout.clone())
+                .with_depth_stencil(
+                    DepthStencilState::new(ctx.render_texture_formats.depth)
+                        .with_depth_write_enabled(true)
+                        .with_depth_compare(CompareFunction::LessEqual),
+                )
+                .with_push_fragment_targets(color_targets.clone());
 
-        let mut pipeline_cache_key_cull_none = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
-            .with_primitive(primitive_state_cull_none)
-            .with_push_vertex_buffer_layout(vertex_buffer_layout)
-            .with_depth_stencil(DepthStencilState::new(ctx.render_texture_formats.depth)
-                    .with_depth_write_enabled(true)
-                    .with_depth_compare(CompareFunction::LessEqual)
-            )
-            .with_push_fragment_targets(color_targets);
+        let mut pipeline_cache_key_cull_none =
+            RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
+                .with_primitive(primitive_state_cull_none)
+                .with_push_vertex_buffer_layout(vertex_buffer_layout)
+                .with_depth_stencil(
+                    DepthStencilState::new(ctx.render_texture_formats.depth)
+                        .with_depth_write_enabled(true)
+                        .with_depth_compare(CompareFunction::LessEqual),
+                )
+                .with_push_fragment_targets(color_targets);
 
         let render_pipeline_key_cull_back = ctx
             .pipelines
@@ -126,7 +127,6 @@ impl GeometryPipelines {
                 pipeline_cache_key_cull_none,
             )
             .await?;
-
 
         Ok(Self {
             pipeline_layout_key,

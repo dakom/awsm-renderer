@@ -1,7 +1,13 @@
 use awsm_renderer_core::pipeline::primitive::IndexFormat;
 use glam::Vec3;
 
-use crate::{gltf::{buffers::{helpers::extract_triangle_indices, MeshBufferIndexInfoWithOffset}, error::{AwsmGltfError, Result}}, mesh::MeshBufferIndexInfo};
+use crate::{
+    gltf::{
+        buffers::{helpers::extract_triangle_indices, MeshBufferIndexInfoWithOffset},
+        error::{AwsmGltfError, Result},
+    },
+    mesh::MeshBufferIndexInfo,
+};
 
 pub(super) fn compute_normals(
     positions_bytes: &[u8],
@@ -9,7 +15,7 @@ pub(super) fn compute_normals(
     index_bytes: &[u8],
 ) -> Result<Vec<u8>> {
     tracing::info!("no baked normals, computing from positions and indices...");
-    
+
     // Validate positions buffer (must be Float32x3 format)
     if positions_bytes.len() % 12 != 0 {
         return Err(AwsmGltfError::ConstructNormals(format!(
@@ -22,9 +28,7 @@ pub(super) fn compute_normals(
     let vertices = positions_bytes
         .chunks_exact(12)
         .map(|chunk| {
-            let values_f32 = unsafe {
-                std::slice::from_raw_parts(chunk.as_ptr() as *const f32, 3)
-            };
+            let values_f32 = unsafe { std::slice::from_raw_parts(chunk.as_ptr() as *const f32, 3) };
             Vec3::new(values_f32[0], values_f32[1], values_f32[2])
         })
         .collect::<Vec<Vec3>>();
@@ -50,7 +54,8 @@ pub(super) fn compute_normals(
             if vertex_idx >= vertices.len() {
                 return Err(AwsmGltfError::ConstructNormals(format!(
                     "Vertex index {} out of bounds (total vertices: {})",
-                    vertex_idx, vertices.len()
+                    vertex_idx,
+                    vertices.len()
                 )));
             }
         }
