@@ -43,9 +43,14 @@ pub enum BindGroupCreate {
     CameraInitOnly,
     LightsResize,
     TransformsResize,
-    MorphTargetWeightsResize,
-    MorphTargetValuesResize,
+    GeometryMorphTargetWeightsResize,
+    GeometryMorphTargetValuesResize,
+    MaterialMorphTargetWeightsResize,
+    MaterialMorphTargetValuesResize,
     SkinJointMatricesResize,
+    MeshMetaResize,
+    MeshAttributeDataResize,
+    MeshAttributeIndexResize,
     PbrMaterialResize,
     TextureViewResize,
     MegaTexture,
@@ -98,18 +103,19 @@ impl BindGroups {
 
         if self
             .create_list
-            .contains(&BindGroupCreate::MorphTargetWeightsResize)
+            .contains(&BindGroupCreate::GeometryMorphTargetWeightsResize)
             || self
                 .create_list
-                .contains(&BindGroupCreate::MorphTargetValuesResize)
+                .contains(&BindGroupCreate::GeometryMorphTargetValuesResize)
             || self
                 .create_list
                 .contains(&BindGroupCreate::SkinJointMatricesResize)
+            || self.create_list.contains(&BindGroupCreate::MeshMetaResize)
         {
             render_passes
                 .geometry
                 .bind_groups
-                .vertex_animation
+                .meta_vertex_animation
                 .recreate(&ctx)?;
         }
 

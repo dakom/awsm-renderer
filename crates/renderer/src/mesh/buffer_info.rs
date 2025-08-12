@@ -4,7 +4,8 @@ use awsm_renderer_core::pipeline::{primitive::IndexFormat, vertex::VertexFormat}
 pub struct MeshBufferInfo {
     pub vertex: MeshBufferVertexInfo,
     pub triangles: MeshBufferTriangleInfo,
-    pub morph: Option<MeshBufferMorphInfo>,
+    pub geometry_morph: Option<MeshBufferGeometryMorphInfo>,
+    pub material_morph: Option<MeshBufferMaterialMorphInfo>,
 }
 
 #[derive(Debug, Clone)]
@@ -68,19 +69,27 @@ pub struct MeshBufferTriangleDataInfo {
     pub total_size: usize,
 }
 
-#[derive(Default, Debug, Clone)]
-pub struct MeshBufferMorphInfo {
-    // Contains info about the specific attribute targets
-    pub attributes: MeshBufferMorphAttributes,
-    // The number of morph targets for this primitive
+/// Information about geometry morphs (positions only, exploded for visibility buffer)
+#[derive(Debug, Clone)]
+pub struct MeshBufferGeometryMorphInfo {
     pub targets_len: usize,
-    // Size in bytes of morph data per triangle (across all targets)
-    // e.g., if we have 3 targets with positions+normals per triangle vertex:
-    // 3 targets * 3 vertices * (3 pos + 3 normal) * 4 bytes = 216 bytes per triangle
-    pub triangle_stride_size: usize,
-    // Total size in bytes of the entire morph buffer for this mesh
-    // triangle_count * triangle_stride_size
+    pub triangle_stride_size: usize, // Size per triangle across all targets (positions only)
     pub values_size: usize,
+}
+
+/// Information about material morphs (normals + tangents, non-exploded per-vertex)
+#[derive(Debug, Clone)]
+pub struct MeshBufferMaterialMorphInfo {
+    pub attributes: MeshBufferMaterialMorphAttributes, // Which attributes are present
+    pub targets_len: usize,
+    pub vertex_stride_size: usize, // Size per original vertex across all targets
+    pub values_size: usize,
+}
+
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MeshBufferMaterialMorphAttributes {
+    pub normal: bool,
+    pub tangent: bool,
 }
 
 impl MeshBufferInfo {
@@ -121,17 +130,4 @@ pub enum MeshBufferVertexAttributeKind {
 
     /// Joint weights.
     Weights { count: u32 },
-}
-
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct MeshBufferMorphAttributes {
-    pub position: bool,
-    pub normal: bool,
-    pub tangent: bool,
-}
-
-impl MeshBufferMorphAttributes {
-    pub fn any(&self) -> bool {
-        self.position || self.normal || self.tangent
-    }
 }

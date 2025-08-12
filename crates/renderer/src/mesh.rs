@@ -10,6 +10,7 @@ use awsm_renderer_core::{
 };
 
 use crate::materials::MaterialKey;
+use crate::mesh::morphs::{GeometryMorphKey, MaterialMorphKey};
 use crate::render::RenderContext;
 use crate::render_passes::geometry::bind_group::GeometryBindGroups;
 use crate::transforms::TransformKey;
@@ -19,7 +20,6 @@ use skins::SkinKey;
 pub use buffer_info::*;
 pub use error::AwsmMeshError;
 pub use meshes::{MeshKey, Meshes};
-pub use morphs::MorphKey;
 
 use super::error::Result;
 
@@ -32,7 +32,8 @@ pub struct Mesh {
     pub world_aabb: Option<Aabb>, // this is the transformed AABB, used for frustum culling and depth sorting
     pub transform_key: TransformKey,
     pub material_key: MaterialKey,
-    pub morph_key: Option<MorphKey>,
+    pub geometry_morph_key: Option<GeometryMorphKey>,
+    pub material_morph_key: Option<MaterialMorphKey>,
     pub skin_key: Option<SkinKey>,
 }
 
@@ -48,7 +49,8 @@ impl Mesh {
             material_key,
             aabb: None,
             world_aabb: None,
-            morph_key: None,
+            geometry_morph_key: None,
+            material_morph_key: None,
             skin_key: None,
         }
     }
@@ -59,8 +61,13 @@ impl Mesh {
         self
     }
 
-    pub fn with_morph_key(mut self, morph_key: MorphKey) -> Self {
-        self.morph_key = Some(morph_key);
+    pub fn with_geometry_morph_key(mut self, morph_key: GeometryMorphKey) -> Self {
+        self.geometry_morph_key = Some(morph_key);
+        self
+    }
+
+    pub fn with_material_morph_key(mut self, morph_key: MaterialMorphKey) -> Self {
+        self.material_morph_key = Some(morph_key);
         self
     }
 
@@ -90,10 +97,13 @@ impl Mesh {
 
         // if _any_ shapes are used, set the bind group
         // unused shapes will simply be ignored (so 0 offset is fine)
-        let (morph_weights_offset, morph_values_offset) = match self.morph_key {
+        let (morph_weights_offset, morph_values_offset) = match self.geometry_morph_key {
             Some(morph_key) => (
-                ctx.meshes.morphs.weights_buffer_offset(morph_key)? as u32,
-                ctx.meshes.morphs.values_buffer_offset(morph_key)? as u32,
+                ctx.meshes
+                    .morphs
+                    .geometry
+                    .weights_buffer_offset(morph_key)? as u32,
+                ctx.meshes.morphs.geometry.values_buffer_offset(morph_key)? as u32,
             ),
             None => (0, 0),
         };
@@ -103,10 +113,19 @@ impl Mesh {
             None => 0,
         };
 
+        let meta_offset = ctx.meshes.meta_data_buffer_offset(mesh_key)? as u32;
+
         render_pass.set_bind_group(
             2,
-            geometry_bind_groups.vertex_animation.get_bind_group()?,
-            Some(&[morph_weights_offset, morph_values_offset, skin_offset]),
+            geometry_bind_groups
+                .meta_vertex_animation
+                .get_bind_group()?,
+            Some(&[
+                morph_weights_offset,
+                morph_values_offset,
+                skin_offset,
+                meta_offset,
+            ]),
         )?;
 
         render_pass.set_vertex_buffer(

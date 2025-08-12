@@ -9,6 +9,7 @@ use std::{
 use awsm_renderer_core::{
     buffers::{BufferDescriptor, BufferUsage},
     error::AwsmCoreError,
+    pipeline::primitive::FrontFace,
     renderer::AwsmRendererWebGpu,
 };
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
@@ -344,6 +345,20 @@ impl Transform {
 
     pub fn to_matrix(&self) -> Mat4 {
         Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
+    }
+
+    pub fn winding_order(&self) -> FrontFace {
+        /*
+        Staying consistent with gltf spec: "When a mesh primitive uses any triangle-based topology (i.e., triangles, triangle strip, or triangle fan),
+        the determinant of the node’s global transform defines the winding order of that primitive.
+        If the determinant is a positive value, the winding order triangle faces is counterclockwise;
+        in the opposite case, the winding order is clockwise.
+        */
+        if self.to_matrix().determinant() > 0.0 {
+            FrontFace::Ccw
+        } else {
+            FrontFace::Cw
+        }
     }
 }
 

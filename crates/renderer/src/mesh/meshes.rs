@@ -6,6 +6,7 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::Mat4;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
+use crate::bind_groups::{BindGroupCreate, BindGroups};
 use crate::buffer::dynamic_storage::DynamicStorageBuffer;
 use crate::buffer::dynamic_uniform::DynamicUniformBuffer;
 use crate::materials::Materials;
@@ -126,7 +127,7 @@ impl Meshes {
                 &BufferDescriptor::new(
                     Some("MeshMetaData"),
                     MESH_META_INITIAL_CAPACITY * MESH_META_BYTE_ALIGNMENT,
-                    BufferUsage::new().with_copy_dst().with_storage(),
+                    BufferUsage::new().with_copy_dst().with_uniform(),
                 )
                 .into(),
             )?,
@@ -150,7 +151,8 @@ impl Meshes {
         // TODO - mesh info uniform buffer
 
         let transform_key = mesh.transform_key;
-        let morph_key = mesh.morph_key;
+        let geometry_morph_key = mesh.geometry_morph_key;
+        let material_morph_key = mesh.material_morph_key;
         let skin_key = mesh.skin_key;
         let material_key = mesh.material_key;
         let key = self.list.insert(mesh);
@@ -185,7 +187,8 @@ impl Meshes {
         let meta_data = mesh_meta_data(
             key,
             material_key,
-            morph_key,
+            geometry_morph_key,
+            material_morph_key,
             skin_key,
             materials,
             &self.morphs,
@@ -316,8 +319,12 @@ impl Meshes {
                 Some(mesh.transform_key)
             };
 
-            if let Some(morph_key) = mesh.morph_key {
-                self.morphs.remove(morph_key);
+            if let Some(morph_key) = mesh.geometry_morph_key {
+                self.morphs.geometry.remove(morph_key);
+            }
+
+            if let Some(morph_key) = mesh.material_morph_key {
+                self.morphs.material.remove(morph_key);
             }
 
             if let Some(skin_key) = mesh.skin_key {
@@ -334,6 +341,7 @@ impl Meshes {
         &mut self,
         logging: &AwsmRendererLogging,
         gpu: &AwsmRendererWebGpu,
+        bind_groups: &mut BindGroups,
     ) -> Result<()> {
         let to_check_dynamic = [
             (
@@ -342,6 +350,7 @@ impl Meshes {
                 &mut self.visibility_data_gpu_buffer,
                 BufferUsage::new().with_copy_dst().with_vertex(),
                 "MeshVisibilityData",
+                None,
             ),
             (
                 self.visibility_index_dirty,
@@ -349,6 +358,7 @@ impl Meshes {
                 &mut self.visibility_index_gpu_buffer,
                 BufferUsage::new().with_copy_dst().with_index(),
                 "MeshVisibilityIndex",
+                None,
             ),
             (
                 self.attribute_data_dirty,
@@ -356,6 +366,7 @@ impl Meshes {
                 &mut self.attribute_data_gpu_buffer,
                 BufferUsage::new().with_copy_dst().with_storage(),
                 "MeshAttributeData",
+                Some(BindGroupCreate::MeshAttributeDataResize),
             ),
             (
                 self.attribute_index_dirty,
@@ -363,6 +374,7 @@ impl Meshes {
                 &mut self.attribute_index_gpu_buffer,
                 BufferUsage::new().with_copy_dst().with_storage(),
                 "MeshAttributeIndex",
+                Some(BindGroupCreate::MeshAttributeIndexResize),
             ),
         ];
 
@@ -372,10 +384,11 @@ impl Meshes {
             &mut self.meta_data_gpu_buffer,
             BufferUsage::new().with_copy_dst().with_storage(),
             "MeshMetaData",
+            Some(BindGroupCreate::MeshMetaResize),
         )];
 
-        let any_dirty = to_check_dynamic.iter().any(|(dirty, _, _, _, _)| *dirty)
-            || to_check_uniform.iter().any(|(dirty, _, _, _, _)| *dirty);
+        let any_dirty = to_check_dynamic.iter().any(|(dirty, _, _, _, _, _)| *dirty)
+            || to_check_uniform.iter().any(|(dirty, _, _, _, _, _)| *dirty);
 
         if any_dirty {
             let _maybe_span_guard = if logging.render_timings {
@@ -383,12 +396,30 @@ impl Meshes {
             } else {
                 None
             };
-            for (dirty, buffer, gpu_buffer, usage, label) in to_check_dynamic {
+            for (dirty, buffer, gpu_buffer, usage, label, bind_group_create) in to_check_dynamic {
                 if dirty {
                     if let Some(new_size) = buffer.take_gpu_needs_resize() {
                         *gpu_buffer = gpu.create_buffer(
                             &BufferDescriptor::new(Some(label), new_size, usage).into(),
                         )?;
+
+                        if let Some(create) = bind_group_create {
+                            bind_groups.mark_create(create);
+                        }
+                    }
+                    gpu.write_buffer(&gpu_buffer, None, buffer.raw_slice(), None, None)?;
+                }
+            }
+
+            for (dirty, buffer, gpu_buffer, usage, label, bind_group_create) in to_check_uniform {
+                if dirty {
+                    if let Some(new_size) = buffer.take_gpu_needs_resize() {
+                        *gpu_buffer = gpu.create_buffer(
+                            &BufferDescriptor::new(Some(label), new_size, usage).into(),
+                        )?;
+                        if let Some(create) = bind_group_create {
+                            bind_groups.mark_create(create);
+                        }
                     }
                     gpu.write_buffer(&gpu_buffer, None, buffer.raw_slice(), None, None)?;
                 }

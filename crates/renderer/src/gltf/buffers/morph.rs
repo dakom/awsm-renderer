@@ -1,170 +1,244 @@
 use std::borrow::Cow;
 
-use super::Result;
 use crate::buffer::helpers::slice_zeroes;
 use crate::gltf::buffers::accessor::accessor_to_bytes;
-use crate::mesh::MeshBufferMorphInfo;
-use crate::render_passes::geometry::shader::cache_key::{
-    ShaderCacheKeyGeometryAttribute, ShaderCacheKeyGeometryMorphs,
+use crate::gltf::buffers::index::extract_triangle_indices;
+use crate::gltf::buffers::{
+    MeshBufferGeometryMorphInfoWithOffset, MeshBufferIndexInfoWithOffset,
+    MeshBufferMaterialMorphInfoWithOffset,
 };
+use crate::gltf::error::{AwsmGltfError, Result};
+use crate::mesh::{MeshBufferMaterialMorphAttributes, MeshBufferVertexAttributeKind};
 
-#[derive(Default, Debug, Clone)]
-pub struct GltfMeshBufferMorphInfo {
-    // offset in morph_bytes where this primitive starts
-    pub values_offset: usize,
+/// Converts GLTF morph targets into separate geometry and material buffers
+///
+/// KEY CONCEPT - Two Different Access Patterns:
+///
+/// GEOMETRY MORPHS (Position only):
+/// - Used in visibility/geometry pass for vertex positioning
+/// - Needs per-triangle-corner data (exploded) to match visibility buffer
+/// - Layout: Triangle0[Corner0[T0_pos, T1_pos], Corner1[...], Corner2[...]]
+///
+/// MATERIAL MORPHS (Normals + Tangents):
+/// - Used in material/shading pass for surface properties  
+/// - Can use original per-vertex data (non-exploded) for efficiency
+/// - Layout: Vertex0[T0_norm, T0_tang, T1_norm, T1_tang], Vertex1[...], etc.
+/// - Material pass interpolates between original vertices anyway
+pub(super) fn convert_morph_targets(
+    primitive: &gltf::Primitive,
+    buffers: &[Vec<u8>],
+    index: &MeshBufferIndexInfoWithOffset,
+    index_bytes: &[u8],
+    triangle_count: usize,
+    geometry_morph_bytes: &mut Vec<u8>, // Exploded position morphs only
+    material_morph_bytes: &mut Vec<u8>, // Non-exploded normal/tangent morphs
+) -> Result<(
+    Option<MeshBufferGeometryMorphInfoWithOffset>,
+    Option<MeshBufferMaterialMorphInfoWithOffset>,
+)> {
+    let has_any_position_morph = primitive
+        .morph_targets()
+        .any(|morph_target| morph_target.positions().is_some());
+    let has_any_normal_morph = primitive
+        .morph_targets()
+        .any(|morph_target| morph_target.normals().is_some());
 
-    // the number of morph targets for this primitive
-    pub targets_len: usize,
+    let has_any_tangent_morph = primitive
+        .morph_targets()
+        .any(|morph_target| morph_target.tangents().is_some());
 
-    // contains info about the specific attribute targets
-    pub shader_key: ShaderCacheKeyGeometryMorphs,
-
-    // the stride of all morph targets across the vertice, without padding
-    pub vertex_stride_size: usize,
-    // the size of the whole slice of data (all vertices and targets)
-    pub values_size: usize,
-}
-
-impl From<GltfMeshBufferMorphInfo> for MeshBufferMorphInfo {
-    fn from(info: GltfMeshBufferMorphInfo) -> Self {
-        Self {
-            shader_key: info.shader_key,
-            targets_len: info.targets_len,
-            vertex_stride_size: info.vertex_stride_size,
-            values_size: info.values_size,
-        }
+    if !has_any_position_morph && !has_any_normal_morph && !has_any_tangent_morph {
+        return Ok((None, None));
     }
-}
 
-impl GltfMeshBufferMorphInfo {
-    pub fn maybe_new(
-        primitive: &gltf::Primitive<'_>,
-        buffers: &[Vec<u8>],
-        vertex_count: usize,
-        morph_bytes: &mut Vec<u8>,
-    ) -> Result<Option<Self>> {
-        let shader_key = ShaderCacheKeyGeometryMorphs {
-            position: primitive
-                .morph_targets()
-                .any(|morph_target| morph_target.positions().is_some()),
-            normal: primitive
-                .morph_targets()
-                .any(|morph_target| morph_target.normals().is_some()),
-            tangent: primitive
-                .morph_targets()
-                .any(|morph_target| morph_target.tangents().is_some()),
-        };
+    // Load all morph target data from GLTF
+    // This is the ORIGINAL per-vertex morph data (deltas from base mesh)
+    #[derive(Default)]
+    struct MorphTargetBufferData<'a> {
+        positions: Option<Cow<'a, [u8]>>, // Position deltas (vec3<f32> per original vertex)
+        normals: Option<Cow<'a, [u8]>>,   // Normal deltas (vec3<f32> per original vertex)
+        tangents: Option<Cow<'a, [u8]>>,  // Tangent deltas (vec3<f32> per original vertex, no W)
+    }
 
-        if !shader_key.any() {
-            Ok(None)
-        } else {
-            let mut morph_targets_buffer_data = Vec::new();
+    let mut morph_targets_buffer_data = Vec::new();
+    for morph_target in primitive.morph_targets() {
+        let mut morph_target_buffer_data = MorphTargetBufferData::default();
 
-            #[derive(Default)]
-            struct MorphTargetBufferData<'a> {
-                positions: Option<Cow<'a, [u8]>>,
-                normals: Option<Cow<'a, [u8]>>,
-                tangents: Option<Cow<'a, [u8]>>,
-            }
-            for morph_target in primitive.morph_targets() {
-                let mut morph_target_buffer_data = MorphTargetBufferData::default();
+        if let Some(accessor) = morph_target.positions() {
+            morph_target_buffer_data.positions = Some(accessor_to_bytes(&accessor, buffers)?);
+        }
+        if let Some(accessor) = morph_target.normals() {
+            morph_target_buffer_data.normals = Some(accessor_to_bytes(&accessor, buffers)?);
+        }
+        if let Some(accessor) = morph_target.tangents() {
+            morph_target_buffer_data.tangents = Some(accessor_to_bytes(&accessor, buffers)?);
+        }
 
-                if let Some(accessor) = morph_target.positions() {
-                    morph_target_buffer_data.positions =
-                        Some(accessor_to_bytes(&accessor, buffers)?);
-                }
+        morph_targets_buffer_data.push(morph_target_buffer_data);
+    }
 
-                if let Some(accessor) = morph_target.normals() {
-                    morph_target_buffer_data.normals = Some(accessor_to_bytes(&accessor, buffers)?);
-                }
-                if let Some(accessor) = morph_target.tangents() {
-                    morph_target_buffer_data.tangents =
-                        Some(accessor_to_bytes(&accessor, buffers)?);
-                }
+    let targets_len = morph_targets_buffer_data.len();
 
-                morph_targets_buffer_data.push(morph_target_buffer_data);
-            }
+    // Get original vertex count for material morphs
+    let original_vertex_count = primitive
+        .attributes()
+        .next()
+        .map(|(_, accessor)| accessor.count())
+        .unwrap_or(0);
 
-            // same idea as what we did with the vertex attributes
-            // but here we lay them out interleaved by morph target
-            // for example, the sequence would be:
-            // vertex 1, target 1: position, normal, tangent
-            // vertex 1, target 2: position, normal, tangent
-            // vertex 2, target 1: position, normal, tangent
-            // vertex 2, target 2: position, normal, tangent
-            //
-            // and then in the shader, for each vertex,
-            // it can read all the morph targets for that vertex
-            // essentially by just reading from its offset start to finish
-            //
-            // if a semantic is not used, we skip it instead of
-            // filling with 0's, since the shader will be different anyway
+    // GEOMETRY MORPHS: Convert positions to exploded triangle-corner format
+    let geometry_morph_info = if has_any_position_morph {
+        let geometry_values_offset = geometry_morph_bytes.len();
 
-            let values_offset = morph_bytes.len();
+        // Get triangles with ORIGINAL vertex indices for explosion
+        let triangle_indices = extract_triangle_indices(index, index_bytes)?;
 
-            let mut vertex_morph_stride_size = 0;
+        // Size of position data for ONE triangle, ONE target (3 vertices * vec3<f32>)
+        let size_per_target_per_triangle = 36; // 3 vertices * 12 bytes (vec3<f32>)
 
-            for vertex_index in 0..vertex_count {
-                // eh, we could only set this once, but this is slightly nicer to read
-                // when the loop breaks we return the latest-and-greatest value
-                vertex_morph_stride_size = 0;
+        // Size of position data for ONE triangle, ALL targets
+        let triangle_stride_size = size_per_target_per_triangle * targets_len;
 
+        // TRIANGLE EXPLOSION FOR POSITIONS
+        // Convert from original indexed position morphs to exploded triangle-corner data
+        //
+        // INTERLEAVING PATTERN (for visibility buffer):
+        // Triangle 0:
+        //   Corner 0: [Target0_pos, Target1_pos, Target2_pos, ...]
+        //   Corner 1: [Target0_pos, Target1_pos, Target2_pos, ...]
+        //   Corner 2: [Target0_pos, Target1_pos, Target2_pos, ...]
+        // Triangle 1:
+        //   Corner 0: [Target0_pos, Target1_pos, Target2_pos, ...]
+        //   ... etc
+        for triangle in &triangle_indices {
+            // For each vertex corner in this triangle (3 corners per triangle)
+            for vertex_index in triangle {
+                // For each morph target (interleaved per vertex corner)
                 for morph_target_buffer_data in &morph_targets_buffer_data {
-                    let mut push_bytes =
-                        |attribute_kind: ShaderCacheKeyGeometryAttribute,
-                         data: Option<&Cow<'_, [u8]>>| {
-                            let stride_size = match attribute_kind {
-                                ShaderCacheKeyGeometryAttribute::Positions => 12, // vec3 of floats
-                                ShaderCacheKeyGeometryAttribute::Normals => 12,   // vec3 of floats
-                                ShaderCacheKeyGeometryAttribute::Tangents => 12, // vec3 of floats (yes, not a vec4, morph targets do not include w component)
-                                _ => unreachable!(),
-                            };
-                            match data {
-                                Some(data) => {
-                                    let data_byte_offset = vertex_index * stride_size;
-                                    //tracing::info!("{:?} {} -> {} of {}", attr_kind, data_byte_offset, data_byte_offset + stride_size, data.len());
-                                    let data_bytes =
-                                        &data[data_byte_offset..data_byte_offset + stride_size];
-                                    morph_bytes.extend_from_slice(data_bytes);
-                                }
-                                None => {
-                                    morph_bytes.extend_from_slice(slice_zeroes(stride_size));
-                                }
+                    match &morph_target_buffer_data.positions {
+                        Some(position_data) => {
+                            // Look up the position delta using the ORIGINAL vertex index
+                            let data_byte_offset = vertex_index * 12; // vec3<f32> = 12 bytes
+                            if data_byte_offset + 12 > position_data.len() {
+                                return Err(AwsmGltfError::ConstructNormals(format!(
+                                    "Position morph data out of bounds for vertex {}",
+                                    vertex_index
+                                )));
                             }
-
-                            vertex_morph_stride_size += stride_size;
-                        };
-
-                    if shader_key.position {
-                        push_bytes(
-                            ShaderCacheKeyGeometryAttribute::Positions,
-                            morph_target_buffer_data.positions.as_ref(),
-                        );
-                    }
-
-                    if shader_key.normal {
-                        push_bytes(
-                            ShaderCacheKeyGeometryAttribute::Normals,
-                            morph_target_buffer_data.normals.as_ref(),
-                        );
-                    }
-
-                    if shader_key.tangent {
-                        push_bytes(
-                            ShaderCacheKeyGeometryAttribute::Tangents,
-                            morph_target_buffer_data.tangents.as_ref(),
-                        );
+                            let position_bytes =
+                                &position_data[data_byte_offset..data_byte_offset + 12];
+                            geometry_morph_bytes.extend_from_slice(position_bytes);
+                        }
+                        None => {
+                            // Fill with zeros if this target doesn't have positions
+                            geometry_morph_bytes.extend_from_slice(slice_zeroes(12));
+                        }
                     }
                 }
             }
-
-            Ok(Some(Self {
-                values_offset,
-                shader_key,
-                targets_len: primitive.morph_targets().len(),
-                values_size: morph_bytes.len() - values_offset,
-                vertex_stride_size: vertex_morph_stride_size,
-            }))
         }
-    }
+
+        let geometry_values_size = geometry_morph_bytes.len() - geometry_values_offset;
+
+        Some(MeshBufferGeometryMorphInfoWithOffset {
+            targets_len,
+            triangle_stride_size,
+            values_size: geometry_values_size,
+            values_offset: geometry_values_offset,
+        })
+    } else {
+        None
+    };
+
+    let morph_attributes = MeshBufferMaterialMorphAttributes {
+        normal: has_any_normal_morph,
+        tangent: has_any_tangent_morph,
+    };
+
+    // MATERIAL MORPHS: Keep normals + tangents in original per-vertex format
+    let material_morph_info = if morph_attributes.normal || morph_attributes.tangent {
+        let material_values_offset = material_morph_bytes.len();
+
+        // Size of material data for ONE vertex, ONE target
+        let mut size_per_target_per_vertex = 0;
+        if morph_attributes.normal {
+            size_per_target_per_vertex += 12; // vec3<f32>
+        }
+        if morph_attributes.tangent {
+            size_per_target_per_vertex += 12; // vec3<f32> (no w component in morph targets)
+        }
+
+        // Size of material data for ONE vertex, ALL targets
+        let vertex_stride_size = size_per_target_per_vertex * targets_len;
+
+        // NON-EXPLODED LAYOUT FOR MATERIALS
+        // Keep original per-vertex structure since material pass interpolates anyway
+        //
+        // INTERLEAVING PATTERN (for material pass):
+        // Vertex 0: [Target0_norm, Target0_tang, Target1_norm, Target1_tang, ...]
+        // Vertex 1: [Target0_norm, Target0_tang, Target1_norm, Target1_tang, ...]
+        // Vertex 2: [Target0_norm, Target0_tang, Target1_norm, Target1_tang, ...]
+        // ... etc (original vertex order preserved)
+        for original_vertex_index in 0..original_vertex_count {
+            // For each morph target (interleaved per original vertex)
+            for morph_target_buffer_data in &morph_targets_buffer_data {
+                // Helper to push material attribute data
+                let mut push_material_morph_data =
+                    |attribute_kind: MeshBufferVertexAttributeKind,
+                     data: Option<&Cow<'_, [u8]>>|
+                     -> Result<()> {
+                        let stride_size = 12; // vec3<f32> for both normals and tangents
+
+                        match data {
+                            Some(data) => {
+                                // Look up the morph delta using the ORIGINAL vertex index
+                                let data_byte_offset = original_vertex_index * stride_size;
+                                if data_byte_offset + stride_size > data.len() {
+                                    return Err(AwsmGltfError::ConstructNormals(format!(
+                                    "Material morph data out of bounds for vertex {} in attribute {:?}",
+                                    original_vertex_index, attribute_kind
+                                )));
+                                }
+                                let data_bytes =
+                                    &data[data_byte_offset..data_byte_offset + stride_size];
+                                material_morph_bytes.extend_from_slice(data_bytes);
+                            }
+                            None => {
+                                // Fill with zeros if this target doesn't have this attribute
+                                material_morph_bytes.extend_from_slice(slice_zeroes(stride_size));
+                            }
+                        }
+                        Ok(())
+                    };
+
+                // Push material attributes in consistent order FOR THIS TARGET
+                if morph_attributes.normal {
+                    push_material_morph_data(
+                        MeshBufferVertexAttributeKind::Normals,
+                        morph_target_buffer_data.normals.as_ref(),
+                    )?;
+                }
+                if morph_attributes.tangent {
+                    push_material_morph_data(
+                        MeshBufferVertexAttributeKind::Tangents,
+                        morph_target_buffer_data.tangents.as_ref(),
+                    )?;
+                }
+            }
+        }
+
+        let material_values_size = material_morph_bytes.len() - material_values_offset;
+
+        Some(MeshBufferMaterialMorphInfoWithOffset {
+            attributes: morph_attributes,
+            targets_len,
+            vertex_stride_size,
+            values_size: material_values_size,
+            values_offset: material_values_offset,
+        })
+    } else {
+        None
+    };
+
+    Ok((geometry_morph_info, material_morph_info))
 }

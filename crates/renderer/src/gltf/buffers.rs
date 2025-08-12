@@ -1,25 +1,28 @@
 // pub mod vertex;
 //pub mod morph;
 pub mod accessor;
-pub mod helpers;
+pub mod attributes;
 pub mod index;
+pub mod morph;
 pub mod normals;
+pub mod triangle;
 pub mod visibility;
 
 use super::populate::transforms::transform_gltf_node;
 
 use awsm_renderer_core::pipeline::primitive::{FrontFace, IndexFormat};
+use gltf::Mesh;
 
 use crate::{
     gltf::buffers::{
-        helpers::transform_to_winding_order,
         index::{generate_fresh_indices_from_primitive, GltfMeshBufferIndexInfo},
         visibility::convert_to_visibility_buffer,
     },
     mesh::{
-        MeshBufferIndexInfo, MeshBufferInfo, MeshBufferMorphAttributes, MeshBufferMorphInfo,
-        MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo,
-        MeshBufferVertexAttributeKind, MeshBufferVertexInfo,
+        MeshBufferGeometryMorphInfo, MeshBufferIndexInfo, MeshBufferInfo,
+        MeshBufferMaterialMorphAttributes, MeshBufferMaterialMorphInfo, MeshBufferTriangleDataInfo,
+        MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo, MeshBufferVertexAttributeKind,
+        MeshBufferVertexInfo,
     },
 };
 
@@ -45,7 +48,8 @@ pub struct GltfBuffers {
     pub triangle_data_bytes: Vec<u8>,
 
     // these also always follow the same interleaving pattern
-    pub triangle_morph_bytes: Option<Vec<u8>>,
+    pub geometry_morph_bytes: Vec<u8>,
+    pub material_morph_bytes: Vec<u8>,
 
     // first level is mesh, second level is primitive
     pub meshes: Vec<Vec<MeshBufferInfoWithOffset>>,
@@ -55,7 +59,8 @@ pub struct GltfBuffers {
 pub struct MeshBufferInfoWithOffset {
     pub vertex: MeshBufferVertexInfoWithOffset,
     pub triangles: MeshBufferTriangleInfoWithOffset,
-    pub morph: Option<MeshBufferMorphInfoWithOffset>,
+    pub geometry_morph: Option<MeshBufferGeometryMorphInfoWithOffset>,
+    pub material_morph: Option<MeshBufferMaterialMorphInfoWithOffset>,
 }
 
 impl From<MeshBufferInfoWithOffset> for MeshBufferInfo {
@@ -63,7 +68,8 @@ impl From<MeshBufferInfoWithOffset> for MeshBufferInfo {
         MeshBufferInfo {
             vertex: info.vertex.into(),
             triangles: info.triangles.into(),
-            morph: info.morph.map(|m| m.into()),
+            geometry_morph: info.geometry_morph.map(|m| m.into()),
+            material_morph: info.material_morph.map(|m| m.into()),
         }
     }
 }
@@ -152,21 +158,41 @@ impl From<MeshBufferVertexAttributeInfoWithOffset> for MeshBufferVertexAttribute
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct MeshBufferMorphInfoWithOffset {
-    pub attributes: MeshBufferMorphAttributes,
+/// Information about geometry morphs (positions only, exploded for visibility buffer)
+#[derive(Debug, Clone)]
+pub struct MeshBufferGeometryMorphInfoWithOffset {
     pub targets_len: usize,
-    pub triangle_stride_size: usize,
+    pub triangle_stride_size: usize, // Size per triangle across all targets (positions only)
     pub values_size: usize,
     pub values_offset: usize,
 }
 
-impl From<MeshBufferMorphInfoWithOffset> for MeshBufferMorphInfo {
-    fn from(info: MeshBufferMorphInfoWithOffset) -> Self {
-        MeshBufferMorphInfo {
-            attributes: info.attributes,
+impl From<MeshBufferGeometryMorphInfoWithOffset> for MeshBufferGeometryMorphInfo {
+    fn from(info: MeshBufferGeometryMorphInfoWithOffset) -> Self {
+        MeshBufferGeometryMorphInfo {
             targets_len: info.targets_len,
             triangle_stride_size: info.triangle_stride_size,
+            values_size: info.values_size,
+        }
+    }
+}
+
+/// Information about material morphs (normals + tangents, non-exploded per-vertex)
+#[derive(Debug, Clone)]
+pub struct MeshBufferMaterialMorphInfoWithOffset {
+    pub attributes: MeshBufferMaterialMorphAttributes, // Which attributes are present
+    pub targets_len: usize,
+    pub vertex_stride_size: usize, // Size per original vertex across all targets
+    pub values_size: usize,
+    pub values_offset: usize,
+}
+
+impl From<MeshBufferMaterialMorphInfoWithOffset> for MeshBufferMaterialMorphInfo {
+    fn from(info: MeshBufferMaterialMorphInfoWithOffset) -> Self {
+        MeshBufferMaterialMorphInfo {
+            attributes: info.attributes,
+            targets_len: info.targets_len,
+            vertex_stride_size: info.vertex_stride_size,
             values_size: info.values_size,
         }
     }
@@ -199,7 +225,8 @@ impl GltfBuffers {
         let mut visibility_vertex_bytes: Vec<u8> = Vec::new();
         let mut attribute_vertex_bytes: Vec<u8> = Vec::new();
         let mut triangle_data_bytes: Vec<u8> = Vec::new();
-        let mut triangle_morph_bytes: Vec<u8> = Vec::new();
+        let mut geometry_morph_bytes: Vec<u8> = Vec::new();
+        let mut material_morph_bytes: Vec<u8> = Vec::new();
         let mut meshes: Vec<Vec<MeshBufferInfoWithOffset>> = Vec::new();
 
         for mesh in doc.meshes() {
@@ -210,7 +237,7 @@ impl GltfBuffers {
                     .find(|node| {
                         node.mesh().is_some() && node.mesh().unwrap().index() == mesh.index()
                     })
-                    .map(|node| transform_to_winding_order(&transform_gltf_node(&node).to_matrix()))
+                    .map(|node| transform_gltf_node(&node).winding_order())
                     .unwrap_or(FrontFace::Ccw) // Default to CCW if no node found
             };
             for primitive in mesh.primitives() {
@@ -233,7 +260,8 @@ impl GltfBuffers {
                     &mut visibility_vertex_bytes,
                     &mut attribute_vertex_bytes,
                     &mut triangle_data_bytes,
-                    &mut triangle_morph_bytes,
+                    &mut geometry_morph_bytes,
+                    &mut material_morph_bytes,
                 )?;
 
                 primitive_buffer_infos.push(visibility_buffer_info);
@@ -249,11 +277,8 @@ impl GltfBuffers {
             attribute_vertex_bytes,
             triangle_data_bytes,
             meshes,
-            triangle_morph_bytes: if triangle_morph_bytes.is_empty() {
-                None
-            } else {
-                Some(triangle_morph_bytes)
-            },
+            geometry_morph_bytes,
+            material_morph_bytes,
         })
     }
 }

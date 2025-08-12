@@ -45,7 +45,8 @@ impl AwsmRenderer {
         self.meshes
             .morphs
             .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
-        self.meshes.write_gpu(&self.logging, &self.gpu)?;
+        self.meshes
+            .write_gpu(&self.logging, &self.gpu, &mut self.bind_groups)?;
         self.camera
             .write_gpu(&self.logging, &self.gpu, &self.bind_groups)?;
 

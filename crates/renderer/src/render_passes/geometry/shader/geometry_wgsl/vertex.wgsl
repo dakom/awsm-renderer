@@ -21,9 +21,23 @@ struct TransformUniform {
     model: mat4x4<f32>,
 };
 
+@group(2) @binding(3)
+var<uniform> mesh_meta: MeshMeta;
+
+struct MeshMeta {
+    mesh_key_high: u32,
+    mesh_key_low: u32,
+    material_offset: u32,
+    morph_geometry_target_len: u32,
+    morph_material_target_len: u32,
+    morph_material_bitmask: u32,
+    skin_joint_len: u32
+}
+
 
 //***** INPUT/OUTPUT *****
 struct VertexInput {
+    @builtin(vertex_index) vertex_index: u32,
     @location(0) position: vec3<f32>,      // World position
     @location(1) triangle_id: u32,        // Triangle ID for this vertex
     @location(2) barycentric: vec2<f32>,   // Barycentric coordinates (x, y) - z = 1.0 - x - y
@@ -40,8 +54,15 @@ struct VertexOutput {
 
 //***** MAIN *****
 @vertex
-fn vert_main(vertex: VertexInput) -> VertexOutput {
+fn vert_main(vertex_orig: VertexInput) -> VertexOutput {
     var out: VertexOutput;
+
+    var vertex = vertex_orig;
+
+    if mesh_meta.morph_geometry_target_len != 0 {
+        vertex = apply_position_morphs(vertex);
+    }
+
 
     let model_transform = u_transform.model;
     var pos = model_transform * vec4<f32>(vertex.position, 1.0);

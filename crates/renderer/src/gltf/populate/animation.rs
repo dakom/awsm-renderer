@@ -2,15 +2,15 @@ use glam::{Quat, Vec3};
 
 use crate::{
     animation::{
-        AnimationClip, AnimationData, AnimationKey, AnimationPlayer, AnimationSampler,
-        TransformAnimation, VertexAnimation,
+        AnimationClip, AnimationData, AnimationKey, AnimationMorphKey, AnimationPlayer,
+        AnimationSampler, TransformAnimation, VertexAnimation,
     },
     buffer::helpers::u8_to_f32_vec,
     gltf::{
         buffers::accessor::accessor_to_bytes,
         error::{AwsmGltfError, Result},
     },
-    mesh::MorphKey,
+    mesh::morphs::{GeometryMorphKey, MaterialMorphKey},
     transforms::TransformKey,
     AwsmRenderer,
 };
@@ -97,48 +97,83 @@ impl AwsmRenderer {
         &'a mut self,
         ctx: &'c GltfPopulateContext,
         gltf_sampler: gltf::animation::Sampler<'b>,
-        morph_key: MorphKey,
-    ) -> Result<AnimationKey> {
-        let morph_info = &self.meshes.morphs.get_info(morph_key)?;
+        geometry_morph_key: Option<GeometryMorphKey>,
+        material_morph_key: Option<MaterialMorphKey>,
+    ) -> Result<Vec<AnimationKey>> {
+        let mut morph_keys = Vec::new();
+        let mut animation_keys = Vec::new();
 
-        let times = sampler_timestamps(ctx, &gltf_sampler)?;
-        let duration = (times.last().copied().unwrap_or(0.0) - times[0]) as f64;
-        let values = accessor_to_bytes(&gltf_sampler.output(), &ctx.data.buffers.raw)?;
-        let values = u8_to_f32_vec(&values);
+        if let Some(morph_key) = geometry_morph_key {
+            morph_keys.push(morph_key.into());
+        }
 
-        let values = values
-            .chunks(morph_info.targets_len)
-            .map(|chunk| AnimationData::Vertex(VertexAnimation::new(chunk.to_vec())))
-            .collect();
+        if let Some(morph_key) = material_morph_key {
+            morph_keys.push(morph_key.into());
+        }
 
-        let sampler = match gltf_sampler.interpolation() {
-            gltf::animation::Interpolation::Linear => AnimationSampler::Linear { times, values },
-            gltf::animation::Interpolation::Step => AnimationSampler::Step { times, values },
-            gltf::animation::Interpolation::CubicSpline => {
-                let mut in_tangents = Vec::with_capacity(values.len() / 3);
-                let mut spline_vertices = Vec::with_capacity(values.len() / 3);
-                let mut out_tangents = Vec::with_capacity(values.len() / 3);
-
-                for x in values.chunks_exact(3) {
-                    in_tangents.push(x[0].clone());
-                    spline_vertices.push(x[1].clone());
-                    out_tangents.push(x[2].clone());
+        for morph_key in morph_keys {
+            let targets_len = match morph_key {
+                AnimationMorphKey::Geometry(morph_key) => {
+                    self.meshes
+                        .morphs
+                        .geometry
+                        .get_info(morph_key)
+                        .map_err(|_| (AwsmGltfError::MissingMorphForAnimation))?
+                        .targets_len
                 }
-
-                AnimationSampler::CubicSpline {
-                    times,
-                    in_tangents,
-                    values: spline_vertices,
-                    out_tangents,
+                AnimationMorphKey::Material(morph_key) => {
+                    self.meshes
+                        .morphs
+                        .material
+                        .get_info(morph_key)
+                        .map_err(|_| (AwsmGltfError::MissingMorphForAnimation))?
+                        .targets_len
                 }
-            }
-        };
+            };
 
-        let clip = AnimationClip::new(Some("morph".to_string()), duration, sampler);
+            let times = sampler_timestamps(ctx, &gltf_sampler)?;
+            let duration = (times.last().copied().unwrap_or(0.0) - times[0]) as f64;
+            let values = accessor_to_bytes(&gltf_sampler.output(), &ctx.data.buffers.raw)?;
+            let values = u8_to_f32_vec(&values);
 
-        let player = AnimationPlayer::new(clip);
+            let values = values
+                .chunks(targets_len)
+                .map(|chunk| AnimationData::Vertex(VertexAnimation::new(chunk.to_vec())))
+                .collect();
 
-        Ok(self.animations.insert_morph(player, morph_key))
+            let sampler = match gltf_sampler.interpolation() {
+                gltf::animation::Interpolation::Linear => {
+                    AnimationSampler::Linear { times, values }
+                }
+                gltf::animation::Interpolation::Step => AnimationSampler::Step { times, values },
+                gltf::animation::Interpolation::CubicSpline => {
+                    let mut in_tangents = Vec::with_capacity(values.len() / 3);
+                    let mut spline_vertices = Vec::with_capacity(values.len() / 3);
+                    let mut out_tangents = Vec::with_capacity(values.len() / 3);
+
+                    for x in values.chunks_exact(3) {
+                        in_tangents.push(x[0].clone());
+                        spline_vertices.push(x[1].clone());
+                        out_tangents.push(x[2].clone());
+                    }
+
+                    AnimationSampler::CubicSpline {
+                        times,
+                        in_tangents,
+                        values: spline_vertices,
+                        out_tangents,
+                    }
+                }
+            };
+
+            let clip = AnimationClip::new(Some("morph".to_string()), duration, sampler);
+
+            let player = AnimationPlayer::new(clip);
+
+            animation_keys.push(self.animations.insert_morph(player, morph_key));
+        }
+
+        Ok(animation_keys)
     }
 
     fn populate_gltf_animation_transform_translation<'a, 'b: 'a, 'c: 'a>(

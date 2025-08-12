@@ -15,27 +15,31 @@ use crate::{
     camera::CameraBuffer,
     lights::Lights,
     materials::{pbr::PbrMaterial, Materials},
+    mesh::meta::MESH_META_BYTE_ALIGNMENT,
     render_passes::{composite::bind_group, RenderPassInitContext},
     transforms::Transforms,
 };
 use crate::{error::Result, materials::MaterialBufferKind};
 
 pub struct GeometryBindGroups {
+    // These could theoretically be somewhat static or re-used with other passes
     pub camera_lights: GeometryBindGroupCameraLights,
+    // Likewise, theoretically these could be be used for multiple meshes
     pub transform_materials: GeometryBindGroupTransformMaterials,
-    pub vertex_animation: GeometryBindGroupVertexAnimation,
+    // These are more specific to the mesh
+    pub meta_vertex_animation: GeometryBindGroupMetaVertexAnimation,
 }
 
 impl GeometryBindGroups {
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let camera_lights = GeometryBindGroupCameraLights::new(ctx).await?;
         let transform_materials = GeometryBindGroupTransformMaterials::new(ctx).await?;
-        let vertex_animation = GeometryBindGroupVertexAnimation::new(ctx).await?;
+        let meta_vertex_animation = GeometryBindGroupMetaVertexAnimation::new(ctx).await?;
 
         Ok(Self {
             camera_lights,
             transform_materials,
-            vertex_animation,
+            meta_vertex_animation,
         })
     }
 }
@@ -194,13 +198,13 @@ impl GeometryBindGroupTransformMaterials {
 }
 
 #[derive(Default)]
-pub struct GeometryBindGroupVertexAnimation {
+pub struct GeometryBindGroupMetaVertexAnimation {
     pub bind_group_layout_key: BindGroupLayoutKey,
     // this is set via `recreate` mechanism
     _bind_group: Option<web_sys::GpuBindGroup>,
 }
 
-impl GeometryBindGroupVertexAnimation {
+impl GeometryBindGroupMetaVertexAnimation {
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
             entries: vec![
@@ -234,6 +238,16 @@ impl GeometryBindGroupVertexAnimation {
                     visibility_fragment: true,
                     visibility_compute: false,
                 },
+                BindGroupLayoutCacheKeyEntry {
+                    resource: BindGroupLayoutResource::Buffer(
+                        BufferBindingLayout::new()
+                            .with_binding_type(BufferBindingType::Uniform)
+                            .with_dynamic_offset(true),
+                    ),
+                    visibility_vertex: true,
+                    visibility_fragment: true,
+                    visibility_compute: false,
+                },
             ],
         };
 
@@ -255,18 +269,25 @@ impl GeometryBindGroupVertexAnimation {
                 BindGroupEntry::new(
                     0,
                     BindGroupResource::Buffer(BufferBinding::new(
-                        &ctx.meshes.morphs.gpu_buffer_weights,
+                        &ctx.meshes.morphs.geometry.gpu_buffer_weights,
                     )),
                 ),
                 BindGroupEntry::new(
                     1,
                     BindGroupResource::Buffer(BufferBinding::new(
-                        &ctx.meshes.morphs.gpu_buffer_values,
+                        &ctx.meshes.morphs.geometry.gpu_buffer_values,
                     )),
                 ),
                 BindGroupEntry::new(
                     2,
                     BindGroupResource::Buffer(BufferBinding::new(&ctx.meshes.skins.gpu_buffer)),
+                ),
+                BindGroupEntry::new(
+                    3,
+                    BindGroupResource::Buffer(
+                        BufferBinding::new(&ctx.meshes.meta_data_gpu_buffer())
+                            .with_size(MESH_META_BYTE_ALIGNMENT),
+                    ),
                 ),
             ],
         );
@@ -280,8 +301,8 @@ impl GeometryBindGroupVertexAnimation {
     pub fn get_bind_group(
         &self,
     ) -> std::result::Result<&web_sys::GpuBindGroup, AwsmBindGroupError> {
-        self._bind_group
-            .as_ref()
-            .ok_or_else(|| AwsmBindGroupError::NotFound("Geometry vertex animation".to_string()))
+        self._bind_group.as_ref().ok_or_else(|| {
+            AwsmBindGroupError::NotFound("Geometry meta vertex animation".to_string())
+        })
     }
 }

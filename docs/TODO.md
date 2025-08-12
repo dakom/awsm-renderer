@@ -1,12 +1,7 @@
-# Set MeshInfo as uniform buffer
+# Get morphs/skins working again
 
-- it's all prepared, just bind!
-- get morphs working again
-    - use uniform data for presence and loop length
+- unroll geometry morphs
 - get skins working again
-    - use unform data for presence and loop length
-
-- unroll the common cases, fall back to for-loop only if those aren't met
 
 # Get started with opaque material pass 
 
@@ -24,6 +19,15 @@
 2. Use in opaque material pass
 
 # Unified draw call (see below)
+
+# get rid of 256 byte alignment for mesh meta?
+
+- maybe only necessary for uniforms?
+
+# Multithreading
+
+Dynamic/Uniform storages could be SharedArrayBuffer
+Requires more design/thought (don't want to expose raw manipulation)
 
 
 # World Position Reconstruction Math: 

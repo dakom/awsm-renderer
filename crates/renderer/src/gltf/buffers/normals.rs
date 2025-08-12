@@ -1,13 +1,35 @@
+use std::{borrow::Cow, collections::HashMap};
+
 use awsm_renderer_core::pipeline::primitive::IndexFormat;
 use glam::Vec3;
 
 use crate::{
     gltf::{
-        buffers::{helpers::extract_triangle_indices, MeshBufferIndexInfoWithOffset},
+        buffers::{index::extract_triangle_indices, MeshBufferIndexInfoWithOffset},
         error::{AwsmGltfError, Result},
     },
-    mesh::MeshBufferIndexInfo,
+    mesh::{MeshBufferIndexInfo, MeshBufferVertexAttributeKind},
 };
+
+pub(super) fn ensure_normals<'a>(
+    mut attribute_data: HashMap<MeshBufferVertexAttributeKind, Cow<'a, [u8]>>,
+    index: &MeshBufferIndexInfoWithOffset,
+    index_bytes: &[u8],
+) -> Result<HashMap<MeshBufferVertexAttributeKind, Cow<'a, [u8]>>> {
+    if !attribute_data.contains_key(&MeshBufferVertexAttributeKind::Normals) {
+        let positions = attribute_data
+            .get(&MeshBufferVertexAttributeKind::Positions)
+            .ok_or_else(|| AwsmGltfError::ConstructNormals("missing positions".to_string()))?;
+
+        let normals_bytes = compute_normals(positions, index, index_bytes)?;
+        attribute_data.insert(
+            MeshBufferVertexAttributeKind::Normals,
+            Cow::Owned(normals_bytes),
+        );
+    }
+
+    Ok(attribute_data)
+}
 
 pub(super) fn compute_normals(
     positions_bytes: &[u8],

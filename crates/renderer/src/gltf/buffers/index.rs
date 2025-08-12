@@ -280,3 +280,96 @@ pub fn generate_fresh_indices_from_primitive(
         ))),
     }
 }
+
+pub(super) fn extract_triangle_indices(
+    index: &MeshBufferIndexInfoWithOffset,
+    all_index_bytes: &[u8],
+) -> Result<Vec<[usize; 3]>> {
+    if index.count % 3 != 0 {
+        return Err(AwsmGltfError::ExtractIndices(format!(
+            "Index count ({}) is not a multiple of 3, cannot form triangles.",
+            index.count
+        )));
+    }
+
+    if index.count == 0 {
+        return Ok(Vec::new());
+    }
+
+    // we're just working with the bytes of this primitive
+    let index_bytes = &all_index_bytes[index.offset..index.offset + index.total_size()];
+
+    let num_triangles = index.count / 3;
+    let mut triangles = Vec::with_capacity(num_triangles);
+
+    for i in 0..num_triangles {
+        let mut triangle = [0usize; 3];
+        let mut triangle = [0usize; 3];
+
+        // Read the 3 vertex indices that form this triangle
+        for j in 0..3 {
+            // Calculate byte offset for this specific index
+            // i = triangle number, j = vertex within triangle (0, 1, or 2)
+            let index_offset = (i * 3 + j) * index.data_size;
+
+            // Bounds check to ensure we don't read past the buffer
+            if index_offset + index.data_size > index_bytes.len() {
+                return Err(AwsmGltfError::ExtractIndices(format!(
+                    "Index data out of bounds at triangle {}, vertex {}",
+                    i, j
+                )));
+            }
+
+            // Extract the raw bytes for this index (either 2 or 4 bytes)
+            let index_slice = &index_bytes[index_offset..index_offset + index.data_size];
+
+            // Convert bytes to vertex index based on format
+            // IMPORTANT: This vertex_idx points to a vertex in the ORIGINAL attribute arrays
+            // For example, if vertex_idx = 5, it means "use the 6th vertex from positions[],
+            // normals[], texcoords[], etc."
+            let vertex_idx = match index.format {
+                IndexFormat::Uint16 => {
+                    if index.data_size != 2 {
+                        return Err(AwsmGltfError::ExtractIndices(
+                            "IndexFormat::Uint16 expects data_size of 2".to_string(),
+                        ));
+                    }
+                    // Read 2 bytes as little-endian u16, convert to usize
+                    u16::from_le_bytes(index_slice.try_into().unwrap()) as usize
+                }
+                IndexFormat::Uint32 => {
+                    if index.data_size != 4 {
+                        return Err(AwsmGltfError::ExtractIndices(
+                            "IndexFormat::Uint32 expects data_size of 4".to_string(),
+                        ));
+                    }
+                    // Read 4 bytes as little-endian u32, convert to usize
+                    u32::from_le_bytes(index_slice.try_into().unwrap()) as usize
+                }
+                _ => {
+                    return Err(AwsmGltfError::ConstructNormals(format!(
+                        "Unsupported index format: {:?}",
+                        index.format
+                    )));
+                }
+            };
+
+            // Store the ORIGINAL vertex index (references attribute arrays)
+            triangle[j] = vertex_idx;
+        }
+
+        // Add this triangle to our collection
+        // Each triangle contains 3 ORIGINAL vertex indices that reference the attribute data
+        triangles.push(triangle);
+    }
+
+    // Return array of triangles, where each triangle is [vertex_idx_0, vertex_idx_1, vertex_idx_2]
+    // These indices reference the ORIGINAL per-vertex attribute data
+    //
+    // NEXT STEP: The visibility buffer conversion will use these triangles to:
+    // 1. Look up vertex attributes (positions, normals, etc.) using these indices
+    // 2. "Explode" the triangles by creating 3 separate vertices per triangle
+    // 3. Generate NEW sequential indices (0,1,2,3,4,5...) for the exploded vertices
+    // 4. Assign triangle IDs and barycentric coordinates to each exploded vertex
+    Ok(triangles)
+}

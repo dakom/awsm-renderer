@@ -3,7 +3,6 @@ use std::{future::Future, pin::Pin};
 use crate::{
     bounds::Aabb,
     gltf::{
-        buffers::helpers::transform_to_winding_order,
         error::{AwsmGltfError, Result},
         populate::material::GltfMaterialInfo,
     },
@@ -101,11 +100,10 @@ impl AwsmRenderer {
             GltfMaterialInfo::new(self, ctx, primitive_buffer_info, gltf_primitive.material())
                 .await?;
 
-        let morph_key = match primitive_buffer_info.morph.clone() {
+        let geometry_morph_key = match primitive_buffer_info.geometry_morph.clone() {
             None => None,
             Some(morph_buffer_info) => {
-                // safe, can't have morph info without backing bytes
-                let values = ctx.data.buffers.triangle_morph_bytes.as_ref().unwrap();
+                let values = &ctx.data.buffers.geometry_morph_bytes;
                 let values = &values[morph_buffer_info.values_offset
                     ..morph_buffer_info.values_offset + morph_buffer_info.values_size];
 
@@ -113,11 +111,30 @@ impl AwsmRenderer {
                 // this is generally verified in the insert() call too
                 let weights = gltf_mesh.weights().unwrap();
 
-                Some(
-                    self.meshes
-                        .morphs
-                        .insert(morph_buffer_info.into(), weights, values)?,
-                )
+                Some(self.meshes.morphs.geometry.insert(
+                    morph_buffer_info.into(),
+                    weights,
+                    values,
+                )?)
+            }
+        };
+
+        let material_morph_key = match primitive_buffer_info.material_morph.clone() {
+            None => None,
+            Some(morph_buffer_info) => {
+                let values = &ctx.data.buffers.material_morph_bytes;
+                let values = &values[morph_buffer_info.values_offset
+                    ..morph_buffer_info.values_offset + morph_buffer_info.values_size];
+
+                // from spec: "The number of array elements MUST match the number of morph targets."
+                // this is generally verified in the insert() call too
+                let weights = gltf_mesh.weights().unwrap();
+
+                Some(self.meshes.morphs.material.insert(
+                    morph_buffer_info.into(),
+                    weights,
+                    values,
+                )?)
             }
         };
 
@@ -139,8 +156,12 @@ impl AwsmRenderer {
             mesh = mesh.with_aabb(aabb);
         }
 
-        if let Some(morph_key) = morph_key {
-            mesh = mesh.with_morph_key(morph_key);
+        if let Some(morph_key) = geometry_morph_key {
+            mesh = mesh.with_geometry_morph_key(morph_key);
+        }
+
+        if let Some(morph_key) = material_morph_key {
+            mesh = mesh.with_material_morph_key(morph_key);
         }
 
         if let Some(skin_key) = skin_key {
@@ -190,7 +211,8 @@ impl AwsmRenderer {
                                         channel_index: channel.index(),
                                         sampler_index: channel.sampler().index(),
                                     })?,
-                                morph_key.ok_or(AwsmGltfError::MissingMorphForAnimation)?,
+                                geometry_morph_key,
+                                material_morph_key,
                             )?;
                         }
                         // transform animations were already populated in the node

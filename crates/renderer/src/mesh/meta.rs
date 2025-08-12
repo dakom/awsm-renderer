@@ -4,20 +4,24 @@ use crate::{
     materials::{MaterialKey, Materials},
     mesh::{
         morphs::Morphs,
+        morphs::{GeometryMorphKey, MaterialMorphKey},
         skins::{SkinKey, Skins},
-        AwsmMeshError, MeshKey, MorphKey,
+        AwsmMeshError, MeshKey,
     },
 };
 
 pub const MESH_META_INITIAL_CAPACITY: usize = 1024;
 pub const MESH_META_BYTE_SIZE: usize = 32; // 8 u32s
-pub const MESH_META_BYTE_ALIGNMENT: usize = 32; // 32 bytes aligned
+pub const MESH_META_BYTE_ALIGNMENT: usize = 256; // 32 bytes aligned
+pub const MESH_META_MORPH_MATERIAL_BITMASK_NORMAL: u32 = 1;
+pub const MESH_META_MORPH_MATERIAL_BITMASK_TANGENT: u32 = 1 << 1;
 
 #[allow(clippy::too_many_arguments)]
 pub fn mesh_meta_data(
     mesh_key: MeshKey,
     material_key: MaterialKey,
-    morph_key: Option<MorphKey>,
+    geometry_morph_key: Option<GeometryMorphKey>,
+    material_morph_key: Option<MaterialMorphKey>,
     skin_key: Option<SkinKey>,
     materials: &Materials,
     morphs: &Morphs,
@@ -52,17 +56,26 @@ pub fn mesh_meta_data(
             .buffer_offset(material_key)
             .ok_or(AwsmMeshError::MaterialNotFound(material_key))? as u32,
     );
-    if let Some(morph_key) = morph_key {
-        let info = morphs.get_info(morph_key)?;
+    if let Some(morph_key) = geometry_morph_key {
+        let info = morphs.geometry.get_info(morph_key)?;
         push_u32(info.targets_len as u32);
-        push_u32(bool_as_u32(info.attributes.position));
-        push_u32(bool_as_u32(info.attributes.normal));
-        push_u32(bool_as_u32(info.attributes.tangent));
     } else {
         push_u32(0);
-        push_u32(bool_as_u32(false));
-        push_u32(bool_as_u32(false));
-        push_u32(bool_as_u32(false));
+    }
+    if let Some(morph_key) = material_morph_key {
+        let info = morphs.material.get_info(morph_key)?;
+        let mut bitmask = 0;
+        if info.attributes.normal {
+            bitmask |= MESH_META_MORPH_MATERIAL_BITMASK_NORMAL;
+        }
+        if info.attributes.tangent {
+            bitmask |= MESH_META_MORPH_MATERIAL_BITMASK_TANGENT;
+        }
+        push_u32(info.targets_len as u32);
+        push_u32(bitmask);
+    } else {
+        push_u32(0);
+        push_u32(0);
     }
     if let Some(skin_key) = skin_key {
         push_u32(skins.joint_len(skin_key)? as u32);
