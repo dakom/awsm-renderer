@@ -113,7 +113,7 @@ pub struct RenderPassDescriptor<'a> {
 #[derive(Debug, Clone)]
 pub struct ColorAttachment<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginRenderPass#color_attachment_object_structure
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuRenderPassColorAttachment.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuRenderPassColorAttachment.html
     pub clear_color: Option<Color>,
     pub depth_slice: Option<u32>,
     pub resolve_target: Option<&'a web_sys::GpuTextureView>,
@@ -151,7 +151,7 @@ impl<'a> ColorAttachment<'a> {
 #[derive(Debug, Clone)]
 pub struct DepthStencilAttachment<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginRenderPass#depthstencil_attachment_object_structure
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuRenderPassDepthStencilAttachment.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuRenderPassDepthStencilAttachment.html
     pub view: &'a web_sys::GpuTextureView,
     pub depth_clear_value: Option<f32>,
     pub depth_load_op: Option<LoadOp>,

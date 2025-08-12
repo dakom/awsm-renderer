@@ -8,7 +8,7 @@ use super::constants::{ConstantOverrideKey, ConstantOverrideValue};
 #[derive(Debug, Clone)]
 pub struct FragmentState<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#fragment_object_structure
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuFragmentState.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuFragmentState.html
     pub constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
     pub entry_point: Option<&'a str>,
     pub module: &'a web_sys::GpuShaderModule,
@@ -18,7 +18,7 @@ pub struct FragmentState<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColorTargetState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#targets
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuColorTargetState.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuColorTargetState.html
     pub blend: Option<BlendState>,
     pub format: TextureFormat,
     pub write_mask_all: bool,
@@ -65,7 +65,7 @@ impl std::hash::Hash for ColorTargetState {
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct BlendState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#blend
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBlendState.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuBlendState.html
     pub alpha: BlendComponent,
     pub color: BlendComponent,
 }
@@ -78,7 +78,7 @@ impl BlendState {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct BlendComponent {
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBlendComponent.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuBlendComponent.html
     pub operation: Option<BlendOperation>,
     pub src_factor: Option<BlendFactor>,
     pub dst_factor: Option<BlendFactor>,
@@ -111,9 +111,9 @@ impl std::hash::Hash for BlendComponent {
     }
 }
 
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuBlendFactor.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuBlendFactor.html
 pub type BlendFactor = web_sys::GpuBlendFactor;
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuBlendOperation.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuBlendOperation.html
 pub type BlendOperation = web_sys::GpuBlendOperation;
 
 // js conversions
@@ -207,7 +207,7 @@ impl From<BlendState> for web_sys::GpuBlendState {
     fn from(state: BlendState) -> web_sys::GpuBlendState {
         web_sys::GpuBlendState::new(
             // not sure why these are reversed compared to opengl, but they are:
-            // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBlendState.html#method.new
+            // https://docs.rs/web-sys/latest/web_sys/struct.GpuBlendState.html#method.new
             // vs. opengl's https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBlendFuncSeparate.xhtml
             &web_sys::GpuBlendComponent::from(state.alpha),
             &web_sys::GpuBlendComponent::from(state.color),

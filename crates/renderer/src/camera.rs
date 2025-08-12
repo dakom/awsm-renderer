@@ -1,26 +1,21 @@
+use awsm_renderer_core::buffers::{BufferDescriptor, BufferUsage};
 use awsm_renderer_core::error::AwsmCoreError;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::{Mat4, Vec2, Vec3};
 use thiserror::Error;
 
-use crate::bind_groups::{
-    uniform_storage::UniformStorageBindGroupIndex, uniform_storage::UniversalBindGroupBinding,
-    AwsmBindGroupError, BindGroups,
-};
-use crate::render::post_process::PostProcess;
-use crate::render::textures::RenderTextures;
+use crate::bind_groups::{AwsmBindGroupError, BindGroups};
+use crate::render_textures::RenderTextures;
 use crate::{AwsmRenderer, AwsmRendererLogging};
 
 impl AwsmRenderer {
-    pub fn update_camera(&mut self, camera: &impl CameraExt) -> Result<()> {
-        let (current_width, current_height) = self
-            .gpu
-            .current_context_texture_size()
-            .map_err(AwsmCameraError::ScreenSize)?;
+    pub fn update_camera(&mut self, camera_matrices: CameraMatrices) -> Result<()> {
+        let (current_width, current_height) = self.gpu.current_context_texture_size()?;
+
         self.camera.update(
-            camera,
+            camera_matrices,
             &self.render_textures,
-            &self.post_process,
+            true,
             current_width as f32,
             current_height as f32,
         )?;
@@ -31,30 +26,48 @@ impl AwsmRenderer {
 
 pub struct CameraBuffer {
     pub(crate) raw_data: [u8; Self::BYTE_SIZE],
-    last_view_matrix: Option<Mat4>,
-    last_proj_matrix: Option<Mat4>,
+    pub(crate) gpu_buffer: web_sys::GpuBuffer,
+    pub last_matrices: Option<CameraMatrices>,
     camera_moved: bool,
     gpu_dirty: bool,
 }
 
-pub trait CameraExt {
-    fn projection_matrix(&self) -> Mat4;
+#[derive(Clone, Debug)]
+pub struct CameraMatrices {
+    pub view: Mat4,
+    pub projection: Mat4,
+    pub position_world: Vec3,
+}
 
-    fn view_matrix(&self) -> Mat4;
+impl CameraMatrices {
+    pub fn view_projection(&self) -> Mat4 {
+        self.projection * self.view
+    }
 
-    fn position_world(&self) -> Vec3;
+    pub fn inv_view_projection(&self) -> Mat4 {
+        self.view_projection().inverse()
+    }
 }
 
 impl CameraBuffer {
     pub const BYTE_SIZE: usize = 336; // see `update()` for details
 
-    pub fn new() -> Result<Self> {
+    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
+        let gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Camera"),
+                Self::BYTE_SIZE,
+                BufferUsage::new().with_uniform().with_copy_dst(),
+            )
+            .into(),
+        )?;
+
         Ok(Self {
             raw_data: [0; Self::BYTE_SIZE],
             gpu_dirty: true,
-            last_view_matrix: None,
-            last_proj_matrix: None,
+            last_matrices: None,
             camera_moved: false,
+            gpu_buffer,
         })
     }
 
@@ -62,17 +75,16 @@ impl CameraBuffer {
     // it will only update the data in the buffer once per frame, at render time
     pub(crate) fn update(
         &mut self,
-        camera: &impl CameraExt,
+        camera_matrices_orig: CameraMatrices,
         render_textures: &RenderTextures,
-        post_process: &PostProcess,
+        apply_jitter: bool,
         screen_width: f32,
         screen_height: f32,
     ) -> Result<()> {
-        let view = camera.view_matrix(); // 16 floats
-        let mut proj = camera.projection_matrix(); // 16 floats
+        let mut camera_matrices = camera_matrices_orig.clone();
 
-        self.camera_moved = match (&self.last_view_matrix, &self.last_proj_matrix) {
-            (Some(last_view), Some(last_proj)) => {
+        self.camera_moved = match (&self.last_matrices) {
+            (Some(last_matrices)) => {
                 fn matrices_equal(a: Mat4, b: Mat4, epsilon: f32) -> bool {
                     for i in 0..16 {
                         if (a.to_cols_array()[i] - b.to_cols_array()[i]).abs() > epsilon {
@@ -82,17 +94,14 @@ impl CameraBuffer {
                     true
                 }
                 // Check if matrices changed (with small epsilon for floating point comparison)
-                !matrices_equal(*last_view, view, 1e-6) || !matrices_equal(*last_proj, proj, 1e-6)
+                !matrices_equal(last_matrices.view, camera_matrices.view, 1e-6)
+                    || !matrices_equal(last_matrices.projection, camera_matrices.projection, 1e-6)
             }
             _ => true, // First frame, assume movement
         };
 
-        if post_process.settings.enabled && post_process.settings.anti_aliasing {
-            let jitter_strength = if self.camera_moved {
-                PostProcess::CAMERA_JITTER_MOVED
-            } else {
-                PostProcess::CAMERA_JITTER_STILL
-            };
+        if apply_jitter {
+            let jitter_strength = if self.camera_moved { 0.2 } else { 0.8 };
             // TAA jitter
             let jitter = get_halton_jitter(render_textures.frame_count());
             let jitter_ndc_x = (jitter.x / screen_width) * jitter_strength;
@@ -102,15 +111,15 @@ impl CameraBuffer {
             let jitter_matrix = Mat4::from_translation(Vec3::new(jitter_ndc_x, jitter_ndc_y, 0.0));
 
             // Apply to your projection matrix
-            proj = jitter_matrix * proj;
+            camera_matrices.projection = jitter_matrix * camera_matrices.projection;
         }
 
-        let view_proj = proj * view; // 16 floats
-        let inv_view_proj = view_proj.inverse(); // 16 floats
-        let inv_view = view.inverse(); // 16 floats
-
-        let position = camera.position_world(); // 3 floats
-
+        // View: 16 floats
+        // Projection: 16 floats
+        // ViewProjection: 16 floats
+        // Inverse ViewProjection: 16 floats
+        // Inverse View: 16 floats
+        // Position: 3 floats
         // altogether that's 83 floats: (16*5) + 3
         // or 332 bytes: 83 * 4
         // however, we need to pad it to a multiple of 16 (https://www.w3.org/TR/WGSL/#address-space-layout-constraints)
@@ -130,20 +139,19 @@ impl CameraBuffer {
             offset += len;
         };
 
-        write_to_data(&view.to_cols_array());
-        write_to_data(&proj.to_cols_array());
-        write_to_data(&view_proj.to_cols_array());
-        write_to_data(&inv_view_proj.to_cols_array());
-        write_to_data(&inv_view.to_cols_array());
-        write_to_data(&position.to_array());
+        write_to_data(&camera_matrices.view.to_cols_array());
+        write_to_data(&camera_matrices.projection.to_cols_array());
+        write_to_data(&camera_matrices.view_projection().to_cols_array());
+        write_to_data(&camera_matrices.inv_view_projection().to_cols_array());
+        write_to_data(&camera_matrices.view.inverse().to_cols_array());
+        write_to_data(&camera_matrices.position_world.to_array());
         self.raw_data[offset..offset + 4]
             .copy_from_slice(&render_textures.frame_count().to_ne_bytes());
 
         self.gpu_dirty = true;
 
         // Store for next frame (unjittered versions)
-        self.last_view_matrix = Some(camera.view_matrix());
-        self.last_proj_matrix = Some(camera.projection_matrix());
+        self.last_matrices = Some(camera_matrices_orig);
 
         Ok(())
     }
@@ -166,17 +174,8 @@ impl CameraBuffer {
                 None
             };
 
-            bind_groups
-                .uniform_storages
-                .gpu_write(
-                    gpu,
-                    UniformStorageBindGroupIndex::Universal(UniversalBindGroupBinding::Camera),
-                    None,
-                    self.raw_data.as_slice(),
-                    None,
-                    None,
-                )
-                .map_err(AwsmCameraError::WriteBuffer)?;
+            gpu.write_buffer(&self.gpu_buffer, None, self.raw_data.as_slice(), None, None)?;
+
             self.gpu_dirty = false;
         }
 
@@ -206,12 +205,6 @@ type Result<T> = std::result::Result<T, AwsmCameraError>;
 
 #[derive(Error, Debug)]
 pub enum AwsmCameraError {
-    #[error("[camera] Error creating buffer: {0:?}")]
-    CreateBuffer(AwsmCoreError),
-
-    #[error("[camera] Error writing buffer: {0:?}")]
-    WriteBuffer(AwsmBindGroupError),
-
-    #[error("[camera] Couldn't get screen size: {0:?}")]
-    ScreenSize(AwsmCoreError),
+    #[error("[camera] {0:?}")]
+    Core(#[from] AwsmCoreError),
 }

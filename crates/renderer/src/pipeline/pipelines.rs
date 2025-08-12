@@ -4,7 +4,7 @@ use awsm_renderer_core::error::AwsmCoreError;
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
-use crate::{bind_groups::AwsmBindGroupError, shaders::ShaderKey, AwsmRenderer};
+use crate::{bind_group::AwsmBindGroupError, shaders::ShaderKey, AwsmRenderer};
 
 use super::{cache::PipelineLayoutCacheKey, RenderPipelineCacheKey};
 

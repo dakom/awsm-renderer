@@ -1,5 +1,12 @@
 use slotmap::{Key, SecondaryMap};
 
+// This dynamic storage buffer allows for flexible allocations of fixed sizes
+// that are power-of-two aligned.
+//
+// It can be used to power either uniform or storage buffers on the gpu
+// the choice of which will depend more on the total size of the buffer than anything else
+// since uniform buffers are a valid choice here
+
 //-------------------------------- PERFORMANCE SUMMARY ------------------------//
 //
 // • insert/update/remove:   O(1)  (amortized, ignoring rare growth)
@@ -12,6 +19,7 @@ use slotmap::{Key, SecondaryMap};
 // • Ideal usage:
 //    Thousands of items with identical sizes, like:
 //      - Transforms
+//      - Lights
 //      - PBR Materials
 //
 //----------------------------------------------------------------------------//
@@ -79,8 +87,10 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
     // * write into the slot if it already has one
     // * use a free slot if available
     // * grow the buffer if needed
+
     // It does not touch the GPU, and can be called many times a frame
-    pub fn update_with(&mut self, key: K, f: impl FnOnce(&mut [u8])) {
+    // first param is the offset into the buffer
+    pub fn update_with(&mut self, key: K, f: impl FnOnce(usize, &mut [u8])) {
         // If we don't have a slot, set one
         let slot = match self.slot_indices.get(key) {
             Some(slot) => *slot,
@@ -108,19 +118,26 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         let offset_bytes = slot * self.aligned_slice_size;
 
         // we can mutate the slice directly
-        f(&mut self.raw_data[offset_bytes..offset_bytes + self.byte_size]);
+        f(
+            offset_bytes,
+            &mut self.raw_data[offset_bytes..offset_bytes + self.byte_size],
+        );
     }
 
+    // Inserts or updates an item in the buffer
+    // returns the offset where the data was written
     pub fn update(&mut self, key: K, values: &[u8]) {
-        self.update_with(key, |data| {
+        self.update_with(key, |_, data| {
             data[..values.len()].copy_from_slice(values);
-        });
+        })
     }
 
+    // updates the slot at the given key with the given *local* offset within the data
+    // returns the global offset in the buffer
     pub fn update_offset(&mut self, key: K, offset: usize, values: &[u8]) {
-        self.update_with(key, |data| {
+        self.update_with(key, |_, data| {
             data[offset..offset + values.len()].copy_from_slice(values);
-        });
+        })
     }
 
     pub fn raw_slice(&self) -> &[u8] {
