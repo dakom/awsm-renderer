@@ -2,7 +2,7 @@ mod projection;
 mod view;
 
 use awsm_renderer::bounds::Aabb;
-use awsm_renderer::camera::CameraExt;
+use awsm_renderer::camera::CameraMatrices;
 use glam::{Mat4, Quat, Vec2, Vec3};
 use projection::orthographic::OrthographicCamera;
 use projection::perspective::PerspectiveCamera;
@@ -24,7 +24,7 @@ pub struct Camera {
 }
 
 // This is what needs to be implemented to make the camera work with the renderer
-impl CameraExt for Camera {
+impl Camera {
     fn projection_matrix(&self) -> Mat4 {
         match &self.projection {
             CameraProjection::Orthographic(camera) => camera.projection_matrix(),
@@ -41,6 +41,14 @@ impl CameraExt for Camera {
     fn position_world(&self) -> Vec3 {
         match &self.view {
             CameraView::Orbit(camera) => camera.get_position(),
+        }
+    }
+
+    pub fn matrices(&self) -> CameraMatrices {
+        CameraMatrices {
+            view: self.view_matrix(),
+            projection: self.projection_matrix(),
+            position_world: self.position_world(),
         }
     }
 }

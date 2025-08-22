@@ -3,10 +3,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use awsm_renderer_core::{renderer::AwsmRendererWebGpu, texture::mega_texture::MegaTexture};
+use glam::Mat4;
+
 use crate::{
-    skin::SkinKey,
+    mesh::skins::SkinKey,
     textures::{SamplerKey, TextureKey},
-    transform::TransformKey,
+    transforms::TransformKey,
     AwsmRenderer,
 };
 
@@ -17,17 +20,20 @@ mod extensions;
 mod material;
 mod mesh;
 mod skin;
-mod transforms;
+pub(super) mod transforms;
 
 pub(crate) struct GltfPopulateContext {
     pub data: Arc<GltfData>,
-    pub textures: Mutex<HashMap<GltfIndex, (TextureKey, SamplerKey)>>,
+    pub textures: Mutex<HashMap<GltfIndex, TextureKey>>,
     pub node_to_transform: Mutex<HashMap<GltfIndex, TransformKey>>,
-    pub node_to_skin: Mutex<HashMap<GltfIndex, SkinKey>>,
+    pub node_to_skin_transform:
+        Mutex<HashMap<GltfIndex, (Vec<TransformKey>, Vec<SkinInverseBindMatrix>)>>,
     pub transform_is_joint: Mutex<HashSet<TransformKey>>,
     pub transform_is_instanced: Mutex<HashSet<TransformKey>>,
     pub generate_mipmaps: bool,
 }
+
+type SkinInverseBindMatrix = Mat4;
 
 type GltfIndex = usize;
 
@@ -46,7 +52,7 @@ impl AwsmRenderer {
             data: gltf_data,
             textures: Mutex::new(HashMap::new()),
             node_to_transform: Mutex::new(HashMap::new()),
-            node_to_skin: Mutex::new(HashMap::new()),
+            node_to_skin_transform: Mutex::new(HashMap::new()),
             transform_is_joint: Mutex::new(HashSet::new()),
             transform_is_instanced: Mutex::new(HashSet::new()),
             generate_mipmaps,
@@ -70,8 +76,6 @@ impl AwsmRenderer {
             self.populate_gltf_node_transform(&ctx, &node, None)?;
         }
 
-        self.transforms.update_world();
-
         for node in scene.nodes() {
             self.populate_gltf_node_extension_instancing(&ctx, &node)?;
         }
@@ -87,6 +91,8 @@ impl AwsmRenderer {
         for node in scene.nodes() {
             self.populate_gltf_node_mesh(&ctx, &node).await?;
         }
+
+        self.finalize_gpu_textures().await?;
 
         Ok(())
     }

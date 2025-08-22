@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct PrimitiveState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#primitive
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuPrimitiveState.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuPrimitiveState.html
     pub cull_mode: Option<CullMode>,
     pub front_face: Option<FrontFace>,
     pub strip_index_format: Option<IndexFormat>,

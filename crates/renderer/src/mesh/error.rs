@@ -1,9 +1,17 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::{bind_groups::AwsmBindGroupError, transform::AwsmTransformError};
+use crate::{
+    bind_groups::AwsmBindGroupError,
+    materials::MaterialKey,
+    mesh::{
+        morphs::{GeometryMorphKey, MaterialMorphKey},
+        skins::AwsmSkinError,
+    },
+    transforms::AwsmTransformError,
+};
 
-use super::{morphs::MorphKey, MeshKey};
+use super::MeshKey;
 
 pub type Result<T> = std::result::Result<T, AwsmMeshError>;
 
@@ -12,14 +20,20 @@ pub enum AwsmMeshError {
     #[error("[mesh] not found: {0:?}")]
     MeshNotFound(MeshKey),
 
+    #[error("[mesh] material not found: {0:?}")]
+    MaterialNotFound(MaterialKey),
+
     #[error("[mesh] {0:?}")]
     Core(#[from] AwsmCoreError),
 
     #[error("[mesh] {0:?}")]
     Transform(#[from] AwsmTransformError),
 
-    #[error("[mesh] morph not found: {0:?}")]
-    MorphNotFound(MorphKey),
+    #[error("[mesh] {0:?}")]
+    Skin(#[from] AwsmSkinError),
+
+    #[error("[mesh] morph not found: {0}")]
+    MorphNotFound(String),
 
     #[error("[mesh] morph must have same number of weights as targets: {weights} weights != {targets} targets")]
     MorphWeightsTargetsMismatch { weights: usize, targets: usize },

@@ -7,7 +7,7 @@ use super::constants::{ConstantOverrideKey, ConstantOverrideValue};
 #[derive(Debug, Clone)]
 pub struct VertexState<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#vertex_object_structure
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuVertexState.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuVertexState.html
     pub constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
     pub entry_point: Option<&'a str>,
     pub module: &'a web_sys::GpuShaderModule,
@@ -17,7 +17,7 @@ pub struct VertexState<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct VertexBufferLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#buffers
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuVertexBufferLayout.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuVertexBufferLayout.html
     pub array_stride: u64,
     pub attributes: Vec<VertexAttribute>,
     pub step_mode: Option<VertexStepMode>,
@@ -34,7 +34,7 @@ impl std::hash::Hash for VertexBufferLayout {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VertexAttribute {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#attributes
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuVertexAttribute.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuVertexAttribute.html
     pub format: VertexFormat,
     pub offset: u64,
     pub shader_location: u32,
@@ -51,7 +51,7 @@ impl std::hash::Hash for VertexAttribute {
 // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#stepmode
 pub type VertexStepMode = web_sys::GpuVertexStepMode;
 
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuVertexFormat.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuVertexFormat.html
 pub type VertexFormat = web_sys::GpuVertexFormat;
 
 // JS conversion

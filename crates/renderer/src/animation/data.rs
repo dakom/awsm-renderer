@@ -1,6 +1,6 @@
 use glam::{Quat, Vec3};
 
-use crate::transform::Transform;
+use crate::transforms::Transform;
 
 use super::interpolate::{
     interpolate_cubic_spline_f32, interpolate_cubic_spline_f64, interpolate_cubic_spline_quat,

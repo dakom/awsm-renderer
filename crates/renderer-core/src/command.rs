@@ -146,7 +146,7 @@ impl CommandEncoder {
         self.inner.pop_debug_group();
     }
 
-    pub fn finish(self) -> web_sys::GpuCommandBuffer {
+    pub fn finish(&self) -> web_sys::GpuCommandBuffer {
         self.inner.finish()
     }
 }

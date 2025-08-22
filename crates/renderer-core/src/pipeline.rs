@@ -20,12 +20,12 @@ use wasm_bindgen::prelude::*;
 #[derive(Debug, Clone)]
 pub struct RenderPipelineDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#descriptor
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuRenderPipelineDescriptor.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuRenderPipelineDescriptor.html
     // fill this out with a lot more detail
     depth_stencil: Option<DepthStencilState>,
     fragment: Option<FragmentState<'a>>,
     label: Option<&'a str>,
-    layout: PipelineLayoutKind,
+    layout: PipelineLayoutKind<'a>,
     multisample: Option<MultisampleState>,
     primitive: Option<PrimitiveState>,
     vertex: VertexState<'a>,
@@ -53,7 +53,7 @@ impl<'a> RenderPipelineDescriptor<'a> {
         self
     }
 
-    pub fn with_layout(mut self, layout: PipelineLayoutKind) -> Self {
+    pub fn with_layout(mut self, layout: PipelineLayoutKind<'a>) -> Self {
         self.layout = layout;
         self
     }
@@ -69,15 +69,15 @@ impl<'a> RenderPipelineDescriptor<'a> {
 
 pub struct ComputePipelineDescriptor<'a, 'b> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createComputePipeline#descriptor
+    compute: ProgrammableStage<'a, 'b>,
+    layout: PipelineLayoutKind<'a>,
     label: Option<&'a str>,
-    layout: PipelineLayoutKind,
-    compute: ProgrammableStage<'b>,
 }
 
 impl<'a, 'b> ComputePipelineDescriptor<'a, 'b> {
     pub fn new(
-        compute: ProgrammableStage<'b>,
-        layout: PipelineLayoutKind,
+        compute: ProgrammableStage<'a, 'b>,
+        layout: PipelineLayoutKind<'a>,
         label: Option<&'a str>,
     ) -> Self {
         Self {
@@ -88,28 +88,28 @@ impl<'a, 'b> ComputePipelineDescriptor<'a, 'b> {
     }
 }
 
-pub struct ProgrammableStage<'a> {
+pub struct ProgrammableStage<'a, 'b> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createComputePipeline#descriptor
-    module: web_sys::GpuShaderModule,
-    entry_point: Option<&'a str>,
-    constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
+    pub module: &'a web_sys::GpuShaderModule,
+    pub entry_point: Option<&'b str>,
+    pub constant_overrides: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
 }
 
-impl<'a> ProgrammableStage<'a> {
-    pub fn new(module: web_sys::GpuShaderModule, entry_point: Option<&'a str>) -> Self {
+impl<'a, 'b> ProgrammableStage<'a, 'b> {
+    pub fn new(module: &'a web_sys::GpuShaderModule, entry_point: Option<&'b str>) -> Self {
         Self {
             module,
             entry_point,
-            constants: BTreeMap::new(),
+            constant_overrides: BTreeMap::new(),
         }
     }
 
-    pub fn with_push_constant(
+    pub fn with_push_constant_override(
         mut self,
         key: ConstantOverrideKey,
         value: ConstantOverrideValue,
     ) -> Self {
-        self.constants.insert(key, value);
+        self.constant_overrides.insert(key, value);
         self
     }
 }
@@ -175,17 +175,17 @@ impl From<ComputePipelineDescriptor<'_, '_>> for web_sys::GpuComputePipelineDesc
     }
 }
 
-impl From<ProgrammableStage<'_>> for web_sys::GpuProgrammableStage {
+impl From<ProgrammableStage<'_, '_>> for web_sys::GpuProgrammableStage {
     fn from(compute: ProgrammableStage) -> web_sys::GpuProgrammableStage {
-        let compute_js = web_sys::GpuProgrammableStage::new(&compute.module);
+        let compute_js = web_sys::GpuProgrammableStage::new(compute.module);
 
         if let Some(entry_point) = compute.entry_point {
             compute_js.set_entry_point(entry_point);
         }
 
-        if !compute.constants.is_empty() {
+        if !compute.constant_overrides.is_empty() {
             let obj = js_sys::Object::new();
-            for (binding, constant) in compute.constants {
+            for (binding, constant) in compute.constant_overrides {
                 js_sys::Reflect::set(&obj, &JsValue::from(binding), &JsValue::from(constant))
                     .unwrap_throw();
             }

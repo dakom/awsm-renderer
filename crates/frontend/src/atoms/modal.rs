@@ -66,14 +66,8 @@ impl ModalInstance {
                 .style("background-color", "#fefefe")
                 .style("border", "1px solid #888")
                 .style("width", "80%")
-            }
-        });
-
-        static CONTENT: LazyLock<String> = LazyLock::new(|| {
-            class! {
-                .style("display", "flex")
-                .style("justify-content", "center")
-                .style("align-items", "center")
+                .style("height", "80%")
+                .style("overflow", "auto")
             }
         });
 
@@ -106,7 +100,6 @@ impl ModalInstance {
                                 })))
                             }))
                             .child(html!("div", {
-                                .class(&*CONTENT)
                                 .child(html!("div", {
                                     .style("padding", "20px")
                                     .child(content())
