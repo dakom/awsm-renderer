@@ -20,11 +20,17 @@ pub struct ShaderTemplateGeometry {
 
 #[derive(Template, Debug)]
 #[template(path = "geometry_wgsl/vertex.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateGeometryVertex {}
+pub struct ShaderTemplateGeometryVertex {
+    max_morph_unroll: u32,
+    max_skin_unroll: u32,
+}
 
 impl ShaderTemplateGeometryVertex {
     pub fn new(cache_key: &ShaderCacheKeyGeometry) -> Self {
-        Self {}
+        Self {
+            max_morph_unroll: 2,
+            max_skin_unroll: 2,
+        }
     }
 }
 
@@ -55,6 +61,7 @@ impl ShaderTemplateGeometry {
         let fragment_source = self.fragment.render()?;
         let source = format!("{}\n{}", vertex_source, fragment_source);
 
+        print_shader_source(&vertex_source, false);
         //print_shader_source(&source, true);
 
         Ok(source)

@@ -126,7 +126,7 @@ impl ImageData {
         &self,
         origin: Option<[f32; 2]>,
         flip_y: Option<bool>,
-    ) -> Result<CopyExternalImageSourceInfo> {
+    ) -> Result<CopyExternalImageSourceInfo<'_>> {
         Ok(CopyExternalImageSourceInfo {
             flip_y,
             origin,

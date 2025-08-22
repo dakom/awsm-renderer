@@ -6,18 +6,23 @@ pub struct MeshBufferInfo {
     pub triangles: MeshBufferTriangleInfo,
     pub geometry_morph: Option<MeshBufferGeometryMorphInfo>,
     pub material_morph: Option<MeshBufferMaterialMorphInfo>,
+    pub skin: Option<MeshBufferSkinInfo>,
 }
 
 #[derive(Debug, Clone)]
 pub struct MeshBufferVertexInfo {
     // Number of vertices (triangle_count * 3)
     pub count: usize,
+    pub size: usize,
+}
+
+impl MeshBufferVertexInfo {
     // We have:
     // - positions (vec3<f32>), 12 bytes per vertex
     // - triangle_id (u32), 4 bytes per vertex
     // - barycentric coordinates (vec2<f32>), 8 bytes per vertex
     // Total size per vertex = 12 + 4 + 8 = 24 bytes
-    pub size: usize,
+    pub const BYTE_SIZE: usize = 24;
 }
 
 #[derive(Debug, Clone)]
@@ -90,6 +95,16 @@ pub struct MeshBufferMaterialMorphInfo {
 pub struct MeshBufferMaterialMorphAttributes {
     pub normal: bool,
     pub tangent: bool,
+}
+
+/// Information about skin (indices and weights, exploded per-vertex)
+#[derive(Debug, Clone)]
+pub struct MeshBufferSkinInfo {
+    // 4 joint influences per set
+    pub set_count: usize, // Number of skin sets (JOINTS_0/WEIGHTS_0, JOINTS_1/WEIGHTS_1, etc.)
+
+    // Buffer size info
+    pub index_weights_size: usize, // Total bytes: exploded_vertices * set_count * 16 (vec4<u32>) * 2 (index and weights)
 }
 
 impl MeshBufferInfo {

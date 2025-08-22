@@ -5,6 +5,7 @@ pub mod attributes;
 pub mod index;
 pub mod morph;
 pub mod normals;
+pub mod skin;
 pub mod triangle;
 pub mod visibility;
 
@@ -20,9 +21,9 @@ use crate::{
     },
     mesh::{
         MeshBufferGeometryMorphInfo, MeshBufferIndexInfo, MeshBufferInfo,
-        MeshBufferMaterialMorphAttributes, MeshBufferMaterialMorphInfo, MeshBufferTriangleDataInfo,
-        MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo, MeshBufferVertexAttributeKind,
-        MeshBufferVertexInfo,
+        MeshBufferMaterialMorphAttributes, MeshBufferMaterialMorphInfo, MeshBufferSkinInfo,
+        MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo,
+        MeshBufferVertexAttributeKind, MeshBufferVertexInfo,
     },
 };
 
@@ -47,9 +48,13 @@ pub struct GltfBuffers {
     // Triangle data buffer (vertex indices + material info per triangle)
     pub triangle_data_bytes: Vec<u8>,
 
-    // these also always follow the same interleaving pattern
+    // just positions
     pub geometry_morph_bytes: Vec<u8>,
+    // normal, tangent (TODO: TEXCOORD_n, COLOR_n)
     pub material_morph_bytes: Vec<u8>,
+
+    // skins
+    pub skin_joint_index_weight_bytes: Vec<u8>,
 
     // first level is mesh, second level is primitive
     pub meshes: Vec<Vec<MeshBufferInfoWithOffset>>,
@@ -61,6 +66,7 @@ pub struct MeshBufferInfoWithOffset {
     pub triangles: MeshBufferTriangleInfoWithOffset,
     pub geometry_morph: Option<MeshBufferGeometryMorphInfoWithOffset>,
     pub material_morph: Option<MeshBufferMaterialMorphInfoWithOffset>,
+    pub skin: Option<MeshBufferSkinInfoWithOffset>,
 }
 
 impl From<MeshBufferInfoWithOffset> for MeshBufferInfo {
@@ -70,6 +76,7 @@ impl From<MeshBufferInfoWithOffset> for MeshBufferInfo {
             triangles: info.triangles.into(),
             geometry_morph: info.geometry_morph.map(|m| m.into()),
             material_morph: info.material_morph.map(|m| m.into()),
+            skin: info.skin.map(|m| m.into()),
         }
     }
 }
@@ -199,6 +206,23 @@ impl From<MeshBufferMaterialMorphInfoWithOffset> for MeshBufferMaterialMorphInfo
 }
 
 #[derive(Debug, Clone)]
+pub struct MeshBufferSkinInfoWithOffset {
+    pub set_count: usize,
+    pub index_weights_size: usize,
+    // Offsets for GLTF population (not needed after we feed the dynamic storage buffer)
+    pub index_weights_offset: usize,
+}
+
+impl From<MeshBufferSkinInfoWithOffset> for MeshBufferSkinInfo {
+    fn from(info: MeshBufferSkinInfoWithOffset) -> Self {
+        MeshBufferSkinInfo {
+            set_count: info.set_count,
+            index_weights_size: info.index_weights_size,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct MeshBufferTriangleDataInfoWithOffset {
     pub size_per_triangle: usize,
     pub total_size: usize,
@@ -227,6 +251,7 @@ impl GltfBuffers {
         let mut triangle_data_bytes: Vec<u8> = Vec::new();
         let mut geometry_morph_bytes: Vec<u8> = Vec::new();
         let mut material_morph_bytes: Vec<u8> = Vec::new();
+        let mut skin_joint_index_weight_bytes: Vec<u8> = Vec::new();
         let mut meshes: Vec<Vec<MeshBufferInfoWithOffset>> = Vec::new();
 
         for mesh in doc.meshes() {
@@ -262,6 +287,7 @@ impl GltfBuffers {
                     &mut triangle_data_bytes,
                     &mut geometry_morph_bytes,
                     &mut material_morph_bytes,
+                    &mut skin_joint_index_weight_bytes,
                 )?;
 
                 primitive_buffer_infos.push(visibility_buffer_info);
@@ -272,13 +298,14 @@ impl GltfBuffers {
 
         Ok(Self {
             raw: buffers,
-            index_bytes, // Always present now
+            index_bytes,
             visibility_vertex_bytes,
             attribute_vertex_bytes,
             triangle_data_bytes,
             meshes,
             geometry_morph_bytes,
             material_morph_bytes,
+            skin_joint_index_weight_bytes,
         })
     }
 }

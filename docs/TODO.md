@@ -1,7 +1,9 @@
 # Get morphs/skins working again
 
-- unroll geometry morphs
 - get skins working again
+- join skin_joint_indices and skin_joint_weights into one struct
+- eliminate one more dynamic storage buffer
+- separate meta vs. vertex_animation bind groups (morph and skin will be in same)
 
 # Get started with opaque material pass 
 

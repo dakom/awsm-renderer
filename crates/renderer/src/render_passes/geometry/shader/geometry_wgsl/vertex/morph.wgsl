@@ -1,38 +1,55 @@
 //***** MORPHS *****
 
 // The morph weights
-@group(2) @binding(0)
+@group(3) @binding(0)
 var<storage, read> geometry_morph_weights: array<f32>;
 
 // this is the array of morph target deltas
 // always interleaved as position, normal, tangent
 // so we can use the same array for all three
 // even as we index sequentially
-@group(2) @binding(1)
+@group(3) @binding(1)
 var<storage, read> geometry_morph_values: array<f32>; 
 
 fn apply_position_morphs(input: VertexInput) -> VertexInput {
     var output = input;
 
-    let morph_targets_len = mesh_meta.morph_geometry_target_len;
+    let target_count = mesh_meta.morph_geometry_target_len;
 
-    let morph_target_count = 3u; // just position, vec3
+    // Each target contributes 3 floats (vec3 position delta)
+    let floats_per_target = 3u;
+    let total_floats_per_vertex = target_count * floats_per_target;
+    
+    // Calculate base offset for this exploded vertex's morph data
+    let base_offset = input.vertex_index * total_floats_per_vertex;
 
-    // all_targets_count is the total number of floats for all morph_targets (for a given vertex, not across all of them)
-    let all_targets_count = morph_targets_len * morph_target_count; 
+    // UNROLLED TARGETS for better performance
+    {% for i in 0..max_morph_unroll %}
+        if target_count >= {{ i+1 }}u {
+            let weight = geometry_morph_weights[{{ i }}];
+            let offset = base_offset + ({{ i }} * floats_per_target);
+            let morph_delta = vec3<f32>(
+                geometry_morph_values[offset],
+                geometry_morph_values[offset + 1u], 
+                geometry_morph_values[offset + 2u]
+            );
+            output.position += weight * morph_delta;
+        }
+    {% endfor %}
 
-    for (var morph_target = 0u; morph_target < morph_targets_len; morph_target = morph_target + 1u) {
-        // 2d index into the array
-        // 4 floats per vec4, so we need to divide by 4 to get "which vec4" we are in
-        // and then mod by 4 to get the index into that vec4
-        var morph_weight = geometry_morph_weights[morph_target]; // the first value is the morph_target count so we skip it
-
-        // For each vertex, skip the "full" morph-target data for all targets
-        // then, for reach morph target, skip the morph-target data up until this count
-        var offset = (input.vertex_index * all_targets_count) + (morph_target * morph_target_count);
-
-        let morph_position = vec3<f32>(geometry_morph_values[offset], geometry_morph_values[offset + 1u], geometry_morph_values[offset + 2u]);
-        output.position += morph_weight * morph_position; 
+    // LOOP FOR REMAINING TARGETS 
+    if target_count > {{ max_morph_unroll }}u {
+        for (var target_index = {{ max_morph_unroll }}u; target_index < target_count; target_index = target_index + 1u) {
+            let weight = geometry_morph_weights[target_index];
+            let offset = base_offset + (target_index * floats_per_target);
+            let morph_delta = vec3<f32>(
+                geometry_morph_values[offset],
+                geometry_morph_values[offset + 1u], 
+                geometry_morph_values[offset + 2u]
+            );
+            
+            output.position += weight * morph_delta;
+        }
     }
 
     return output;

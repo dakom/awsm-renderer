@@ -41,6 +41,13 @@ pub fn u8_to_f32_vec(v: &[u8]) -> Vec<f32> {
         .collect()
 }
 
+pub fn u8_to_f32_iter(v: &[u8]) -> impl Iterator<Item = f32> + '_ {
+    v.chunks_exact(4)
+        .map(TryInto::try_into)
+        .map(Result::unwrap)
+        .map(f32::from_le_bytes)
+}
+
 pub fn u8_to_i8_vec(v: &[u8]) -> Vec<i8> {
     v.chunks_exact(1)
         .map(TryInto::try_into)
@@ -57,6 +64,13 @@ pub fn u8_to_u16_vec(v: &[u8]) -> Vec<u16> {
         .collect()
 }
 
+pub fn u8_to_u16_iter(v: &[u8]) -> impl Iterator<Item = u16> + '_ {
+    v.chunks_exact(2)
+        .map(TryInto::try_into)
+        .map(Result::unwrap)
+        .map(u16::from_le_bytes)
+}
+
 pub fn u8_to_i16_vec(v: &[u8]) -> Vec<i16> {
     v.chunks_exact(2)
         .map(TryInto::try_into)
@@ -71,4 +85,11 @@ pub fn u8_to_u32_vec(v: &[u8]) -> Vec<u32> {
         .map(Result::unwrap)
         .map(u32::from_le_bytes)
         .collect()
+}
+
+pub fn u8_to_u32_iter(v: &[u8]) -> impl Iterator<Item = u32> + '_ {
+    v.chunks_exact(4)
+        .map(TryInto::try_into)
+        .map(Result::unwrap)
+        .map(u32::from_le_bytes)
 }

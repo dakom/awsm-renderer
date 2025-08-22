@@ -7,6 +7,7 @@ use awsm_renderer_core::pipeline::primitive::{
 use awsm_renderer_core::pipeline::vertex::{VertexAttribute, VertexBufferLayout, VertexFormat};
 
 use crate::error::Result;
+use crate::mesh::MeshBufferVertexInfo;
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey};
 use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
 use crate::render_passes::geometry::shader::cache_key::ShaderCacheKeyGeometry;
@@ -26,7 +27,8 @@ impl GeometryPipelines {
         let pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
             bind_groups.camera_lights.bind_group_layout_key,
             bind_groups.transform_materials.bind_group_layout_key,
-            bind_groups.meta_vertex_animation.bind_group_layout_key,
+            bind_groups.meta.bind_group_layout_key,
+            bind_groups.animation.bind_group_layout_key,
         ]);
 
         let pipeline_layout_key = ctx.pipeline_layouts.get_key(
@@ -60,7 +62,7 @@ impl GeometryPipelines {
 
         let vertex_buffer_layout = VertexBufferLayout {
             // this is the stride across all of the attributes
-            array_stride: 24, // 24 bytes per vertex (12 pos + 4 triangle_id + 8 bary),
+            array_stride: MeshBufferVertexInfo::BYTE_SIZE as u64,
             step_mode: None,
             attributes: vec![
                 // Position (vec3<f32>)

@@ -21,7 +21,7 @@ struct TransformUniform {
     model: mat4x4<f32>,
 };
 
-@group(2) @binding(3)
+@group(2) @binding(0)
 var<uniform> mesh_meta: MeshMeta;
 
 struct MeshMeta {
@@ -31,7 +31,7 @@ struct MeshMeta {
     morph_geometry_target_len: u32,
     morph_material_target_len: u32,
     morph_material_bitmask: u32,
-    skin_joint_len: u32
+    skin_sets_len: u32
 }
 
 
@@ -61,6 +61,10 @@ fn vert_main(vertex_orig: VertexInput) -> VertexOutput {
 
     if mesh_meta.morph_geometry_target_len != 0 {
         vertex = apply_position_morphs(vertex);
+    }
+
+    if mesh_meta.skin_sets_len != 0 {
+        vertex = apply_position_skin(vertex);
     }
 
 

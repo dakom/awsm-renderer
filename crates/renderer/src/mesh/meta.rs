@@ -78,7 +78,7 @@ pub fn mesh_meta_data(
         push_u32(0);
     }
     if let Some(skin_key) = skin_key {
-        push_u32(skins.joint_len(skin_key)? as u32);
+        push_u32(skins.sets_len(skin_key)? as u32);
     } else {
         push_u32(0);
     }

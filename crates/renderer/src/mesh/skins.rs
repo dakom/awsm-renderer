@@ -23,21 +23,35 @@ pub struct Skins {
     skeleton_transforms: DenseSlotMap<SkinKey, Vec<TransformKey>>,
     // may be None, in which case its virtually an identity matrix
     inverse_bind_matrices: SecondaryMap<TransformKey, Mat4>,
+    sets_len: SecondaryMap<SkinKey, usize>,
     skin_matrices: DynamicStorageBuffer<SkinKey>,
-    gpu_dirty: bool,
-    pub(crate) gpu_buffer: web_sys::GpuBuffer,
+    joint_index_weights: DynamicStorageBuffer<SkinKey>,
+    matrices_gpu_dirty: bool,
+    joint_index_weights_gpu_dirty: bool,
+    pub(crate) matrices_gpu_buffer: web_sys::GpuBuffer,
+    pub(crate) joint_index_weights_gpu_buffer: web_sys::GpuBuffer,
 }
 
 static BUFFER_USAGE: LazyLock<BufferUsage> =
     LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
 impl Skins {
     pub const SKIN_MATRICES_INITIAL_SIZE: usize = 16 * 4 * 32; // 32 elements is a good starting point
+    pub const JOINT_INDEX_WEIGHTS_INITIAL_SIZE: usize = 4096 * 2; // 4kB (per pair) is a good starting point
 
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let gpu_buffer = gpu.create_buffer(
+        let matrices_gpu_buffer = gpu.create_buffer(
             &BufferDescriptor::new(
-                Some("Skins"),
+                Some("Skin Matrices"),
                 Self::SKIN_MATRICES_INITIAL_SIZE,
+                *BUFFER_USAGE,
+            )
+            .into(),
+        )?;
+
+        let joint_index_weights_gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Skin Joint Index and Weights"),
+                Self::JOINT_INDEX_WEIGHTS_INITIAL_SIZE,
                 *BUFFER_USAGE,
             )
             .into(),
@@ -46,19 +60,28 @@ impl Skins {
         Ok(Self {
             skeleton_transforms: DenseSlotMap::with_key(),
             inverse_bind_matrices: SecondaryMap::new(),
+            sets_len: SecondaryMap::new(),
             skin_matrices: DynamicStorageBuffer::new(
                 Self::SKIN_MATRICES_INITIAL_SIZE,
-                Some("Skins".to_string()),
+                Some("Skin Matrices".to_string()),
             ),
-            gpu_dirty: true,
-            gpu_buffer,
+            joint_index_weights: DynamicStorageBuffer::new(
+                Self::JOINT_INDEX_WEIGHTS_INITIAL_SIZE,
+                Some("Skin Joint Index Weights".to_string()),
+            ),
+            matrices_gpu_dirty: true,
+            joint_index_weights_gpu_dirty: true,
+            matrices_gpu_buffer,
+            joint_index_weights_gpu_buffer,
         })
     }
 
     pub fn insert(
         &mut self,
         skeleton_joint_transforms: Vec<TransformKey>,
-        inverse_bind_matrices: Vec<Mat4>,
+        inverse_bind_matrices: &[Mat4],
+        set_len: usize,
+        joint_index_weights: &[u8],
     ) -> Result<SkinKey> {
         let len = skeleton_joint_transforms.len();
         let mut initial_fill = Vec::with_capacity(len * 16 * 4);
@@ -98,15 +121,21 @@ impl Skins {
 
         self.skin_matrices.update(skin_key, &initial_fill);
 
+        self.sets_len.insert(skin_key, set_len);
+
+        self.joint_index_weights
+            .update(skin_key, joint_index_weights);
+
+        self.matrices_gpu_dirty = true;
+        self.joint_index_weights_gpu_dirty = true;
         Ok(skin_key)
     }
 
-    pub fn joint_len(&self, skin_key: SkinKey) -> Result<usize> {
-        Ok(self
-            .skeleton_transforms
+    pub fn sets_len(&self, skin_key: SkinKey) -> Result<usize> {
+        self.sets_len
             .get(skin_key)
-            .ok_or(AwsmSkinError::SkinNotFound(skin_key))?
-            .len())
+            .cloned()
+            .ok_or(AwsmSkinError::SkinNotFound(skin_key))
     }
 
     pub fn joint_matrices_offset(&self, skin_key: SkinKey) -> Result<usize> {
@@ -115,7 +144,13 @@ impl Skins {
             .ok_or(AwsmSkinError::SkinNotFound(skin_key))
     }
 
-    pub fn update_world(&mut self, dirty_skin_joints: HashMap<TransformKey, &Mat4>) {
+    pub fn joint_index_weights_offset(&self, skin_key: SkinKey) -> Result<usize> {
+        self.joint_index_weights
+            .offset(skin_key)
+            .ok_or(AwsmSkinError::SkinNotFound(skin_key))
+    }
+
+    pub fn update_transforms(&mut self, dirty_skin_joints: HashMap<TransformKey, &Mat4>) {
         // different skins can theoretically share the same joint, so, iterate over them all
         for (skin_key, transform_keys) in self.skeleton_transforms.iter() {
             for (index, transform_key) in transform_keys.iter().enumerate() {
@@ -141,7 +176,7 @@ impl Skins {
                             matrices[start..start + (16 * 4)].copy_from_slice(bytes);
                         });
 
-                    self.gpu_dirty = true;
+                    self.matrices_gpu_dirty = true;
                 }
             }
 
@@ -155,15 +190,15 @@ impl Skins {
         gpu: &AwsmRendererWebGpu,
         bind_groups: &mut BindGroups,
     ) -> Result<()> {
-        if self.gpu_dirty {
+        if self.matrices_gpu_dirty {
             let _maybe_span_guard = if logging.render_timings {
-                Some(tracing::span!(tracing::Level::INFO, "Skins GPU write").entered())
+                Some(tracing::span!(tracing::Level::INFO, "Skin Matrices GPU write").entered())
             } else {
                 None
             };
 
             if let Some(new_size) = self.skin_matrices.take_gpu_needs_resize() {
-                self.gpu_buffer = gpu.create_buffer(
+                self.matrices_gpu_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(Some("Skins"), new_size, *BUFFER_USAGE).into(),
                 )?;
 
@@ -171,25 +206,62 @@ impl Skins {
             }
 
             gpu.write_buffer(
-                &self.gpu_buffer,
+                &self.matrices_gpu_buffer,
                 None,
                 self.skin_matrices.raw_slice(),
                 None,
                 None,
             )?;
 
-            self.gpu_dirty = false;
+            self.matrices_gpu_dirty = false;
         }
+
+        if self.joint_index_weights_gpu_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(
+                    tracing::span!(tracing::Level::INFO, "Skin Joint Index Weights GPU write")
+                        .entered(),
+                )
+            } else {
+                None
+            };
+
+            if let Some(new_size) = self.joint_index_weights.take_gpu_needs_resize() {
+                self.joint_index_weights_gpu_buffer = gpu.create_buffer(
+                    &BufferDescriptor::new(
+                        Some("Skin Joint Index and Weights"),
+                        new_size,
+                        *BUFFER_USAGE,
+                    )
+                    .into(),
+                )?;
+
+                bind_groups.mark_create(BindGroupCreate::SkinJointIndexAndWeightsResize);
+            }
+
+            gpu.write_buffer(
+                &self.joint_index_weights_gpu_buffer,
+                None,
+                self.joint_index_weights.raw_slice(),
+                None,
+                None,
+            )?;
+
+            self.joint_index_weights_gpu_dirty = false;
+        }
+
         Ok(())
     }
 
     pub fn remove(&mut self, key: SkinKey, transform: Option<TransformKey>) {
         self.skeleton_transforms.remove(key);
         self.skin_matrices.remove(key);
+        self.joint_index_weights.remove(key);
         if let Some(transform) = transform {
             self.inverse_bind_matrices.remove(transform);
         }
-        self.gpu_dirty = true;
+        self.matrices_gpu_dirty = true;
+        self.joint_index_weights_gpu_dirty = true;
     }
 }
 

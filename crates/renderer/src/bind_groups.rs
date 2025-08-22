@@ -48,6 +48,7 @@ pub enum BindGroupCreate {
     MaterialMorphTargetWeightsResize,
     MaterialMorphTargetValuesResize,
     SkinJointMatricesResize,
+    SkinJointIndexAndWeightsResize,
     MeshMetaResize,
     MeshAttributeDataResize,
     MeshAttributeIndexResize,
@@ -101,6 +102,10 @@ impl BindGroups {
                 .recreate(&ctx)?;
         }
 
+        if self.create_list.contains(&BindGroupCreate::MeshMetaResize) {
+            render_passes.geometry.bind_groups.meta.recreate(&ctx)?;
+        }
+
         if self
             .create_list
             .contains(&BindGroupCreate::GeometryMorphTargetWeightsResize)
@@ -110,12 +115,14 @@ impl BindGroups {
             || self
                 .create_list
                 .contains(&BindGroupCreate::SkinJointMatricesResize)
-            || self.create_list.contains(&BindGroupCreate::MeshMetaResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::SkinJointIndexAndWeightsResize)
         {
             render_passes
                 .geometry
                 .bind_groups
-                .meta_vertex_animation
+                .animation
                 .recreate(&ctx)?;
         }
 

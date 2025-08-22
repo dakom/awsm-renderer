@@ -104,11 +104,11 @@ pub(super) fn convert_morph_targets(
         //
         // INTERLEAVING PATTERN (for visibility buffer):
         // Triangle 0:
-        //   Corner 0: [Target0_pos, Target1_pos, Target2_pos, ...]
-        //   Corner 1: [Target0_pos, Target1_pos, Target2_pos, ...]
-        //   Corner 2: [Target0_pos, Target1_pos, Target2_pos, ...]
+        //   Corner 0: [MorphTarget0_pos, MorphTarget1_pos, MorphTarget2_pos, ...]
+        //   Corner 1: [MorphTarget0_pos, MorphTarget1_pos, MorphTarget2_pos, ...]
+        //   Corner 2: [MorphTarget0_pos, MorphTarget1_pos, MorphTarget2_pos, ...]
         // Triangle 1:
-        //   Corner 0: [Target0_pos, Target1_pos, Target2_pos, ...]
+        //   Corner 0: [MorphTarget0_pos, MorphTarget1_pos, MorphTarget2_pos, ...]
         //   ... etc
         for triangle in &triangle_indices {
             // For each vertex corner in this triangle (3 corners per triangle)

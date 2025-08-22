@@ -14,6 +14,7 @@ use crate::gltf::buffers::attributes::{
 use crate::gltf::buffers::index::extract_triangle_indices;
 use crate::gltf::buffers::morph::convert_morph_targets;
 use crate::gltf::buffers::normals::{compute_normals, ensure_normals};
+use crate::gltf::buffers::skin::convert_skin;
 use crate::gltf::buffers::triangle::pack_triangle_data;
 use crate::gltf::buffers::{
     MeshBufferIndexInfoWithOffset, MeshBufferInfoWithOffset, MeshBufferTriangleDataInfoWithOffset,
@@ -40,6 +41,7 @@ pub(super) fn convert_to_visibility_buffer(
     triangle_data_bytes: &mut Vec<u8>,
     geometry_morph_bytes: &mut Vec<u8>,
     material_morph_bytes: &mut Vec<u8>,
+    skin_joint_index_weight_bytes: &mut Vec<u8>,
 ) -> Result<MeshBufferInfoWithOffset> {
     // Step 1: Load all GLTF attributes
     let mut gltf_attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> =
@@ -102,12 +104,22 @@ pub(super) fn convert_to_visibility_buffer(
         material_morph_bytes,
     )?;
 
+    // Step 8: Handle skin (if any)
+    let skin = convert_skin(
+        primitive,
+        buffers,
+        index,
+        index_bytes,
+        triangle_count,
+        skin_joint_index_weight_bytes,
+    )?;
+
     // Step 7: Build final MeshBufferInfo
     Ok(MeshBufferInfoWithOffset {
         vertex: MeshBufferVertexInfoWithOffset {
             offset: visability_vertex_offset,
-            count: triangle_count * 3,     // 3 vertices per triangle
-            size: triangle_count * 3 * 24, // 24 bytes per vertex (12 pos + 4 triangle_id + 8 bary)
+            count: triangle_count * 3, // 3 vertices per triangle
+            size: triangle_count * 3 * MeshBufferVertexInfo::BYTE_SIZE,
         },
         triangles: MeshBufferTriangleInfoWithOffset {
             count: triangle_count,
@@ -119,6 +131,7 @@ pub(super) fn convert_to_visibility_buffer(
         },
         geometry_morph,
         material_morph,
+        skin,
     })
 }
 

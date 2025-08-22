@@ -122,9 +122,25 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
         &mut self,
         morph_buffer_info: Info,
         weights: &[f32],
-        value_bytes: &[u8],
+        values: &[f32],
     ) -> Result<Key> {
-        if weights.len() != morph_buffer_info.targets_len() {
+        let weights_u8 = unsafe {
+            std::slice::from_raw_parts(weights.as_ptr() as *const u8, (weights.len() * 4))
+        };
+        let values_u8 = unsafe {
+            std::slice::from_raw_parts(weights.as_ptr() as *const u8, (values.len() * 4))
+        };
+
+        self.insert_raw(morph_buffer_info, weights_u8, values_u8)
+    }
+
+    pub fn insert_raw(
+        &mut self,
+        morph_buffer_info: Info,
+        weights: &[u8],
+        values: &[u8],
+    ) -> Result<Key> {
+        if weights.len() / 4 != morph_buffer_info.targets_len() {
             return Err(AwsmMeshError::MorphWeightsTargetsMismatch {
                 weights: weights.len(),
                 targets: morph_buffer_info.targets_len(),
@@ -132,11 +148,8 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
         }
 
         let key = self.infos.insert(morph_buffer_info.clone());
-        let weights_u8 = unsafe {
-            std::slice::from_raw_parts(weights.as_ptr() as *const u8, (weights.len() * 4))
-        };
-        self.weights.update(key, weights_u8);
-        self.values.update(key, value_bytes);
+        self.weights.update(key, weights);
+        self.values.update(key, values);
 
         self.weights_dirty = true;
         self.values_dirty = true;

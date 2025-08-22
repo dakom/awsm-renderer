@@ -57,12 +57,8 @@ impl AwsmRenderer {
                 // We use the same matrices across the primitives
                 // but the skin as a whole is defined on the mesh
                 // from the spec: "When defined, mesh MUST also be defined."
-                let mesh_skin_key = ctx
-                    .node_to_skin
-                    .lock()
-                    .unwrap()
-                    .get(&gltf_node.index())
-                    .cloned();
+                let mesh_skin_transform = ctx.node_to_skin_transform.lock().unwrap();
+                let mesh_skin_transform = mesh_skin_transform.get(&gltf_node.index());
 
                 for gltf_primitive in gltf_mesh.primitives() {
                     self.populate_gltf_primitive(
@@ -71,7 +67,7 @@ impl AwsmRenderer {
                         &gltf_mesh,
                         gltf_primitive,
                         mesh_transform_key,
-                        mesh_skin_key,
+                        mesh_skin_transform,
                     )
                     .await?;
                 }
@@ -91,7 +87,7 @@ impl AwsmRenderer {
         gltf_mesh: &gltf::Mesh<'_>,
         gltf_primitive: gltf::Primitive<'_>,
         transform_key: TransformKey,
-        skin_key: Option<SkinKey>,
+        skin_transform: Option<&(Vec<TransformKey>, Vec<Mat4>)>,
     ) -> Result<()> {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
@@ -110,10 +106,13 @@ impl AwsmRenderer {
                 // from spec: "The number of array elements MUST match the number of morph targets."
                 // this is generally verified in the insert() call too
                 let weights = gltf_mesh.weights().unwrap();
+                let weights_u8 = unsafe {
+                    std::slice::from_raw_parts(weights.as_ptr() as *const u8, (weights.len() * 4))
+                };
 
-                Some(self.meshes.morphs.geometry.insert(
+                Some(self.meshes.morphs.geometry.insert_raw(
                     morph_buffer_info.into(),
-                    weights,
+                    weights_u8,
                     values,
                 )?)
             }
@@ -129,11 +128,39 @@ impl AwsmRenderer {
                 // from spec: "The number of array elements MUST match the number of morph targets."
                 // this is generally verified in the insert() call too
                 let weights = gltf_mesh.weights().unwrap();
+                let weights_u8 = unsafe {
+                    std::slice::from_raw_parts(weights.as_ptr() as *const u8, (weights.len() * 4))
+                };
 
-                Some(self.meshes.morphs.material.insert(
+                Some(self.meshes.morphs.material.insert_raw(
                     morph_buffer_info.into(),
-                    weights,
+                    weights_u8,
                     values,
+                )?)
+            }
+        };
+
+        let skin_key = match (skin_transform, primitive_buffer_info.skin.clone()) {
+            (None, None) => None,
+            (Some(_), None) => {
+                return Err(AwsmGltfError::SkinPartialData(
+                    "Got transform but no buffers".to_string(),
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(AwsmGltfError::SkinPartialData(
+                    "Got buffers but no transform".to_string(),
+                ));
+            }
+            (Some((joints, inverse_bind_matrices)), Some(info)) => {
+                let index_weights = &ctx.data.buffers.skin_joint_index_weight_bytes;
+                let index_weights = &index_weights[info.index_weights_offset
+                    ..info.index_weights_offset + info.index_weights_size];
+                Some(self.meshes.skins.insert(
+                    joints.clone(),
+                    inverse_bind_matrices,
+                    info.set_count,
+                    index_weights,
                 )?)
             }
         };

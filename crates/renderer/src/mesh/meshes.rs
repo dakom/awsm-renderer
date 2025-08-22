@@ -219,7 +219,7 @@ impl Meshes {
         }
 
         // This does update the GPU as dirty, bit skins manage their own GPU dirty state
-        self.skins.update_world(dirty_transforms);
+        self.skins.update_transforms(dirty_transforms);
     }
 
     pub fn keys(&self) -> impl Iterator<Item = MeshKey> + '_ {

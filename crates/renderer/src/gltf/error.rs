@@ -62,6 +62,18 @@ pub enum AwsmGltfError {
     #[error("[gltf] unsupported morph semantic: {0:?}")]
     UnsupportedMorphSemantic(gltf::mesh::Semantic),
 
+    #[error("[gltf] Unsupported skin data type: {0:?}")]
+    UnsupportedSkinDataType(gltf::accessor::DataType),
+
+    #[error("[gltf] Skin indices: {0}")]
+    SkinIndices(String),
+
+    #[error("[gltf] Skin weights: {0}")]
+    SkinWeights(String),
+
+    #[error("[gltf] Skin partial data: {0}")]
+    SkinPartialData(String),
+
     #[error("[gltf] morph storage key missing")]
     MorphStorageKeyMissing,
 

@@ -58,15 +58,10 @@ impl AwsmRenderer {
                 None => None,
             };
 
-            let skin_key = self
-                .meshes
-                .skins
-                .insert(joints, inverse_bind_matrices.unwrap_or_default())?;
-
-            ctx.node_to_skin
-                .lock()
-                .unwrap()
-                .insert(gltf_node.index(), skin_key);
+            ctx.node_to_skin_transform.lock().unwrap().insert(
+                gltf_node.index(),
+                (joints, inverse_bind_matrices.unwrap_or_default()),
+            );
         }
 
         for child in gltf_node.children() {
