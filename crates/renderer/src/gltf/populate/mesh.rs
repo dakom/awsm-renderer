@@ -174,7 +174,13 @@ impl AwsmRenderer {
             .render_passes
             .geometry
             .pipelines
-            .get_render_pipeline_key(material_info.material.double_sided());
+            .get_render_pipeline_key(
+                material_info.material.double_sided(),
+                ctx.transform_is_instanced
+                    .lock()
+                    .unwrap()
+                    .contains(&transform_key),
+            );
 
         let native_primitive_buffer_info = MeshBufferInfo::from(primitive_buffer_info.clone());
         let mut mesh = Mesh::new(render_pipeline_key, transform_key, material_key);

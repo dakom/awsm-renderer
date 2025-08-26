@@ -142,15 +142,6 @@ impl Mesh {
             None,
         );
 
-        let buffer_info = ctx.meshes.buffer_info(mesh_key)?;
-
-        render_pass.set_index_buffer(
-            ctx.meshes.visibility_index_gpu_buffer(),
-            IndexFormat::Uint32,
-            Some(ctx.meshes.visibility_index_buffer_offset(mesh_key)? as u64),
-            None,
-        );
-
         if let Ok(offset) = ctx.instances.transform_buffer_offset(self.transform_key) {
             render_pass.set_vertex_buffer(
                 1,
@@ -160,7 +151,26 @@ impl Mesh {
             );
         }
 
-        render_pass.draw_indexed(buffer_info.vertex.count as u32);
+        let buffer_info = ctx.meshes.buffer_info(mesh_key)?;
+
+        render_pass.set_index_buffer(
+            ctx.meshes.visibility_index_gpu_buffer(),
+            IndexFormat::Uint32,
+            Some(ctx.meshes.visibility_index_buffer_offset(mesh_key)? as u64),
+            None,
+        );
+
+        match ctx.instances.transform_instance_count(self.transform_key) {
+            Some(instance_count) => {
+                render_pass.draw_indexed_with_instance_count(
+                    buffer_info.vertex.count as u32,
+                    instance_count as u32,
+                );
+            }
+            _ => {
+                render_pass.draw_indexed(buffer_info.vertex.count as u32);
+            }
+        }
 
         Ok(())
     }

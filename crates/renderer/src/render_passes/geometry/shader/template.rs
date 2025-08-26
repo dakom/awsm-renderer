@@ -23,6 +23,7 @@ pub struct ShaderTemplateGeometry {
 pub struct ShaderTemplateGeometryVertex {
     max_morph_unroll: u32,
     max_skin_unroll: u32,
+    instancing_transforms: bool,
 }
 
 impl ShaderTemplateGeometryVertex {
@@ -30,6 +31,7 @@ impl ShaderTemplateGeometryVertex {
         Self {
             max_morph_unroll: 2,
             max_skin_unroll: 2,
+            instancing_transforms: cache_key.instancing_transforms,
         }
     }
 }
@@ -61,7 +63,7 @@ impl ShaderTemplateGeometry {
         let fragment_source = self.fragment.render()?;
         let source = format!("{}\n{}", vertex_source, fragment_source);
 
-        print_shader_source(&vertex_source, false);
+        // print_shader_source(&vertex_source, false);
         //print_shader_source(&source, true);
 
         Ok(source)

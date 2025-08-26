@@ -4,7 +4,9 @@ use awsm_renderer_core::pipeline::fragment::ColorTargetState;
 use awsm_renderer_core::pipeline::primitive::{
     CullMode, FrontFace, PrimitiveState, PrimitiveTopology,
 };
-use awsm_renderer_core::pipeline::vertex::{VertexAttribute, VertexBufferLayout, VertexFormat};
+use awsm_renderer_core::pipeline::vertex::{
+    VertexAttribute, VertexBufferLayout, VertexFormat, VertexStepMode,
+};
 
 use crate::error::Result;
 use crate::mesh::MeshBufferVertexInfo;
@@ -16,7 +18,9 @@ use crate::render_passes::{geometry::bind_group::GeometryBindGroups, RenderPassI
 pub struct GeometryPipelines {
     pub pipeline_layout_key: PipelineLayoutKey,
     pub render_pipeline_key_cull_back: RenderPipelineKey,
+    pub render_pipeline_key_cull_back_instancing: RenderPipelineKey,
     pub render_pipeline_key_cull_none: RenderPipelineKey,
+    pub render_pipeline_key_cull_none_instancing: RenderPipelineKey,
 }
 
 impl GeometryPipelines {
@@ -39,7 +43,22 @@ impl GeometryPipelines {
 
         let shader_key = ctx
             .shaders
-            .get_key(&ctx.gpu, ShaderCacheKeyGeometry {})
+            .get_key(
+                &ctx.gpu,
+                ShaderCacheKeyGeometry {
+                    instancing_transforms: false,
+                },
+            )
+            .await?;
+
+        let shader_key_instancing = ctx
+            .shaders
+            .get_key(
+                &ctx.gpu,
+                ShaderCacheKeyGeometry {
+                    instancing_transforms: true,
+                },
+            )
             .await?;
 
         let primitive_state_cull_back = PrimitiveState::new()
@@ -86,10 +105,39 @@ impl GeometryPipelines {
             ],
         };
 
+        let mut vertex_buffer_layout_instancing = VertexBufferLayout {
+            // this is the stride across all of the attributes
+            array_stride: MeshBufferVertexInfo::BYTE_SIZE_INSTANCE as u64,
+            step_mode: Some(VertexStepMode::Instance),
+            attributes: Vec::new(),
+        };
+
+        for i in 0..4 {
+            vertex_buffer_layout_instancing
+                .attributes
+                .push(VertexAttribute {
+                    format: VertexFormat::Float32x4,
+                    offset: i * 16,
+                    shader_location: 3 + i as u32,
+                });
+        }
+
         let mut pipeline_cache_key_cull_back =
             RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
+                .with_primitive(primitive_state_cull_back.clone())
+                .with_push_vertex_buffer_layout(vertex_buffer_layout.clone())
+                .with_depth_stencil(
+                    DepthStencilState::new(ctx.render_texture_formats.depth)
+                        .with_depth_write_enabled(true)
+                        .with_depth_compare(CompareFunction::LessEqual),
+                )
+                .with_push_fragment_targets(color_targets.clone());
+
+        let mut pipeline_cache_key_cull_back_instancing =
+            RenderPipelineCacheKey::new(shader_key_instancing, pipeline_layout_key)
                 .with_primitive(primitive_state_cull_back)
                 .with_push_vertex_buffer_layout(vertex_buffer_layout.clone())
+                .with_push_vertex_buffer_layout(vertex_buffer_layout_instancing.clone())
                 .with_depth_stencil(
                     DepthStencilState::new(ctx.render_texture_formats.depth)
                         .with_depth_write_enabled(true)
@@ -99,8 +147,20 @@ impl GeometryPipelines {
 
         let mut pipeline_cache_key_cull_none =
             RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
+                .with_primitive(primitive_state_cull_none.clone())
+                .with_push_vertex_buffer_layout(vertex_buffer_layout.clone())
+                .with_depth_stencil(
+                    DepthStencilState::new(ctx.render_texture_formats.depth)
+                        .with_depth_write_enabled(true)
+                        .with_depth_compare(CompareFunction::LessEqual),
+                )
+                .with_push_fragment_targets(color_targets.clone());
+
+        let mut pipeline_cache_key_cull_none_instancing =
+            RenderPipelineCacheKey::new(shader_key_instancing, pipeline_layout_key)
                 .with_primitive(primitive_state_cull_none)
                 .with_push_vertex_buffer_layout(vertex_buffer_layout)
+                .with_push_vertex_buffer_layout(vertex_buffer_layout_instancing)
                 .with_depth_stencil(
                     DepthStencilState::new(ctx.render_texture_formats.depth)
                         .with_depth_write_enabled(true)
@@ -119,6 +179,17 @@ impl GeometryPipelines {
             )
             .await?;
 
+        let render_pipeline_key_cull_back_instancing = ctx
+            .pipelines
+            .render
+            .get_key(
+                &ctx.gpu,
+                &ctx.shaders,
+                &ctx.pipeline_layouts,
+                pipeline_cache_key_cull_back_instancing,
+            )
+            .await?;
+
         let render_pipeline_key_cull_none = ctx
             .pipelines
             .render
@@ -130,17 +201,36 @@ impl GeometryPipelines {
             )
             .await?;
 
+        let render_pipeline_key_cull_none_instancing = ctx
+            .pipelines
+            .render
+            .get_key(
+                &ctx.gpu,
+                &ctx.shaders,
+                &ctx.pipeline_layouts,
+                pipeline_cache_key_cull_none_instancing,
+            )
+            .await?;
+
         Ok(Self {
             pipeline_layout_key,
             render_pipeline_key_cull_back,
+            render_pipeline_key_cull_back_instancing,
             render_pipeline_key_cull_none,
+            render_pipeline_key_cull_none_instancing,
         })
     }
 
-    pub fn get_render_pipeline_key(&self, double_sided: bool) -> RenderPipelineKey {
-        match double_sided {
-            true => self.render_pipeline_key_cull_none,
-            false => self.render_pipeline_key_cull_back,
+    pub fn get_render_pipeline_key(
+        &self,
+        double_sided: bool,
+        transform_instancing: bool,
+    ) -> RenderPipelineKey {
+        match (double_sided, transform_instancing) {
+            (true, false) => self.render_pipeline_key_cull_none,
+            (false, false) => self.render_pipeline_key_cull_back,
+            (true, true) => self.render_pipeline_key_cull_none_instancing,
+            (false, true) => self.render_pipeline_key_cull_back_instancing,
         }
     }
 }

@@ -161,11 +161,11 @@ impl AwsmRendererBuilder {
             AwsmRendererGpuBuilderKind::WebGpuBuilt(gpu) => gpu,
         };
 
-        tracing::info!("Max bind groups: {}", gpu.device.limits().max_bind_groups());
-        tracing::info!(
-            "Max texture size: {}",
-            gpu.device.limits().max_texture_dimension_2d()
-        );
+        // tracing::info!("Max bind groups: {}", gpu.device.limits().max_bind_groups());
+        // tracing::info!(
+        //     "Max texture size: {}",
+        //     gpu.device.limits().max_texture_dimension_2d()
+        // );
 
         let mut pipeline_layouts = PipelineLayouts::new();
         let mut bind_group_layouts = BindGroupLayouts::new();

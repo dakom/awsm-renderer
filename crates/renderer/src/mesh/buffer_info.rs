@@ -23,6 +23,8 @@ impl MeshBufferVertexInfo {
     // - barycentric coordinates (vec2<f32>), 8 bytes per vertex
     // Total size per vertex = 12 + 4 + 8 = 24 bytes
     pub const BYTE_SIZE: usize = 24;
+    // 16 floats for transform
+    pub const BYTE_SIZE_INSTANCE: usize = 64;
 }
 
 #[derive(Debug, Clone)]
