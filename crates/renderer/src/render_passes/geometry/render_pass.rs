@@ -82,6 +82,12 @@ impl GeometryRenderPass {
 
         render_pass.set_bind_group(0, self.bind_groups.camera_lights.get_bind_group()?, None)?;
 
+        render_pass.set_bind_group(
+            1,
+            self.bind_groups.transform_materials.get_bind_group()?,
+            None
+        )?;
+
         let mut last_render_pipeline_key = None;
         for renderable in renderables {
             let render_pipeline_key = renderable.render_pipeline_key();

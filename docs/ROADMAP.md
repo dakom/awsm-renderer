@@ -1,8 +1,8 @@
 # Next up
 
 - Rewrite entire pipeline to match README doc (Visiblity+)
-    - move shaders to passes (template and cache_key stuff should be ported)
-    - get down to one draw call for geometry using new shader
+
+- Megatexture tool/load
 
 - materials cont'd
     - normal texture
@@ -13,6 +13,7 @@
 - Is it right that specular isn't moving across sphere test when camera moves?
 
 - fix "dev-release" mode (just base path?)
+
 
 - Initial allocation?
     - derive from gltf?
@@ -74,12 +75,10 @@ If it's supported here, corresponding core functionality is also supported
 
 ## Optimizations
 
-- [ ] Reduce draw calls
-  - Instancing everywhere
-    - [ ] Geometry pass is one call
-    - [ ] Transparent pass is one call per-render-pipeline
 - [ ] Multithreading
 - [x] MegaTextures
+    - [ ] Tool to precreate megatextures
+    - [ ] Load precreated megatextures
 - [x] Dynamic buffer primitives
     - Single gpu binding
     - Offset-driven
@@ -92,15 +91,8 @@ If it's supported here, corresponding core functionality is also supported
     - Dirty flag
 - [x] AABB
     - Only update when transform changes
-- [x] Morphs
-    - One dynamic uniform bind group for weights
-        - gpu gating on dirty flag
-    - One dynamic storage bind group for values
-        - gpu gating on dirty flag
-    - Conscious shader generation
-        - Number of targets -> weights -> constant override -> new shader
-        - Presence of attributes -> new shader
-        - Unused but present attributes do not create new shader, just 0 influence
+- [x] Morphs and Skins
+    - Global buffers and dirty flags
 - [x] Meshes
     - One vertex buffer
     - One index buffer

@@ -133,8 +133,7 @@ impl GeometryBindGroupTransformMaterials {
                 BindGroupLayoutCacheKeyEntry {
                     resource: BindGroupLayoutResource::Buffer(
                         BufferBindingLayout::new()
-                            .with_binding_type(BufferBindingType::Uniform)
-                            .with_dynamic_offset(true),
+                            .with_binding_type(BufferBindingType::ReadOnlyStorage)
                     ),
                     visibility_vertex: true,
                     visibility_fragment: true,
@@ -143,8 +142,7 @@ impl GeometryBindGroupTransformMaterials {
                 BindGroupLayoutCacheKeyEntry {
                     resource: BindGroupLayoutResource::Buffer(
                         BufferBindingLayout::new()
-                            .with_binding_type(BufferBindingType::Uniform)
-                            .with_dynamic_offset(true),
+                            .with_binding_type(BufferBindingType::ReadOnlyStorage)
                     ),
                     visibility_vertex: true,
                     visibility_fragment: true,
@@ -164,6 +162,11 @@ impl GeometryBindGroupTransformMaterials {
     }
 
     pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
+
+        if self._bind_group.is_some() {
+            tracing::warn!("Geometry transform/material bind group recreated when it already existed");
+        }
+
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts.get(self.bind_group_layout_key)?,
             Some("Geometry Transforms (and materials)"),
@@ -172,14 +175,12 @@ impl GeometryBindGroupTransformMaterials {
                     0,
                     BindGroupResource::Buffer(
                         BufferBinding::new(&ctx.transforms.gpu_buffer)
-                            .with_size(Transforms::BYTE_ALIGNMENT),
                     ),
                 ),
                 BindGroupEntry::new(
                     1,
                     BindGroupResource::Buffer(
                         BufferBinding::new(&ctx.materials.gpu_buffer(MaterialBufferKind::Pbr))
-                            .with_size(Materials::MAX_SIZE),
                     ),
                 ),
             ],

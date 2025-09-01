@@ -78,6 +78,11 @@ impl BindGroups {
         ctx: BindGroupRecreateContext<'_>,
         render_passes: &mut RenderPasses,
     ) -> crate::error::Result<()> {
+
+        if !self.create_list.is_empty() {
+            tracing::info!("Recreating bind groups: {:?}", self.create_list);
+        }
+
         if self.create_list.contains(&BindGroupCreate::CameraInitOnly)
             || self.create_list.contains(&BindGroupCreate::LightsResize)
         {

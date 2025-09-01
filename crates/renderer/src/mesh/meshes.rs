@@ -11,11 +11,11 @@ use crate::buffer::dynamic_storage::DynamicStorageBuffer;
 use crate::buffer::dynamic_uniform::DynamicUniformBuffer;
 use crate::materials::Materials;
 use crate::mesh::meta::{
-    mesh_meta_data, MESH_META_BYTE_ALIGNMENT, MESH_META_BYTE_SIZE, MESH_META_INITIAL_CAPACITY,
+    MeshMeta, MESH_META_BYTE_ALIGNMENT, MESH_META_BYTE_SIZE, MESH_META_INITIAL_CAPACITY,
 };
 use crate::mesh::skins::Skins;
 use crate::mesh::MeshBufferInfo;
-use crate::transforms::TransformKey;
+use crate::transforms::{TransformKey, Transforms};
 use crate::AwsmRendererLogging;
 
 use super::error::{AwsmMeshError, Result};
@@ -120,7 +120,7 @@ impl Meshes {
             meta_data_buffers: DynamicUniformBuffer::new(
                 MESH_META_INITIAL_CAPACITY,
                 MESH_META_BYTE_SIZE,
-                MESH_META_BYTE_ALIGNMENT,
+                Some(MESH_META_BYTE_ALIGNMENT),
                 Some("MeshMetaData".to_string()),
             ),
             meta_data_gpu_buffer: gpu.create_buffer(
@@ -143,6 +143,7 @@ impl Meshes {
         mesh: Mesh,
         buffer_info: MeshBufferInfo,
         materials: &Materials,
+        transforms: &Transforms,
         visibility_data: &[u8],
         // visibility index will be auto-generated
         attribute_data: &[u8],
@@ -184,16 +185,18 @@ impl Meshes {
         self.attribute_data_dirty = true;
 
         // meta - data
-        let meta_data = mesh_meta_data(
-            key,
+        let meta_data = MeshMeta {
+            mesh_key: key,
             material_key,
+            transform_key,
             geometry_morph_key,
             material_morph_key,
             skin_key,
             materials,
-            &self.morphs,
-            &self.skins,
-        )?;
+            transforms,
+            morphs: &self.morphs,
+            skins: &self.skins,
+        }.to_bytes()?;
         self.meta_data_buffers.update(key, &meta_data);
         self.meta_data_dirty = true;
 
@@ -232,7 +235,7 @@ impl Meshes {
     pub fn visibility_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         self.visibility_data_buffers
             .offset(key)
-            .ok_or(AwsmMeshError::MeshNotFound(key))
+            .ok_or(AwsmMeshError::VisibilityBufferNotFound(key))
     }
 
     pub fn visibility_index_gpu_buffer(&self) -> &web_sys::GpuBuffer {
@@ -241,7 +244,7 @@ impl Meshes {
     pub fn visibility_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         self.visibility_index_buffers
             .offset(key)
-            .ok_or(AwsmMeshError::MeshNotFound(key))
+            .ok_or(AwsmMeshError::VisibilityBufferNotFound(key))
     }
 
     pub fn attribute_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
@@ -250,7 +253,7 @@ impl Meshes {
     pub fn attribute_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         self.attribute_data_buffers
             .offset(key)
-            .ok_or(AwsmMeshError::MeshNotFound(key))
+            .ok_or(AwsmMeshError::AttributeBufferNotFound(key))
     }
 
     pub fn attribute_index_gpu_buffer(&self) -> &web_sys::GpuBuffer {
@@ -259,7 +262,7 @@ impl Meshes {
     pub fn attribute_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         self.attribute_index_buffers
             .offset(key)
-            .ok_or(AwsmMeshError::MeshNotFound(key))
+            .ok_or(AwsmMeshError::AttributeBufferNotFound(key))
     }
 
     pub fn meta_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
@@ -268,13 +271,13 @@ impl Meshes {
     pub fn meta_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         self.meta_data_buffers
             .offset(key)
-            .ok_or(AwsmMeshError::MeshNotFound(key))
+            .ok_or(AwsmMeshError::MetaNotFound(key))
     }
 
     pub fn buffer_info(&self, key: MeshKey) -> Result<&MeshBufferInfo> {
         self.buffer_infos
             .get(key)
-            .ok_or(AwsmMeshError::MeshNotFound(key))
+            .ok_or(AwsmMeshError::BufferInfoNotFound(key))
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (MeshKey, &Mesh)> {

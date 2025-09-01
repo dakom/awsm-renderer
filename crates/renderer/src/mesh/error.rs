@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use crate::{
     bind_groups::AwsmBindGroupError,
-    materials::MaterialKey,
+    materials::{AwsmMaterialError, MaterialKey},
     mesh::{
         morphs::{GeometryMorphKey, MaterialMorphKey},
         skins::AwsmSkinError,
@@ -20,14 +20,26 @@ pub enum AwsmMeshError {
     #[error("[mesh] not found: {0:?}")]
     MeshNotFound(MeshKey),
 
-    #[error("[mesh] material not found: {0:?}")]
-    MaterialNotFound(MaterialKey),
+    #[error("[mesh] visibility buffer not found: {0:?}")]
+    VisibilityBufferNotFound(MeshKey),
+
+    #[error("[mesh] attribute buffer not found: {0:?}")]
+    AttributeBufferNotFound(MeshKey),
+
+    #[error("[mesh] buffer info not found: {0:?}")]
+    BufferInfoNotFound(MeshKey),
+
+    #[error("[mesh] metadata not found: {0:?}")]
+    MetaNotFound(MeshKey),
 
     #[error("[mesh] {0:?}")]
     Core(#[from] AwsmCoreError),
 
     #[error("[mesh] {0:?}")]
     Transform(#[from] AwsmTransformError),
+
+    #[error("[mesh] {0:?}")]
+    Material(#[from] AwsmMaterialError),
 
     #[error("[mesh] {0:?}")]
     Skin(#[from] AwsmSkinError),

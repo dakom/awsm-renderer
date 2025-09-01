@@ -1,39 +1,8 @@
+{% include "geometry_wgsl/vertex/meta.wgsl" %}
+{% include "geometry_wgsl/vertex/camera.wgsl" %}
+{% include "geometry_wgsl/vertex/transform.wgsl" %}
 {% include "geometry_wgsl/vertex/morph.wgsl" %}
 {% include "geometry_wgsl/vertex/skin.wgsl" %}
-
-struct CameraUniform {
-    view: mat4x4<f32>,
-    proj: mat4x4<f32>,
-    view_proj: mat4x4<f32>,
-    inv_view_proj: mat4x4<f32>,
-    inv_view: mat4x4<f32>,
-    position: vec3<f32>,
-    frame_count: u32,
-};
-
-@group(0) @binding(0)
-var<uniform> camera: CameraUniform;
-
-@group(1) @binding(0)
-var<uniform> u_transform: TransformUniform;
-
-struct TransformUniform {
-    model: mat4x4<f32>,
-};
-
-@group(2) @binding(0)
-var<uniform> mesh_meta: MeshMeta;
-
-struct MeshMeta {
-    mesh_key_high: u32,
-    mesh_key_low: u32,
-    material_offset: u32,
-    morph_geometry_target_len: u32,
-    morph_material_target_len: u32,
-    morph_material_bitmask: u32,
-    skin_sets_len: u32
-}
-
 
 //***** INPUT/OUTPUT *****
 struct VertexInput {
@@ -83,9 +52,9 @@ fn vert_main(vertex_orig: VertexInput) -> VertexOutput {
             vertex.instance_transform_row_3,
         );
 
-        let model_transform = u_transform.model * instance_transform;
+        let model_transform = get_model_transform(mesh_meta.transform_offset) * instance_transform;
     {% else %}
-        let model_transform = u_transform.model;
+        let model_transform = get_model_transform(mesh_meta.transform_offset);
     {% endif %}
 
     var pos = model_transform * vec4<f32>(vertex.position, 1.0);

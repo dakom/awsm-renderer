@@ -38,6 +38,8 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
     //     material_id,
     //     0u  // Unused - could be used for other data
     // );
+
+    out.material_offset = 1u;
     
     return out;
 }

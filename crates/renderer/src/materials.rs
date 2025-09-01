@@ -37,10 +37,11 @@ impl MaterialBuffers {
         })
     }
 
-    pub fn buffer_offset(&self, key: MaterialKey) -> Option<usize> {
-        match self.buffer_kind.get(key)? {
-            MaterialBufferKind::Pbr => self.pbr.buffer_offset(key),
-        }
+    pub fn buffer_offset(&self, key: MaterialKey) -> Result<usize> {
+        self.buffer_kind.get(key).and_then(|kind| match kind {
+            MaterialBufferKind::Pbr => self.pbr.buffer_offset(key)
+        })
+        .ok_or(AwsmMaterialError::BufferSlotMissing(key))
     }
 }
 
@@ -70,7 +71,7 @@ impl Materials {
         key
     }
 
-    pub fn buffer_offset(&self, key: MaterialKey) -> Option<usize> {
+    pub fn buffer_offset(&self, key: MaterialKey) -> Result<usize> {
         self.buffers.buffer_offset(key)
     }
 
@@ -199,4 +200,7 @@ pub enum AwsmMaterialError {
 
     #[error("[material] {0:?}")]
     Texture(#[from] AwsmTextureError),
+
+    #[error("[material] buffer slot missing {0:?}")]
+    BufferSlotMissing(MaterialKey),
 }

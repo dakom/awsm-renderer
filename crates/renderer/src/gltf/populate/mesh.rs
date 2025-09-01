@@ -223,10 +223,11 @@ impl AwsmRenderer {
                 mesh,
                 primitive_buffer_info.clone().into(),
                 &self.materials,
+                &self.transforms,
                 visibility_data,
                 attribute_data,
                 attribute_index,
-            )
+            )?
         };
 
         for gltf_animation in ctx.data.doc.animations() {

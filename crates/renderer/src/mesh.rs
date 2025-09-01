@@ -83,17 +83,6 @@ impl Mesh {
         render_pass: &RenderPassEncoder,
         geometry_bind_groups: &GeometryBindGroups,
     ) -> Result<()> {
-        let transform_offset = ctx.transforms.buffer_offset(self.transform_key)? as u32;
-        let pbr_material_offset = ctx
-            .materials
-            .buffer_offset(self.material_key)
-            .unwrap_or_default() as u32;
-
-        render_pass.set_bind_group(
-            1,
-            geometry_bind_groups.transform_materials.get_bind_group()?,
-            Some(&[transform_offset, pbr_material_offset]),
-        )?;
 
         // if _any_ shapes are used, set the bind group
         // unused shapes will simply be ignored (so 0 offset is fine)

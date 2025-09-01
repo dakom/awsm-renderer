@@ -1,5 +1,7 @@
 # Optimize bindings in geometry pass
 - get rid of dynamic uniform buffers (except mesh meta, only thing that really changes)
+    - fix transforms
+        - specifically, fix when buffer is grown, offsets change (or do they?)
 
 # Get started with opaque material pass 
 

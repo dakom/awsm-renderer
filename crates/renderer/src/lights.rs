@@ -197,7 +197,7 @@ impl Lights {
             storage_buffer: DynamicUniformBuffer::new(
                 Self::INITIAL_ELEMENTS,
                 Self::BYTE_SIZE,
-                Self::BYTE_ALIGNMENT,
+                Some(Self::BYTE_ALIGNMENT),
                 Some("Lights".to_string()),
             ),
             gpu_dirty: true,

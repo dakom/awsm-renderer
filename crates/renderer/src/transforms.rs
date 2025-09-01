@@ -48,18 +48,17 @@ pub struct Transforms {
 }
 
 static BUFFER_USAGE: LazyLock<BufferUsage> =
-    LazyLock::new(|| BufferUsage::new().with_uniform().with_copy_dst());
+    LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
 
 impl Transforms {
     pub const INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
     pub const BYTE_SIZE: usize = 64; // 4x4 matrix of f32 is 64 bytes
-    pub const BYTE_ALIGNMENT: usize = 256; // minUniformBufferOffsetAlignment
 
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let gpu_buffer = gpu.create_buffer(
             &BufferDescriptor::new(
                 Some("Transforms"),
-                Transforms::INITIAL_CAPACITY * Transforms::BYTE_ALIGNMENT,
+                Transforms::INITIAL_CAPACITY * Transforms::BYTE_SIZE,
                 *BUFFER_USAGE,
             )
             .into(),
@@ -68,7 +67,7 @@ impl Transforms {
         let buffer = DynamicUniformBuffer::new(
             Self::INITIAL_CAPACITY,
             Self::BYTE_SIZE,
-            Self::BYTE_ALIGNMENT,
+            None,
             Some("Transforms".to_string()),
         );
         let mut locals = SlotMap::with_capacity_and_key(Self::INITIAL_CAPACITY);
@@ -101,6 +100,8 @@ impl Transforms {
         self.world_matrices.insert(key, world_matrix);
         self.children.insert(key, Vec::new());
         self.dirties.insert(key);
+
+        self.buffer.update(key, &[0; Self::BYTE_SIZE]);
 
         self.set_parent(key, parent);
 

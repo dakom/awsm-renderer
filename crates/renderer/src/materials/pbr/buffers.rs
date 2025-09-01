@@ -50,7 +50,7 @@ impl PbrMaterialBuffers {
             uniform_buffer: DynamicUniformBuffer::new(
                 PbrMaterial::INITIAL_ELEMENTS,
                 PbrMaterial::BYTE_SIZE,
-                Materials::MAX_SIZE,
+                Some(Materials::MAX_SIZE),
                 Some("PbrUniformBuffer".to_string()),
             ),
             uniform_buffer_gpu_dirty: false,
