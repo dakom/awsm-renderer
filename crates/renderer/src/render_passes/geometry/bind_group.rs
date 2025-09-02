@@ -162,11 +162,6 @@ impl GeometryBindGroupTransformMaterials {
     }
 
     pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
-
-        if self._bind_group.is_some() {
-            tracing::warn!("Geometry transform/material bind group recreated when it already existed");
-        }
-
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts.get(self.bind_group_layout_key)?,
             Some("Geometry Transforms (and materials)"),

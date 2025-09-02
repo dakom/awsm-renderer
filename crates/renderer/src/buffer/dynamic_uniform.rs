@@ -1,11 +1,10 @@
 use slotmap::{Key, SecondaryMap};
 
-// This dynamic storage buffer allows for flexible allocations of fixed sizes
-// that are power-of-two aligned.
-//
-// It can be used to power either uniform or storage buffers on the gpu
-// the choice of which will depend more on the total size of the buffer than anything else
-// since uniform buffers are a valid choice here
+/// Dynamic buffer for fixed-size allocations with efficient slot reuse.
+/// 
+/// This buffer is optimized for managing many items of identical size,
+/// automatically handling slot allocation, reuse, and buffer growth.
+/// All items must be the same size (specified at creation time).
 
 //-------------------------------- PERFORMANCE SUMMARY ------------------------//
 //
@@ -35,7 +34,7 @@ use slotmap::{Key, SecondaryMap};
 /// without having to reallocate the entire buffer every time.
 ///
 /// This also has the benefit of not needing complicated logic to avoid coalescing etc.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DynamicUniformBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
     /// Raw CPU‑side data for all items, organized in BYTE_SIZE slots.
     raw_data: Vec<u8>,
@@ -85,16 +84,18 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         self.raw_data.len()
     }
 
-    // Inserts or updates an item in the buffer.
-    // the values should be of size `byte_size` not `alignment_size`
-    //
-    // this will efficiently:
-    // * write into the slot if it already has one
-    // * use a free slot if available
-    // * grow the buffer if needed
-
-    // It does not touch the GPU, and can be called many times a frame
-    // first param is the offset into the buffer
+    /// Updates an item in the buffer using a callback function.
+    /// 
+    /// The callback receives:
+    /// - The byte offset of the slot in the buffer
+    /// - A mutable slice of exactly `byte_size` bytes to write into
+    /// 
+    /// This method efficiently:
+    /// - Reuses existing slot if the key already exists
+    /// - Allocates from free slots when available
+    /// - Grows the buffer automatically when needed
+    /// 
+    /// Note: GPU buffer is not updated until `take_gpu_needs_resize()` is called.
     pub fn update_with(&mut self, key: K, f: impl FnOnce(usize, &mut [u8])) {
         // If we don't have a slot, set one
         let slot = match self.slot_indices.get(key) {
@@ -129,16 +130,20 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         );
     }
 
-    // Inserts or updates an item in the buffer
-    // returns the offset where the data was written
+    /// Updates an item in the buffer with raw bytes.
+    /// 
+    /// # Panics
+    /// Panics if `values.len()` exceeds `byte_size`.
     pub fn update(&mut self, key: K, values: &[u8]) {
         self.update_with(key, |_, data| {
             data[..values.len()].copy_from_slice(values);
         })
     }
 
-    // updates the slot at the given key with the given *local* offset within the data
-    // returns the global offset in the buffer
+    /// Updates a portion of an existing slot starting at the given offset.
+    /// 
+    /// # Panics
+    /// Panics if `offset + values.len()` exceeds `byte_size`.
     pub fn update_offset(&mut self, key: K, offset: usize, values: &[u8]) {
         self.update_with(key, |_, data| {
             data[offset..offset + values.len()].copy_from_slice(values);
@@ -181,6 +186,31 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
 
     pub fn keys(&self) -> slotmap::secondary::Keys<K, usize> {
         self.slot_indices.keys()
+    }
+
+    /// Returns the number of currently allocated keys
+    pub fn len(&self) -> usize {
+        self.slot_indices.len()
+    }
+
+    /// Returns true if no keys are allocated
+    pub fn is_empty(&self) -> bool {
+        self.slot_indices.is_empty()
+    }
+
+    /// Returns the current capacity in number of slots
+    pub fn capacity(&self) -> usize {
+        self.capacity_slots
+    }
+
+    /// Returns the number of free slots available for reuse
+    pub fn free_slots_count(&self) -> usize {
+        self.free_slots.len()
+    }
+
+    /// Checks if a key exists in the buffer
+    pub fn contains_key(&self, key: K) -> bool {
+        self.slot_indices.contains_key(key)
     }
 
     fn resize(&mut self, required_slots: usize) {
@@ -1180,6 +1210,107 @@ mod test {
         
         assert_eq!(buffer.raw_data[offset1], 0x42);
         assert_eq!(buffer.raw_data[offset2], 0x43);
+    }
+
+    #[test]
+    fn test_new_utility_methods() {
+        let mut buffer = create_test_buffer();
+        let (_, key1, key2, _) = create_keys();
+        
+        // Test is_empty and len
+        assert!(buffer.is_empty());
+        assert_eq!(buffer.len(), 0);
+        
+        buffer.update(key1, b"data1___________");
+        assert!(!buffer.is_empty());
+        assert_eq!(buffer.len(), 1);
+        
+        buffer.update(key2, b"data2___________");
+        assert_eq!(buffer.len(), 2);
+        
+        // Test contains_key
+        assert!(buffer.contains_key(key1));
+        assert!(buffer.contains_key(key2));
+        
+        // Test capacity and free_slots_count
+        assert_eq!(buffer.capacity(), 2);
+        assert_eq!(buffer.free_slots_count(), 0);
+        
+        buffer.remove(key1);
+        assert_eq!(buffer.len(), 1);
+        assert!(!buffer.contains_key(key1));
+        assert!(buffer.contains_key(key2));
+        assert_eq!(buffer.free_slots_count(), 1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_update_panics_on_oversized_data() {
+        let mut buffer: DynamicUniformBuffer<TestKey> = DynamicUniformBuffer::new(
+            1, 10, Some(16), None
+        );
+        let (_, key1, _, _) = create_keys();
+        
+        // This should panic because we're trying to write 11 bytes into a 10-byte slot
+        buffer.update(key1, &[0u8; 11]);
+    }
+
+    #[test]
+    fn test_zero_capacity_initialization() {
+        let buffer: DynamicUniformBuffer<TestKey> = DynamicUniformBuffer::new(
+            0, 16, Some(32), None
+        );
+        
+        assert_eq!(buffer.capacity(), 0);
+        assert_eq!(buffer.size(), 0);
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn test_concurrent_operations_simulation() {
+        let mut buffer = create_test_buffer();
+        let mut key_map = SlotMap::new();
+        let mut keys = Vec::new();
+        
+        // Simulate concurrent-like access pattern
+        for i in 0..10 {
+            let key = key_map.insert(());
+            keys.push(key);
+            let data = format!("data_{:03}________", i); // Exactly 16 bytes (data_000________)
+            assert_eq!(data.len(), 16);
+            buffer.update(key, data.as_bytes());
+        }
+        
+        // Remove every third item
+        for i in (0..10).step_by(3) {
+            buffer.remove(keys[i]);
+        }
+        
+        // Update remaining items
+        for (i, &key) in keys.iter().enumerate() {
+            if i % 3 != 0 {
+                let data = format!("updt_{:03}________", i); // Exactly 16 bytes
+                assert_eq!(data.len(), 16);
+                buffer.update(key, data.as_bytes());
+            }
+        }
+        
+        // Add new items to fill gaps
+        for i in 10..15 {
+            let key = key_map.insert(());
+            let data = format!("new__{:03}________", i); // Exactly 16 bytes
+            assert_eq!(data.len(), 16);
+            buffer.update(key, data.as_bytes());
+        }
+        
+        // Verify no data corruption
+        for (i, &key) in keys.iter().enumerate() {
+            if i % 3 != 0 {
+                let offset = buffer.offset(key).unwrap();
+                let expected = format!("updt_{:03}________", i); // Exactly 16 bytes
+                assert_eq!(&buffer.raw_data[offset..offset + 16], expected.as_bytes());
+            }
+        }
     }
 
     #[test]
