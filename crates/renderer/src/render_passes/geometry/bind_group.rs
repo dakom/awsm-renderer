@@ -133,7 +133,7 @@ impl GeometryBindGroupTransformMaterials {
                 BindGroupLayoutCacheKeyEntry {
                     resource: BindGroupLayoutResource::Buffer(
                         BufferBindingLayout::new()
-                            .with_binding_type(BufferBindingType::ReadOnlyStorage)
+                            .with_binding_type(BufferBindingType::ReadOnlyStorage),
                     ),
                     visibility_vertex: true,
                     visibility_fragment: true,
@@ -142,7 +142,7 @@ impl GeometryBindGroupTransformMaterials {
                 BindGroupLayoutCacheKeyEntry {
                     resource: BindGroupLayoutResource::Buffer(
                         BufferBindingLayout::new()
-                            .with_binding_type(BufferBindingType::ReadOnlyStorage)
+                            .with_binding_type(BufferBindingType::ReadOnlyStorage),
                     ),
                     visibility_vertex: true,
                     visibility_fragment: true,
@@ -168,15 +168,13 @@ impl GeometryBindGroupTransformMaterials {
             vec![
                 BindGroupEntry::new(
                     0,
-                    BindGroupResource::Buffer(
-                        BufferBinding::new(&ctx.transforms.gpu_buffer)
-                    ),
+                    BindGroupResource::Buffer(BufferBinding::new(&ctx.transforms.gpu_buffer)),
                 ),
                 BindGroupEntry::new(
                     1,
-                    BindGroupResource::Buffer(
-                        BufferBinding::new(&ctx.materials.gpu_buffer(MaterialBufferKind::Pbr))
-                    ),
+                    BindGroupResource::Buffer(BufferBinding::new(
+                        &ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
+                    )),
                 ),
             ],
         );
@@ -270,8 +268,7 @@ impl GeometryBindGroupAnimation {
                 BindGroupLayoutCacheKeyEntry {
                     resource: BindGroupLayoutResource::Buffer(
                         BufferBindingLayout::new()
-                            .with_binding_type(BufferBindingType::ReadOnlyStorage)
-                            .with_dynamic_offset(true),
+                            .with_binding_type(BufferBindingType::ReadOnlyStorage),
                     ),
                     visibility_vertex: true,
                     visibility_fragment: true,
@@ -280,8 +277,7 @@ impl GeometryBindGroupAnimation {
                 BindGroupLayoutCacheKeyEntry {
                     resource: BindGroupLayoutResource::Buffer(
                         BufferBindingLayout::new()
-                            .with_binding_type(BufferBindingType::ReadOnlyStorage)
-                            .with_dynamic_offset(true),
+                            .with_binding_type(BufferBindingType::ReadOnlyStorage),
                     ),
                     visibility_vertex: true,
                     visibility_fragment: true,
@@ -290,8 +286,7 @@ impl GeometryBindGroupAnimation {
                 BindGroupLayoutCacheKeyEntry {
                     resource: BindGroupLayoutResource::Buffer(
                         BufferBindingLayout::new()
-                            .with_binding_type(BufferBindingType::ReadOnlyStorage)
-                            .with_dynamic_offset(true),
+                            .with_binding_type(BufferBindingType::ReadOnlyStorage),
                     ),
                     visibility_vertex: true,
                     visibility_fragment: true,
@@ -300,8 +295,7 @@ impl GeometryBindGroupAnimation {
                 BindGroupLayoutCacheKeyEntry {
                     resource: BindGroupLayoutResource::Buffer(
                         BufferBindingLayout::new()
-                            .with_binding_type(BufferBindingType::ReadOnlyStorage)
-                            .with_dynamic_offset(true),
+                            .with_binding_type(BufferBindingType::ReadOnlyStorage),
                     ),
                     visibility_vertex: true,
                     visibility_fragment: true,

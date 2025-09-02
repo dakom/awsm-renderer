@@ -138,6 +138,13 @@ fn convert_indices_to_u32(
                 indices[i] = value;
             }
         }
+        gltf::accessor::DataType::U8 => {
+            let stride = 4; // vec4<u8>
+            let offset = vertex_index * stride;
+            for (i, value) in data.iter().skip(offset).take(4).enumerate() {
+                indices[i] = (*value).into();
+            }
+        }
         _ => {
             return Err(AwsmGltfError::UnsupportedSkinDataType(data_type));
         }

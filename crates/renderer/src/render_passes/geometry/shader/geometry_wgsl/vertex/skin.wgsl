@@ -21,7 +21,9 @@ fn apply_position_skin(input: VertexInput) -> VertexInput {
     let original_position = vec4<f32>(input.position, 1.0);
 
     // Calculate base offset for this exploded vertex's skin data
-    let base_offset = input.vertex_index * skin_sets_count * floats_per_set;
+    let base_offset = (mesh_meta.skin_index_weights_offset / 4) + input.vertex_index * skin_sets_count * floats_per_set;
+
+    let matrix_offset = mesh_meta.skin_matrices_offset / 64; // mat4x4<f32> is 64 bytes
 
     var skin_matrix: mat4x4<f32>;
     
@@ -43,10 +45,10 @@ fn apply_position_skin(input: VertexInput) -> VertexInput {
             let joint_index_3 = bitcast<u32>(skin_joint_index_weights[buffer_offset + 6u]);
             let joint_weight_3 = skin_joint_index_weights[buffer_offset + 7u];
 
-            let skin_mat_acc = joint_weight_0 * skin_joint_matrices[joint_index_0]
-                            + joint_weight_1 * skin_joint_matrices[joint_index_1]
-                            + joint_weight_2 * skin_joint_matrices[joint_index_2]
-                            + joint_weight_3 * skin_joint_matrices[joint_index_3];
+            let skin_mat_acc = joint_weight_0 * skin_joint_matrices[joint_index_0 + matrix_offset]
+                            + joint_weight_1 * skin_joint_matrices[joint_index_1 + matrix_offset]
+                            + joint_weight_2 * skin_joint_matrices[joint_index_2 + matrix_offset]
+                            + joint_weight_3 * skin_joint_matrices[joint_index_3 + matrix_offset];
 
             {% if i == 0 %}
                 skin_matrix = skin_mat_acc;
@@ -73,10 +75,10 @@ fn apply_position_skin(input: VertexInput) -> VertexInput {
             let joint_index_3 = bitcast<u32>(skin_joint_index_weights[buffer_offset + 6u]);
             let joint_weight_3 = skin_joint_index_weights[buffer_offset + 7u];
 
-            let skin_mat_acc = joint_weight_0 * skin_joint_matrices[joint_index_0]
-                             + joint_weight_1 * skin_joint_matrices[joint_index_1]
-                             + joint_weight_2 * skin_joint_matrices[joint_index_2]
-                             + joint_weight_3 * skin_joint_matrices[joint_index_3];
+            let skin_mat_acc = joint_weight_0 * skin_joint_matrices[joint_index_0 + matrix_offset]
+                             + joint_weight_1 * skin_joint_matrices[joint_index_1 + matrix_offset]
+                             + joint_weight_2 * skin_joint_matrices[joint_index_2 + matrix_offset]
+                             + joint_weight_3 * skin_joint_matrices[joint_index_3 + matrix_offset];
 
             skin_matrix = skin_matrix * skin_mat_acc;
         }

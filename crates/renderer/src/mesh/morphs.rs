@@ -148,6 +148,7 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
         }
 
         let key = self.infos.insert(morph_buffer_info.clone());
+
         self.weights.update(key, weights);
         self.values.update(key, values);
 

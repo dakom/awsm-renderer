@@ -196,7 +196,8 @@ impl Meshes {
             transforms,
             morphs: &self.morphs,
             skins: &self.skins,
-        }.to_bytes()?;
+        }
+        .to_bytes()?;
         self.meta_data_buffers.update(key, &meta_data);
         self.meta_data_dirty = true;
 

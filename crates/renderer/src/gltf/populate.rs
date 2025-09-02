@@ -65,11 +65,15 @@ impl AwsmRenderer {
                 .scenes()
                 .nth(index)
                 .ok_or(AwsmGltfError::InvalidScene(index))?,
-            None => ctx
-                .data
-                .doc
-                .default_scene()
-                .ok_or(AwsmGltfError::NoDefaultScene)?,
+            None => match ctx.data.doc.default_scene() {
+                Some(scene) => scene,
+                None => ctx
+                    .data
+                    .doc
+                    .scenes()
+                    .next()
+                    .ok_or(AwsmGltfError::NoDefaultScene)?,
+            },
         };
 
         for node in scene.nodes() {

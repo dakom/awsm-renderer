@@ -38,10 +38,12 @@ impl MaterialBuffers {
     }
 
     pub fn buffer_offset(&self, key: MaterialKey) -> Result<usize> {
-        self.buffer_kind.get(key).and_then(|kind| match kind {
-            MaterialBufferKind::Pbr => self.pbr.buffer_offset(key)
-        })
-        .ok_or(AwsmMaterialError::BufferSlotMissing(key))
+        self.buffer_kind
+            .get(key)
+            .and_then(|kind| match kind {
+                MaterialBufferKind::Pbr => self.pbr.buffer_offset(key),
+            })
+            .ok_or(AwsmMaterialError::BufferSlotMissing(key))
     }
 }
 

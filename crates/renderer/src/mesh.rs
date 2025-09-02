@@ -83,45 +83,12 @@ impl Mesh {
         render_pass: &RenderPassEncoder,
         geometry_bind_groups: &GeometryBindGroups,
     ) -> Result<()> {
-
-        // if _any_ shapes are used, set the bind group
-        // unused shapes will simply be ignored (so 0 offset is fine)
-        let (morph_weights_offset, morph_values_offset) = match self.geometry_morph_key {
-            Some(morph_key) => (
-                ctx.meshes
-                    .morphs
-                    .geometry
-                    .weights_buffer_offset(morph_key)? as u32,
-                ctx.meshes.morphs.geometry.values_buffer_offset(morph_key)? as u32,
-            ),
-            None => (0, 0),
-        };
-
-        let (skin_matrices_offset, skin_index_weights_offset) = match self.skin_key {
-            Some(skin_key) => (
-                ctx.meshes.skins.joint_matrices_offset(skin_key)? as u32,
-                ctx.meshes.skins.joint_index_weights_offset(skin_key)? as u32,
-            ),
-            None => (0, 0),
-        };
-
         let meta_offset = ctx.meshes.meta_data_buffer_offset(mesh_key)? as u32;
 
         render_pass.set_bind_group(
             2,
             geometry_bind_groups.meta.get_bind_group()?,
             Some(&[meta_offset]),
-        )?;
-
-        render_pass.set_bind_group(
-            3,
-            geometry_bind_groups.animation.get_bind_group()?,
-            Some(&[
-                morph_weights_offset,
-                morph_values_offset,
-                skin_matrices_offset,
-                skin_index_weights_offset,
-            ]),
         )?;
 
         render_pass.set_vertex_buffer(

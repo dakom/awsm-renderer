@@ -1,24 +1,17 @@
-# Optimize bindings in geometry pass
-- get rid of dynamic uniform buffers (except mesh meta, only thing that really changes)
-    - fix transforms
-        - specifically, fix when buffer is grown, offsets change (or do they?)
-
-# Get started with opaque material pass 
+# Opaque material pass 
 
 2. Pass material offset from geometry pass
 3. Calculate world position
 4. Write basic material
 
-# Load mip level in compute shader pass
+# Transparent material pass
 
-# Change transform and material binding to storage in geometry pass (prepare for unified draw call)
+# Load mip level in compute shader pass
 
 # Get started with light culling pass
 
 1. Write light
 2. Use in opaque material pass
-
-# Unified draw call (see below)
 
 # get rid of 256 byte alignment for mesh meta?
 

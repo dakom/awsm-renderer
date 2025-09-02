@@ -6,17 +6,18 @@ use crate::{
         morphs::{GeometryMorphKey, MaterialMorphKey, Morphs},
         skins::{SkinKey, Skins},
         AwsmMeshError, MeshKey,
-    }, transforms::{TransformKey, Transforms},
+    },
+    transforms::{TransformKey, Transforms},
 };
 
 pub const MESH_META_INITIAL_CAPACITY: usize = 1024;
-pub const MESH_META_BYTE_SIZE: usize = 32; // 8 u32s
+pub const MESH_META_BYTE_SIZE: usize = 48;
 pub const MESH_META_BYTE_ALIGNMENT: usize = 256; // 32 bytes aligned
 pub const MESH_META_MORPH_MATERIAL_BITMASK_NORMAL: u32 = 1;
 pub const MESH_META_MORPH_MATERIAL_BITMASK_TANGENT: u32 = 1 << 1;
 
 // See meta.wgsl for the corresponding struct
-pub struct MeshMeta <'a> {
+pub struct MeshMeta<'a> {
     pub mesh_key: MeshKey,
     pub transform_key: TransformKey,
     pub material_key: MaterialKey,
@@ -29,22 +30,22 @@ pub struct MeshMeta <'a> {
     pub skins: &'a Skins,
 }
 
-impl <'a> MeshMeta<'a> {
-    pub fn to_bytes(self) -> std::result::Result<[u8; 32], AwsmMeshError> {
-        let Self { 
+impl<'a> MeshMeta<'a> {
+    pub fn to_bytes(self) -> std::result::Result<[u8; MESH_META_BYTE_SIZE], AwsmMeshError> {
+        let Self {
             mesh_key,
             transform_key,
-            material_key, 
-            geometry_morph_key, 
-            material_morph_key, 
-            skin_key, 
+            material_key,
+            geometry_morph_key,
+            material_morph_key,
+            skin_key,
             materials,
             transforms,
-            morphs, 
-            skins 
+            morphs,
+            skins,
         } = self;
 
-        let mut result = [0u8; 32];
+        let mut result = [0u8; MESH_META_BYTE_SIZE];
         let mut offset = 0;
 
         let mut push_u32 = |value: u32| {
@@ -71,11 +72,15 @@ impl <'a> MeshMeta<'a> {
         push_u32(mesh_key_u32_high);
         push_u32(mesh_key_u32_low);
 
-        // Morph (12 bytes)
+        // Morph (20 bytes)
         if let Some(morph_key) = geometry_morph_key {
             let info = morphs.geometry.get_info(morph_key)?;
             push_u32(info.targets_len as u32);
+            push_u32(morphs.geometry.weights_buffer_offset(morph_key)? as u32);
+            push_u32(morphs.geometry.values_buffer_offset(morph_key)? as u32);
         } else {
+            push_u32(0);
+            push_u32(0);
             push_u32(0);
         }
         if let Some(morph_key) = material_morph_key {
@@ -94,25 +99,22 @@ impl <'a> MeshMeta<'a> {
             push_u32(0);
         }
 
-        // Skin (4 bytes)
+        // Skin (12 bytes)
         if let Some(skin_key) = skin_key {
             push_u32(skins.sets_len(skin_key)? as u32);
+            push_u32(skins.joint_matrices_offset(skin_key)? as u32);
+            push_u32(skins.joint_index_weights_offset(skin_key)? as u32);
         } else {
+            push_u32(0);
+            push_u32(0);
             push_u32(0);
         }
 
         // Transform (4 bytes)
-        push_u32(
-            transforms
-                .buffer_offset(transform_key)? as u32
-        );
-
+        push_u32(transforms.buffer_offset(transform_key)? as u32);
 
         // Material (4 bytes)
-        push_u32(
-            materials
-                .buffer_offset(material_key)? as u32
-        );
+        push_u32(materials.buffer_offset(material_key)? as u32);
 
         Ok(result)
     }

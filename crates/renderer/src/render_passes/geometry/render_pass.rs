@@ -85,8 +85,10 @@ impl GeometryRenderPass {
         render_pass.set_bind_group(
             1,
             self.bind_groups.transform_materials.get_bind_group()?,
-            None
+            None,
         )?;
+
+        render_pass.set_bind_group(3, self.bind_groups.animation.get_bind_group()?, None)?;
 
         let mut last_render_pipeline_key = None;
         for renderable in renderables {

@@ -21,17 +21,19 @@ fn apply_position_morphs(input: VertexInput) -> VertexInput {
     let total_floats_per_vertex = target_count * floats_per_target;
     
     // Calculate base offset for this exploded vertex's morph data
-    let base_offset = input.vertex_index * total_floats_per_vertex;
+    let base_weights_offset = mesh_meta.morph_geometry_weights_offset / 4;
+    let base_values_offset = (mesh_meta.morph_geometry_values_offset / 4) +  input.vertex_index * total_floats_per_vertex;
 
     // UNROLLED TARGETS for better performance
     {% for i in 0..max_morph_unroll %}
         if target_count >= {{ i+1 }}u {
-            let weight = geometry_morph_weights[{{ i }}];
-            let offset = base_offset + ({{ i }} * floats_per_target);
+            let weight_offset = base_weights_offset + {{ i }}; 
+            let weight = geometry_morph_weights[weight_offset];
+            let value_offset = base_values_offset + ({{ i }} * floats_per_target);
             let morph_delta = vec3<f32>(
-                geometry_morph_values[offset],
-                geometry_morph_values[offset + 1u], 
-                geometry_morph_values[offset + 2u]
+                geometry_morph_values[value_offset],
+                geometry_morph_values[value_offset + 1u], 
+                geometry_morph_values[value_offset + 2u]
             );
             output.position += weight * morph_delta;
         }
@@ -40,12 +42,13 @@ fn apply_position_morphs(input: VertexInput) -> VertexInput {
     // LOOP FOR REMAINING TARGETS 
     if target_count > {{ max_morph_unroll }}u {
         for (var target_index = {{ max_morph_unroll }}u; target_index < target_count; target_index = target_index + 1u) {
-            let weight = geometry_morph_weights[target_index];
-            let offset = base_offset + (target_index * floats_per_target);
+            let weight_offset = base_weights_offset + target_index; 
+            let weight = geometry_morph_weights[weight_offset];
+            let value_offset = base_values_offset + (target_index * floats_per_target);
             let morph_delta = vec3<f32>(
-                geometry_morph_values[offset],
-                geometry_morph_values[offset + 1u], 
-                geometry_morph_values[offset + 2u]
+                geometry_morph_values[value_offset],
+                geometry_morph_values[value_offset + 1u], 
+                geometry_morph_values[value_offset + 2u]
             );
             
             output.position += weight * morph_delta;

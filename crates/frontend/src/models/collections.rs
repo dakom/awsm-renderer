@@ -47,6 +47,7 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
             GltfId::SimpleTexture,
             GltfId::SimpleInstancing,
             GltfId::SimpleMaterial,
+            GltfId::MorphPrimitives,
         ],
     );
 
@@ -58,6 +59,8 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
             GltfId::AnimatedTriangle,
             GltfId::AnimatedMorphCube,
             GltfId::InterpolationTest,
+            GltfId::RiggedFigure,
+            GltfId::RecursiveSkeletons,
         ],
     );
 
@@ -131,6 +134,7 @@ pub enum GltfId {
     BoxWithSpaces,
     BoxVertexColors,
     Cube,
+    RiggedFigure,
 
     // EXTENSION TESTS
     // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#feature-tests-1
@@ -216,6 +220,7 @@ impl GltfId {
             Self::BoxWithSpaces => "Box With Spaces/glTF/Box With Spaces.gltf",
             Self::BoxVertexColors => "BoxVertexColors/glTF/BoxVertexColors.gltf",
             Self::Cube => "Cube/glTF/Cube.gltf",
+            Self::RiggedFigure => "RiggedFigure/glTF/RiggedFigure.gltf",
 
             // Extension Tests
             Self::EnvironmentTest => "EnvironmentTest/glTF/EnvironmentTest.gltf",
@@ -265,6 +270,7 @@ impl GltfId {
             Self::BoxWithSpaces => "Box with spaces",
             Self::BoxVertexColors => "Box vertex colors",
             Self::Cube => "Cube",
+            Self::RiggedFigure => "Rigged figure",
 
             // Extension Tests
             Self::EnvironmentTest => "Environment test",
