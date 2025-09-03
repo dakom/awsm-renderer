@@ -6,7 +6,6 @@ use awsm_renderer_core::{
 };
 use thiserror::Error;
 
-#[derive(Default)]
 pub struct RenderTextures {
     pub formats: RenderTextureFormats,
     frame_count: u32,
@@ -16,10 +15,8 @@ pub struct RenderTextures {
 #[derive(Clone, Debug)]
 pub struct RenderTextureFormats {
     // Output from geometry pass
-    pub material_offset: TextureFormat,
-    pub world_normal: TextureFormat,
-    pub screen_pos: TextureFormat,
-    pub motion_vector: TextureFormat,
+    pub visiblity_data: TextureFormat,
+    pub taa_clip_position: TextureFormat,
 
     // Output from opaque shading pass
     pub opaque_color: TextureFormat,
@@ -38,13 +35,26 @@ pub struct RenderTextureFormats {
     // note - output from the composite pass will be whatever the gpu texture format is
 }
 
-impl Default for RenderTextureFormats {
-    fn default() -> Self {
+impl RenderTextureFormats {
+    pub async fn new(device: &web_sys::GpuDevice) -> Self {
+        let actual_rgba32_format = {
+            let res = device.create_texture(&TextureDescriptor::new(
+                TextureFormat::Rgba32float,
+                Extent3d::new(1, Some(1), Some(1)),
+                TextureUsage::new().with_render_attachment(),
+            ).into());
+
+            match res {
+                Ok(tex) => {
+                    tex.destroy();
+                    TextureFormat::Rgba32float
+                },
+                Err(_) => TextureFormat::Rgba16float,
+            }
+        };
         Self {
-            material_offset: TextureFormat::R32uint,
-            world_normal: TextureFormat::Rgba16float,
-            screen_pos: TextureFormat::Rgba16float, // just xy, z is for depth
-            motion_vector: TextureFormat::Rg32float, // just xy, z is not needed
+            visiblity_data: actual_rgba32_format,
+            taa_clip_position: TextureFormat::Rgba16float,
             opaque_color: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
             oit_rgb: TextureFormat::Rgba16float,    // HDR format for bloom/tonemapping
             oit_alpha: TextureFormat::R32float,     // Alpha channel for OIT
@@ -111,10 +121,8 @@ impl RenderTextures {
 
 pub struct RenderTextureViews {
     // Output from geometry pass
-    pub material_offset: web_sys::GpuTextureView,
-    pub world_normal: web_sys::GpuTextureView,
-    pub screen_pos: [web_sys::GpuTextureView; 2],
-    pub motion_vector: web_sys::GpuTextureView,
+    pub visibility_data: web_sys::GpuTextureView,
+    pub taa_clip_positions: [web_sys::GpuTextureView; 2],
 
     // Output from opaque shading pass
     pub opaque_color: web_sys::GpuTextureView,
@@ -145,13 +153,8 @@ impl RenderTextureViews {
         let curr_index = if ping_pong { 0 } else { 1 };
         let prev_index = if ping_pong { 1 } else { 0 };
         Self {
-            material_offset: inner.material_offset_view.clone(),
-            world_normal: inner.world_normal_view.clone(),
-            screen_pos: [
-                inner.screen_pos_views[0].clone(),
-                inner.screen_pos_views[1].clone(),
-            ],
-            motion_vector: inner.motion_vector_view.clone(),
+            visibility_data: inner.visibility_data_view.clone(),
+            taa_clip_positions: inner.taa_clip_position_views.clone(),
             opaque_color: inner.opaque_color_view.clone(),
             oit_rgb: inner.oit_rgb_view.clone(),
             oit_alpha: inner.oit_alpha_view.clone(),
@@ -168,17 +171,11 @@ impl RenderTextureViews {
 
 #[allow(dead_code)]
 pub struct RenderTexturesInner {
-    pub material_offset: web_sys::GpuTexture,
-    pub material_offset_view: web_sys::GpuTextureView,
+    pub visibility_data: web_sys::GpuTexture,
+    pub visibility_data_view: web_sys::GpuTextureView,
 
-    pub world_normal: web_sys::GpuTexture,
-    pub world_normal_view: web_sys::GpuTextureView,
-
-    pub screen_pos: [web_sys::GpuTexture; 2],
-    pub screen_pos_views: [web_sys::GpuTextureView; 2],
-
-    pub motion_vector: web_sys::GpuTexture,
-    pub motion_vector_view: web_sys::GpuTextureView,
+    pub taa_clip_positions: [web_sys::GpuTexture;2],
+    pub taa_clip_position_views: [web_sys::GpuTextureView;2],
 
     pub opaque_color: web_sys::GpuTexture,
     pub opaque_color_view: web_sys::GpuTextureView,
@@ -207,10 +204,10 @@ impl RenderTexturesInner {
         height: u32,
     ) -> Result<Self> {
         // 1. Create all textures
-        let material_offset = gpu
+        let visibility_data = gpu
             .create_texture(
                 &TextureDescriptor::new(
-                    render_texture_formats.material_offset,
+                    render_texture_formats.visiblity_data,
                     Extent3d::new(width, Some(height), Some(1)),
                     TextureUsage::new()
                         .with_render_attachment()
@@ -221,24 +218,10 @@ impl RenderTexturesInner {
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let world_normal = gpu
-            .create_texture(
-                &TextureDescriptor::new(
-                    render_texture_formats.world_normal,
-                    Extent3d::new(width, Some(height), Some(1)),
-                    TextureUsage::new()
-                        .with_render_attachment()
-                        .with_texture_binding(),
-                )
-                .with_label("World Normal")
-                .into(),
-            )
-            .map_err(AwsmRenderTextureError::CreateTexture)?;
-
-        let screen_pos = [
+        let taa_clip_positions = [
             gpu.create_texture(
                 &TextureDescriptor::new(
-                    render_texture_formats.screen_pos,
+                    render_texture_formats.taa_clip_position,
                     Extent3d::new(width, Some(height), Some(1)),
                     TextureUsage::new()
                         .with_render_attachment()
@@ -250,7 +233,7 @@ impl RenderTexturesInner {
             .map_err(AwsmRenderTextureError::CreateTexture)?,
             gpu.create_texture(
                 &TextureDescriptor::new(
-                    render_texture_formats.screen_pos,
+                    render_texture_formats.taa_clip_position,
                     Extent3d::new(width, Some(height), Some(1)),
                     TextureUsage::new()
                         .with_render_attachment()
@@ -261,20 +244,6 @@ impl RenderTexturesInner {
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?,
         ];
-
-        let motion_vector = gpu
-            .create_texture(
-                &TextureDescriptor::new(
-                    render_texture_formats.motion_vector,
-                    Extent3d::new(width, Some(height), Some(1)),
-                    TextureUsage::new()
-                        .with_render_attachment()
-                        .with_texture_binding(),
-                )
-                .with_label("Motion Vector")
-                .into(),
-            )
-            .map_err(AwsmRenderTextureError::CreateTexture)?;
 
         let opaque_color = gpu
             .create_texture(
@@ -346,26 +315,18 @@ impl RenderTexturesInner {
 
         // 2. Create views for all textures
 
-        let material_offset_view = material_offset.create_view().map_err(|e| {
-            AwsmRenderTextureError::CreateTextureView(format!("material_offset: {e:?}"))
+        let visibility_data_view = visibility_data.create_view().map_err(|e| {
+            AwsmRenderTextureError::CreateTextureView(format!("visibility_data: {e:?}"))
         })?;
 
-        let world_normal_view = world_normal.create_view().map_err(|e| {
-            AwsmRenderTextureError::CreateTextureView(format!("world_normal: {e:?}"))
-        })?;
-
-        let screen_pos_views = [
-            screen_pos[0].create_view().map_err(|e| {
-                AwsmRenderTextureError::CreateTextureView(format!("screen_pos[0]: {e:?}"))
+        let taa_clip_position_views = [
+            taa_clip_positions[0].create_view().map_err(|e| {
+                AwsmRenderTextureError::CreateTextureView(format!("taa_clip_positions[0]: {e:?}"))
             })?,
-            screen_pos[1].create_view().map_err(|e| {
-                AwsmRenderTextureError::CreateTextureView(format!("screen_pos[1]: {e:?}"))
+            taa_clip_positions[1].create_view().map_err(|e| {
+                AwsmRenderTextureError::CreateTextureView(format!("taa_clip_positions[1]: {e:?}"))
             })?,
         ];
-
-        let motion_vector_view = motion_vector.create_view().map_err(|e| {
-            AwsmRenderTextureError::CreateTextureView(format!("motion_vector: {e:?}"))
-        })?;
 
         let opaque_color_view = opaque_color.create_view().map_err(|e| {
             AwsmRenderTextureError::CreateTextureView(format!("opaque_color: {e:?}"))
@@ -388,17 +349,11 @@ impl RenderTexturesInner {
             .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("composite: {e:?}")))?;
 
         Ok(Self {
-            material_offset,
-            material_offset_view,
+            visibility_data,
+            visibility_data_view,
 
-            world_normal,
-            world_normal_view,
-
-            screen_pos,
-            screen_pos_views,
-
-            motion_vector,
-            motion_vector_view,
+            taa_clip_positions,
+            taa_clip_position_views,
 
             opaque_color,
             opaque_color_view,
@@ -421,12 +376,10 @@ impl RenderTexturesInner {
     }
 
     pub fn destroy(self) {
-        self.material_offset.destroy();
-        self.world_normal.destroy();
-        for texture in self.screen_pos {
+        self.visibility_data.destroy();
+        for texture in self.taa_clip_positions {
             texture.destroy();
         }
-        self.motion_vector.destroy();
         self.opaque_color.destroy();
         self.oit_rgb.destroy();
         self.oit_alpha.destroy();

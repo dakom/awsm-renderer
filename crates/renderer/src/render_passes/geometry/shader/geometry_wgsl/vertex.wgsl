@@ -22,10 +22,10 @@ struct VertexInput {
 // Vertex output
 struct VertexOutput {
     @builtin(position) screen_position: vec4<f32>,
-    @location(0) world_position: vec3<f32>, 
+    // same value as screen_position
     @location(1) clip_position: vec4<f32>,
     @location(2) @interpolate(flat) triangle_id: u32,
-    @location(3) barycentric: vec3<f32>,  // Full barycentric coordinates
+    @location(3) barycentric: vec2<f32>,  // Full barycentric coordinates
 }
 
 //***** MAIN *****
@@ -57,8 +57,7 @@ fn vert_main(vertex_orig: VertexInput) -> VertexOutput {
         let model_transform = get_model_transform(mesh_meta.transform_offset);
     {% endif %}
 
-    var pos = model_transform * vec4<f32>(vertex.position, 1.0);
-    out.world_position = pos.xyz;
+    let pos = model_transform * vec4<f32>(vertex.position, 1.0);
     out.clip_position = camera.view_proj * pos;
     out.screen_position = camera.view_proj * pos;
     
@@ -66,11 +65,9 @@ fn vert_main(vertex_orig: VertexInput) -> VertexOutput {
     out.triangle_id = vertex.triangle_id;
     
     // Reconstruct full barycentric coordinates
-    // Input has (x, y), we calculate z = 1.0 - x - y
-    out.barycentric = vec3<f32>(
+    out.barycentric = vec2<f32>(
         vertex.barycentric.x,
         vertex.barycentric.y,
-        1.0 - vertex.barycentric.x - vertex.barycentric.y
     );
     
     return out;

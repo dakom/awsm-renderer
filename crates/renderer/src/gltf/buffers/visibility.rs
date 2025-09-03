@@ -3,13 +3,13 @@ use awsm_renderer_core::pipeline::vertex::VertexFormat;
 use gltf::accessor::{DataType, Dimensions};
 use gltf::Semantic;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::buffer::helpers::{
     i16_to_i32_vec, slice_zeroes, u16_to_u32_vec, u8_to_i16_vec, u8_to_u16_vec,
 };
 use crate::gltf::buffers::attributes::{
-    load_attribute_data_by_kind, pack_vertex_attributes, semantic_cmp,
+    load_attribute_data_by_kind, pack_vertex_attributes,
 };
 use crate::gltf::buffers::index::extract_triangle_indices;
 use crate::gltf::buffers::morph::convert_morph_targets;
@@ -17,14 +17,14 @@ use crate::gltf::buffers::normals::{compute_normals, ensure_normals};
 use crate::gltf::buffers::skin::convert_skin;
 use crate::gltf::buffers::triangle::pack_triangle_data;
 use crate::gltf::buffers::{
-    MeshBufferIndexInfoWithOffset, MeshBufferInfoWithOffset, MeshBufferTriangleDataInfoWithOffset,
-    MeshBufferTriangleInfoWithOffset, MeshBufferVertexAttributeInfoWithOffset,
+    MeshBufferAttributeIndexInfoWithOffset, MeshBufferInfoWithOffset, MeshBufferTriangleDataInfoWithOffset,
+    MeshBufferTriangleInfoWithOffset, 
     MeshBufferVertexInfoWithOffset,
 };
 use crate::gltf::error::AwsmGltfError;
 use crate::mesh::{
-    MeshBufferIndexInfo, MeshBufferInfo, MeshBufferTriangleDataInfo, MeshBufferTriangleInfo,
-    MeshBufferVertexAttributeInfo, MeshBufferVertexAttributeKind, MeshBufferVertexInfo,
+    MeshBufferAttributeIndexInfo, MeshBufferInfo, MeshBufferTriangleDataInfo, MeshBufferTriangleInfo,
+    MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
 };
 
 use super::accessor::accessor_to_bytes;
@@ -34,8 +34,8 @@ pub(super) fn convert_to_visibility_buffer(
     primitive: &gltf::Primitive,
     front_face: FrontFace,
     buffers: &[Vec<u8>],
-    index: &MeshBufferIndexInfoWithOffset,
-    index_bytes: &[u8],
+    vertex_attribute_index: &MeshBufferAttributeIndexInfoWithOffset,
+    vertex_attribute_index_bytes: &[u8],
     visibility_vertex_bytes: &mut Vec<u8>,
     attribute_vertex_bytes: &mut Vec<u8>,
     triangle_data_bytes: &mut Vec<u8>,
@@ -47,29 +47,27 @@ pub(super) fn convert_to_visibility_buffer(
     let mut gltf_attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> =
         primitive.attributes().collect();
 
-    gltf_attributes.sort_by(|(a, _), (b, _)| semantic_cmp(a, b));
-
     // this should never be empty, but let's be safe
     let vertex_count = gltf_attributes
         .first()
         .map(|(_, accessor)| accessor.count())
         .unwrap_or(0);
 
-    let triangle_count = index.count / 3;
+    let triangle_count = vertex_attribute_index.count / 3;
 
     // Step 2: Load attribute data by kind
     let attribute_data_by_kind = load_attribute_data_by_kind(&gltf_attributes, buffers)?;
 
     // Step 3: Ensure normals exist (compute if missing)
-    let attribute_data_by_kind = ensure_normals(attribute_data_by_kind, index, index_bytes)?;
+    let attribute_data_by_kind = ensure_normals(attribute_data_by_kind, vertex_attribute_index, vertex_attribute_index_bytes)?;
 
     // Step 4: Create visibility vertices (positions + triangle_id + barycentric)
     // These are expanded such that each vertex gets its own visibility vertex (triangle_id will be repeated for all 3)
     let visability_vertex_offset = visibility_vertex_bytes.len();
     create_visibility_vertices(
         &attribute_data_by_kind,
-        index,
-        index_bytes,
+        vertex_attribute_index,
+        vertex_attribute_index_bytes,
         triangle_count,
         visibility_vertex_bytes,
     )?;
@@ -81,11 +79,11 @@ pub(super) fn convert_to_visibility_buffer(
     let vertex_attributes =
         pack_vertex_attributes(&attribute_data_by_kind, attribute_vertex_bytes)?;
 
-    // Step 6: Pack triangle data (vertex indices + material info)
+    // Step 6: Pack triangle data (vertex indices)
     let triangle_data_offset = triangle_data_bytes.len();
     let triangle_data_info = pack_triangle_data(
-        index,
-        index_bytes,
+        vertex_attribute_index,
+        vertex_attribute_index_bytes,
         triangle_count,
         triangle_data_offset,
         triangle_data_bytes,
@@ -97,8 +95,8 @@ pub(super) fn convert_to_visibility_buffer(
     let (geometry_morph, material_morph) = convert_morph_targets(
         primitive,
         buffers,
-        index,
-        index_bytes,
+        vertex_attribute_index,
+        vertex_attribute_index_bytes,
         triangle_count,
         geometry_morph_bytes,
         material_morph_bytes,
@@ -108,8 +106,8 @@ pub(super) fn convert_to_visibility_buffer(
     let skin = convert_skin(
         primitive,
         buffers,
-        index,
-        index_bytes,
+        vertex_attribute_index,
+        vertex_attribute_index_bytes,
         triangle_count,
         skin_joint_index_weight_bytes,
     )?;
@@ -119,11 +117,10 @@ pub(super) fn convert_to_visibility_buffer(
         vertex: MeshBufferVertexInfoWithOffset {
             offset: visability_vertex_offset,
             count: triangle_count * 3, // 3 vertices per triangle
-            size: triangle_count * 3 * MeshBufferVertexInfo::BYTE_SIZE,
         },
         triangles: MeshBufferTriangleInfoWithOffset {
             count: triangle_count,
-            indices: index.clone(),
+            vertex_attribute_indices: vertex_attribute_index.clone(),
             vertex_attributes,
             vertex_attributes_offset: attribute_vertex_offset,
             vertex_attributes_size: attribute_vertex_bytes.len() - attribute_vertex_offset,
@@ -136,8 +133,8 @@ pub(super) fn convert_to_visibility_buffer(
 }
 
 fn create_visibility_vertices(
-    attribute_data: &HashMap<MeshBufferVertexAttributeKind, Cow<'_, [u8]>>,
-    index: &MeshBufferIndexInfoWithOffset,
+    attribute_data: &BTreeMap<MeshBufferVertexAttributeInfo, Cow<'_, [u8]>>,
+    index: &MeshBufferAttributeIndexInfoWithOffset,
     index_bytes: &[u8],
     triangle_count: usize,
     visibility_vertex_bytes: &mut Vec<u8>,
@@ -148,9 +145,13 @@ fn create_visibility_vertices(
         [0.0, 0.0], // Third vertex: (0, 0, 1) - z = 1-0-0 = 1
     ];
     // Get positions data
-    let positions = attribute_data
-        .get(&MeshBufferVertexAttributeKind::Positions)
-        .ok_or_else(|| AwsmGltfError::Positions("missing positions".to_string()))?;
+    let positions = attribute_data.iter().find_map(|(attr_info, data)| {
+        match attr_info {
+            MeshBufferVertexAttributeInfo::Positions { .. } => Some(&data[..]),
+            _ => None
+        }
+    })
+    .ok_or_else(|| AwsmGltfError::Positions("missing positions".to_string()))?;
 
     // Validate positions buffer (must be Float32x3 format)
     if positions.len() % 12 != 0 {

@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use awsm_renderer_core::{
     command::{
         color::Color,
@@ -18,6 +20,16 @@ use crate::{
     renderable::Renderable,
     AwsmRenderer,
 };
+
+static VISIBILITY_CLEAR_COLOR:LazyLock<Color> = LazyLock::new(|| {
+    let max = f32::MAX.into(); 
+    Color {
+        r: max,
+        g: max,
+        b: max,
+        a: max,
+    }
+});
 
 pub struct GeometryRenderPass {
     pub bind_groups: GeometryBindGroups,
@@ -41,30 +53,13 @@ impl GeometryRenderPass {
                 label: Some("Geometry Render Pass"),
                 color_attachments: vec![
                     ColorAttachment::new(
-                        &ctx.render_texture_views.material_offset,
+                        &ctx.render_texture_views.visibility_data,
                         LoadOp::Clear,
                         StoreOp::Store,
                     )
-                    .with_clear_color(Color {
-                        // this will correctly propogate it to the u32::MAX in the channel
-                        // see https://www.w3.org/TR/webgpu/#abstract-opdef-to-a-texel-value-of-texture-format
-                        r: u32::MAX as f64,
-                        g: 0.0,
-                        b: 0.0,
-                        a: 0.0,
-                    }),
+                    .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
                     ColorAttachment::new(
-                        &ctx.render_texture_views.world_normal,
-                        LoadOp::Clear,
-                        StoreOp::Store,
-                    ),
-                    ColorAttachment::new(
-                        &ctx.render_texture_views.screen_pos[ctx.render_texture_views.curr_index],
-                        LoadOp::Clear,
-                        StoreOp::Store,
-                    ),
-                    ColorAttachment::new(
-                        &ctx.render_texture_views.motion_vector,
+                        &ctx.render_texture_views.taa_clip_positions[ctx.render_texture_views.curr_index],
                         LoadOp::Clear,
                         StoreOp::Store,
                     ),

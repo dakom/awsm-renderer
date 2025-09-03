@@ -8,6 +8,8 @@ use crate::bind_groups::{AwsmBindGroupError, BindGroups};
 use crate::render_textures::RenderTextures;
 use crate::{AwsmRenderer, AwsmRendererLogging};
 
+const APPLY_JITTER:bool = false;
+
 impl AwsmRenderer {
     pub fn update_camera(&mut self, camera_matrices: CameraMatrices) -> Result<()> {
         let (current_width, current_height) = self.gpu.current_context_texture_size()?;
@@ -15,7 +17,6 @@ impl AwsmRenderer {
         self.camera.update(
             camera_matrices,
             &self.render_textures,
-            true,
             current_width as f32,
             current_height as f32,
         )?;
@@ -77,7 +78,6 @@ impl CameraBuffer {
         &mut self,
         camera_matrices_orig: CameraMatrices,
         render_textures: &RenderTextures,
-        apply_jitter: bool,
         screen_width: f32,
         screen_height: f32,
     ) -> Result<()> {
@@ -100,7 +100,7 @@ impl CameraBuffer {
             _ => true, // First frame, assume movement
         };
 
-        if apply_jitter {
+        if APPLY_JITTER {
             let jitter_strength = if self.camera_moved { 0.2 } else { 0.8 };
             // TAA jitter
             let jitter = get_halton_jitter(render_textures.frame_count());

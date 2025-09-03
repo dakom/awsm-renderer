@@ -1,7 +1,7 @@
-fn texture_load_base_color(material: Material) -> vec4<f32> {
+fn texture_load_base_color(material: Material, attribute_uv: vec2<f32>) -> vec4<f32> {
     var color = material.base_color_factor;
     if material.has_base_color_texture {
-        color *= texture_load_atlas(material.base_color_tex_info); 
+        color *= texture_load_atlas(material.base_color_tex_info, attribute_uv); 
     } 
 
     // alpha_mode: 0=opaque, 1=mask, 2=blend
@@ -13,7 +13,7 @@ fn texture_load_base_color(material: Material) -> vec4<f32> {
     return color;
 }
 
-fn texture_load_atlas(info: TextureInfo) -> vec4<f32> {
+fn texture_load_atlas(info: TextureInfo, attribute_uv: vec2<f32>) -> vec4<f32> {
     switch info.atlas_index {
         {% for texture_load_case_string in texture_load_case_strings %}
             {{texture_load_case_string}}
@@ -26,13 +26,18 @@ fn texture_load_atlas(info: TextureInfo) -> vec4<f32> {
 
 fn texture_load_atlas_binding(
     info: TextureInfo,
-    atlas_tex: texture_2d_array<f32>
+    atlas_tex: texture_2d_array<f32>,
+    attribute_uv: vec2<f32>,
 ) -> vec4<f32> {
     let mip_level = 0u; // TODO: Handle mip levels
 
-    var coords = info.pixel_offset;
+    let cell_size = vec2<f32>(info.size);
+    let cell_offset = vec2<u32>(attribute_uv * cell_size);
 
-    coords += vec2<u32>(100, 100);
+    var coords = info.pixel_offset + cell_offset;
+
+    // coords.x += 250;
+    // coords.y += 250;
 
     var color = textureLoad(atlas_tex, coords, info.layer_index, mip_level);
 

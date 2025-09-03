@@ -53,7 +53,7 @@ fn apply_position_skin(input: VertexInput) -> VertexInput {
             {% if i == 0 %}
                 skin_matrix = skin_mat_acc;
             {% else %}
-                skin_matrix = skin_matrix * skin_mat_acc;
+                skin_matrix = skin_matrix + skin_mat_acc;
             {% endif %}
         }
     {% endfor %}
@@ -80,7 +80,7 @@ fn apply_position_skin(input: VertexInput) -> VertexInput {
                              + joint_weight_2 * skin_joint_matrices[joint_index_2 + matrix_offset]
                              + joint_weight_3 * skin_joint_matrices[joint_index_3 + matrix_offset];
 
-            skin_matrix = skin_matrix * skin_mat_acc;
+            skin_matrix = skin_matrix + skin_mat_acc;
         }
     }
 

@@ -20,10 +20,10 @@ use crate::{
         visibility::convert_to_visibility_buffer,
     },
     mesh::{
-        MeshBufferGeometryMorphInfo, MeshBufferIndexInfo, MeshBufferInfo,
+        MeshBufferGeometryMorphInfo, MeshBufferAttributeIndexInfo, MeshBufferInfo,
         MeshBufferMaterialMorphAttributes, MeshBufferMaterialMorphInfo, MeshBufferSkinInfo,
-        MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo,
-        MeshBufferVertexAttributeKind, MeshBufferVertexInfo,
+        MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, 
+        MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
     },
 };
 
@@ -84,7 +84,6 @@ impl From<MeshBufferInfoWithOffset> for MeshBufferInfo {
 #[derive(Clone, Debug)]
 pub struct MeshBufferVertexInfoWithOffset {
     pub count: usize,
-    pub size: usize,
     pub offset: usize,
 }
 
@@ -92,7 +91,6 @@ impl From<MeshBufferVertexInfoWithOffset> for MeshBufferVertexInfo {
     fn from(info: MeshBufferVertexInfoWithOffset) -> Self {
         MeshBufferVertexInfo {
             count: info.count,
-            size: info.size,
         }
     }
 }
@@ -100,9 +98,9 @@ impl From<MeshBufferVertexInfoWithOffset> for MeshBufferVertexInfo {
 #[derive(Clone, Debug)]
 pub struct MeshBufferTriangleInfoWithOffset {
     pub count: usize,
-    pub indices: MeshBufferIndexInfoWithOffset,
+    pub vertex_attribute_indices: MeshBufferAttributeIndexInfoWithOffset,
     pub vertex_attributes_offset: usize,
-    pub vertex_attributes: Vec<MeshBufferVertexAttributeInfoWithOffset>,
+    pub vertex_attributes: Vec<MeshBufferVertexAttributeInfo>,
     pub vertex_attributes_size: usize,
     pub triangle_data: MeshBufferTriangleDataInfoWithOffset,
 }
@@ -111,7 +109,7 @@ impl From<MeshBufferTriangleInfoWithOffset> for MeshBufferTriangleInfo {
     fn from(info: MeshBufferTriangleInfoWithOffset) -> Self {
         MeshBufferTriangleInfo {
             count: info.count,
-            indices: info.indices.into(),
+            vertex_attribute_indices: info.vertex_attribute_indices.into(),
             vertex_attributes: info
                 .vertex_attributes
                 .into_iter()
@@ -124,45 +122,29 @@ impl From<MeshBufferTriangleInfoWithOffset> for MeshBufferTriangleInfo {
 }
 
 #[derive(Debug, Clone)]
-pub struct MeshBufferIndexInfoWithOffset {
-    pub count: usize,
-    pub data_size: usize,
-    pub format: IndexFormat,
+pub struct MeshBufferAttributeIndexInfoWithOffset {
     pub offset: usize,
+    pub count: usize,
 }
 
-impl MeshBufferIndexInfoWithOffset {
+impl MeshBufferAttributeIndexInfoWithOffset {
     pub fn total_size(&self) -> usize {
-        self.count * self.data_size
+        self.count * 4 // guaranteed u32
     }
 }
 
-impl From<MeshBufferIndexInfoWithOffset> for MeshBufferIndexInfo {
-    fn from(info: MeshBufferIndexInfoWithOffset) -> Self {
-        MeshBufferIndexInfo {
+impl From<MeshBufferAttributeIndexInfoWithOffset> for MeshBufferAttributeIndexInfo {
+    fn from(info: MeshBufferAttributeIndexInfoWithOffset) -> Self {
+        MeshBufferAttributeIndexInfo {
             count: info.count,
-            data_size: info.data_size,
-            format: info.format,
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct MeshBufferVertexAttributeInfoWithOffset {
-    pub kind: MeshBufferVertexAttributeKind,
-    pub size_per_vertex: usize,
-    pub components: u32,
+pub struct MeshBufferVertexAttributeInfosWithOffset {
+    pub info: Vec<MeshBufferVertexAttributeInfo>,
     pub offset: usize,
-}
-
-impl From<MeshBufferVertexAttributeInfoWithOffset> for MeshBufferVertexAttributeInfo {
-    fn from(info: MeshBufferVertexAttributeInfoWithOffset) -> Self {
-        MeshBufferVertexAttributeInfo {
-            kind: info.kind,
-            size_per_vertex: info.size_per_vertex,
-            components: info.components,
-        }
-    }
 }
 
 /// Information about geometry morphs (positions only, exploded for visibility buffer)
@@ -266,7 +248,7 @@ impl GltfBuffers {
                     .unwrap_or(FrontFace::Ccw) // Default to CCW if no node found
             };
             for primitive in mesh.primitives() {
-                let index: MeshBufferIndexInfoWithOffset = match GltfMeshBufferIndexInfo::maybe_new(
+                let index: MeshBufferAttributeIndexInfoWithOffset = match GltfMeshBufferIndexInfo::maybe_new(
                     &primitive,
                     &buffers,
                     &mut index_bytes,

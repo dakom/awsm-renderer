@@ -50,6 +50,9 @@ pub enum AwsmGltfError {
     #[error("[gltf] Unsupported index mode: {0:?}")]
     UnsupportedIndexMode(String),
 
+    #[error("[gltf] Negative index value: {0}")]
+    NegativeIndexValue(i32),
+
     #[error("[gltf] Unsupported index format: {0:?}")]
     UnsupportedIndexFormat(IndexFormat),
 

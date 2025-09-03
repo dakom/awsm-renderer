@@ -1,12 +1,12 @@
 use awsm_renderer_core::pipeline::primitive::FrontFace;
 
 use crate::gltf::buffers::index::extract_triangle_indices;
-use crate::gltf::buffers::{MeshBufferIndexInfoWithOffset, MeshBufferTriangleDataInfoWithOffset};
+use crate::gltf::buffers::{MeshBufferAttributeIndexInfoWithOffset, MeshBufferTriangleDataInfoWithOffset};
 use crate::gltf::error::Result;
 
-// Pack triangle data (vertex indices + material info)
+// Pack triangle data (vertex indices)
 pub(super) fn pack_triangle_data(
-    index: &MeshBufferIndexInfoWithOffset,
+    index: &MeshBufferAttributeIndexInfoWithOffset,
     index_bytes: &[u8],
     triangle_count: usize,
     offset: usize,
@@ -28,12 +28,9 @@ pub(super) fn pack_triangle_data(
         triangle_data_bytes.extend_from_slice(&(normalized_triangle[1] as u32).to_le_bytes());
         triangle_data_bytes.extend_from_slice(&(normalized_triangle[2] as u32).to_le_bytes());
 
-        // Pack material_id (u32 = 4 bytes) - TODO: get actual material ID
-        let material_id = 0u32; // Placeholder
-        triangle_data_bytes.extend_from_slice(&material_id.to_le_bytes());
     }
 
-    let size_per_triangle = 16; // 3 u32 indices + 1 u32 material_id
+    let size_per_triangle = 12; // 3 u32 indices
     let total_size = triangle_count * size_per_triangle;
 
     Ok(MeshBufferTriangleDataInfoWithOffset {

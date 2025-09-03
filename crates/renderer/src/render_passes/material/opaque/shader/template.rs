@@ -47,7 +47,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
         let mut texture_load_case_strings = Vec::new();
         for i in 0..total_index {
             texture_load_case_strings.push(format!(
-                "case {i}u: {{ return texture_load_atlas_binding(info, atlas_tex_{i}); }}"
+                "case {i}u: {{ return texture_load_atlas_binding(info, atlas_tex_{i}, attribute_uv); }}"
             ));
         }
 

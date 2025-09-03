@@ -1,6 +1,5 @@
 struct MaterialRaw {
-    // Basic properties, 15 * 4 = 60 bytes
-    offset: u32,
+    // Basic properties, 14 * 4 = 56 bytes
     alpha_mode: u32,
     alpha_cutoff: f32,
     double_sided: u32,
@@ -27,8 +26,8 @@ struct MaterialRaw {
     texture_bitmask: u32,
 
     // Padding to align to 256 bytes
-    // 256 - (60 + 120 + 4) = 72 bytes padding, as 8 u32s
-    padding: array<u32, 18>
+    // 256 - (56 + 120 + 4) = 76 bytes padding, as 8 u32s
+    padding: array<u32, 19>
 };
 
 struct Material {
@@ -57,6 +56,10 @@ struct Material {
     has_emissive_texture: bool,
     emissive_tex_info: TextureInfo,
     emissive_factor: vec3<f32>,
+}
+
+fn get_material(offset: u32) -> Material {
+    return convert_material(materials[offset / 256u]);
 }
 
 fn convert_material(raw: MaterialRaw) -> Material {
@@ -106,7 +109,7 @@ struct TextureInfoRaw {
     width: u32,
     height: u32,
     atlas_layer_index: u32,
-    entry_empty_index: u32,
+    entry_attribute_uv_index: u32,
 }
 
 struct TextureInfo {
@@ -114,7 +117,8 @@ struct TextureInfo {
     size: vec2<u32>,
     atlas_index: u32,
     layer_index: u32,
-    entry_index: u32
+    entry_index: u32,
+    attribute_uv_index: u32,
 }
 
 fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
@@ -123,6 +127,7 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
         vec2<u32>(raw.width, raw.height),
         raw.atlas_layer_index & 0xFFFFu,           // atlas_index (16 bits)
         (raw.atlas_layer_index >> 16u) & 0xFFFFu, // layer_index (16 bits)
-        raw.entry_empty_index & 0xFFFFu           // entry_index (16 bits)
+        raw.entry_attribute_uv_index & 0xFFFFu,    // entry_index (16 bits)
+        (raw.entry_attribute_uv_index >> 16u) & 0xFFFFu, // attribute_uv_index (16 bits)
     );
 }

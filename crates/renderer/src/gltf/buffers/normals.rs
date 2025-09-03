@@ -1,29 +1,38 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::{BTreeMap, HashMap}};
 
 use awsm_renderer_core::pipeline::primitive::IndexFormat;
 use glam::Vec3;
 
 use crate::{
     gltf::{
-        buffers::{index::extract_triangle_indices, MeshBufferIndexInfoWithOffset},
+        buffers::{index::extract_triangle_indices, MeshBufferAttributeIndexInfoWithOffset},
         error::{AwsmGltfError, Result},
     },
-    mesh::{MeshBufferIndexInfo, MeshBufferVertexAttributeKind},
+    mesh::{MeshBufferVertexAttributeInfo},
 };
 
 pub(super) fn ensure_normals<'a>(
-    mut attribute_data: HashMap<MeshBufferVertexAttributeKind, Cow<'a, [u8]>>,
-    index: &MeshBufferIndexInfoWithOffset,
+    mut attribute_data: BTreeMap<MeshBufferVertexAttributeInfo, Cow<'a, [u8]>>,
+    index: &MeshBufferAttributeIndexInfoWithOffset,
     index_bytes: &[u8],
-) -> Result<HashMap<MeshBufferVertexAttributeKind, Cow<'a, [u8]>>> {
-    if !attribute_data.contains_key(&MeshBufferVertexAttributeKind::Normals) {
+) -> Result<BTreeMap<MeshBufferVertexAttributeInfo, Cow<'a, [u8]>>> {
+    if !attribute_data.keys().any(|x| matches!(x, MeshBufferVertexAttributeInfo::Normals{..})) {
         let positions = attribute_data
-            .get(&MeshBufferVertexAttributeKind::Positions)
+            .iter()
+            .find_map(|(k, v)| {
+                match k {
+                    MeshBufferVertexAttributeInfo::Positions { .. } => Some(v.as_ref()),
+                    _ => None
+                }
+            })
             .ok_or_else(|| AwsmGltfError::ConstructNormals("missing positions".to_string()))?;
 
         let normals_bytes = compute_normals(positions, index, index_bytes)?;
         attribute_data.insert(
-            MeshBufferVertexAttributeKind::Normals,
+            MeshBufferVertexAttributeInfo::Normals {
+                data_size: 4, // f32
+                component_len: 3 // vec3
+            },
             Cow::Owned(normals_bytes),
         );
     }
@@ -33,7 +42,7 @@ pub(super) fn ensure_normals<'a>(
 
 pub(super) fn compute_normals(
     positions_bytes: &[u8],
-    index: &MeshBufferIndexInfoWithOffset,
+    index: &MeshBufferAttributeIndexInfoWithOffset,
     index_bytes: &[u8],
 ) -> Result<Vec<u8>> {
     tracing::info!("no baked normals, computing from positions and indices...");

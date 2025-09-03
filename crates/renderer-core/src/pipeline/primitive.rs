@@ -20,6 +20,7 @@ impl std::hash::Hash for PrimitiveState {
 }
 
 pub type PrimitiveTopology = web_sys::GpuPrimitiveTopology;
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuIndexFormat.html
 pub type IndexFormat = web_sys::GpuIndexFormat;
 pub type FrontFace = web_sys::GpuFrontFace;
 pub type CullMode = web_sys::GpuCullMode;

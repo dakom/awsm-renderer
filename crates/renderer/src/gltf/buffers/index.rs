@@ -2,8 +2,7 @@ use awsm_renderer_core::pipeline::primitive::IndexFormat;
 
 use crate::{
     buffer::helpers::{u8_to_f32_vec, u8_to_i16_vec, u8_to_i8_vec, u8_to_u16_vec, u8_to_u32_vec},
-    gltf::buffers::MeshBufferIndexInfoWithOffset,
-    mesh::MeshBufferIndexInfo,
+    gltf::buffers::MeshBufferAttributeIndexInfoWithOffset,
 };
 
 use super::{accessor::accessor_to_bytes, AwsmGltfError, Result};
@@ -14,26 +13,20 @@ pub struct GltfMeshBufferIndexInfo {
     pub offset: usize,
     // number of index elements for this primitive
     pub count: usize,
-    // number of bytes per index (e.g. 2 for u16, 4 for u32)
-    pub data_size: usize,
-    // the format of the index data
-    pub format: IndexFormat,
 }
 
 impl GltfMeshBufferIndexInfo {
     // the size in bytes of the index buffer for this primitive
     pub fn total_size(&self) -> usize {
-        self.count * self.data_size
+        self.count * 4 // guaranteed u32
     }
 }
 
-impl From<GltfMeshBufferIndexInfo> for MeshBufferIndexInfoWithOffset {
+impl From<GltfMeshBufferIndexInfo> for MeshBufferAttributeIndexInfoWithOffset {
     fn from(info: GltfMeshBufferIndexInfo) -> Self {
         Self {
             offset: info.offset,
             count: info.count,
-            data_size: info.data_size,
-            format: info.format,
         }
     }
 }
@@ -50,64 +43,39 @@ impl GltfMeshBufferIndexInfo {
                 let offset = index_bytes.len();
                 let accessor_bytes = accessor_to_bytes(&accessor, buffers)?;
 
-                let format = match accessor.data_type() {
-                    // https://docs.rs/web-sys/latest/web_sys/enum.GpuIndexFormat.html
-                    gltf::accessor::DataType::U16 => IndexFormat::Uint16,
-                    gltf::accessor::DataType::U32 => IndexFormat::Uint32,
-                    // Only Uint16 and Uint16 are supported for indices
-                    // these are convered
-                    gltf::accessor::DataType::I16 => IndexFormat::Uint16,
-                    gltf::accessor::DataType::I8 => IndexFormat::Uint16,
-                    gltf::accessor::DataType::U8 => IndexFormat::Uint16,
-                    // Floats for indices is probably a mistake
-                    gltf::accessor::DataType::F32 => {
-                        return Err(AwsmGltfError::UnsupportedIndexDataType(
-                            accessor.data_type(),
-                        ))
-                    }
-                };
-
-                let data_size = match format {
-                    IndexFormat::Uint16 => 2,
-                    IndexFormat::Uint32 => 4,
-                    _ => {
-                        return Err(AwsmGltfError::UnsupportedIndexDataType(
-                            accessor.data_type(),
-                        ))
-                    }
-                };
-
                 match accessor.data_type() {
-                    gltf::accessor::DataType::U16 | gltf::accessor::DataType::U32 => {
+                    gltf::accessor::DataType::U32 => {
                         index_bytes.extend_from_slice(&accessor_bytes);
-                    }
+                    },
+
+                    gltf::accessor::DataType::U16 => {
+                        let u16_values = u8_to_u16_vec(&accessor_bytes);
+                        for value in u16_values {
+                            index_bytes.extend_from_slice(&u32::from(value).to_le_bytes());
+                        }
+                    },
+
                     gltf::accessor::DataType::I16 => {
                         let i16_values = u8_to_i16_vec(&accessor_bytes);
                         for value in i16_values {
                             if value < 0 {
-                                return Err(AwsmGltfError::ConstructNormals(format!(
-                                    "Negative index value: {}",
-                                    value
-                                )));
+                                return Err(AwsmGltfError::NegativeIndexValue(value as i32));
                             }
-                            index_bytes.extend_from_slice(&(value as u16).to_le_bytes());
+                            index_bytes.extend_from_slice(&u32::try_from(value)?.to_le_bytes());
                         }
                     }
                     gltf::accessor::DataType::I8 => {
                         for byte in accessor_bytes.iter() {
-                            let i8_value = *byte as i8;
-                            if i8_value < 0 {
-                                return Err(AwsmGltfError::ConstructNormals(format!(
-                                    "Negative index value: {}",
-                                    i8_value
-                                )));
+                            let value = *byte as i8;
+                            if value < 0 {
+                                return Err(AwsmGltfError::NegativeIndexValue(value as i32));
                             }
-                            index_bytes.extend_from_slice(&(i8_value as u16).to_le_bytes());
+                            index_bytes.extend_from_slice(&u32::try_from(value)?.to_le_bytes());
                         }
                     }
                     gltf::accessor::DataType::U8 => {
-                        for byte in accessor_bytes.iter() {
-                            index_bytes.extend_from_slice(&(*byte as u16).to_le_bytes());
+                        for value in accessor_bytes.iter() {
+                            index_bytes.extend_from_slice(&u32::from(*value).to_le_bytes());
                         }
                     }
 
@@ -115,7 +83,7 @@ impl GltfMeshBufferIndexInfo {
                         let f32_values = u8_to_f32_vec(&accessor_bytes);
                         for value in f32_values {
                             let value = value as u32;
-                            index_bytes.extend_from_slice(&value.to_le_bytes());
+                            index_bytes.extend_from_slice(&u32::from(value).to_le_bytes());
                         }
                     }
                 }
@@ -123,8 +91,6 @@ impl GltfMeshBufferIndexInfo {
                 let info = Self {
                     offset,
                     count: accessor.count(),
-                    data_size,
-                    format,
                 };
 
                 assert_eq!(index_bytes.len() - offset, info.total_size());
@@ -138,7 +104,7 @@ impl GltfMeshBufferIndexInfo {
 pub fn generate_fresh_indices_from_primitive(
     primitive: &gltf::Primitive,
     index_bytes: &mut Vec<u8>,
-) -> Result<MeshBufferIndexInfoWithOffset> {
+) -> Result<MeshBufferAttributeIndexInfoWithOffset> {
     let offset = index_bytes.len();
     // Get vertex count from any attribute (positions is guaranteed to exist)
     let vertex_count = primitive
@@ -148,20 +114,11 @@ pub fn generate_fresh_indices_from_primitive(
         .unwrap_or(0);
 
     if vertex_count == 0 {
-        return Ok(MeshBufferIndexInfoWithOffset {
+        return Ok(MeshBufferAttributeIndexInfoWithOffset {
             offset,
             count: 0,
-            data_size: 4, // u32
-            format: IndexFormat::Uint32,
         });
     }
-
-    // Check if we can use u16 or need u32
-    let (format, data_size) = if vertex_count <= u16::MAX as usize {
-        (IndexFormat::Uint16, 2)
-    } else {
-        (IndexFormat::Uint32, 4)
-    };
 
     let start_offset = index_bytes.len();
 
@@ -171,24 +128,12 @@ pub fn generate_fresh_indices_from_primitive(
             // Simple case: 0, 1, 2, 3, 4, 5, ...
             let index_count = vertex_count;
             for i in 0..index_count {
-                match format {
-                    IndexFormat::Uint16 => {
-                        index_bytes.extend_from_slice(&(i as u16).to_le_bytes());
-                    }
-                    IndexFormat::Uint32 => {
-                        index_bytes.extend_from_slice(&(i as u32).to_le_bytes());
-                    }
-                    _ => {
-                        return Err(AwsmGltfError::UnsupportedIndexFormat(format));
-                    }
-                }
+                index_bytes.extend_from_slice(&(i as u32).to_le_bytes());
             }
 
-            Ok(MeshBufferIndexInfoWithOffset {
+            Ok(MeshBufferAttributeIndexInfoWithOffset {
                 offset,
                 count: index_count,
-                data_size,
-                format,
             })
         }
         gltf::mesh::Mode::TriangleStrip => {
@@ -211,28 +156,14 @@ pub fn generate_fresh_indices_from_primitive(
                     (i, i + 2, i + 1)
                 };
 
-                match format {
-                    IndexFormat::Uint16 => {
-                        index_bytes.extend_from_slice(&(v0 as u16).to_le_bytes());
-                        index_bytes.extend_from_slice(&(v1 as u16).to_le_bytes());
-                        index_bytes.extend_from_slice(&(v2 as u16).to_le_bytes());
-                    }
-                    IndexFormat::Uint32 => {
-                        index_bytes.extend_from_slice(&(v0 as u32).to_le_bytes());
-                        index_bytes.extend_from_slice(&(v1 as u32).to_le_bytes());
-                        index_bytes.extend_from_slice(&(v2 as u32).to_le_bytes());
-                    }
-                    _ => {
-                        return Err(AwsmGltfError::UnsupportedIndexFormat(format));
-                    }
-                }
+                index_bytes.extend_from_slice(&(v0 as u32).to_le_bytes());
+                index_bytes.extend_from_slice(&(v1 as u32).to_le_bytes());
+                index_bytes.extend_from_slice(&(v2 as u32).to_le_bytes());
             }
 
-            Ok(MeshBufferIndexInfoWithOffset {
+            Ok(MeshBufferAttributeIndexInfoWithOffset {
                 offset,
                 count: index_count,
-                data_size,
-                format,
             })
         }
         gltf::mesh::Mode::TriangleFan => {
@@ -250,28 +181,14 @@ pub fn generate_fresh_indices_from_primitive(
                 // Fan triangles: (0, i+1, i+2)
                 let (v0, v1, v2) = (0, i + 1, i + 2);
 
-                match format {
-                    IndexFormat::Uint16 => {
-                        index_bytes.extend_from_slice(&(v0 as u16).to_le_bytes());
-                        index_bytes.extend_from_slice(&(v1 as u16).to_le_bytes());
-                        index_bytes.extend_from_slice(&(v2 as u16).to_le_bytes());
-                    }
-                    IndexFormat::Uint32 => {
-                        index_bytes.extend_from_slice(&(v0 as u32).to_le_bytes());
-                        index_bytes.extend_from_slice(&(v1 as u32).to_le_bytes());
-                        index_bytes.extend_from_slice(&(v2 as u32).to_le_bytes());
-                    }
-                    _ => {
-                        return Err(AwsmGltfError::UnsupportedIndexFormat(format));
-                    }
-                }
+                index_bytes.extend_from_slice(&(v0 as u32).to_le_bytes());
+                index_bytes.extend_from_slice(&(v1 as u32).to_le_bytes());
+                index_bytes.extend_from_slice(&(v2 as u32).to_le_bytes());
             }
 
-            Ok(MeshBufferIndexInfoWithOffset {
+            Ok(MeshBufferAttributeIndexInfoWithOffset {
                 offset,
                 count: index_count,
-                data_size,
-                format,
             })
         }
         other => Err(AwsmGltfError::UnsupportedIndexMode(format!(
@@ -282,7 +199,7 @@ pub fn generate_fresh_indices_from_primitive(
 }
 
 pub(super) fn extract_triangle_indices(
-    index: &MeshBufferIndexInfoWithOffset,
+    index: &MeshBufferAttributeIndexInfoWithOffset,
     all_index_bytes: &[u8],
 ) -> Result<Vec<[usize; 3]>> {
     if index.count % 3 != 0 {
@@ -310,49 +227,24 @@ pub(super) fn extract_triangle_indices(
         for j in 0..3 {
             // Calculate byte offset for this specific index
             // i = triangle number, j = vertex within triangle (0, 1, or 2)
-            let index_offset = (i * 3 + j) * index.data_size;
+            let index_offset = (i * 3 + j) * 4; // 4 bytes per u32 index
 
             // Bounds check to ensure we don't read past the buffer
-            if index_offset + index.data_size > index_bytes.len() {
+            if index_offset + 4 > index_bytes.len() {
                 return Err(AwsmGltfError::ExtractIndices(format!(
                     "Index data out of bounds at triangle {}, vertex {}",
                     i, j
                 )));
             }
 
-            // Extract the raw bytes for this index (either 2 or 4 bytes)
-            let index_slice = &index_bytes[index_offset..index_offset + index.data_size];
+            // Extract the raw bytes for this index (4 bytes)
+            let index_slice = &index_bytes[index_offset..index_offset + 4];
 
             // Convert bytes to vertex index based on format
             // IMPORTANT: This vertex_idx points to a vertex in the ORIGINAL attribute arrays
             // For example, if vertex_idx = 5, it means "use the 6th vertex from positions[],
             // normals[], texcoords[], etc."
-            let vertex_idx = match index.format {
-                IndexFormat::Uint16 => {
-                    if index.data_size != 2 {
-                        return Err(AwsmGltfError::ExtractIndices(
-                            "IndexFormat::Uint16 expects data_size of 2".to_string(),
-                        ));
-                    }
-                    // Read 2 bytes as little-endian u16, convert to usize
-                    u16::from_le_bytes(index_slice.try_into().unwrap()) as usize
-                }
-                IndexFormat::Uint32 => {
-                    if index.data_size != 4 {
-                        return Err(AwsmGltfError::ExtractIndices(
-                            "IndexFormat::Uint32 expects data_size of 4".to_string(),
-                        ));
-                    }
-                    // Read 4 bytes as little-endian u32, convert to usize
-                    u32::from_le_bytes(index_slice.try_into().unwrap()) as usize
-                }
-                _ => {
-                    return Err(AwsmGltfError::ConstructNormals(format!(
-                        "Unsupported index format: {:?}",
-                        index.format
-                    )));
-                }
-            };
+            let vertex_idx = u32::from_le_bytes(index_slice.try_into().unwrap()) as usize;
 
             // Store the ORIGINAL vertex index (references attribute arrays)
             triangle[j] = vertex_idx;

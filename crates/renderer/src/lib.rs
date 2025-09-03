@@ -102,7 +102,7 @@ impl AwsmRenderer {
 pub struct AwsmRendererBuilder {
     gpu: AwsmRendererGpuBuilderKind,
     logging: AwsmRendererLogging,
-    render_texture_formats: RenderTextureFormats,
+    render_texture_formats: Option<RenderTextureFormats>,
     clear_color: Color,
 }
 
@@ -128,7 +128,7 @@ impl AwsmRendererBuilder {
         Self {
             gpu: gpu.into(),
             logging: AwsmRendererLogging::default(),
-            render_texture_formats: RenderTextureFormats::default(),
+            render_texture_formats: None, 
             clear_color: Color::BLACK,
         }
     }
@@ -139,7 +139,7 @@ impl AwsmRendererBuilder {
     }
 
     pub fn with_render_texture_formats(mut self, formats: RenderTextureFormats) -> Self {
-        self.render_texture_formats = formats;
+        self.render_texture_formats = Some(formats);
         self
     }
 
@@ -152,13 +152,18 @@ impl AwsmRendererBuilder {
         let Self {
             gpu,
             logging,
-            mut render_texture_formats,
+            render_texture_formats,
             clear_color,
         } = self;
 
         let mut gpu = match gpu {
             AwsmRendererGpuBuilderKind::WebGpuBuilder(builder) => builder.build().await?,
             AwsmRendererGpuBuilderKind::WebGpuBuilt(gpu) => gpu,
+        };
+
+        let mut render_texture_formats = match render_texture_formats {
+            Some(formats) => formats,
+            None => RenderTextureFormats::new(&gpu.device).await,
         };
 
         // tracing::info!("Max bind groups: {}", gpu.device.limits().max_bind_groups());

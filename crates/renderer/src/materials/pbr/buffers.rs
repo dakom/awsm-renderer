@@ -68,8 +68,7 @@ impl PbrMaterialBuffers {
         pbr_material: &mut PbrMaterial,
         textures: &Textures,
     ) {
-        self.uniform_buffer.update_with(key, |offset, data| {
-            pbr_material.uniform_buffer_offset = Some(offset);
+        self.uniform_buffer.update_with(key, |_, data| {
             let values = pbr_material.uniform_buffer_data(textures);
             data[..values.len()].copy_from_slice(&values);
         });

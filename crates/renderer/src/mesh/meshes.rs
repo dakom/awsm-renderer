@@ -20,7 +20,7 @@ use crate::AwsmRendererLogging;
 
 use super::error::{AwsmMeshError, Result};
 use super::morphs::Morphs;
-use super::{Mesh, MeshBufferIndexInfo, MeshBufferVertexInfo};
+use super::{Mesh, MeshBufferAttributeIndexInfo, MeshBufferVertexInfo};
 
 pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
@@ -183,6 +183,11 @@ impl Meshes {
         // attributes - data
         self.attribute_data_buffers.update(key, attribute_data);
         self.attribute_data_dirty = true;
+
+        // tracing::info!("attribute indices: {:?}", buffer_info.triangles.vertex_attribute_indices.debug_to_vec(attribute_index));
+        // for attr in buffer_info.triangles.vertex_attributes.iter() {
+        //     tracing::info!("attribute data {:?}: {:?}", attr, buffer_info.triangles.debug_get_attribute_vec_f32(attr, attribute_data));
+        // }
 
         // meta - data
         let meta_data = MeshMeta {

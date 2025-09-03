@@ -5,7 +5,7 @@ use crate::buffer::helpers::{
 };
 use crate::gltf::buffers::accessor::accessor_to_bytes;
 use crate::gltf::buffers::index::extract_triangle_indices;
-use crate::gltf::buffers::{MeshBufferIndexInfoWithOffset, MeshBufferSkinInfoWithOffset};
+use crate::gltf::buffers::{MeshBufferAttributeIndexInfoWithOffset, MeshBufferSkinInfoWithOffset};
 use crate::gltf::error::{AwsmGltfError, Result};
 
 /// Converts GLTF skin into exploded index and weight buffers
@@ -17,7 +17,7 @@ use crate::gltf::error::{AwsmGltfError, Result};
 pub(super) fn convert_skin(
     primitive: &gltf::Primitive,
     buffers: &[Vec<u8>],
-    index: &MeshBufferIndexInfoWithOffset,
+    index: &MeshBufferAttributeIndexInfoWithOffset,
     index_bytes: &[u8],
     triangle_count: usize,
     skin_joint_index_weight_bytes: &mut Vec<u8>, // Indices (u32) interleaved with weights (f32)

@@ -3,10 +3,7 @@ use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use thiserror::Error;
 
 use crate::{
-    bind_groups::{AwsmBindGroupError, BindGroups},
-    materials::pbr::{PbrMaterial, PbrMaterialBuffers},
-    textures::{AwsmTextureError, SamplerKey, TextureKey, Textures},
-    AwsmRendererLogging,
+    bind_groups::{AwsmBindGroupError, BindGroups}, debug, materials::pbr::{PbrMaterial, PbrMaterialBuffers}, textures::{AwsmTextureError, SamplerKey, TextureKey, Textures}, AwsmRendererLogging
 };
 
 pub mod pbr;
@@ -74,7 +71,20 @@ impl Materials {
     }
 
     pub fn buffer_offset(&self, key: MaterialKey) -> Result<usize> {
-        self.buffers.buffer_offset(key)
+        let offset = self.buffers.buffer_offset(key)?;
+
+        #[cfg(debug_assertions)]
+        {
+            let max:usize = f32::MAX.to_bits() as usize;
+            if offset >= max {
+                tracing::error!(
+                    "[material] material buffer offset {} exceeds f32 max {} - see note in material compute shader",
+                    offset, max
+                );
+            }
+        }
+
+        Ok(offset)
     }
 
     pub fn gpu_buffer(&self, kind: MaterialBufferKind) -> &web_sys::GpuBuffer {

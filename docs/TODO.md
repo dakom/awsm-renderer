@@ -1,12 +1,22 @@
 # Opaque material pass 
 
-2. Pass material offset from geometry pass
+- Somehow pass per-mesh per-attribute offsets
+    - different kinds of mesh_meta: geometry and material
+    - material meta is basically Vec<MeshBufferVertexAttributeInfo>
+    - (do need to keep skins so we can calculate normals)
+    - template generate multiple passes like before
+    - needs to check the material meta and early-exit if it's "not me"
+    - then everything should be static
+
+
 3. Calculate world position
 4. Write basic material
 
 # Transparent material pass
 
 # Load mip level in compute shader pass
+
+# Ensure normals are being recalculated in opaque pass
 
 # Get started with light culling pass
 

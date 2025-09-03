@@ -23,7 +23,6 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct PbrMaterial {
-    pub uniform_buffer_offset: Option<usize>,
     pub base_color_tex: Option<TextureKey>,
     pub base_color_uv_index: Option<u32>,
     pub base_color_factor: [f32; 4],
@@ -60,7 +59,6 @@ impl PbrMaterial {
         Self {
             alpha_mode,
             double_sided,
-            uniform_buffer_offset: None,
             base_color_tex: None,
             base_color_uv_index: None,
             base_color_factor: [1.0, 1.0, 1.0, 1.0],
@@ -117,7 +115,10 @@ impl PbrMaterial {
         enum Value<'a> {
             F32(f32),
             U32(u32),
-            Texture(&'a MegaTextureEntryInfo<TextureKey>),
+            Texture {
+                entry_info: &'a MegaTextureEntryInfo<TextureKey>,
+                uv_index: u32,
+            },
             SkipTexture,
         }
 
@@ -132,9 +133,12 @@ impl PbrMaterial {
             }
         }
 
-        impl<'a> From<&'a MegaTextureEntryInfo<TextureKey>> for Value<'a> {
-            fn from(value: &'a MegaTextureEntryInfo<TextureKey>) -> Self {
-                Value::Texture(value)
+        impl<'a> From<(&'a MegaTextureEntryInfo<TextureKey>, u32)> for Value<'a> {
+            fn from(value: (&'a MegaTextureEntryInfo<TextureKey>, u32)) -> Self {
+                Value::Texture {
+                    entry_info: value.0,
+                    uv_index: value.1,
+                }
             }
         }
 
@@ -151,15 +155,16 @@ impl PbrMaterial {
                         data[offset..offset + 4].copy_from_slice(&bytes);
                         offset += 4;
                     }
-                    Value::Texture(tex) => {
-                        offset = write_inner(data, tex.pixel_offset[0].into(), offset);
-                        offset = write_inner(data, tex.pixel_offset[1].into(), offset);
-                        offset = write_inner(data, tex.size[0].into(), offset);
-                        offset = write_inner(data, tex.size[1].into(), offset);
+                    Value::Texture{entry_info, uv_index} => {
+                        offset = write_inner(data, entry_info.pixel_offset[0].into(), offset);
+                        offset = write_inner(data, entry_info.pixel_offset[1].into(), offset);
+                        offset = write_inner(data, entry_info.size[0].into(), offset);
+                        offset = write_inner(data, entry_info.size[1].into(), offset);
 
                         let packed_index_1 =
-                            (tex.index.atlas as u32) | ((tex.index.layer as u32) << 16);
-                        let packed_index_2 = (tex.index.entry as u32); // Only uses lower 16 bits, upper 16 still free
+                            (entry_info.index.atlas as u32) | ((entry_info.index.layer as u32) << 16);
+                        let packed_index_2 =
+                            (entry_info.index.entry as u32) | (uv_index << 16);
 
                         offset = write_inner(data, packed_index_1.into(), offset);
                         offset = write_inner(data, packed_index_2.into(), offset);
@@ -175,7 +180,6 @@ impl PbrMaterial {
             offset = write_inner(&mut data, value, offset);
         };
 
-        write((self.uniform_buffer_offset.unwrap_or(0) as u32).into());
         write(self.alpha_mode.variant_as_u32().into());
         write(self.alpha_cutoff().unwrap_or(0.0f32).into());
         write(if self.double_sided {
@@ -203,6 +207,9 @@ impl PbrMaterial {
         if let Some(tex) = self
             .base_color_tex
             .and_then(|key| textures.get_entry(key).ok())
+            .and_then(|entry_info| {
+                self.base_color_uv_index.map(|index| (entry_info, index))
+            })
         {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_BASE_COLOR;
@@ -213,6 +220,9 @@ impl PbrMaterial {
         if let Some(tex) = self
             .metallic_roughness_tex
             .and_then(|key| textures.get_entry(key).ok())
+            .and_then(|entry_info| {
+                self.metallic_roughness_uv_index.map(|index| (entry_info, index))
+            })
         {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_METALIC_ROUGHNESS;
@@ -220,7 +230,13 @@ impl PbrMaterial {
             write(Value::SkipTexture);
         }
 
-        if let Some(tex) = self.normal_tex.and_then(|key| textures.get_entry(key).ok()) {
+        if let Some(tex) = self
+            .normal_tex
+            .and_then(|key| textures.get_entry(key).ok())
+            .and_then(|entry_info| {
+                self.normal_uv_index.map(|index| (entry_info, index))
+            })
+        {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_NORMAL;
         } else {
@@ -230,6 +246,9 @@ impl PbrMaterial {
         if let Some(tex) = self
             .occlusion_tex
             .and_then(|key| textures.get_entry(key).ok())
+            .and_then(|entry_info| {
+                self.occlusion_uv_index.map(|index| (entry_info, index))
+            })
         {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_OCCLUSION;
@@ -240,6 +259,9 @@ impl PbrMaterial {
         if let Some(tex) = self
             .emissive_tex
             .and_then(|key| textures.get_entry(key).ok())
+            .and_then(|entry_info| {
+                self.emissive_uv_index.map(|index| (entry_info, index))
+            })
         {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_EMISSIVE;

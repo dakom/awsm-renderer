@@ -7,7 +7,7 @@ use crate::{
         populate::material::GltfMaterialInfo,
     },
     materials::Material,
-    mesh::{skins::SkinKey, Mesh, MeshBufferInfo},
+    mesh::{skins::SkinKey, Mesh, MeshBufferInfo, MeshBufferVertexInfo},
     pipeline_layouts::PipelineLayoutCacheKey,
     pipelines::render_pipeline::RenderPipelineCacheKey,
     transforms::{Transform, TransformKey},
@@ -203,7 +203,7 @@ impl AwsmRenderer {
 
         let _mesh_key = {
             let visibility_data_start = primitive_buffer_info.vertex.offset;
-            let visibility_data_end = visibility_data_start + primitive_buffer_info.vertex.size;
+            let visibility_data_end = visibility_data_start + MeshBufferVertexInfo::from(primitive_buffer_info.vertex.clone()).size();
             let visibility_data = &ctx.data.buffers.visibility_vertex_bytes
                 [visibility_data_start..visibility_data_end];
 
@@ -213,9 +213,9 @@ impl AwsmRenderer {
             let attribute_data =
                 &ctx.data.buffers.attribute_vertex_bytes[attribute_data_start..attribute_data_end];
 
-            let attribute_index_start = primitive_buffer_info.triangles.indices.offset;
+            let attribute_index_start = primitive_buffer_info.triangles.vertex_attribute_indices.offset;
             let attribute_index_end =
-                attribute_index_start + primitive_buffer_info.triangles.indices.total_size();
+                attribute_index_start + primitive_buffer_info.triangles.vertex_attribute_indices.total_size();
             let attribute_index =
                 &ctx.data.buffers.index_bytes[attribute_index_start..attribute_index_end];
 

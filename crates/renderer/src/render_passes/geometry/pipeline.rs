@@ -73,10 +73,8 @@ impl GeometryPipelines {
 
         let color_targets = [
             // TODO - will revisit this to add more targets if necessary
-            ColorTargetState::new(ctx.render_texture_formats.material_offset),
-            ColorTargetState::new(ctx.render_texture_formats.world_normal),
-            ColorTargetState::new(ctx.render_texture_formats.screen_pos),
-            ColorTargetState::new(ctx.render_texture_formats.motion_vector),
+            ColorTargetState::new(ctx.render_texture_formats.visiblity_data),
+            ColorTargetState::new(ctx.render_texture_formats.taa_clip_position),
         ];
 
         let vertex_buffer_layout = VertexBufferLayout {

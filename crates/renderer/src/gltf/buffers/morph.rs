@@ -4,11 +4,11 @@ use crate::buffer::helpers::slice_zeroes;
 use crate::gltf::buffers::accessor::accessor_to_bytes;
 use crate::gltf::buffers::index::extract_triangle_indices;
 use crate::gltf::buffers::{
-    MeshBufferGeometryMorphInfoWithOffset, MeshBufferIndexInfoWithOffset,
+    MeshBufferGeometryMorphInfoWithOffset, MeshBufferAttributeIndexInfoWithOffset,
     MeshBufferMaterialMorphInfoWithOffset,
 };
 use crate::gltf::error::{AwsmGltfError, Result};
-use crate::mesh::{MeshBufferMaterialMorphAttributes, MeshBufferVertexAttributeKind};
+use crate::mesh::{MeshBufferMaterialMorphAttributes, MeshBufferVertexAttributeInfo};
 
 /// Converts GLTF morph targets into separate geometry and material buffers
 ///
@@ -27,7 +27,7 @@ use crate::mesh::{MeshBufferMaterialMorphAttributes, MeshBufferVertexAttributeKi
 pub(super) fn convert_morph_targets(
     primitive: &gltf::Primitive,
     buffers: &[Vec<u8>],
-    index: &MeshBufferIndexInfoWithOffset,
+    index: &MeshBufferAttributeIndexInfoWithOffset,
     index_bytes: &[u8],
     triangle_count: usize,
     geometry_morph_bytes: &mut Vec<u8>, // Exploded position morphs only
@@ -184,28 +184,27 @@ pub(super) fn convert_morph_targets(
             for morph_target_buffer_data in &morph_targets_buffer_data {
                 // Helper to push material attribute data
                 let mut push_material_morph_data =
-                    |attribute_kind: MeshBufferVertexAttributeKind,
+                    |attribute_info: MeshBufferVertexAttributeInfo,
                      data: Option<&Cow<'_, [u8]>>|
                      -> Result<()> {
-                        let stride_size = 12; // vec3<f32> for both normals and tangents
-
+                        let vertex_size = attribute_info.vertex_size();
                         match data {
                             Some(data) => {
                                 // Look up the morph delta using the ORIGINAL vertex index
-                                let data_byte_offset = original_vertex_index * stride_size;
-                                if data_byte_offset + stride_size > data.len() {
+                                let data_byte_offset = original_vertex_index * vertex_size;
+                                if data_byte_offset + vertex_size > data.len() {
                                     return Err(AwsmGltfError::ConstructNormals(format!(
                                     "Material morph data out of bounds for vertex {} in attribute {:?}",
-                                    original_vertex_index, attribute_kind
+                                    original_vertex_index, attribute_info
                                 )));
                                 }
                                 let data_bytes =
-                                    &data[data_byte_offset..data_byte_offset + stride_size];
+                                    &data[data_byte_offset..data_byte_offset + vertex_size];
                                 material_morph_bytes.extend_from_slice(data_bytes);
                             }
                             None => {
                                 // Fill with zeros if this target doesn't have this attribute
-                                material_morph_bytes.extend_from_slice(slice_zeroes(stride_size));
+                                material_morph_bytes.extend_from_slice(slice_zeroes(vertex_size));
                             }
                         }
                         Ok(())
@@ -214,13 +213,19 @@ pub(super) fn convert_morph_targets(
                 // Push material attributes in consistent order FOR THIS TARGET
                 if morph_attributes.normal {
                     push_material_morph_data(
-                        MeshBufferVertexAttributeKind::Normals,
+                        MeshBufferVertexAttributeInfo::Normals {
+                            data_size: 4, // f32
+                            component_len: 3, // vec3
+                        },
                         morph_target_buffer_data.normals.as_ref(),
                     )?;
                 }
                 if morph_attributes.tangent {
                     push_material_morph_data(
-                        MeshBufferVertexAttributeKind::Tangents,
+                        MeshBufferVertexAttributeInfo::Tangents {
+                            data_size: 4, // f32
+                            component_len: 3, // vec3
+                        },
                         morph_target_buffer_data.tangents.as_ref(),
                     )?;
                 }

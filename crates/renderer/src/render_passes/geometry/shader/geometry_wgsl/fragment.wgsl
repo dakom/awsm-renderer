@@ -1,45 +1,42 @@
 // Fragment input from vertex shader
 struct FragmentInput {
     @builtin(position) frag_coord: vec4<f32>,
-    @location(0) world_position: vec3<f32>, 
+    // same value as screen_position
     @location(1) clip_position: vec4<f32>,
     @location(2) @interpolate(flat) triangle_id: u32,
-    @location(3) barycentric: vec3<f32>,  // Full barycentric coordinates
+    @location(3) barycentric: vec2<f32>,  // Full barycentric coordinates
 }
 
-// Output to triangle data texture
 struct FragmentOutput {
-    //@location(0) triangle_data: vec4<u32>,  // triangle_id, barycentric_xy packed, material_id
-    @location(0) material_offset: u32,
-    @location(1) world_normal: vec4<f32>,
-    @location(2) screen_pos: vec4<f32>,
-    @location(3) motion_vector: vec2<f32>,
+    // Ideally RGBA32Float target, possibly RGBA16Float
+    @location(0) visibility_data: vec4<f32>,    // triangle_id, material_offset, bary.xy
+    // RGBA16Float
+    @location(1) taa_clip_position: vec4<f32>,      // Exact clip coords for TAA reprojection
 }
 
 @fragment
 fn fs_main(input: FragmentInput) -> FragmentOutput {
+    // input.frag_coord already contains screen position + depth!
+    // frag_coord.xy = screen coordinates (will inherently exist in compute shader)
+    // frag_coord.z = depth (also written to depth buffer)
+
+    // So, compute shader can essentially do:
+    // let screen_pos = vec2<f32>(f32(pixel_coord.x), f32(pixel_coord.y));
+    // let depth = textureLoad(depth_texture, pixel_coord, 0).x;
+    // let world_pos = unproject_screen_to_world(screen_pos, depth, inv_view_proj_matrix);
+    
     var out: FragmentOutput;
     
-    // Pack triangle data for the visibility buffer
-    // Format: [triangle_id, barycentric_packed, material_id, unused]
+    // Pack visibility buffer data
+    out.visibility_data = vec4<f32>(
+        bitcast<f32>(input.triangle_id),
+        bitcast<f32>(mesh_meta.material_offset),
+        input.barycentric.x,
+        input.barycentric.y  // z = 1.0 - x - y
+    );
     
-    // Pack barycentric coordinates into a single u32
-    // We can pack two f32 barycentrics (x, y) since z = 1.0 - x - y
-    let bary_x_packed = u32(input.barycentric.x * 65535.0); // 16 bits
-    let bary_y_packed = u32(input.barycentric.y * 65535.0); // 16 bits
-    let barycentric_packed = (bary_x_packed << 16u) | bary_y_packed;
-    
-    // TODO: Get actual material ID from triangle data buffer
-    let material_id = 0u;
-    
-    // out.triangle_data = vec4<u32>(
-    //     input.triangle_id,
-    //     barycentric_packed,
-    //     material_id,
-    //     0u  // Unused - could be used for other data
-    // );
-
-    out.material_offset = 1u;
+    // Store exact clip position for TAA (not the interpolated @builtin(position))
+    out.taa_clip_position = input.clip_position;
     
     return out;
 }

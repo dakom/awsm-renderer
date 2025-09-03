@@ -31,36 +31,6 @@ impl MaterialOpaqueBindGroups {
                 resource: BindGroupLayoutResource::Texture(
                     TextureBindingLayout::new()
                         .with_view_dimension(TextureViewDimension::N2d)
-                        .with_sample_type(TextureSampleType::Uint),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new()
-                        .with_view_dimension(TextureViewDimension::N2d)
-                        .with_sample_type(TextureSampleType::UnfilterableFloat),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new()
-                        .with_view_dimension(TextureViewDimension::N2d)
-                        .with_sample_type(TextureSampleType::UnfilterableFloat),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new()
-                        .with_view_dimension(TextureViewDimension::N2d)
                         .with_sample_type(TextureSampleType::UnfilterableFloat),
                 ),
                 visibility_vertex: false,
@@ -86,12 +56,30 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
         ];
 
         let texture_bindings =
             ctx.textures
                 .mega_texture
-                .get_bindings(&ctx.gpu.device.limits(), 0, 6); // 6 is the start binding for the mega texture
+                .get_bindings(&ctx.gpu.device.limits(), 0, entries.len() as u32);
 
         let mut bind_group_layout_keys = Vec::new();
 
@@ -151,37 +139,31 @@ impl MaterialOpaqueBindGroups {
             BindGroupEntry::new(
                 0,
                 BindGroupResource::TextureView(Cow::Borrowed(
-                    &ctx.render_texture_views.material_offset,
+                    &ctx.render_texture_views.visibility_data,
                 )),
             ),
             BindGroupEntry::new(
                 1,
                 BindGroupResource::TextureView(Cow::Borrowed(
-                    &ctx.render_texture_views.world_normal,
-                )),
-            ),
-            BindGroupEntry::new(
-                2,
-                BindGroupResource::TextureView(Cow::Borrowed(
-                    &ctx.render_texture_views.screen_pos[0],
-                )),
-            ),
-            BindGroupEntry::new(
-                3,
-                BindGroupResource::TextureView(Cow::Borrowed(
-                    &ctx.render_texture_views.screen_pos[1],
-                )),
-            ),
-            BindGroupEntry::new(
-                4,
-                BindGroupResource::TextureView(Cow::Borrowed(
                     &ctx.render_texture_views.opaque_color,
                 )),
             ),
             BindGroupEntry::new(
-                5,
+                2,
                 BindGroupResource::Buffer(BufferBinding::new(
                     &ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
+                )),
+            ),
+            BindGroupEntry::new(
+                3,
+                BindGroupResource::Buffer(BufferBinding::new(
+                    &ctx.meshes.attribute_index_gpu_buffer()
+                )),
+            ),
+            BindGroupEntry::new(
+                4,
+                BindGroupResource::Buffer(BufferBinding::new(
+                    &ctx.meshes.attribute_data_gpu_buffer()
                 )),
             ),
         ];

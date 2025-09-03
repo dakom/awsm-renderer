@@ -1,18 +1,23 @@
 {% include "pbr_shared_wgsl/color_space.wgsl" %}
+{% include "pbr_shared_wgsl/projection.wgsl" %}
 {% include "pbr_shared_wgsl/material.wgsl" %}
 {% include "pbr_shared_wgsl/textures.wgsl" %}
 {% include "pbr_shared_wgsl/debug.wgsl" %}
+{% include "material_opaque_wgsl/attribute.wgsl" %}
 
-@group(0) @binding(0) var material_offset_tex: texture_2d<u32>;
-@group(0) @binding(1) var world_normal_tex: texture_2d<f32>;
-@group(0) @binding(2) var screen_pos_tex_0: texture_2d<f32>;
-@group(0) @binding(3) var screen_pos_tex_1: texture_2d<f32>;
-@group(0) @binding(4) var opaque_tex: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(5) var<storage, read> materials: array<MaterialRaw>;
+@group(0) @binding(0) var visibility_data_tex: texture_2d<f32>;
+@group(0) @binding(1) var opaque_tex: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(2) var<storage, read> materials: array<MaterialRaw>;
+@group(0) @binding(3) var<storage, read> attribute_indices: array<u32>;
+@group(0) @binding(4) var<storage, read> attribute_data: array<f32>;
+
 {% for texture_binding_string in texture_binding_strings %}
     {{texture_binding_string}}
 {% endfor %}
 
+// TODO - if material_offset goes beyond this, then we need to refactor things
+// simple fix would be to add another render target for proper u32 (e.g. just red channel texture)
+const f32_max = 2139095039u;
 
 // TODO - bind material uniform buffer, load material properties
 
@@ -28,54 +33,28 @@ fn main(
         return;
     }
 
+    let visibility_data = textureLoad(visibility_data_tex, coords, 0);
+
+    let triangle_id = bitcast<u32>(visibility_data.x);
+    let material_offset = bitcast<u32>(visibility_data.y);
+    let barycentric = vec3<f32>(visibility_data.z, visibility_data.w, 1.0 - visibility_data.z - visibility_data.w);
+
     var color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-    let material_offset = textureLoad(material_offset_tex, coords, 0).r;
-    if (material_offset == 0xffffffffu) {
-        textureStore(opaque_tex, coords, vec4<f32>(0.0, 0.0, 0.0, 0.0));
-        return; // Skip if material offset is not set
+
+    // only calculate color if material_offset is valid
+    if (material_offset != f32_max) {
+        color = calculate_color(triangle_id, material_offset, barycentric);
     }
-    color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
 
-
-    // {% if has_atlas %}
-    //     color = debug_test(atlas_tex_0, 0, coords, textureDimensions(opaque_tex));
-    // {% endif %}
-
-            // let material_offset = textureLoad(material_offset_tex, coords, 0).r;
-            // if (material_offset == 0xffffffffu) {
-            //     textureStore(opaque_tex, coords, vec4<f32>(0.0, 0.0, 0.0, 0.0));
-            //     return; // Skip if material offset is not set
-            // }
-            // let world_normal = textureLoad(world_normal_tex, coords, 0);
-
-            // // ping/pong this one
-            // let screen_pos = textureLoad(screen_pos_tex_0, coords, 0);
-
-
-            // let material = convert_material(materials[material_offset / 256u]);
-
-            // var color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-
-            // color = texture_load_base_color(material);
-
-    // if material.has_base_color_texture {
-    //     color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
-    // }
-
-    // if material.alpha_mode == 1u {
-    //     color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
-    // } else if material.alpha_mode == 2u {
-    //     color = vec4<f32>(0.0, 1.0, 0.0, 1.0);
-    // } else if material.alpha_mode == 3u {
-    //     color = vec4<f32>(0.0, 0.0, 1.0, 1.0);
-    // }
-
-
-    // if (material_offset != 0u) {
-    //     color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
-    // }
-    
-    
     // Write to output texture
     textureStore(opaque_tex, coords, color);
+}
+
+fn calculate_color(triangle_id: u32, material_offset: u32, barycentric: vec3<f32>) -> vec4<f32> {
+    let triangle_indices = get_triangle_indices(triangle_id);
+    let material = get_material(material_offset);
+
+    var color = texture_load_base_color(material, base_color_tex_uv(triangle_indices, barycentric, material.base_color_tex_info));
+
+    return color;
 }
