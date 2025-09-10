@@ -49,7 +49,8 @@ pub enum BindGroupCreate {
     MaterialMorphTargetValuesResize,
     SkinJointMatricesResize,
     SkinJointIndexAndWeightsResize,
-    MeshMetaResize,
+    GeometryMeshMetaResize,
+    MaterialMeshMetaResize,
     MeshAttributeDataResize,
     MeshAttributeIndexResize,
     PbrMaterialResize,
@@ -106,7 +107,10 @@ impl BindGroups {
                 .recreate(&ctx)?;
         }
 
-        if self.create_list.contains(&BindGroupCreate::MeshMetaResize) {
+        if self
+            .create_list
+            .contains(&BindGroupCreate::GeometryMeshMetaResize)
+        {
             render_passes.geometry.bind_groups.meta.recreate(&ctx)?;
         }
 
@@ -140,15 +144,45 @@ impl BindGroups {
             render_passes.display.bind_groups.recreate(&ctx)?;
         }
 
+        if self.create_list.contains(&BindGroupCreate::MegaTexture) {
+            render_passes
+                .material_opaque
+                .bind_groups
+                .textures
+                .recreate(&ctx)?;
+        }
+
         if self.create_list.contains(&BindGroupCreate::MegaTexture)
             || self
                 .create_list
-                .contains(&BindGroupCreate::TextureViewResize)
+                .contains(&BindGroupCreate::MaterialMeshMetaResize)
+        {
+            render_passes
+                .material_opaque
+                .bind_groups
+                .meta
+                .recreate(&ctx)?;
+        }
+
+        if self
+            .create_list
+            .contains(&BindGroupCreate::TextureViewResize)
+            || self.create_list.contains(&BindGroupCreate::MegaTexture)
             || self
                 .create_list
                 .contains(&BindGroupCreate::PbrMaterialResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::MaterialMorphTargetWeightsResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::MaterialMorphTargetValuesResize)
         {
-            render_passes.material_opaque.bind_groups.recreate(&ctx)?;
+            render_passes
+                .material_opaque
+                .bind_groups
+                .core
+                .recreate(&ctx)?;
             render_passes
                 .material_transparent
                 .bind_groups

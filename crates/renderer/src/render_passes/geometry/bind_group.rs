@@ -15,7 +15,7 @@ use crate::{
     camera::CameraBuffer,
     lights::Lights,
     materials::{pbr::PbrMaterial, Materials},
-    mesh::meta::MESH_META_BYTE_ALIGNMENT,
+    mesh::meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT,
     render_passes::{composite::bind_group, RenderPassInitContext},
     transforms::Transforms,
 };
@@ -233,8 +233,8 @@ impl GeometryBindGroupMeta {
             vec![BindGroupEntry::new(
                 0,
                 BindGroupResource::Buffer(
-                    BufferBinding::new(&ctx.meshes.meta_data_gpu_buffer())
-                        .with_size(MESH_META_BYTE_ALIGNMENT),
+                    BufferBinding::new(&ctx.meshes.meta.geometry_gpu_buffer())
+                        .with_size(GEOMETRY_MESH_META_BYTE_ALIGNMENT),
                 ),
             )],
         );

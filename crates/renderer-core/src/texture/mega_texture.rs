@@ -285,6 +285,10 @@ where
         }
     }
 
+    pub fn atlases_len(&self) -> usize {
+        self.atlases.len()
+    }
+
     pub fn layer_len(&self, atlas_index: usize) -> usize {
         self.atlases
             .get(atlas_index)

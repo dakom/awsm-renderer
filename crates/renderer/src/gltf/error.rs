@@ -6,6 +6,7 @@ use crate::{
     animation::AwsmAnimationError,
     bind_group_layout::AwsmBindGroupLayoutError,
     bind_groups::AwsmBindGroupError,
+    error::AwsmError,
     materials::AwsmMaterialError,
     mesh::{skins::AwsmSkinError, AwsmMeshError},
     pipeline_layouts::AwsmPipelineLayoutError,
@@ -185,6 +186,9 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] extract indices: {0}")]
     ExtractIndices(String),
+
+    #[error("[gltf] Couldn't get material opaque compute pipeline key: {0:?}")]
+    MaterialOpaqueComputePipelineKey(AwsmError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

@@ -7,6 +7,7 @@ use crate::{
     mesh::{
         morphs::{GeometryMorphKey, MaterialMorphKey},
         skins::AwsmSkinError,
+        MeshBufferInfoKey,
     },
     transforms::AwsmTransformError,
 };
@@ -25,9 +26,6 @@ pub enum AwsmMeshError {
 
     #[error("[mesh] attribute buffer not found: {0:?}")]
     AttributeBufferNotFound(MeshKey),
-
-    #[error("[mesh] buffer info not found: {0:?}")]
-    BufferInfoNotFound(MeshKey),
 
     #[error("[mesh] metadata not found: {0:?}")]
     MetaNotFound(MeshKey),
@@ -52,4 +50,7 @@ pub enum AwsmMeshError {
 
     #[error("[mesh] {0:?}")]
     BindGroup(#[from] AwsmBindGroupError),
+
+    #[error("[mesh] buffer info not found: {0:?}")]
+    BufferInfoNotFound(MeshBufferInfoKey),
 }

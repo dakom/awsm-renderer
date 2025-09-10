@@ -25,6 +25,8 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             bind_group_bindings_len,
         } = &value.texture_bindings;
 
+        tracing::info!("{:#?}", value.texture_bindings);
+
         let mut texture_binding_strings = Vec::new();
 
         let mut total_index = 0;
@@ -51,6 +53,8 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             ));
         }
 
+        tracing::info!("{:#?}", texture_binding_strings);
+
         Ok(Self {
             texture_binding_strings,
             texture_load_case_strings,
@@ -63,7 +67,7 @@ impl ShaderTemplateMaterialOpaque {
     pub fn into_source(self) -> Result<String> {
         let source = self.render()?;
 
-        // debug_unique_string(1, &source, || { print_shader_source(&source, true) });
+        // debug_unique_string(1, &source, || print_shader_source(&source, true));
 
         Ok(source)
     }

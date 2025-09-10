@@ -12,14 +12,16 @@ use awsm_renderer_core::{
     },
 };
 use ordered_float::OrderedFloat;
-use slotmap::{new_key_type, SlotMap};
+use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use thiserror::Error;
 use web_sys::GpuSupportedLimits;
 
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
     error::AwsmError,
-    render_passes::RenderPassInitContext,
+    render_passes::{
+        material::opaque::render_pass::MaterialOpaqueRenderPass, RenderPassInitContext,
+    },
     AwsmRenderer, AwsmRendererLogging,
 };
 
@@ -42,11 +44,39 @@ impl AwsmRenderer {
                 pipeline_layouts: &mut self.pipeline_layouts,
             };
 
-            self.render_passes
-                .update_texture_bindings(&mut render_pass_ctx)
-                .await?;
-
             self.bind_groups.mark_create(BindGroupCreate::MegaTexture);
+
+            // Update all the things that depend on opaque materials changing due to textures
+
+            // First, that's the render pass itself
+            self.render_passes.material_opaque =
+                MaterialOpaqueRenderPass::new(&mut render_pass_ctx).await?;
+
+            // Then, all the meshes that use opaque materials and need their shader/pipelines (re)created
+            let mut has_seen_buffer_info = SecondaryMap::new();
+            let mut has_seen_material = SecondaryMap::new();
+            for (key, mesh) in self.meshes.iter() {
+                if has_seen_buffer_info
+                    .insert(mesh.buffer_info_key, ())
+                    .is_none()
+                    || has_seen_material.insert(mesh.material_key, ()).is_none()
+                {
+                    self.render_passes
+                        .material_opaque
+                        .pipelines
+                        .set_compute_pipeline_key(
+                            mesh.buffer_info_key,
+                            mesh.material_key,
+                            &self.gpu,
+                            &mut self.shaders,
+                            &mut self.pipelines,
+                            &self.render_passes.material_opaque.bind_groups,
+                            &self.pipeline_layouts,
+                            &self.meshes.buffer_infos,
+                        )
+                        .await?;
+                }
+            }
 
             self.textures
                 .mega_texture

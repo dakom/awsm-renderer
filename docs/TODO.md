@@ -1,10 +1,14 @@
-# Opaque material pass 
+# Opaque material pass
 
 - Somehow pass per-mesh per-attribute offsets
     - different kinds of mesh_meta: geometry and material
+      - finish pushing it through, setup material meta in opaque shader
     - material meta is basically Vec<MeshBufferVertexAttributeInfo>
     - (do need to keep skins so we can calculate normals)
-    - template generate multiple passes like before
+    - template generate multiple passes like before with different layout settings
+      - cache key must not care about offsets etc., that's in the metadata
+      - generate keys when collecting renderables, since that's when we know what each contains
+        - might need to precreate shaders on mesh creation?
     - needs to check the material meta and early-exit if it's "not me"
     - then everything should be static
 
@@ -33,7 +37,7 @@ Dynamic/Uniform storages could be SharedArrayBuffer
 Requires more design/thought (don't want to expose raw manipulation)
 
 
-# World Position Reconstruction Math: 
+# World Position Reconstruction Math:
 
 A common way to implement this is to reconstruct the view-space position first, then transform it to world space. In your shading shader:
 
@@ -93,7 +97,7 @@ for i in 0..4 {
 @compute @workgroup_size(16, 16)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let screen_dims = vec2<f32>(textureDimensions(depth_texture));
-    
+
     // 1. Calculate the pixel's UV coordinate (0.0 to 1.0)
     let uv = (vec2<f32>(id.xy) + vec2(0.5, 0.5)) / screen_dims;
 

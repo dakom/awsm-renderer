@@ -82,6 +82,7 @@ impl AwsmRenderer {
             pipelines: &self.pipelines,
             instances: &self.instances,
             bind_groups: &self.bind_groups,
+            render_passes: &self.render_passes,
         };
 
         let renderables = self.collect_renderables()?;
@@ -95,7 +96,7 @@ impl AwsmRenderer {
 
             self.render_passes
                 .geometry
-                .render(&ctx, renderables.opaque)?;
+                .render(&ctx, &renderables.opaque)?;
         }
 
         {
@@ -115,7 +116,9 @@ impl AwsmRenderer {
                 None
             };
 
-            self.render_passes.material_opaque.render(&ctx)?;
+            self.render_passes
+                .material_opaque
+                .render(&ctx, renderables.opaque)?;
         }
 
         {
@@ -169,4 +172,5 @@ pub struct RenderContext<'a> {
     pub materials: &'a Materials,
     pub instances: &'a Instances,
     pub bind_groups: &'a BindGroups,
+    pub render_passes: &'a RenderPasses,
 }

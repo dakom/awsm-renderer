@@ -1,13 +1,18 @@
-use awsm_renderer_core::command::render_pass::RenderPassEncoder;
+use awsm_renderer_core::command::{
+    compute_pass::ComputePassEncoder, render_pass::RenderPassEncoder,
+};
 use glam::Mat4;
 
 use crate::{
     bounds::Aabb,
     error::AwsmError,
     mesh::{Mesh, MeshKey},
-    pipelines::render_pipeline::RenderPipelineKey,
+    pipelines::{compute_pipeline::ComputePipelineKey, render_pipeline::RenderPipelineKey},
     render::RenderContext,
-    render_passes::geometry::bind_group::GeometryBindGroups,
+    render_passes::{
+        geometry::bind_group::GeometryBindGroups,
+        material::opaque::bind_group::MaterialOpaqueBindGroups,
+    },
     transforms::TransformKey,
     AwsmRenderer,
 };
@@ -36,21 +41,30 @@ impl AwsmRenderer {
                 // }
             }
 
+            let renderable = Renderable::Mesh {
+                key,
+                mesh,
+                material_opaque_compute_pipeline_key: self
+                    .render_passes
+                    .material_opaque
+                    .pipelines
+                    .get_compute_pipeline_key(mesh.buffer_info_key, mesh.material_key),
+            };
             if self
                 .materials
                 .has_alpha_blend(mesh.material_key)
                 .unwrap_or(false)
             {
-                transparent.push(Renderable::Mesh { key, mesh });
+                transparent.push(renderable);
             } else {
-                opaque.push(Renderable::Mesh { key, mesh });
+                opaque.push(renderable);
             }
         }
 
         if let Some(camera_matrices) = self.camera.last_matrices.as_ref() {
             let view_proj = camera_matrices.view_projection();
-            opaque.sort_by(|a, b| sort_renderable(a, b, &view_proj, false));
-            transparent.sort_by(|a, b| sort_renderable(a, b, &view_proj, true));
+            opaque.sort_by(|a, b| geometry_sort_renderable(a, b, &view_proj, false));
+            transparent.sort_by(|a, b| geometry_sort_renderable(a, b, &view_proj, true));
         }
 
         Ok(Renderables {
@@ -60,14 +74,16 @@ impl AwsmRenderer {
     }
 }
 
-fn sort_renderable(
+fn geometry_sort_renderable(
     a: &Renderable,
     b: &Renderable,
     view_proj: &Mat4,
     transparent: bool,
 ) -> std::cmp::Ordering {
     // Criteria 1: group by render_pipeline_key.
-    let pipeline_ordering = a.render_pipeline_key().cmp(&b.render_pipeline_key());
+    let pipeline_ordering = a
+        .geometry_render_pipeline_key()
+        .cmp(&b.geometry_render_pipeline_key());
     if pipeline_ordering != std::cmp::Ordering::Equal {
         return pipeline_ordering;
     }
@@ -111,13 +127,32 @@ fn sort_renderable(
 }
 
 pub enum Renderable<'a> {
-    Mesh { key: MeshKey, mesh: &'a Mesh },
+    Mesh {
+        key: MeshKey,
+        mesh: &'a Mesh,
+        material_opaque_compute_pipeline_key: Option<ComputePipelineKey>,
+    },
 }
 
 impl Renderable<'_> {
-    pub fn render_pipeline_key(&self) -> RenderPipelineKey {
+    pub fn geometry_render_pipeline_key(&self) -> RenderPipelineKey {
         match self {
-            Self::Mesh { mesh, .. } => mesh.render_pipeline_key,
+            Self::Mesh { mesh, .. } => mesh.geometry_render_pipeline_key,
+        }
+    }
+
+    pub fn material_opaque_compute_pipeline_key(&self) -> Option<ComputePipelineKey> {
+        match self {
+            Self::Mesh {
+                material_opaque_compute_pipeline_key,
+                ..
+            } => *material_opaque_compute_pipeline_key,
+        }
+    }
+
+    pub fn material_key(&self) -> crate::materials::MaterialKey {
+        match self {
+            Self::Mesh { mesh, .. } => mesh.material_key,
         }
     }
 
@@ -137,6 +172,24 @@ impl Renderable<'_> {
             Self::Mesh { mesh, key, .. } => {
                 mesh.push_geometry_pass_commands(ctx, *key, render_pass, geometry_bind_groups)
             }
+        }
+    }
+
+    pub fn push_material_opaque_pass_commands(
+        &self,
+        ctx: &RenderContext,
+        compute_pass: &ComputePassEncoder,
+        material_opaque_bind_groups: &MaterialOpaqueBindGroups,
+        workgroup_size: (u32, u32),
+    ) -> Result<()> {
+        match self {
+            Self::Mesh { mesh, key, .. } => mesh.push_material_opaque_pass_commands(
+                ctx,
+                *key,
+                compute_pass,
+                material_opaque_bind_groups,
+                workgroup_size,
+            ),
         }
     }
 }

@@ -1,4 +1,32 @@
+use super::error::{AwsmMeshError, Result};
 use awsm_renderer_core::pipeline::{primitive::IndexFormat, vertex::VertexFormat};
+use slotmap::new_key_type;
+
+pub struct MeshBufferInfos {
+    infos: slotmap::SlotMap<MeshBufferInfoKey, MeshBufferInfo>,
+}
+
+impl MeshBufferInfos {
+    pub fn new() -> Self {
+        Self {
+            infos: slotmap::SlotMap::with_key(),
+        }
+    }
+
+    pub fn insert(&mut self, info: MeshBufferInfo) -> MeshBufferInfoKey {
+        self.infos.insert(info)
+    }
+
+    pub fn get(&self, key: MeshBufferInfoKey) -> Result<&MeshBufferInfo> {
+        self.infos
+            .get(key)
+            .ok_or(AwsmMeshError::BufferInfoNotFound(key))
+    }
+
+    pub fn remove(&mut self, key: MeshBufferInfoKey) -> Option<MeshBufferInfo> {
+        self.infos.remove(key)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct MeshBufferInfo {
@@ -46,10 +74,17 @@ pub struct MeshBufferTriangleInfo {
 
 impl MeshBufferTriangleInfo {
     pub fn vertex_attribute_stride(&self) -> usize {
-        self.vertex_attributes.iter().map(|attr| attr.vertex_size()).sum()
+        self.vertex_attributes
+            .iter()
+            .map(|attr| attr.vertex_size())
+            .sum()
     }
 
-    pub fn debug_get_attribute_vec_f32(&self, info: &MeshBufferVertexAttributeInfo, data: &[u8]) -> Vec<Vec<f32>> {
+    pub fn debug_get_attribute_vec_f32(
+        &self,
+        info: &MeshBufferVertexAttributeInfo,
+        data: &[u8],
+    ) -> Vec<Vec<f32>> {
         let mut out = Vec::new();
         let mut offset = 0;
         while offset < data.len() {
@@ -57,14 +92,18 @@ impl MeshBufferTriangleInfo {
                 if std::mem::discriminant(attr) == std::mem::discriminant(info) {
                     let attr_data = &data[offset..offset + attr.vertex_size()];
                     let mut values = Vec::new();
-                    for value in attr_data.chunks(attr.data_size()).map(|chunk| match attr.data_size() {
-                            1 => chunk[0] as f32,
-                            2 => u16::from_le_bytes(chunk.try_into().unwrap()) as f32,
-                            4 => f32::from_le_bytes(chunk.try_into().unwrap()),
-                            _ => {
-                                panic!("Unsupported vertex attribute data size for debugging")
-                            },
-                    }) {
+                    for value in
+                        attr_data
+                            .chunks(attr.data_size())
+                            .map(|chunk| match attr.data_size() {
+                                1 => chunk[0] as f32,
+                                2 => u16::from_le_bytes(chunk.try_into().unwrap()) as f32,
+                                4 => f32::from_le_bytes(chunk.try_into().unwrap()),
+                                _ => {
+                                    panic!("Unsupported vertex attribute data size for debugging")
+                                }
+                            })
+                    {
                         values.push(value);
                     }
 
@@ -86,7 +125,9 @@ pub struct MeshBufferAttributeIndexInfo {
 
 impl MeshBufferAttributeIndexInfo {
     pub fn debug_to_vec(&self, data: &[u8]) -> Vec<usize> {
-        data.chunks(4).map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()) as usize).collect()
+        data.chunks(4)
+            .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()) as usize)
+            .collect()
     }
 }
 
@@ -175,28 +216,28 @@ pub enum MeshBufferVertexAttributeInfo {
     },
 
     /// RGB or RGBA vertex color.
-    Colors { 
+    Colors {
         count: u32,
         data_size: usize,
         component_len: usize,
     },
 
     /// UV texture co-ordinates.
-    TexCoords { 
+    TexCoords {
         count: u32,
         data_size: usize,
         component_len: usize,
     },
 
     /// Joint indices.
-    Joints { 
+    Joints {
         count: u32,
         data_size: usize,
         component_len: usize,
     },
 
     /// Joint weights.
-    Weights { 
+    Weights {
         count: u32,
         data_size: usize,
         component_len: usize,
@@ -206,11 +247,11 @@ pub enum MeshBufferVertexAttributeInfo {
 impl MeshBufferVertexAttributeInfo {
     fn primary_val(&self) -> usize {
         match self {
-            MeshBufferVertexAttributeInfo::Positions{..} => 0,
-            MeshBufferVertexAttributeInfo::Normals{..} => 1,
-            MeshBufferVertexAttributeInfo::Tangents{..} => 2,
+            MeshBufferVertexAttributeInfo::Positions { .. } => 0,
+            MeshBufferVertexAttributeInfo::Normals { .. } => 1,
+            MeshBufferVertexAttributeInfo::Tangents { .. } => 2,
             MeshBufferVertexAttributeInfo::Colors { .. } => 3,
-            MeshBufferVertexAttributeInfo::TexCoords {.. } => 4,
+            MeshBufferVertexAttributeInfo::TexCoords { .. } => 4,
             MeshBufferVertexAttributeInfo::Joints { .. } => 5,
             MeshBufferVertexAttributeInfo::Weights { .. } => 6,
         }
@@ -218,61 +259,89 @@ impl MeshBufferVertexAttributeInfo {
 
     fn secondary_val(&self) -> u32 {
         match self {
-            MeshBufferVertexAttributeInfo::Positions{..} => 0,
-            MeshBufferVertexAttributeInfo::Normals{..} => 0,
-            MeshBufferVertexAttributeInfo::Tangents{..} => 0,
-            MeshBufferVertexAttributeInfo::Colors { count,.. } => *count,
-            MeshBufferVertexAttributeInfo::TexCoords { count,.. } => *count,
-            MeshBufferVertexAttributeInfo::Joints { count,.. } => *count,
-            MeshBufferVertexAttributeInfo::Weights { count,.. } => *count,
+            MeshBufferVertexAttributeInfo::Positions { .. } => 0,
+            MeshBufferVertexAttributeInfo::Normals { .. } => 0,
+            MeshBufferVertexAttributeInfo::Tangents { .. } => 0,
+            MeshBufferVertexAttributeInfo::Colors { count, .. } => *count,
+            MeshBufferVertexAttributeInfo::TexCoords { count, .. } => *count,
+            MeshBufferVertexAttributeInfo::Joints { count, .. } => *count,
+            MeshBufferVertexAttributeInfo::Weights { count, .. } => *count,
         }
     }
 
     pub fn force_data_size(&mut self, new_size: usize) {
         match self {
-            MeshBufferVertexAttributeInfo::Positions{data_size,..} => *data_size = new_size,
-            MeshBufferVertexAttributeInfo::Normals{data_size,..} => *data_size = new_size,
-            MeshBufferVertexAttributeInfo::Tangents{data_size,..} => *data_size = new_size,
-            MeshBufferVertexAttributeInfo::Colors { data_size,.. } => *data_size = new_size,
-            MeshBufferVertexAttributeInfo::TexCoords { data_size,.. } => *data_size = new_size,
-            MeshBufferVertexAttributeInfo::Joints { data_size,.. } => *data_size = new_size,
-            MeshBufferVertexAttributeInfo::Weights { data_size,.. } => *data_size = new_size,
+            MeshBufferVertexAttributeInfo::Positions { data_size, .. } => *data_size = new_size,
+            MeshBufferVertexAttributeInfo::Normals { data_size, .. } => *data_size = new_size,
+            MeshBufferVertexAttributeInfo::Tangents { data_size, .. } => *data_size = new_size,
+            MeshBufferVertexAttributeInfo::Colors { data_size, .. } => *data_size = new_size,
+            MeshBufferVertexAttributeInfo::TexCoords { data_size, .. } => *data_size = new_size,
+            MeshBufferVertexAttributeInfo::Joints { data_size, .. } => *data_size = new_size,
+            MeshBufferVertexAttributeInfo::Weights { data_size, .. } => *data_size = new_size,
         }
     }
 
     pub fn data_size(&self) -> usize {
         match self {
-            MeshBufferVertexAttributeInfo::Positions{data_size,..} => *data_size,
-            MeshBufferVertexAttributeInfo::Normals{data_size,..} => *data_size,
-            MeshBufferVertexAttributeInfo::Tangents{data_size,..} => *data_size,
-            MeshBufferVertexAttributeInfo::Colors { data_size,.. } => *data_size,
-            MeshBufferVertexAttributeInfo::TexCoords { data_size,.. } => *data_size,
-            MeshBufferVertexAttributeInfo::Joints { data_size,.. } => *data_size,
-            MeshBufferVertexAttributeInfo::Weights { data_size,.. } => *data_size,
+            MeshBufferVertexAttributeInfo::Positions { data_size, .. } => *data_size,
+            MeshBufferVertexAttributeInfo::Normals { data_size, .. } => *data_size,
+            MeshBufferVertexAttributeInfo::Tangents { data_size, .. } => *data_size,
+            MeshBufferVertexAttributeInfo::Colors { data_size, .. } => *data_size,
+            MeshBufferVertexAttributeInfo::TexCoords { data_size, .. } => *data_size,
+            MeshBufferVertexAttributeInfo::Joints { data_size, .. } => *data_size,
+            MeshBufferVertexAttributeInfo::Weights { data_size, .. } => *data_size,
         }
     }
 
     pub fn component_len(&self) -> usize {
         match self {
-            MeshBufferVertexAttributeInfo::Positions{component_len,..} => *component_len,
-            MeshBufferVertexAttributeInfo::Normals{component_len,..} => *component_len,
-            MeshBufferVertexAttributeInfo::Tangents{component_len,..} => *component_len,
-            MeshBufferVertexAttributeInfo::Colors { component_len,.. } => *component_len,
-            MeshBufferVertexAttributeInfo::TexCoords { component_len,.. } => *component_len,
-            MeshBufferVertexAttributeInfo::Joints { component_len,.. } => *component_len,
-            MeshBufferVertexAttributeInfo::Weights { component_len,.. } => *component_len,
+            MeshBufferVertexAttributeInfo::Positions { component_len, .. } => *component_len,
+            MeshBufferVertexAttributeInfo::Normals { component_len, .. } => *component_len,
+            MeshBufferVertexAttributeInfo::Tangents { component_len, .. } => *component_len,
+            MeshBufferVertexAttributeInfo::Colors { component_len, .. } => *component_len,
+            MeshBufferVertexAttributeInfo::TexCoords { component_len, .. } => *component_len,
+            MeshBufferVertexAttributeInfo::Joints { component_len, .. } => *component_len,
+            MeshBufferVertexAttributeInfo::Weights { component_len, .. } => *component_len,
         }
     }
 
     pub fn vertex_size(&self) -> usize {
         match self {
-            MeshBufferVertexAttributeInfo::Positions{component_len, data_size, ..} => *component_len * *data_size,
-            MeshBufferVertexAttributeInfo::Normals{component_len, data_size, ..} => *component_len * *data_size,
-            MeshBufferVertexAttributeInfo::Tangents{component_len, data_size, ..} => *component_len * *data_size,
-            MeshBufferVertexAttributeInfo::Colors { component_len, data_size, .. } => *component_len * *data_size,
-            MeshBufferVertexAttributeInfo::TexCoords { component_len, data_size, .. } => *component_len * *data_size,
-            MeshBufferVertexAttributeInfo::Joints { component_len, data_size, .. } => *component_len * *data_size,
-            MeshBufferVertexAttributeInfo::Weights { component_len, data_size, .. } => *component_len * *data_size,
+            MeshBufferVertexAttributeInfo::Positions {
+                component_len,
+                data_size,
+                ..
+            } => *component_len * *data_size,
+            MeshBufferVertexAttributeInfo::Normals {
+                component_len,
+                data_size,
+                ..
+            } => *component_len * *data_size,
+            MeshBufferVertexAttributeInfo::Tangents {
+                component_len,
+                data_size,
+                ..
+            } => *component_len * *data_size,
+            MeshBufferVertexAttributeInfo::Colors {
+                component_len,
+                data_size,
+                ..
+            } => *component_len * *data_size,
+            MeshBufferVertexAttributeInfo::TexCoords {
+                component_len,
+                data_size,
+                ..
+            } => *component_len * *data_size,
+            MeshBufferVertexAttributeInfo::Joints {
+                component_len,
+                data_size,
+                ..
+            } => *component_len * *data_size,
+            MeshBufferVertexAttributeInfo::Weights {
+                component_len,
+                data_size,
+                ..
+            } => *component_len * *data_size,
         }
     }
 }
@@ -289,4 +358,8 @@ impl Ord for MeshBufferVertexAttributeInfo {
             ordering => ordering,
         }
     }
+}
+
+new_key_type! {
+    pub struct MeshBufferInfoKey;
 }

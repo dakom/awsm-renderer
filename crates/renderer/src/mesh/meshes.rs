@@ -11,10 +11,11 @@ use crate::buffer::dynamic_storage::DynamicStorageBuffer;
 use crate::buffer::dynamic_uniform::DynamicUniformBuffer;
 use crate::materials::Materials;
 use crate::mesh::meta::{
-    MeshMeta, MESH_META_BYTE_ALIGNMENT, MESH_META_BYTE_SIZE, MESH_META_INITIAL_CAPACITY,
+    GeometryMeshMeta, MeshMeta, GEOMETRY_MESH_META_BYTE_ALIGNMENT, GEOMETRY_MESH_META_BYTE_SIZE,
+    MESH_META_INITIAL_CAPACITY,
 };
 use crate::mesh::skins::Skins;
-use crate::mesh::MeshBufferInfo;
+use crate::mesh::{MeshBufferInfo, MeshBufferInfos};
 use crate::transforms::{TransformKey, Transforms};
 use crate::AwsmRendererLogging;
 
@@ -25,7 +26,6 @@ use super::{Mesh, MeshBufferAttributeIndexInfo, MeshBufferVertexInfo};
 pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
     transform_to_meshes: SecondaryMap<TransformKey, Vec<MeshKey>>,
-    buffer_infos: SecondaryMap<MeshKey, MeshBufferInfo>,
     // visibility data buffers (position, triangle-id, barycentric)
     visibility_data_buffers: DynamicStorageBuffer<MeshKey>,
     visibility_data_gpu_buffer: web_sys::GpuBuffer,
@@ -42,10 +42,10 @@ pub struct Meshes {
     attribute_index_buffers: DynamicStorageBuffer<MeshKey>,
     attribute_index_gpu_buffer: web_sys::GpuBuffer,
     attribute_index_dirty: bool,
-    // meta data buffers
-    meta_data_buffers: DynamicUniformBuffer<MeshKey>,
-    meta_data_gpu_buffer: web_sys::GpuBuffer,
-    meta_data_dirty: bool,
+    // buffer infos
+    pub buffer_infos: MeshBufferInfos,
+    // meta
+    pub meta: MeshMeta,
     // morphs and skins
     pub morphs: Morphs,
     pub skins: Skins,
@@ -59,7 +59,7 @@ impl Meshes {
         Ok(Self {
             list: DenseSlotMap::with_key(),
             transform_to_meshes: SecondaryMap::new(),
-            buffer_infos: SecondaryMap::new(),
+            buffer_infos: MeshBufferInfos::new(),
             // visibility data
             visibility_data_buffers: DynamicStorageBuffer::new(
                 Self::VERTICES_INITIAL_SIZE,
@@ -116,22 +116,7 @@ impl Meshes {
                 .into(),
             )?,
             attribute_index_dirty: true,
-            // meta
-            meta_data_buffers: DynamicUniformBuffer::new(
-                MESH_META_INITIAL_CAPACITY,
-                MESH_META_BYTE_SIZE,
-                Some(MESH_META_BYTE_ALIGNMENT),
-                Some("MeshMetaData".to_string()),
-            ),
-            meta_data_gpu_buffer: gpu.create_buffer(
-                &BufferDescriptor::new(
-                    Some("MeshMetaData"),
-                    MESH_META_INITIAL_CAPACITY * MESH_META_BYTE_ALIGNMENT,
-                    BufferUsage::new().with_copy_dst().with_uniform(),
-                )
-                .into(),
-            )?,
-            meta_data_dirty: true,
+            meta: MeshMeta::new(gpu)?,
             // attribute morphs and skins
             morphs: Morphs::new(gpu)?,
             skins: Skins::new(gpu)?,
@@ -141,7 +126,6 @@ impl Meshes {
     pub fn insert(
         &mut self,
         mesh: Mesh,
-        buffer_info: MeshBufferInfo,
         materials: &Materials,
         transforms: &Transforms,
         visibility_data: &[u8],
@@ -149,14 +133,15 @@ impl Meshes {
         attribute_data: &[u8],
         attribute_index: &[u8],
     ) -> Result<MeshKey> {
-        // TODO - mesh info uniform buffer
-
         let transform_key = mesh.transform_key;
         let geometry_morph_key = mesh.geometry_morph_key;
         let material_morph_key = mesh.material_morph_key;
+        let buffer_info_key = mesh.buffer_info_key;
         let skin_key = mesh.skin_key;
         let material_key = mesh.material_key;
-        let key = self.list.insert(mesh);
+        let key = self.list.insert(mesh.clone());
+
+        let buffer_info = self.buffer_infos.get(buffer_info_key)?;
 
         self.transform_to_meshes
             .entry(transform_key)
@@ -188,25 +173,17 @@ impl Meshes {
         // for attr in buffer_info.triangles.vertex_attributes.iter() {
         //     tracing::info!("attribute data {:?}: {:?}", attr, buffer_info.triangles.debug_get_attribute_vec_f32(attr, attribute_data));
         // }
+        //
 
-        // meta - data
-        let meta_data = MeshMeta {
-            mesh_key: key,
-            material_key,
-            transform_key,
-            geometry_morph_key,
-            material_morph_key,
-            skin_key,
+        self.meta.insert(
+            key,
+            &mesh,
+            buffer_info.clone(),
             materials,
             transforms,
-            morphs: &self.morphs,
-            skins: &self.skins,
-        }
-        .to_bytes()?;
-        self.meta_data_buffers.update(key, &meta_data);
-        self.meta_data_dirty = true;
-
-        self.buffer_infos.insert(key, buffer_info);
+            &self.morphs,
+            &self.skins,
+        )?;
 
         Ok(key)
     }
@@ -271,21 +248,6 @@ impl Meshes {
             .ok_or(AwsmMeshError::AttributeBufferNotFound(key))
     }
 
-    pub fn meta_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
-        &self.meta_data_gpu_buffer
-    }
-    pub fn meta_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
-        self.meta_data_buffers
-            .offset(key)
-            .ok_or(AwsmMeshError::MetaNotFound(key))
-    }
-
-    pub fn buffer_info(&self, key: MeshKey) -> Result<&MeshBufferInfo> {
-        self.buffer_infos
-            .get(key)
-            .ok_or(AwsmMeshError::BufferInfoNotFound(key))
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = (MeshKey, &Mesh)> {
         self.list.iter()
     }
@@ -308,14 +270,13 @@ impl Meshes {
             self.visibility_index_buffers.remove(mesh_key);
             self.attribute_data_buffers.remove(mesh_key);
             self.attribute_index_buffers.remove(mesh_key);
-            self.meta_data_buffers.remove(mesh_key);
+            self.meta.remove(mesh_key);
 
-            if self.buffer_infos.remove(mesh_key).is_some() {
+            if self.buffer_infos.remove(mesh.buffer_info_key).is_some() {
                 self.visibility_data_dirty = true;
                 self.visibility_index_dirty = true;
                 self.attribute_data_dirty = true;
                 self.attribute_index_dirty = true;
-                self.meta_data_dirty = true;
             }
 
             self.transform_to_meshes
@@ -387,17 +348,7 @@ impl Meshes {
             ),
         ];
 
-        let to_check_uniform = [(
-            self.meta_data_dirty,
-            &mut self.meta_data_buffers,
-            &mut self.meta_data_gpu_buffer,
-            BufferUsage::new().with_copy_dst().with_storage(),
-            "MeshMetaData",
-            Some(BindGroupCreate::MeshMetaResize),
-        )];
-
-        let any_dirty = to_check_dynamic.iter().any(|(dirty, _, _, _, _, _)| *dirty)
-            || to_check_uniform.iter().any(|(dirty, _, _, _, _, _)| *dirty);
+        let any_dirty = to_check_dynamic.iter().any(|(dirty, _, _, _, _, _)| *dirty);
 
         if any_dirty {
             let _maybe_span_guard = if logging.render_timings {
@@ -420,25 +371,10 @@ impl Meshes {
                 }
             }
 
-            for (dirty, buffer, gpu_buffer, usage, label, bind_group_create) in to_check_uniform {
-                if dirty {
-                    if let Some(new_size) = buffer.take_gpu_needs_resize() {
-                        *gpu_buffer = gpu.create_buffer(
-                            &BufferDescriptor::new(Some(label), new_size, usage).into(),
-                        )?;
-                        if let Some(create) = bind_group_create {
-                            bind_groups.mark_create(create);
-                        }
-                    }
-                    gpu.write_buffer(&gpu_buffer, None, buffer.raw_slice(), None, None)?;
-                }
-            }
-
             self.visibility_data_dirty = false;
             self.visibility_index_dirty = false;
             self.attribute_data_dirty = false;
             self.attribute_index_dirty = false;
-            self.meta_data_dirty = false;
         }
 
         Ok(())
@@ -451,7 +387,6 @@ impl Drop for Meshes {
         self.visibility_index_gpu_buffer.destroy();
         self.attribute_data_gpu_buffer.destroy();
         self.attribute_index_gpu_buffer.destroy();
-        self.meta_data_gpu_buffer.destroy();
     }
 }
 

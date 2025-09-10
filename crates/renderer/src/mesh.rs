@@ -5,14 +5,17 @@ pub mod meta;
 pub mod morphs;
 pub mod skins;
 
+use awsm_renderer_core::command::compute_pass::ComputePassEncoder;
 use awsm_renderer_core::{
     command::render_pass::RenderPassEncoder, pipeline::primitive::IndexFormat,
 };
 
 use crate::materials::MaterialKey;
 use crate::mesh::morphs::{GeometryMorphKey, MaterialMorphKey};
+use crate::pipelines::compute_pipeline::ComputePipelineKey;
 use crate::render::RenderContext;
 use crate::render_passes::geometry::bind_group::GeometryBindGroups;
+use crate::render_passes::material::opaque::bind_group::MaterialOpaqueBindGroups;
 use crate::transforms::TransformKey;
 use crate::{bounds::Aabb, pipelines::render_pipeline::RenderPipelineKey};
 use skins::SkinKey;
@@ -25,9 +28,10 @@ use super::error::Result;
 
 // this is most like a "primitive" in gltf, not the containing "mesh"
 // because for non-gltf naming, "mesh" makes more sense
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mesh {
-    pub render_pipeline_key: RenderPipelineKey,
+    pub geometry_render_pipeline_key: RenderPipelineKey,
+    pub buffer_info_key: MeshBufferInfoKey,
     pub aabb: Option<Aabb>,
     pub world_aabb: Option<Aabb>, // this is the transformed AABB, used for frustum culling and depth sorting
     pub transform_key: TransformKey,
@@ -39,12 +43,14 @@ pub struct Mesh {
 
 impl Mesh {
     pub fn new(
-        render_pipeline_key: RenderPipelineKey,
+        buffer_info_key: MeshBufferInfoKey,
+        geometry_render_pipeline_key: RenderPipelineKey,
         transform_key: TransformKey,
         material_key: MaterialKey,
     ) -> Self {
         Self {
-            render_pipeline_key,
+            buffer_info_key,
+            geometry_render_pipeline_key,
             transform_key,
             material_key,
             aabb: None,
@@ -83,7 +89,7 @@ impl Mesh {
         render_pass: &RenderPassEncoder,
         geometry_bind_groups: &GeometryBindGroups,
     ) -> Result<()> {
-        let meta_offset = ctx.meshes.meta_data_buffer_offset(mesh_key)? as u32;
+        let meta_offset = ctx.meshes.meta.geometry_buffer_offset(mesh_key)? as u32;
 
         render_pass.set_bind_group(
             2,
@@ -107,7 +113,7 @@ impl Mesh {
             );
         }
 
-        let buffer_info = ctx.meshes.buffer_info(mesh_key)?;
+        let buffer_info = ctx.meshes.buffer_infos.get(self.buffer_info_key)?;
 
         render_pass.set_index_buffer(
             ctx.meshes.visibility_index_gpu_buffer(),
@@ -127,6 +133,27 @@ impl Mesh {
                 render_pass.draw_indexed(buffer_info.vertex.count as u32);
             }
         }
+
+        Ok(())
+    }
+
+    pub fn push_material_opaque_pass_commands(
+        &self,
+        ctx: &RenderContext,
+        mesh_key: MeshKey,
+        compute_pass: &ComputePassEncoder,
+        material_bind_groups: &MaterialOpaqueBindGroups,
+        workgroup_size: (u32, u32),
+    ) -> Result<()> {
+        let meta_offset = ctx.meshes.meta.material_buffer_offset(mesh_key)? as u32;
+
+        compute_pass.set_bind_group(
+            1,
+            material_bind_groups.meta.get_bind_group()?,
+            Some(&[meta_offset]),
+        )?;
+
+        compute_pass.dispatch_workgroups(workgroup_size.0, Some(workgroup_size.1), Some(1));
 
         Ok(())
     }

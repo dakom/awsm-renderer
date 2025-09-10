@@ -21,8 +21,8 @@ use crate::{
     AwsmRenderer,
 };
 
-static VISIBILITY_CLEAR_COLOR:LazyLock<Color> = LazyLock::new(|| {
-    let max = f32::MAX.into(); 
+static VISIBILITY_CLEAR_COLOR: LazyLock<Color> = LazyLock::new(|| {
+    let max = f32::MAX.into();
     Color {
         r: max,
         g: max,
@@ -47,7 +47,7 @@ impl GeometryRenderPass {
         })
     }
 
-    pub fn render(&self, ctx: &RenderContext, renderables: Vec<Renderable>) -> Result<()> {
+    pub fn render(&self, ctx: &RenderContext, renderables: &[Renderable]) -> Result<()> {
         let render_pass = ctx.command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 label: Some("Geometry Render Pass"),
@@ -59,7 +59,8 @@ impl GeometryRenderPass {
                     )
                     .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
                     ColorAttachment::new(
-                        &ctx.render_texture_views.taa_clip_positions[ctx.render_texture_views.curr_index],
+                        &ctx.render_texture_views.taa_clip_positions
+                            [ctx.render_texture_views.curr_index],
                         LoadOp::Clear,
                         StoreOp::Store,
                     ),
@@ -87,7 +88,7 @@ impl GeometryRenderPass {
 
         let mut last_render_pipeline_key = None;
         for renderable in renderables {
-            let render_pipeline_key = renderable.render_pipeline_key();
+            let render_pipeline_key = renderable.geometry_render_pipeline_key();
             if last_render_pipeline_key != Some(render_pipeline_key) {
                 render_pass.set_pipeline(ctx.pipelines.render.get(render_pipeline_key)?);
                 last_render_pipeline_key = Some(render_pipeline_key);

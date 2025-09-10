@@ -49,17 +49,6 @@ impl RenderPasses {
             display: DisplayRenderPass::new(ctx).await?,
         })
     }
-
-    pub async fn update_texture_bindings(
-        &mut self,
-        ctx: &mut RenderPassInitContext<'_>,
-    ) -> Result<()> {
-        self.material_opaque.update_texture_bindings(ctx).await?;
-        self.material_transparent
-            .update_texture_bindings(ctx)
-            .await?;
-        Ok(())
-    }
 }
 
 pub struct RenderPassInitContext<'a> {

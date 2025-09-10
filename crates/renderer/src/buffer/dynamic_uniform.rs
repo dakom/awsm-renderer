@@ -167,7 +167,8 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
 
     /// Removes the slot corresponding to the given key.
     /// The slot is marked as free for reuse.
-    pub fn remove(&mut self, key: K) {
+    /// returns whether or not it was actually removed
+    pub fn remove(&mut self, key: K) -> bool {
         if let Some(slot) = self.slot_indices.remove(key) {
             // Add this slot to the free list.
             self.free_slots.push(slot);
@@ -175,6 +176,9 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
             // Zero out the data in the slot.
             let offset_bytes = slot * self.aligned_slice_size;
             self.raw_data[offset_bytes..offset_bytes + self.aligned_slice_size].fill(ZERO_VALUE);
+            true
+        } else {
+            false
         }
     }
 
