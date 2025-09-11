@@ -73,32 +73,6 @@ impl Pipelines {
 }
 
 impl AwsmRenderer {
-    pub fn add_pipeline_layout(
-        &mut self,
-        label: Option<&str>,
-        cache_key: PipelineLayoutCacheKey,
-    ) -> Result<PipelineLayoutKey> {
-        if let Some(layout_key) = self
-            .pipelines
-            .get_pipeline_layout_key_from_cache(&cache_key)
-        {
-            return Ok(layout_key);
-        }
-
-        let layout = self.gpu.create_pipeline_layout(
-            &cache_key
-                .clone()
-                .into_descriptor(&self.bind_groups, label)?
-                .into(),
-        );
-
-        let layout_key = self.pipelines.layout.insert(layout);
-
-        self.pipelines.layout_cache.insert(cache_key, layout_key);
-
-        Ok(layout_key)
-    }
-
     pub async fn add_render_pipeline(
         &mut self,
         label: Option<&str>,

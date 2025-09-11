@@ -1,16 +1,14 @@
 # Opaque material pass
 
+- next up: get_uv in attribute.wgsl
 - Somehow pass per-mesh per-attribute offsets
-    - different kinds of mesh_meta: geometry and material
-      - finish pushing it through, setup material meta in opaque shader
-    - material meta is basically Vec<MeshBufferVertexAttributeInfo>
-    - (do need to keep skins so we can calculate normals)
-    - template generate multiple passes like before with different layout settings
-      - cache key must not care about offsets etc., that's in the metadata
-      - generate keys when collecting renderables, since that's when we know what each contains
-        - might need to precreate shaders on mesh creation?
+    - material meta probably needs to contain Vec<MeshBufferVertexAttributeInfo>
+    - skins too so we can calculate normals?
+    - shader cache key must not care about offsets etc., that's in the metadata
     - needs to check the material meta and early-exit if it's "not me"
-    - then everything should be static
+      - since the compute shader executes over the entire texture, but only some pixels are relevant in a draw call
+    - then, if it passes that early gating, everything else should be static
+- make sure all meshes have _some_ material, automatically assign "unlit" or something if none assigned
 
 
 3. Calculate world position

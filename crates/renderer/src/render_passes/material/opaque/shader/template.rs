@@ -67,7 +67,7 @@ impl ShaderTemplateMaterialOpaque {
     pub fn into_source(self) -> Result<String> {
         let source = self.render()?;
 
-        // debug_unique_string(1, &source, || print_shader_source(&source, true));
+        //debug_unique_string(1, &source, || print_shader_source(&source, true));
 
         Ok(source)
     }

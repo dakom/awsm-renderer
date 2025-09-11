@@ -24,9 +24,9 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
     // let screen_pos = vec2<f32>(f32(pixel_coord.x), f32(pixel_coord.y));
     // let depth = textureLoad(depth_texture, pixel_coord, 0).x;
     // let world_pos = unproject_screen_to_world(screen_pos, depth, inv_view_proj_matrix);
-    
+
     var out: FragmentOutput;
-    
+
     // Pack visibility buffer data
     out.visibility_data = vec4<f32>(
         bitcast<f32>(input.triangle_id),
@@ -34,9 +34,9 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
         input.barycentric.x,
         input.barycentric.y  // z = 1.0 - x - y
     );
-    
+
     // Store exact clip position for TAA (not the interpolated @builtin(position))
     out.taa_clip_position = input.clip_position;
-    
+
     return out;
 }

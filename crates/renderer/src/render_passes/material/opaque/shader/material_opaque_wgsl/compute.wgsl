@@ -6,14 +6,13 @@
 {% include "pbr_shared_wgsl/meta.wgsl" %}
 {% include "material_opaque_wgsl/attribute.wgsl" %}
 
-@group(0) @binding(0) var visibility_data_tex: texture_2d<f32>;
-@group(0) @binding(1) var opaque_tex: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(2) var<storage, read> materials: array<MaterialRaw>;
-@group(0) @binding(3) var<storage, read> attribute_indices: array<u32>;
-@group(0) @binding(4) var<storage, read> attribute_data: array<f32>;
+@group(0) @binding(0) var<storage, read> mesh_metas: array<MaterialMeshMeta>;
+@group(0) @binding(1) var visibility_data_tex: texture_2d<f32>;
+@group(0) @binding(2) var opaque_tex: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var<storage, read> materials: array<MaterialRaw>;
+@group(0) @binding(4) var<storage, read> attribute_indices: array<u32>;
+@group(0) @binding(5) var<storage, read> attribute_data: array<f32>;
 
-@group(1) @binding(0)
-var<uniform> mesh_meta: MaterialMeshMeta;
 
 {% for texture_binding_string in texture_binding_strings %}
     {{texture_binding_string}}
@@ -40,13 +39,15 @@ fn main(
     let visibility_data = textureLoad(visibility_data_tex, coords, 0);
 
     let triangle_id = bitcast<u32>(visibility_data.x);
-    let material_offset = bitcast<u32>(visibility_data.y);
+    let material_meta_offset = bitcast<u32>(visibility_data.y);
     let barycentric = vec3<f32>(visibility_data.z, visibility_data.w, 1.0 - visibility_data.z - visibility_data.w);
 
     var color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
 
     // only calculate color if material_offset is valid
-    if (material_offset != f32_max) {
+    if (triangle_id != f32_max) {
+        let mesh_meta = mesh_metas[material_meta_offset / meta_size_in_bytes];
+        let material_offset = mesh_meta.material_offset;
         color = calculate_color(triangle_id, material_offset, barycentric);
     }
 

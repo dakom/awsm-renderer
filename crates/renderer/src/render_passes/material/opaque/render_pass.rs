@@ -13,6 +13,7 @@ use crate::{
 use awsm_renderer_core::{
     command::compute_pass::ComputePassDescriptor, renderer::AwsmRendererWebGpu,
 };
+use slotmap::SecondaryMap;
 
 pub struct MaterialOpaqueRenderPass {
     pub bind_groups: MaterialOpaqueBindGroups,
@@ -35,14 +36,7 @@ impl MaterialOpaqueRenderPass {
             &ComputePassDescriptor::new(Some("Material Opaque Pass")).into(),
         ));
 
-        renderables.sort_by(|a, b| {
-            a.material_opaque_compute_pipeline_key()
-                .cmp(&b.material_opaque_compute_pipeline_key())
-        });
-
-        // these bind groups stay the same, it's only meta that changes
-        compute_pass.set_bind_group(0, self.bind_groups.core.get_bind_group()?, None)?;
-        let bind_groups = self.bind_groups.textures.get_bind_groups()?;
+        let bind_groups = self.bind_groups.get_bind_groups()?;
         for (index, bind_group) in bind_groups.iter().enumerate() {
             compute_pass.set_bind_group(index as u32, &bind_group, None)?;
         }
@@ -52,20 +46,20 @@ impl MaterialOpaqueRenderPass {
             ctx.render_texture_views.height.div_ceil(8),
         );
 
-        let mut last_compute_pipeline_key = None;
+        let mut seen_pipeline_keys = SecondaryMap::new();
         for renderable in renderables {
             if let Some(compute_pipeline_key) = renderable.material_opaque_compute_pipeline_key() {
-                if last_compute_pipeline_key != Some(compute_pipeline_key) {
-                    compute_pass.set_pipeline(ctx.pipelines.compute.get(compute_pipeline_key)?);
-                    last_compute_pipeline_key = Some(compute_pipeline_key);
-                }
+                // only need to dispatch once per pipeline, not per renderable
+                if !seen_pipeline_keys.contains_key(compute_pipeline_key) {
+                    seen_pipeline_keys.insert(compute_pipeline_key, ());
 
-                renderable.push_material_opaque_pass_commands(
-                    ctx,
-                    &compute_pass,
-                    &self.bind_groups,
-                    workgroup_size,
-                )?;
+                    compute_pass.set_pipeline(ctx.pipelines.compute.get(compute_pipeline_key)?);
+                    compute_pass.dispatch_workgroups(
+                        workgroup_size.0,
+                        Some(workgroup_size.1),
+                        Some(1),
+                    );
+                }
             }
         }
 

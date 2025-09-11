@@ -136,25 +136,4 @@ impl Mesh {
 
         Ok(())
     }
-
-    pub fn push_material_opaque_pass_commands(
-        &self,
-        ctx: &RenderContext,
-        mesh_key: MeshKey,
-        compute_pass: &ComputePassEncoder,
-        material_bind_groups: &MaterialOpaqueBindGroups,
-        workgroup_size: (u32, u32),
-    ) -> Result<()> {
-        let meta_offset = ctx.meshes.meta.material_buffer_offset(mesh_key)? as u32;
-
-        compute_pass.set_bind_group(
-            1,
-            material_bind_groups.meta.get_bind_group()?,
-            Some(&[meta_offset]),
-        )?;
-
-        compute_pass.dispatch_workgroups(workgroup_size.0, Some(workgroup_size.1), Some(1));
-
-        Ok(())
-    }
 }

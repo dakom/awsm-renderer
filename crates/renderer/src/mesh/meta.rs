@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use awsm_renderer_core::{
     buffers::{BufferDescriptor, BufferUsage},
     renderer::AwsmRendererWebGpu,
@@ -20,11 +22,17 @@ use crate::{
 
 pub const MESH_META_INITIAL_CAPACITY: usize = 1024;
 pub const GEOMETRY_MESH_META_BYTE_SIZE: usize = 40;
-pub const GEOMETRY_MESH_META_BYTE_ALIGNMENT: usize = 256; // 32 bytes aligned
+pub const GEOMETRY_MESH_META_BYTE_ALIGNMENT: usize = 256;
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_NORMAL: u32 = 1;
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_TANGENT: u32 = 1 << 1;
-pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 48;
-pub const MATERIAL_MESH_META_BYTE_ALIGNMENT: usize = 256; // 32 bytes aligned
+pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 28;
+pub const MATERIAL_MESH_META_BYTE_ALIGNMENT: usize = MATERIAL_MESH_META_BYTE_SIZE; // storage buffer is less strict
+
+static GEOMETRY_BUFFER_USAGE: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_copy_dst().with_uniform());
+
+static MATERIAL_BUFFER_USAGE: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_copy_dst().with_storage());
 
 pub struct MeshMeta {
     // meta data buffers
@@ -50,7 +58,7 @@ impl MeshMeta {
                 &BufferDescriptor::new(
                     Some("GeometryMeshMetaData"),
                     MESH_META_INITIAL_CAPACITY * GEOMETRY_MESH_META_BYTE_ALIGNMENT,
-                    BufferUsage::new().with_copy_dst().with_uniform(),
+                    *GEOMETRY_BUFFER_USAGE,
                 )
                 .into(),
             )?,
@@ -65,7 +73,7 @@ impl MeshMeta {
                 &BufferDescriptor::new(
                     Some("MaterialMeshMetaData"),
                     MESH_META_INITIAL_CAPACITY * MATERIAL_MESH_META_BYTE_ALIGNMENT,
-                    BufferUsage::new().with_copy_dst().with_uniform(),
+                    *MATERIAL_BUFFER_USAGE,
                 )
                 .into(),
             )?,
@@ -88,21 +96,6 @@ impl MeshMeta {
         let skin_key = mesh.skin_key;
         let material_key = mesh.material_key;
 
-        let meta_data = GeometryMeshMeta {
-            mesh_key: key,
-            material_key,
-            transform_key,
-            geometry_morph_key,
-            skin_key,
-            materials,
-            transforms,
-            morphs,
-            skins,
-        }
-        .to_bytes()?;
-        self.geometry_buffers.update(key, &meta_data);
-        self.geometry_dirty = true;
-
         // TODO
         // should be basically Vec<MeshBufferVertexAttributeInfo>
         let meta_data = MaterialMeshMeta {
@@ -115,6 +108,23 @@ impl MeshMeta {
         .to_bytes()?;
         self.material_buffers.update(key, &meta_data);
         self.material_dirty = true;
+
+        let meta_data = GeometryMeshMeta {
+            mesh_key: key,
+            material_key,
+            transform_key,
+            geometry_morph_key,
+            skin_key,
+            materials,
+            transforms,
+            morphs,
+            skins,
+            material_meta_buffers: &self.material_buffers,
+        }
+        .to_bytes()?;
+
+        self.geometry_buffers.update(key, &meta_data);
+        self.geometry_dirty = true;
 
         Ok(())
     }
@@ -159,7 +169,7 @@ impl MeshMeta {
                     &BufferDescriptor::new(
                         Some("GeometryMeshMetaData"),
                         new_size,
-                        BufferUsage::new().with_copy_dst().with_uniform(),
+                        *GEOMETRY_BUFFER_USAGE,
                     )
                     .into(),
                 )?;
@@ -182,7 +192,7 @@ impl MeshMeta {
                     &BufferDescriptor::new(
                         Some("MaterialMeshMetaData"),
                         new_size,
-                        BufferUsage::new().with_copy_dst().with_uniform(),
+                        *MATERIAL_BUFFER_USAGE,
                     )
                     .into(),
                 )?;
@@ -198,6 +208,7 @@ impl MeshMeta {
 
             self.material_dirty = false;
         }
+
         Ok(())
     }
 }
@@ -220,6 +231,7 @@ pub struct GeometryMeshMeta<'a> {
     pub transforms: &'a Transforms,
     pub morphs: &'a Morphs,
     pub skins: &'a Skins,
+    pub material_meta_buffers: &'a DynamicUniformBuffer<MeshKey>,
 }
 
 impl<'a> GeometryMeshMeta<'a> {
@@ -236,6 +248,7 @@ impl<'a> GeometryMeshMeta<'a> {
             transforms,
             morphs,
             skins,
+            material_meta_buffers,
         } = self;
 
         let mut result = [0u8; GEOMETRY_MESH_META_BYTE_SIZE];
@@ -291,8 +304,12 @@ impl<'a> GeometryMeshMeta<'a> {
         // Transform (4 bytes)
         push_u32(transforms.buffer_offset(transform_key)? as u32);
 
-        // Material (4 bytes)
-        push_u32(materials.buffer_offset(material_key)? as u32);
+        // Material Meta (4 bytes)
+        push_u32(
+            material_meta_buffers
+                .offset(mesh_key)
+                .ok_or(AwsmMeshError::MetaNotFound(mesh_key))? as u32,
+        );
 
         Ok(result)
     }
@@ -352,13 +369,6 @@ impl<'a> MaterialMeshMeta<'a> {
             push_u32(info.targets_len as u32);
             push_u32(morphs.material.weights_buffer_offset(morph_key)? as u32);
             push_u32(morphs.material.values_buffer_offset(morph_key)? as u32);
-        } else {
-            push_u32(0);
-            push_u32(0);
-            push_u32(0);
-        }
-        if let Some(morph_key) = material_morph_key {
-            let info = morphs.material.get_info(morph_key)?;
             let mut bitmask = 0;
             if info.attributes.normal {
                 bitmask |= MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_NORMAL;
@@ -366,9 +376,10 @@ impl<'a> MaterialMeshMeta<'a> {
             if info.attributes.tangent {
                 bitmask |= MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_TANGENT;
             }
-            push_u32(info.targets_len as u32);
             push_u32(bitmask);
         } else {
+            push_u32(0);
+            push_u32(0);
             push_u32(0);
             push_u32(0);
         }

@@ -126,6 +126,7 @@ fn geometry_sort_renderable(
     }
 }
 
+#[derive(Debug)]
 pub enum Renderable<'a> {
     Mesh {
         key: MeshKey,
@@ -172,24 +173,6 @@ impl Renderable<'_> {
             Self::Mesh { mesh, key, .. } => {
                 mesh.push_geometry_pass_commands(ctx, *key, render_pass, geometry_bind_groups)
             }
-        }
-    }
-
-    pub fn push_material_opaque_pass_commands(
-        &self,
-        ctx: &RenderContext,
-        compute_pass: &ComputePassEncoder,
-        material_opaque_bind_groups: &MaterialOpaqueBindGroups,
-        workgroup_size: (u32, u32),
-    ) -> Result<()> {
-        match self {
-            Self::Mesh { mesh, key, .. } => mesh.push_material_opaque_pass_commands(
-                ctx,
-                *key,
-                compute_pass,
-                material_opaque_bind_groups,
-                workgroup_size,
-            ),
         }
     }
 }
