@@ -10,10 +10,7 @@ use crate::bind_groups::{BindGroupCreate, BindGroups};
 use crate::buffer::dynamic_storage::DynamicStorageBuffer;
 use crate::buffer::dynamic_uniform::DynamicUniformBuffer;
 use crate::materials::Materials;
-use crate::mesh::meta::{
-    GeometryMeshMeta, MeshMeta, GEOMETRY_MESH_META_BYTE_ALIGNMENT, GEOMETRY_MESH_META_BYTE_SIZE,
-    MESH_META_INITIAL_CAPACITY,
-};
+use crate::mesh::meta::{MeshMeta, MESH_META_INITIAL_CAPACITY};
 use crate::mesh::skins::Skins;
 use crate::mesh::{MeshBufferInfo, MeshBufferInfos};
 use crate::transforms::{TransformKey, Transforms};
@@ -162,23 +159,38 @@ impl Meshes {
         self.visibility_data_dirty = true;
 
         // attributes - index
-        self.attribute_index_buffers.update(key, attribute_index);
+        let attribute_indices_offset = self.attribute_index_buffers.update(key, attribute_index);
         self.attribute_index_dirty = true;
 
         // attributes - data
-        self.attribute_data_buffers.update(key, attribute_data);
+        let attribute_data_offset = self.attribute_data_buffers.update(key, attribute_data);
         self.attribute_data_dirty = true;
 
-        // tracing::info!("attribute indices: {:?}", buffer_info.triangles.vertex_attribute_indices.debug_to_vec(attribute_index));
+        // KEEP THIS AROUND FOR DEBUGGING
+        // Very helpful - shows all the non-position vertex attributes and triangle indices
+        // tracing::info!(
+        //     "attribute indices: {:?}",
+        //     buffer_info
+        //         .triangles
+        //         .vertex_attribute_indices
+        //         .debug_to_vec(attribute_index)
+        // );
         // for attr in buffer_info.triangles.vertex_attributes.iter() {
-        //     tracing::info!("attribute data {:?}: {:?}", attr, buffer_info.triangles.debug_get_attribute_vec_f32(attr, attribute_data));
+        //     tracing::info!(
+        //         "attribute data {:?}: {:?}",
+        //         attr,
+        //         buffer_info
+        //             .triangles
+        //             .debug_get_attribute_vec_f32(attr, attribute_data)
+        //     );
         // }
-        //
 
         self.meta.insert(
             key,
             &mesh,
-            buffer_info.clone(),
+            buffer_info,
+            attribute_indices_offset,
+            attribute_data_offset,
             materials,
             transforms,
             &self.morphs,

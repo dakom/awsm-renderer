@@ -9,6 +9,10 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
     h.insert(
         "Todo",
         vec![
+            GltfId::TextureSettings,
+            GltfId::Triangle,
+            GltfId::TextureLinearInterpolation,
+            GltfId::BoxTextured,
             GltfId::AlphaBlendMode,
             GltfId::MetalRoughSpheresTextureless,
             GltfId::MetalRoughSpheres,
@@ -40,8 +44,8 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
     h.insert(
         "Simple",
         vec![
+            GltfId::TextureCoordinate,
             GltfId::TriangleWithoutIndices,
-            GltfId::Triangle,
             GltfId::SimpleSparseAccessor,
             GltfId::SimpleMeshes,
             GltfId::SimpleTexture,

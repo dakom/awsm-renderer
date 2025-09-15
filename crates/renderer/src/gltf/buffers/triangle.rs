@@ -1,7 +1,9 @@
 use awsm_renderer_core::pipeline::primitive::FrontFace;
 
 use crate::gltf::buffers::index::extract_triangle_indices;
-use crate::gltf::buffers::{MeshBufferAttributeIndexInfoWithOffset, MeshBufferTriangleDataInfoWithOffset};
+use crate::gltf::buffers::{
+    MeshBufferAttributeIndexInfoWithOffset, MeshBufferTriangleDataInfoWithOffset,
+};
 use crate::gltf::error::Result;
 
 // Pack triangle data (vertex indices)
@@ -27,7 +29,6 @@ pub(super) fn pack_triangle_data(
         triangle_data_bytes.extend_from_slice(&(normalized_triangle[0] as u32).to_le_bytes());
         triangle_data_bytes.extend_from_slice(&(normalized_triangle[1] as u32).to_le_bytes());
         triangle_data_bytes.extend_from_slice(&(normalized_triangle[2] as u32).to_le_bytes());
-
     }
 
     let size_per_triangle = 12; // 3 u32 indices

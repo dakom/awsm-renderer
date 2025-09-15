@@ -15,7 +15,7 @@ use crate::{
     camera::CameraBuffer,
     lights::Lights,
     materials::{pbr::PbrMaterial, Materials},
-    mesh::meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT,
+    mesh::meta::geometry_meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT,
     render_passes::{composite::bind_group, RenderPassInitContext},
     transforms::Transforms,
 };

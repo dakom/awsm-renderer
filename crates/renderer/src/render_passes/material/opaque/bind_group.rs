@@ -15,7 +15,7 @@ use crate::bind_groups::{AwsmBindGroupError, BindGroupRecreateContext};
 use crate::error::Result;
 use crate::materials::pbr::PbrMaterial;
 use crate::materials::MaterialBufferKind;
-use crate::mesh::meta::MATERIAL_MESH_META_BYTE_ALIGNMENT;
+use crate::mesh::meta::material_opaque_meta::MATERIAL_MESH_META_BYTE_ALIGNMENT;
 use crate::{bind_group_layout::BindGroupLayoutKey, render_passes::RenderPassInitContext};
 
 pub const MATERIAL_OPAQUE_CORE_TEXTURES_START_GROUP: u32 = 0;

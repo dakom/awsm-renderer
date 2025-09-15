@@ -1,14 +1,20 @@
 use awsm_renderer_core::texture::mega_texture::MegaTextureBindings;
 
 use crate::{
+    mesh::{MeshBufferInfo, MeshBufferVertexAttributeInfo},
     render_passes::{
-        material::cache_key::ShaderCacheKeyMaterial, shader_cache_key::ShaderCacheKeyRenderPass,
+        material::{
+            cache_key::ShaderCacheKeyMaterial,
+            opaque::shader::attributes::ShaderMaterialOpaqueVertexAttributes,
+        },
+        shader_cache_key::ShaderCacheKeyRenderPass,
     },
     shaders::ShaderCacheKey,
 };
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyMaterialOpaque {
+    pub attributes: ShaderMaterialOpaqueVertexAttributes,
     pub texture_bindings: MegaTextureBindings,
 }
 

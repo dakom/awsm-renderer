@@ -13,7 +13,7 @@ struct MaterialRaw {
     occlusion_strength: f32,
     emissive_factor_r: f32,
     emissive_factor_g: f32,
-    emissive_factor_b: f32, 
+    emissive_factor_b: f32,
 
     // Textures, 5 * 24 = 120 bytes
     base_color_tex_info: TextureInfoRaw,
@@ -99,35 +99,5 @@ fn convert_material(raw: MaterialRaw) -> Material {
         (raw.texture_bitmask & TEXTURE_BITMASK_EMISSIVE) != 0u,
         convert_texture_info(raw.emissive_tex_info),
         vec3<f32>(raw.emissive_factor_r, raw.emissive_factor_g, raw.emissive_factor_b),
-    );
-}
-
-// 24 bytes
-struct TextureInfoRaw {
-    pixel_offset_x: u32,
-    pixel_offset_y: u32,
-    width: u32,
-    height: u32,
-    atlas_layer_index: u32,
-    entry_attribute_uv_index: u32,
-}
-
-struct TextureInfo {
-    pixel_offset: vec2<u32>,
-    size: vec2<u32>,
-    atlas_index: u32,
-    layer_index: u32,
-    entry_index: u32,
-    attribute_uv_index: u32,
-}
-
-fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
-    return TextureInfo(
-        vec2<u32>(raw.pixel_offset_x, raw.pixel_offset_y),
-        vec2<u32>(raw.width, raw.height),
-        raw.atlas_layer_index & 0xFFFFu,           // atlas_index (16 bits)
-        (raw.atlas_layer_index >> 16u) & 0xFFFFu, // layer_index (16 bits)
-        raw.entry_attribute_uv_index & 0xFFFFu,    // entry_index (16 bits)
-        (raw.entry_attribute_uv_index >> 16u) & 0xFFFFu, // attribute_uv_index (16 bits)
     );
 }

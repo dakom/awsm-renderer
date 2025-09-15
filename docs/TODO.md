@@ -1,20 +1,18 @@
 # Opaque material pass
 
-- next up: get_uv in attribute.wgsl
-- Somehow pass per-mesh per-attribute offsets
-    - material meta probably needs to contain Vec<MeshBufferVertexAttributeInfo>
-    - skins too so we can calculate normals?
-    - shader cache key must not care about offsets etc., that's in the metadata
-    - needs to check the material meta and early-exit if it's "not me"
-      - since the compute shader executes over the entire texture, but only some pixels are relevant in a draw call
-    - then, if it passes that early gating, everything else should be static
-- make sure all meshes have _some_ material, automatically assign "unlit" or something if none assigned
+- get Triangle test working again
+  - make sure all meshes have _some_ material, automatically assign "unlit" or something if none assigned
+- needs to check the material meta and early-exit if it's "not me"
+- get Texture settings test working
+- get Linear texture interpolation at least showing circles (don't worry about accurate colors yet)
+- alpha cutoff (not full alpha blend test, just cutoff, rest depends on transparent pass)
+- get basic lighting working
+  - Calculate world position
+  - don't worry about morphed normals yet
 
-
-3. Calculate world position
-4. Write basic material
 
 # Transparent material pass
+- complete getting alpha blend mode working again
 
 # Load mip level in compute shader pass
 

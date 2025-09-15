@@ -124,9 +124,14 @@ pub struct MeshBufferAttributeIndexInfo {
 }
 
 impl MeshBufferAttributeIndexInfo {
-    pub fn debug_to_vec(&self, data: &[u8]) -> Vec<usize> {
-        data.chunks(4)
-            .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()) as usize)
+    pub fn debug_to_vec(&self, data: &[u8]) -> Vec<Vec<usize>> {
+        data.chunks(12)
+            .map(|chunk| {
+                chunk
+                    .chunks(4)
+                    .map(|c| u32::from_le_bytes(c.try_into().unwrap()) as usize)
+                    .collect()
+            })
             .collect()
     }
 }
@@ -306,42 +311,40 @@ impl MeshBufferVertexAttributeInfo {
     }
 
     pub fn vertex_size(&self) -> usize {
+        // the count is zero-based (e.g. TEXCOORD_0 = count 0) so we need to add 1
         match self {
             MeshBufferVertexAttributeInfo::Positions {
                 component_len,
                 data_size,
-                ..
             } => *component_len * *data_size,
             MeshBufferVertexAttributeInfo::Normals {
                 component_len,
                 data_size,
-                ..
             } => *component_len * *data_size,
             MeshBufferVertexAttributeInfo::Tangents {
                 component_len,
                 data_size,
-                ..
             } => *component_len * *data_size,
             MeshBufferVertexAttributeInfo::Colors {
                 component_len,
                 data_size,
-                ..
-            } => *component_len * *data_size,
+                count,
+            } => *component_len * *data_size * (*count as usize + 1),
             MeshBufferVertexAttributeInfo::TexCoords {
                 component_len,
                 data_size,
-                ..
-            } => *component_len * *data_size,
+                count,
+            } => *component_len * *data_size * (*count as usize + 1),
             MeshBufferVertexAttributeInfo::Joints {
                 component_len,
                 data_size,
-                ..
-            } => *component_len * *data_size,
+                count,
+            } => *component_len * *data_size * (*count as usize + 1),
             MeshBufferVertexAttributeInfo::Weights {
                 component_len,
                 data_size,
-                ..
-            } => *component_len * *data_size,
+                count,
+            } => *component_len * *data_size * (*count as usize + 1),
         }
     }
 }
