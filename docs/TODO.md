@@ -1,8 +1,7 @@
 # Opaque material pass
 
-- get Triangle test working again
-  - make sure all meshes have _some_ material, automatically assign "unlit" or something if none assigned
 - needs to check the material meta and early-exit if it's "not me"
+  - material_has_any_uvs / material_uses_uv_count
 - get Texture settings test working
 - get Linear texture interpolation at least showing circles (don't worry about accurate colors yet)
 - alpha cutoff (not full alpha blend test, just cutoff, rest depends on transparent pass)
@@ -16,7 +15,10 @@
 
 # Load mip level in compute shader pass
 
-# Ensure normals are being recalculated in opaque pass
+# Ensure normals are being recalculated
+  - test with some model that has morphs
+  - test with some model that has skins
+
 
 # Get started with light culling pass
 

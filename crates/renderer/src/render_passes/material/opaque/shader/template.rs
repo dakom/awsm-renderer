@@ -15,8 +15,11 @@ pub struct ShaderTemplateMaterialOpaque {
     pub uv_sets_index: u32,
     pub texture_binding_strings: Vec<String>,
     pub texture_load_case_strings: Vec<String>,
-
     pub has_atlas: bool,
+    pub normals: bool,
+    pub tangents: bool,
+    pub color_sets: Option<u32>,
+    pub uv_sets: Option<u32>,
 }
 
 impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
@@ -31,7 +34,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
 
         let mut texture_binding_strings = Vec::new();
 
-        let mut total_index = 0;
+        let mut total_atlas_index = 0;
         for (texture_group_index, &len) in bind_group_bindings_len.iter().enumerate() {
             let group_index = texture_group_index as u32 + start_group;
 
@@ -43,13 +46,13 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
 
             for i in 0..len {
                 let binding_index = binding_start + i as u32;
-                texture_binding_strings.push(format!("@group({group_index}) @binding({binding_index}) var atlas_tex_{total_index}: texture_2d_array<f32>;"));
-                total_index += 1;
+                texture_binding_strings.push(format!("@group({group_index}) @binding({binding_index}) var atlas_tex_{total_atlas_index}: texture_2d_array<f32>;"));
+                total_atlas_index += 1;
             }
         }
 
         let mut texture_load_case_strings = Vec::new();
-        for i in 0..total_index {
+        for i in 0..total_atlas_index {
             texture_load_case_strings.push(format!(
                 "case {i}u: {{ return texture_load_atlas_binding(info, atlas_tex_{i}, attribute_uv); }}"
             ));
@@ -64,14 +67,22 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
         if value.attributes.tangents {
             uv_sets_index += 4; // tangents use 4 floats
         }
-        uv_sets_index += (value.attributes.colors.unwrap_or(0) * 4) as u32; // colors use 4 floats each
+        uv_sets_index += (value.attributes.color_sets.unwrap_or(0) * 4) as u32; // colors use 4 floats each
 
-        Ok(Self {
+        let _self = Self {
             texture_binding_strings,
             texture_load_case_strings,
             uv_sets_index,
-            has_atlas: total_index > 0,
-        })
+            has_atlas: total_atlas_index > 0,
+            normals: value.attributes.normals,
+            tangents: value.attributes.tangents,
+            color_sets: value.attributes.color_sets,
+            uv_sets: value.attributes.uv_sets,
+        };
+
+        tracing::info!("{:#?}", _self);
+
+        Ok(_self)
     }
 }
 

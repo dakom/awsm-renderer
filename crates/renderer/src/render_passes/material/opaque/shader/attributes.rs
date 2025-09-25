@@ -4,8 +4,8 @@ use crate::mesh::{MeshBufferInfo, MeshBufferVertexAttributeInfo};
 pub struct ShaderMaterialOpaqueVertexAttributes {
     pub normals: bool,
     pub tangents: bool,
-    pub colors: Option<u32>,
-    pub tex_coords: Option<u32>,
+    pub color_sets: Option<u32>,
+    pub uv_sets: Option<u32>,
 }
 
 impl From<&MeshBufferInfo> for ShaderMaterialOpaqueVertexAttributes {
@@ -24,10 +24,10 @@ impl From<&MeshBufferInfo> for ShaderMaterialOpaqueVertexAttributes {
                     _self.tangents = true;
                 }
                 MeshBufferVertexAttributeInfo::Colors { count, .. } => {
-                    _self.colors = Some(*count + 1);
+                    _self.color_sets = Some(*count + 1);
                 }
                 MeshBufferVertexAttributeInfo::TexCoords { count, .. } => {
-                    _self.tex_coords = Some(*count + 1);
+                    _self.uv_sets = Some(*count + 1);
                 }
                 MeshBufferVertexAttributeInfo::Joints { .. } => {
                     // not part of material shader requirements

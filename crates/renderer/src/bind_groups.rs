@@ -138,7 +138,7 @@ impl BindGroups {
             .create_list
             .contains(&BindGroupCreate::TextureViewResize)
         {
-            // material passes are also recreated on megatexture and material changes
+            // material passes are also recreated on render texture changes
             render_passes.light_culling.bind_groups.recreate(&ctx)?;
             render_passes.composite.bind_groups.recreate(&ctx)?;
             render_passes.display.bind_groups.recreate(&ctx)?;

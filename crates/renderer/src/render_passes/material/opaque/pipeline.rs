@@ -64,6 +64,11 @@ impl MaterialOpaquePipelines {
     ) -> Result<ComputePipelineKey> {
         let mesh_buffer_info = mesh_buffer_infos.get(mesh_buffer_info_key)?;
 
+        let shader_cache_key = ShaderCacheKeyMaterialOpaque {
+            attributes: mesh_buffer_info.into(),
+            texture_bindings: material_opaque_bind_groups.texture_bindings.clone(),
+        };
+
         let shader_key = shaders
             .get_key(
                 gpu,
@@ -83,12 +88,14 @@ impl MaterialOpaquePipelines {
                 &gpu,
                 &shaders,
                 &pipeline_layouts,
-                compute_pipeline_cache_key,
+                compute_pipeline_cache_key.clone(),
             )
             .await?;
 
         match self.compute_pipeline_keys.entry(mesh_buffer_info_key) {
             None => {
+                // this isn't "if the key doesn't exist yet"
+                // it's "if the key was removed"
                 let mut m = SecondaryMap::new();
                 m.insert(material_key, compute_pipeline_key);
                 self.compute_pipeline_keys.insert(mesh_buffer_info_key, m);

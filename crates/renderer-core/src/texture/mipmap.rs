@@ -29,9 +29,14 @@ struct MipmapPipeline {
 }
 
 thread_local! {
-    // key is TextureFormat and is_array
-    static MIPMAP_PIPELINE: RefCell<HashMap<u32, MipmapPipeline>> = RefCell::new(HashMap::new());
+    static MIPMAP_PIPELINE: RefCell<HashMap<LookupKey, MipmapPipeline>> = RefCell::new(HashMap::new());
     static MIPMAP_SHADER_MODULE: RefCell<Option<web_sys::GpuShaderModule>> = const { RefCell::new(None) };
+}
+
+#[derive(Hash, Debug, Eq, PartialEq)]
+struct LookupKey {
+    pub texture_format: String,
+    pub is_array: bool,
 }
 
 pub async fn generate_mipmaps(
@@ -142,7 +147,10 @@ async fn get_mipmap_pipeline(
     is_array: bool, // Add this parameter
 ) -> Result<MipmapPipeline> {
     // Create a composite key that includes both format and array status
-    let key = ((format as u32) << 1) | (is_array as u32);
+    let key = LookupKey {
+        texture_format: format!("{format:?}"),
+        is_array,
+    };
 
     let pipeline = MIPMAP_PIPELINE.with(|pipeline_cell| pipeline_cell.borrow().get(&key).cloned());
 

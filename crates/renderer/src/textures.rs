@@ -52,37 +52,38 @@ impl AwsmRenderer {
             self.render_passes.material_opaque =
                 MaterialOpaqueRenderPass::new(&mut render_pass_ctx).await?;
 
-            // Then, all the meshes that use opaque materials and need their shader/pipelines (re)created
-            let mut has_seen_buffer_info = SecondaryMap::new();
-            let mut has_seen_material = SecondaryMap::new();
-            for (key, mesh) in self.meshes.iter() {
-                if has_seen_buffer_info
-                    .insert(mesh.buffer_info_key, ())
-                    .is_none()
-                    || has_seen_material.insert(mesh.material_key, ()).is_none()
-                {
-                    self.render_passes
-                        .material_opaque
-                        .pipelines
-                        .set_compute_pipeline_key(
-                            mesh.buffer_info_key,
-                            mesh.material_key,
-                            &self.gpu,
-                            &mut self.shaders,
-                            &mut self.pipelines,
-                            &self.render_passes.material_opaque.bind_groups,
-                            &self.pipeline_layouts,
-                            &self.meshes.buffer_infos,
-                        )
-                        .await?;
-                }
-            }
-
             self.textures
                 .mega_texture
                 .info(&self.gpu.device.limits())
                 .into_report()
                 .console_log();
+        }
+
+        // Either way, all the meshes that use opaque materials and need their shader/pipelines (re)created
+        // It's okay if it's the same container as before, actual heavy creation uses cache
+        let mut has_seen_buffer_info = SecondaryMap::new();
+        let mut has_seen_material = SecondaryMap::new();
+        for (key, mesh) in self.meshes.iter() {
+            if has_seen_buffer_info
+                .insert(mesh.buffer_info_key, ())
+                .is_none()
+                || has_seen_material.insert(mesh.material_key, ()).is_none()
+            {
+                self.render_passes
+                    .material_opaque
+                    .pipelines
+                    .set_compute_pipeline_key(
+                        mesh.buffer_info_key,
+                        mesh.material_key,
+                        &self.gpu,
+                        &mut self.shaders,
+                        &mut self.pipelines,
+                        &self.render_passes.material_opaque.bind_groups,
+                        &self.pipeline_layouts,
+                        &self.meshes.buffer_infos,
+                    )
+                    .await?;
+            }
         }
         Ok(())
     }

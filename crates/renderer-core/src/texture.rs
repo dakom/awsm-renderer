@@ -3,6 +3,7 @@ pub mod exporter;
 #[cfg(feature = "mega-texture")]
 pub mod mega_texture;
 
+pub mod clear;
 pub mod mipmap;
 
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuTextureFormat.html

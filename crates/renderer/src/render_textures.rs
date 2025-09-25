@@ -2,7 +2,7 @@ use awsm_renderer_core::{
     error::AwsmCoreError,
     pipeline::fragment::ColorTargetState,
     renderer::AwsmRendererWebGpu,
-    texture::{Extent3d, TextureDescriptor, TextureFormat, TextureUsage},
+    texture::{clear::TextureClearer, Extent3d, TextureDescriptor, TextureFormat, TextureUsage},
 };
 use thiserror::Error;
 
@@ -38,17 +38,20 @@ pub struct RenderTextureFormats {
 impl RenderTextureFormats {
     pub async fn new(device: &web_sys::GpuDevice) -> Self {
         let actual_rgba32_format = {
-            let res = device.create_texture(&TextureDescriptor::new(
-                TextureFormat::Rgba32float,
-                Extent3d::new(1, Some(1), Some(1)),
-                TextureUsage::new().with_render_attachment(),
-            ).into());
+            let res = device.create_texture(
+                &TextureDescriptor::new(
+                    TextureFormat::Rgba32float,
+                    Extent3d::new(1, Some(1), Some(1)),
+                    TextureUsage::new().with_render_attachment(),
+                )
+                .into(),
+            );
 
             match res {
                 Ok(tex) => {
                     tex.destroy();
                     TextureFormat::Rgba32float
-                },
+                }
                 Err(_) => TextureFormat::Rgba16float,
             }
         };
@@ -56,10 +59,10 @@ impl RenderTextureFormats {
             visiblity_data: actual_rgba32_format,
             taa_clip_position: TextureFormat::Rgba16float,
             opaque_color: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
-            oit_rgb: TextureFormat::Rgba16float,    // HDR format for bloom/tonemapping
-            oit_alpha: TextureFormat::R32float,     // Alpha channel for OIT
-            composite: TextureFormat::Rgba8unorm,   // Final composite output format
-            depth: TextureFormat::Depth24plus,      // Depth format for depth testing
+            oit_rgb: TextureFormat::Rgba16float,      // HDR format for bloom/tonemapping
+            oit_alpha: TextureFormat::R32float,       // Alpha channel for OIT
+            composite: TextureFormat::Rgba8unorm,     // Final composite output format
+            depth: TextureFormat::Depth24plus,        // Depth format for depth testing
         }
     }
 }
@@ -116,6 +119,17 @@ impl RenderTextures {
             current_size.1,
             size_changed,
         ))
+    }
+
+    pub fn clear_opaque_color(&self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+        if let Some(inner) = self.inner.as_ref() {
+            inner
+                .opaque_color_clearer
+                .clear(gpu, &inner.opaque_color)
+                .map_err(AwsmRenderTextureError::TextureClearerClear)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -174,10 +188,11 @@ pub struct RenderTexturesInner {
     pub visibility_data: web_sys::GpuTexture,
     pub visibility_data_view: web_sys::GpuTextureView,
 
-    pub taa_clip_positions: [web_sys::GpuTexture;2],
-    pub taa_clip_position_views: [web_sys::GpuTextureView;2],
+    pub taa_clip_positions: [web_sys::GpuTexture; 2],
+    pub taa_clip_position_views: [web_sys::GpuTextureView; 2],
 
     pub opaque_color: web_sys::GpuTexture,
+    pub opaque_color_clearer: TextureClearer,
     pub opaque_color_view: web_sys::GpuTextureView,
 
     pub oit_rgb: web_sys::GpuTexture,
@@ -252,7 +267,8 @@ impl RenderTexturesInner {
                     Extent3d::new(width, Some(height), Some(1)),
                     TextureUsage::new()
                         .with_storage_binding()
-                        .with_texture_binding(),
+                        .with_texture_binding()
+                        .with_copy_dst(),
                 )
                 .with_label("Opaque Color")
                 .into(),
@@ -356,6 +372,13 @@ impl RenderTexturesInner {
             taa_clip_position_views,
 
             opaque_color,
+            opaque_color_clearer: TextureClearer::new(
+                gpu,
+                render_texture_formats.opaque_color,
+                width,
+                height,
+            )
+            .map_err(AwsmRenderTextureError::CreateTextureClearer)?,
             opaque_color_view,
 
             oit_rgb,
@@ -402,4 +425,10 @@ pub enum AwsmRenderTextureError {
 
     #[error("[render_texture] Error getting current texture view: {0:?}")]
     CurrentTextureView(AwsmCoreError),
+
+    #[error("[render_texture] Error creating texture clearer: {0:?}")]
+    CreateTextureClearer(AwsmCoreError),
+
+    #[error("[render_texture] Error clearing texture: {0:?}")]
+    TextureClearerClear(AwsmCoreError),
 }

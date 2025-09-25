@@ -114,6 +114,16 @@ impl AwsmRenderer {
 
         {
             let _maybe_span_guard = if self.logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Clear opaque color").entered())
+            } else {
+                None
+            };
+
+            self.render_textures.clear_opaque_color(&self.gpu)?;
+        }
+
+        {
+            let _maybe_span_guard = if self.logging.render_timings {
                 Some(tracing::span!(tracing::Level::INFO, "Material Opaque RenderPass").entered())
             } else {
                 None

@@ -157,6 +157,9 @@ pub enum AwsmCoreError {
 
     #[error("[gpu] Failed to create texture view: {0:?}")]
     CreateTextureView(String),
+
+    #[error("[gpu] texture export unsupported format: {0:?}")]
+    TextureClearUnsupportedFormat(TextureFormat),
 }
 
 impl AwsmCoreError {

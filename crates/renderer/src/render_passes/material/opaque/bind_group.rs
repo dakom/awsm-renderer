@@ -96,27 +96,35 @@ impl MaterialOpaqueBindGroups {
 
         let mut bind_group_layout_keys = Vec::new();
 
-        for len in texture_bindings.bind_group_bindings_len.iter() {
-            for i in 0..*len {
-                entries.push(BindGroupLayoutCacheKeyEntry {
-                    resource: BindGroupLayoutResource::Texture(
-                        TextureBindingLayout::new()
-                            .with_view_dimension(TextureViewDimension::N2dArray)
-                            .with_sample_type(TextureSampleType::Float),
-                    ),
-                    visibility_vertex: false,
-                    visibility_fragment: false,
-                    visibility_compute: true,
-                });
-            }
-
+        if texture_bindings.bind_group_bindings_len.is_empty() {
             let bind_group_layout_key = ctx
                 .bind_group_layouts
                 .get_key(&ctx.gpu, BindGroupLayoutCacheKey { entries })?;
 
             bind_group_layout_keys.push(bind_group_layout_key);
+        } else {
+            for len in texture_bindings.bind_group_bindings_len.iter() {
+                for i in 0..*len {
+                    entries.push(BindGroupLayoutCacheKeyEntry {
+                        resource: BindGroupLayoutResource::Texture(
+                            TextureBindingLayout::new()
+                                .with_view_dimension(TextureViewDimension::N2dArray)
+                                .with_sample_type(TextureSampleType::Float),
+                        ),
+                        visibility_vertex: false,
+                        visibility_fragment: false,
+                        visibility_compute: true,
+                    });
+                }
 
-            entries = Vec::new();
+                let bind_group_layout_key = ctx
+                    .bind_group_layouts
+                    .get_key(&ctx.gpu, BindGroupLayoutCacheKey { entries })?;
+
+                bind_group_layout_keys.push(bind_group_layout_key);
+
+                entries = Vec::new();
+            }
         }
 
         Ok(Self {
@@ -174,33 +182,43 @@ impl MaterialOpaqueBindGroups {
             ),
         ];
 
-        let mut texture_count = 0;
-        let mut bind_groups = Vec::new();
-        for len in self.texture_bindings.bind_group_bindings_len.iter() {
-            for i in 0..*len {
-                entries.push(BindGroupEntry::new(
-                    entries.len() as u32,
-                    BindGroupResource::TextureView(Cow::Borrowed(
-                        &ctx.textures.gpu_texture_array_views[texture_count],
-                    )),
-                ));
-
-                texture_count += 1;
-            }
-
+        if self.texture_bindings.bind_group_bindings_len.is_empty() {
             let descriptor = BindGroupDescriptor::new(
-                ctx.bind_group_layouts
-                    .get(self.bind_group_layout_keys[bind_groups.len()])?,
+                ctx.bind_group_layouts.get(self.bind_group_layout_keys[0])?,
                 Some("Material Opaque"),
                 entries,
             );
 
-            bind_groups.push(ctx.gpu.create_bind_group(&descriptor.into()));
+            self._bind_groups = Some(vec![ctx.gpu.create_bind_group(&descriptor.into())]);
+        } else {
+            let mut texture_count = 0;
+            let mut bind_groups = Vec::new();
+            for len in self.texture_bindings.bind_group_bindings_len.iter() {
+                for i in 0..*len {
+                    entries.push(BindGroupEntry::new(
+                        entries.len() as u32,
+                        BindGroupResource::TextureView(Cow::Borrowed(
+                            &ctx.textures.gpu_texture_array_views[texture_count],
+                        )),
+                    ));
 
-            entries = Vec::new();
+                    texture_count += 1;
+                }
+
+                let descriptor = BindGroupDescriptor::new(
+                    ctx.bind_group_layouts
+                        .get(self.bind_group_layout_keys[bind_groups.len()])?,
+                    Some("Material Opaque"),
+                    entries,
+                );
+
+                bind_groups.push(ctx.gpu.create_bind_group(&descriptor.into()));
+
+                entries = Vec::new();
+            }
+            self._bind_groups = Some(bind_groups);
         }
 
-        self._bind_groups = Some(bind_groups);
         Ok(())
     }
 }

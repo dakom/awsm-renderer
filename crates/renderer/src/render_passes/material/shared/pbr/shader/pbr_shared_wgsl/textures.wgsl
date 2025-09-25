@@ -5,7 +5,7 @@ struct TextureInfoRaw {
     width: u32,
     height: u32,
     atlas_layer_index: u32,
-    entry_attribute_uv_index: u32,
+    entry_attribute_uv_set_index: u32,
 }
 
 struct TextureInfo {
@@ -14,7 +14,7 @@ struct TextureInfo {
     atlas_index: u32,
     layer_index: u32,
     entry_index: u32,
-    attribute_uv_index: u32,
+    attribute_uv_set_index: u32,
 }
 
 fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
@@ -23,8 +23,8 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
         vec2<u32>(raw.width, raw.height),
         raw.atlas_layer_index & 0xFFFFu,           // atlas_index (16 bits)
         (raw.atlas_layer_index >> 16u) & 0xFFFFu, // layer_index (16 bits)
-        raw.entry_attribute_uv_index & 0xFFFFu,    // entry_index (16 bits)
-        (raw.entry_attribute_uv_index >> 16u) & 0xFFFFu, // attribute_uv_index (16 bits)
+        raw.entry_attribute_uv_set_index & 0xFFFFu,    // entry_index (16 bits)
+        (raw.entry_attribute_uv_set_index >> 16u) & 0xFFFFu, // attribute_uv_index (16 bits)
     );
 }
 
