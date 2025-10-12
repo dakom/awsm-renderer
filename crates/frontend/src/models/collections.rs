@@ -16,6 +16,8 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
             GltfId::AlphaBlendMode,
             GltfId::MetalRoughSpheresTextureless,
             GltfId::MetalRoughSpheres,
+            // GltfId::TextureTransformTest,
+            GltfId::TextureTransformMultiTest,
         ],
     );
 
@@ -86,6 +88,7 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
     //     vec![
     //         // GltfId::EnvironmentTest,
     //         // GltfId::EnvironmentIblTest,
+    //         // GltfId::TextureTransformMultiTest,
     //     ],
     // );
 
@@ -141,9 +144,10 @@ pub enum GltfId {
     RiggedFigure,
 
     // EXTENSION TESTS
-    // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#feature-tests-1
     EnvironmentTest,
     EnvironmentIblTest,
+    TextureTransformTest,
+    TextureTransformMultiTest,
 }
 
 impl TryFrom<&str> for GltfId {
@@ -199,6 +203,10 @@ impl GltfId {
                 "TextureLinearInterpolationTest/glTF/TextureLinearInterpolationTest.gltf"
             }
             Self::TextureSettings => "TextureSettingsTest/glTF/TextureSettingsTest.gltf",
+            Self::TextureTransformTest => "TextureTransformTest/glTF/TextureTransformTest.gltf",
+            Self::TextureTransformMultiTest => {
+                "TextureTransformMultiTest/glTF/TextureTransformMultiTest.gltf"
+            }
             Self::VertexColor => "VertexColorTest/glTF/VertexColorTest.gltf",
             // Minimal
             Self::TriangleWithoutIndices => {
@@ -250,6 +258,8 @@ impl GltfId {
             Self::TextureCoordinate => "Texture coordinates",
             Self::TextureLinearInterpolation => "Linear texture interpolation",
             Self::TextureSettings => "Texture settings",
+            Self::TextureTransformTest => "Texture transform test",
+            Self::TextureTransformMultiTest => "Texture transform multi test",
             Self::VertexColor => "Vertex colors",
 
             // Minimal

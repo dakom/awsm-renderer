@@ -19,7 +19,7 @@ pub fn u16_to_u32_vec(v: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(v.len() * 2);
     for chunk in v.chunks_exact(2) {
         let value = u16::from_le_bytes([chunk[0], chunk[1]]);
-        output.extend_from_slice(&value.to_le_bytes());
+        output.extend_from_slice(&(value as u32).to_le_bytes());
     }
     output
 }
@@ -28,7 +28,7 @@ pub fn i16_to_i32_vec(v: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(v.len() * 2);
     for chunk in v.chunks_exact(2) {
         let value = i16::from_le_bytes([chunk[0], chunk[1]]);
-        output.extend_from_slice(&value.to_le_bytes());
+        output.extend_from_slice(&(value as i32).to_le_bytes());
     }
     output
 }

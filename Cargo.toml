@@ -80,7 +80,7 @@ glam = {version = "0.30.4", features = ["bytemuck"]}
 half = "2.6.0"
 
 # Media
-gltf = {version = "1.4.1", features = ["KHR_lights_punctual", "extensions"]}
+gltf = {version = "1.4.1", features = ["KHR_lights_punctual", "KHR_texture_transform", "extensions"]}
 exr = "1.73.0"
 binpack2d = "1.0.1"
 image = {version = "0.25.6", default-features = false, features = ["png"]}
@@ -132,7 +132,7 @@ features = [
     "GpuCanvasConfiguration",
     "GpuShaderModule",
     "GpuShaderModuleDescriptor",
-    "GpuRenderPipeline", 
+    "GpuRenderPipeline",
     "GpuRenderPipelineDescriptor",
     "GpuVertexState",
     "GpuVertexBufferLayout",

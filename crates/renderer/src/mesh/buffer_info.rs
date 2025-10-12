@@ -311,7 +311,6 @@ impl MeshBufferVertexAttributeInfo {
     }
 
     pub fn vertex_size(&self) -> usize {
-        // the count is zero-based (e.g. TEXCOORD_0 = count 0) so we need to add 1
         match self {
             MeshBufferVertexAttributeInfo::Positions {
                 component_len,
@@ -328,23 +327,26 @@ impl MeshBufferVertexAttributeInfo {
             MeshBufferVertexAttributeInfo::Colors {
                 component_len,
                 data_size,
-                count,
-            } => *component_len * *data_size * (*count as usize + 1),
+                // `count` stores the COLOR_n set index; the accessor only carries this set,
+                // so the per-vertex stride is just the component width.
+                count: _,
+            } => *component_len * *data_size,
             MeshBufferVertexAttributeInfo::TexCoords {
                 component_len,
                 data_size,
-                count,
-            } => *component_len * *data_size * (*count as usize + 1),
+                // Same for TEXCOORD_n: each accessor is a single UV set.
+                count: _,
+            } => *component_len * *data_size,
             MeshBufferVertexAttributeInfo::Joints {
                 component_len,
                 data_size,
-                count,
-            } => *component_len * *data_size * (*count as usize + 1),
+                count: _,
+            } => *component_len * *data_size,
             MeshBufferVertexAttributeInfo::Weights {
                 component_len,
                 data_size,
-                count,
-            } => *component_len * *data_size * (*count as usize + 1),
+                count: _,
+            } => *component_len * *data_size,
         }
     }
 }

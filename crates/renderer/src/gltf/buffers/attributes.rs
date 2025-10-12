@@ -1,12 +1,12 @@
-use std::{borrow::Cow, collections::{BTreeMap, HashMap}};
+use std::{borrow::Cow, collections::BTreeMap};
 
 use gltf::{accessor::DataType, Semantic};
 
 use crate::{
     buffer::helpers::{i16_to_i32_vec, u16_to_u32_vec},
     gltf::{
-        buffers::{accessor::accessor_to_bytes},
-        error::Result,
+        buffers::accessor::accessor_to_bytes,
+        error::{AwsmGltfError, Result},
     },
     mesh::MeshBufferVertexAttributeInfo,
 };
@@ -27,11 +27,11 @@ pub(super) fn load_attribute_data_by_kind<'a>(
             DataType::U16 => {
                 attribute_kind.force_data_size(4); // Update data size to 4 bytes (u32)
                 Cow::Owned(u16_to_u32_vec(&bytes))
-            },
+            }
             DataType::I16 => {
                 attribute_kind.force_data_size(4); // Update data size to 4 bytes (i32)
                 Cow::Owned(i16_to_i32_vec(&bytes))
-            },
+            }
             _ => bytes,
         };
 
@@ -46,44 +46,62 @@ pub(super) fn pack_vertex_attributes(
     attribute_data: &BTreeMap<MeshBufferVertexAttributeInfo, Cow<'_, [u8]>>,
     vertex_attribute_bytes: &mut Vec<u8>,
 ) -> Result<Vec<MeshBufferVertexAttributeInfo>> {
-    let mut offsets:HashMap<MeshBufferVertexAttributeInfo, usize> = attribute_data.keys().map(|k| (*k, 0)).collect();
+    let mut per_vertex_attributes: Vec<(&MeshBufferVertexAttributeInfo, &Cow<'_, [u8]>)> =
+        attribute_data
+            .iter()
+            .filter(|(attr_info, _)| {
+                !matches!(attr_info, MeshBufferVertexAttributeInfo::Positions { .. })
+            })
+            .collect();
 
-    // Process each attribute (except positions, which are in visibility buffer)
-    loop {
-        let mut done = false;
+    if per_vertex_attributes.is_empty() {
+        return Ok(Vec::new());
+    }
 
-        for (attr_info, attr_data) in attribute_data.iter() {
-            if matches!(attr_info, MeshBufferVertexAttributeInfo::Positions{..}) {
-                continue; // Skip positions
+    // Determine vertex count (ensure all attributes have matching lengths)
+    let vertex_count = per_vertex_attributes
+        .iter()
+        .map(|(attr_info, attr_data)| {
+            let stride = attr_info.vertex_size();
+            debug_assert!(stride > 0);
+            (attr_data.len() / stride, attr_data.len() % stride)
+        })
+        .try_fold(None, |acc, (count, remainder)| {
+            if remainder != 0 {
+                return Err(());
             }
-
-            let offset = offsets.get_mut(attr_info).unwrap();
-            let slice = &attr_data[*offset..*offset + attr_info.vertex_size()];
-            *offset += attr_info.vertex_size();
-
-            if *offset == attr_data.len() {
-                done = true;
+            match acc {
+                None => Ok(Some(count)),
+                Some(prev) if prev == count => Ok(Some(prev)),
+                Some(_) => Err(()),
             }
+        })
+        .map_err(|_| {
+            AwsmGltfError::AttributeData(
+                "vertex attribute buffers do not share a common vertex count".to_string(),
+            )
+        })?
+        .unwrap_or(0);
 
-            // Copy original vertex attribute data as-is
-            vertex_attribute_bytes.extend_from_slice(slice);
-        }
-
-        if done {
-            break;
+    for vertex_index in 0..vertex_count {
+        for (attr_info, attr_data) in per_vertex_attributes.iter() {
+            let stride = attr_info.vertex_size();
+            let start = vertex_index * stride;
+            let end = start + stride;
+            vertex_attribute_bytes.extend_from_slice(&attr_data[start..end]);
         }
     }
 
-    Ok(
-        attribute_data
-            .keys()
-            .filter(|k| !matches!(k, MeshBufferVertexAttributeInfo::Positions{..}))
-            .cloned()
-            .collect()
-    )
+    Ok(per_vertex_attributes
+        .into_iter()
+        .map(|(attr_info, _)| (*attr_info))
+        .collect())
 }
 
-pub(super) fn convert_attribute_kind(semantic: &gltf::Semantic, accessor: &gltf::Accessor<'_>) -> MeshBufferVertexAttributeInfo {
+pub(super) fn convert_attribute_kind(
+    semantic: &gltf::Semantic,
+    accessor: &gltf::Accessor<'_>,
+) -> MeshBufferVertexAttributeInfo {
     match semantic {
         Semantic::Positions => MeshBufferVertexAttributeInfo::Positions {
             data_size: accessor.data_type().size(),
@@ -115,7 +133,7 @@ pub(super) fn convert_attribute_kind(semantic: &gltf::Semantic, accessor: &gltf:
         Semantic::Weights(count) => MeshBufferVertexAttributeInfo::Weights {
             data_size: accessor.data_type().size(),
             component_len: accessor.dimensions().multiplicity() as usize,
-            count: *count, 
-        }
+            count: *count,
+        },
     }
 }

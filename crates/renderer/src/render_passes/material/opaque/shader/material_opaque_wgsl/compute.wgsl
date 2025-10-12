@@ -53,9 +53,9 @@ fn main(
     let pbr_material = pbr_get_material(material_offset);
 
     // early return if this shader pass isn't meant to run for this material
-    if !pbr_should_run(pbr_material) {
-        return;
-    }
+    // if !pbr_should_run(pbr_material) {
+    //     return;
+    // }
 
     let vertex_attribute_stride = mesh_meta.vertex_attribute_stride / 4; // 4 bytes per float
     let attribute_indices_offset = mesh_meta.vertex_attribute_indices_offset / 4;
