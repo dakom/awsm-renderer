@@ -58,7 +58,9 @@ pub(super) fn pack_vertex_attributes(
         return Ok(Vec::new());
     }
 
-    // Determine vertex count (ensure all attributes have matching lengths)
+    // Determine vertex count (ensure all attributes have matching lengths).
+    // This keeps silently truncated buffers from slipping through and causing
+    // unpredictable out-of-bounds reads in the compute shaders later on.
     let vertex_count = per_vertex_attributes
         .iter()
         .map(|(attr_info, attr_data)| {
@@ -88,6 +90,8 @@ pub(super) fn pack_vertex_attributes(
             let stride = attr_info.vertex_size();
             let start = vertex_index * stride;
             let end = start + stride;
+            // Copy one vertex worth of data per attribute, preserving the
+            // attribute ordering enforced by the BTree map above.
             vertex_attribute_bytes.extend_from_slice(&attr_data[start..end]);
         }
     }

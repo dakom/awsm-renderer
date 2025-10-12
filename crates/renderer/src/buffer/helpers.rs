@@ -19,6 +19,8 @@ pub fn u16_to_u32_vec(v: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(v.len() * 2);
     for chunk in v.chunks_exact(2) {
         let value = u16::from_le_bytes([chunk[0], chunk[1]]);
+        // Promote each 16-bit lane to 32-bit so the caller's metadata (data_size = 4)
+        // stays in sync with the packed byte stream.
         output.extend_from_slice(&(value as u32).to_le_bytes());
     }
     output
@@ -28,6 +30,7 @@ pub fn i16_to_i32_vec(v: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(v.len() * 2);
     for chunk in v.chunks_exact(2) {
         let value = i16::from_le_bytes([chunk[0], chunk[1]]);
+        // Same story for signed 16-bit attributes (normals/tangents, etc.).
         output.extend_from_slice(&(value as i32).to_le_bytes());
     }
     output
