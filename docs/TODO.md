@@ -1,5 +1,8 @@
 # Opaque material pass
 
+- support emissive
+  - factor
+  - texture
 - needs to check the material meta and early-exit if it's "not me"
   - material_has_any_uvs / material_uses_uv_count
 - get Texture settings test working

@@ -76,12 +76,19 @@ fn should_run(material: Material) -> bool {
 
 // TODO!
 fn material_has_any_uvs(material: Material) -> bool {
+    if material.has_base_color_texture {
+        return true;
+    }
+
     return false;
 }
 
 // TODO!
 fn material_uses_uv_count(material: Material, uv_set_count: u32) -> bool {
-    return true;
+    if material.has_base_color_texture {
+        return uv_set_count > 0;
+    }
+    return false;
 }
 
 fn calculate_color(attribute_indices_offset: u32, attribute_data_offset: u32, triangle_id: u32, material: Material, barycentric: vec3<f32>, vertex_attribute_stride: u32) -> vec4<f32> {
