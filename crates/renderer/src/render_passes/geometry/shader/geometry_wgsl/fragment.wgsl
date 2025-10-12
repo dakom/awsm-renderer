@@ -3,13 +3,13 @@ struct FragmentInput {
     @builtin(position) frag_coord: vec4<f32>,
     // same value as screen_position
     @location(1) clip_position: vec4<f32>,
-    @location(2) @interpolate(flat) triangle_id: u32,
+    @location(2) @interpolate(flat) triangle_index: u32,
     @location(3) barycentric: vec2<f32>,  // Full barycentric coordinates
 }
 
 struct FragmentOutput {
     // Ideally RGBA32Float target, possibly RGBA16Float
-    @location(0) visibility_data: vec4<f32>,    // triangle_id, material_offset, bary.xy
+    @location(0) visibility_data: vec4<f32>,    // triangle_index, material_offset, bary.xy
     // RGBA16Float
     @location(1) taa_clip_position: vec4<f32>,      // Exact clip coords for TAA reprojection
 }
@@ -29,7 +29,7 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
 
     // Pack visibility buffer data
     out.visibility_data = vec4<f32>(
-        bitcast<f32>(input.triangle_id),
+        bitcast<f32>(input.triangle_index),
         bitcast<f32>(mesh_meta.material_offset),
         input.barycentric.x,
         input.barycentric.y  // z = 1.0 - x - y

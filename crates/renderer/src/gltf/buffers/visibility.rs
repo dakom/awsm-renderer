@@ -61,8 +61,8 @@ pub(super) fn convert_to_visibility_buffer(
     // Step 3: Ensure normals exist (compute if missing)
     let attribute_data_by_kind = ensure_normals(attribute_data_by_kind, vertex_attribute_index, vertex_attribute_index_bytes)?;
 
-    // Step 4: Create visibility vertices (positions + triangle_id + barycentric)
-    // These are expanded such that each vertex gets its own visibility vertex (triangle_id will be repeated for all 3)
+    // Step 4: Create visibility vertices (positions + triangle_index + barycentric)
+    // These are expanded such that each vertex gets its own visibility vertex (triangle_index will be repeated for all 3)
     let visability_vertex_offset = visibility_vertex_bytes.len();
     create_visibility_vertices(
         &attribute_data_by_kind,
@@ -165,21 +165,21 @@ fn create_visibility_vertices(
     let triangle_indices = extract_triangle_indices(index, index_bytes)?;
 
     // Process each triangle
-    for (triangle_id, triangle) in triangle_indices.iter().enumerate() {
+    for (triangle_index, triangle) in triangle_indices.iter().enumerate() {
         // Create 3 visibility vertices for this triangle
         for (vertex_in_triangle, &vertex_index) in triangle.iter().enumerate() {
             // Get position for this vertex
             let position = get_position_from_buffer(&positions, vertex_index)?;
 
-            // Write vertex data: position (12 bytes) + triangle_id (4 bytes) + barycentric (8 bytes)
+            // Write vertex data: position (12 bytes) + triangle_index (4 bytes) + barycentric (8 bytes)
 
             // Position (12 bytes)
             visibility_vertex_bytes.extend_from_slice(&position[0].to_le_bytes());
             visibility_vertex_bytes.extend_from_slice(&position[1].to_le_bytes());
             visibility_vertex_bytes.extend_from_slice(&position[2].to_le_bytes());
 
-            // Triangle ID (4 bytes)
-            visibility_vertex_bytes.extend_from_slice(&(triangle_id as u32).to_le_bytes());
+            // Triangle index (4 bytes)
+            visibility_vertex_bytes.extend_from_slice(&(triangle_index as u32).to_le_bytes());
 
             // Barycentric coordinates (8 bytes)
             let bary = BARYCENTRICS[vertex_in_triangle];

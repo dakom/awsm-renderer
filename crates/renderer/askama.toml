@@ -5,7 +5,7 @@ dirs = [
     "src/render_passes/light_culling/shader",
     "src/render_passes/material/opaque/shader",
     "src/render_passes/material/transparent/shader",
-    "src/render_passes/material/shared/pbr/shader",
+    "src/render_passes/material/shared/shader",
     "src/render_passes/display/shader",
     "src/render_passes/composite/shader",
 ]

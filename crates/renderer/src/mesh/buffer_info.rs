@@ -46,7 +46,7 @@ pub struct MeshBufferVertexInfo {
 impl MeshBufferVertexInfo {
     // We have:
     // - positions (vec3<f32>), 12 bytes per vertex
-    // - triangle_id (u32), 4 bytes per vertex
+    // - triangle_index (u32), 4 bytes per vertex
     // - barycentric coordinates (vec2<f32>), 8 bytes per vertex
     // Total size per vertex = 12 + 4 + 8 = 24 bytes
     pub const BYTE_SIZE: usize = 24;

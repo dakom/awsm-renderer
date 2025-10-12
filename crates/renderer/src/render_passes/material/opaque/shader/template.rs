@@ -13,13 +13,20 @@ use crate::{
 #[template(path = "material_opaque_wgsl/compute.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateMaterialOpaque {
     pub uv_sets_index: u32,
-    pub texture_binding_strings: Vec<String>,
-    pub texture_load_case_strings: Vec<String>,
+    pub total_atlas_index: u32,
+    pub texture_bindings: Vec<TextureBinding>,
     pub has_atlas: bool,
     pub normals: bool,
     pub tangents: bool,
     pub color_sets: Option<u32>,
     pub uv_sets: Option<u32>,
+}
+
+#[derive(Debug)]
+pub struct TextureBinding {
+    group: u32,
+    binding: u32,
+    atlas_index: u32,
 }
 
 impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
@@ -32,11 +39,11 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             bind_group_bindings_len,
         } = &value.texture_bindings;
 
-        let mut texture_binding_strings = Vec::new();
+        let mut texture_bindings = Vec::new();
 
         let mut total_atlas_index = 0;
         for (texture_group_index, &len) in bind_group_bindings_len.iter().enumerate() {
-            let group_index = texture_group_index as u32 + start_group;
+            let group = start_group + texture_group_index as u32;
 
             let mut binding_start = if texture_group_index == 0 {
                 *start_binding
@@ -45,17 +52,14 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             };
 
             for i in 0..len {
-                let binding_index = binding_start + i as u32;
-                texture_binding_strings.push(format!("@group({group_index}) @binding({binding_index}) var atlas_tex_{total_atlas_index}: texture_2d_array<f32>;"));
+                let binding = binding_start + i as u32;
+                texture_bindings.push(TextureBinding {
+                    group,
+                    binding,
+                    atlas_index: total_atlas_index,
+                });
                 total_atlas_index += 1;
             }
-        }
-
-        let mut texture_load_case_strings = Vec::new();
-        for i in 0..total_atlas_index {
-            texture_load_case_strings.push(format!(
-                "case {i}u: {{ return texture_load_atlas_binding(info, atlas_tex_{i}, attribute_uv); }}"
-            ));
         }
 
         // see `impl Ord for MeshBufferVertexAttributeInfo`
@@ -70,8 +74,8 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
         uv_sets_index += (value.attributes.color_sets.unwrap_or(0) * 4) as u32; // colors use 4 floats each
 
         let _self = Self {
-            texture_binding_strings,
-            texture_load_case_strings,
+            texture_bindings,
+            total_atlas_index,
             uv_sets_index,
             has_atlas: total_atlas_index > 0,
             normals: value.attributes.normals,
@@ -79,8 +83,6 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             color_sets: value.attributes.color_sets,
             uv_sets: value.attributes.uv_sets,
         };
-
-        tracing::info!("{:#?}", _self);
 
         Ok(_self)
     }

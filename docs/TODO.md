@@ -1,12 +1,12 @@
 # Opaque material pass
 
-- support emissive
-  - factor
-  - texture
 - needs to check the material meta and early-exit if it's "not me"
+  - which model would be a good test for that?
   - material_has_any_uvs / material_uses_uv_count
 - get Texture settings test working
-- get Linear texture interpolation at least showing circles (don't worry about accurate colors yet)
+  - wrap modes
+  - filter modes
+  - http://127.0.0.1:9080/app/model/TextureSettings
 - alpha cutoff (not full alpha blend test, just cutoff, rest depends on transparent pass)
 - get basic lighting working
   - Calculate world position

@@ -36,7 +36,7 @@ pub struct GltfBuffers {
     // just used in the pipeline for drawing
     pub index_bytes: Vec<u8>,
 
-    // Visibility vertex buffer (positions + triangle_id + barycentric)
+    // Visibility vertex buffer (positions + triangle_index + barycentric)
     pub visibility_vertex_bytes: Vec<u8>,
 
     // Vertex attribute storage buffer (normals, UVs, colors, etc. per triangle)

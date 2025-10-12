@@ -8,7 +8,7 @@
 struct VertexInput {
     @builtin(vertex_index) vertex_index: u32,
     @location(0) position: vec3<f32>,      // World position
-    @location(1) triangle_id: u32,        // Triangle ID for this vertex
+    @location(1) triangle_index: u32,        // Triangle index for this vertex
     @location(2) barycentric: vec2<f32>,   // Barycentric coordinates (x, y) - z = 1.0 - x - y
     {% if instancing_transforms %}
     // instance transform matrix
@@ -24,7 +24,7 @@ struct VertexOutput {
     @builtin(position) screen_position: vec4<f32>,
     // same value as screen_position
     @location(1) clip_position: vec4<f32>,
-    @location(2) @interpolate(flat) triangle_id: u32,
+    @location(2) @interpolate(flat) triangle_index: u32,
     @location(3) barycentric: vec2<f32>,  // Full barycentric coordinates
 }
 
@@ -61,8 +61,8 @@ fn vert_main(vertex_orig: VertexInput) -> VertexOutput {
     out.clip_position = camera.view_proj * pos;
     out.screen_position = camera.view_proj * pos;
     
-    // Pass through triangle ID
-    out.triangle_id = vertex.triangle_id;
+    // Pass through triangle index
+    out.triangle_index = vertex.triangle_index;
     
     // Reconstruct full barycentric coordinates
     out.barycentric = vec2<f32>(

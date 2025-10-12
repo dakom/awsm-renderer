@@ -66,8 +66,6 @@ impl Materials {
         let has_alpha_blend = material.has_alpha_blend();
         let buffer_kind = material.buffer_kind();
 
-        tracing::info!("{:#?}", material);
-
         let key = self.lookup.insert(material);
         self.alpha_blend.insert(key, has_alpha_blend);
         self.buffers.buffer_kind.insert(key, buffer_kind);

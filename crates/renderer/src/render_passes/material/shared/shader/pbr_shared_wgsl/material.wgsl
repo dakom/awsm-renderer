@@ -1,4 +1,6 @@
-struct MaterialRaw {
+const material_alignment = 256u; // must match `Materials::MAX_SIZE`
+
+struct PbrMaterialRaw {
     // Basic properties, 14 * 4 = 56 bytes
     alpha_mode: u32,
     alpha_cutoff: f32,
@@ -30,7 +32,7 @@ struct MaterialRaw {
     padding: array<u32, 19>
 };
 
-struct Material {
+struct PbrMaterial {
     alpha_mode: u32,
     alpha_cutoff: f32,
 
@@ -58,18 +60,16 @@ struct Material {
     emissive_factor: vec3<f32>,
 }
 
-fn get_material(offset: u32) -> Material {
-    return convert_material(materials[offset / 256u]);
-}
-
-fn convert_material(raw: MaterialRaw) -> Material {
+fn pbr_get_material(offset: u32) -> PbrMaterial {
     const TEXTURE_BITMASK_BASE_COLOR: u32 = 1u;
     const TEXTURE_BITMASK_METALIC_ROUGHNESS: u32 = 2u;
     const TEXTURE_BITMASK_NORMAL: u32 = 4u;
     const TEXTURE_BITMASK_OCCLUSION: u32 = 8u;
     const TEXTURE_BITMASK_EMISSIVE: u32 = 16u;
 
-    return Material(
+    let raw = materials[offset / material_alignment];
+
+    return PbrMaterial(
         raw.alpha_mode,
         raw.alpha_cutoff,
         raw.double_sided,
