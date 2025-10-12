@@ -1,8 +1,5 @@
 # Opaque material pass
 
-- fix KHR_texture_transform causing panic
-  - might need to actually implement it? "range end index 2896 out of range for slice of length 2888"
-
 - needs to check the material meta and early-exit if it's "not me"
   - which model would be a good test for that?
     - AI prompt:
@@ -87,6 +84,8 @@
 
 Dynamic/Uniform storages could be SharedArrayBuffer
 Requires more design/thought (don't want to expose raw manipulation)
+
+# KHR_texture_transform support maybe
 
 
 # World Position Reconstruction Math:
