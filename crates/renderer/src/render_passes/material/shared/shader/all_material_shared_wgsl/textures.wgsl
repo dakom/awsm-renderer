@@ -42,6 +42,8 @@ fn texture_uv(attribute_data_offset: u32, triangle_indices: vec3<u32>, barycentr
 fn _texture_uv_per_vertex(attribute_data_offset: u32, set_index: u32, vertex_index: u32, vertex_attribute_stride: u32) -> vec2<f32> {
     // First get to the right vertex, THEN to the right UV set within that vertex
     let vertex_start = attribute_data_offset + (vertex_index * vertex_attribute_stride);
+    // `uv_sets_index` points to the beginning of TEXCOORD_0 inside the packed stream.
+    // Each additional UV set contributes two more floats per vertex.
     let uv_offset = {{ uv_sets_index }}u + (set_index * 2u);
     let index = vertex_start + uv_offset;
     let uv = vec2<f32>(attribute_data[index], attribute_data[index + 1]);

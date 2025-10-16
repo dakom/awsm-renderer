@@ -52,10 +52,10 @@ fn main(
 
     let pbr_material = pbr_get_material(material_offset);
 
-    // early return if this shader pass isn't meant to run for this material
-    // if !pbr_should_run(pbr_material) {
-    //     return;
-    // }
+    // Skip work when the mesh doesn't provide enough UV data for the material.
+    if !pbr_should_run(pbr_material) {
+        return;
+    }
 
     let vertex_attribute_stride = mesh_meta.vertex_attribute_stride / 4; // 4 bytes per float
     let attribute_indices_offset = mesh_meta.vertex_attribute_indices_offset / 4;
@@ -98,19 +98,43 @@ fn pbr_should_run(material: PbrMaterial) -> bool {
     {% endmatch %}
 }
 
-// TODO!
 fn pbr_material_has_any_uvs(material: PbrMaterial) -> bool {
-    if material.has_base_color_texture {
+    return material.has_base_color_texture ||
+        material.has_metallic_roughness_texture ||
+        material.has_normal_texture ||
+        material.has_occlusion_texture ||
+        material.has_emissive_texture;
+}
+
+fn pbr_material_uses_uv_count(material: PbrMaterial, uv_set_count: u32) -> bool {
+    if !texture_fits_uv_budget(material.has_base_color_texture, material.base_color_tex_info, uv_set_count) {
+        return false;
+    }
+
+    if !texture_fits_uv_budget(material.has_metallic_roughness_texture, material.metallic_roughness_tex_info, uv_set_count) {
+        return false;
+    }
+
+    if !texture_fits_uv_budget(material.has_normal_texture, material.normal_tex_info, uv_set_count) {
+        return false;
+    }
+
+    if !texture_fits_uv_budget(material.has_occlusion_texture, material.occlusion_tex_info, uv_set_count) {
+        return false;
+    }
+
+    if !texture_fits_uv_budget(material.has_emissive_texture, material.emissive_tex_info, uv_set_count) {
+        return false;
+    }
+
+    return true;
+}
+
+fn texture_fits_uv_budget(has_texture: bool, info: TextureInfo, uv_set_count: u32) -> bool {
+    if !has_texture {
         return true;
     }
 
-    return false;
-}
-
-// TODO!
-fn pbr_material_uses_uv_count(material: PbrMaterial, uv_set_count: u32) -> bool {
-    if material.has_base_color_texture {
-        return uv_set_count > 0;
-    }
-    return false;
+    // When the mesh exposes fewer TEXCOORD sets than a texture expects, we cannot sample safely.
+    return info.attribute_uv_set_index < uv_set_count;
 }

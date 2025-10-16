@@ -5,6 +5,9 @@ pub struct ShaderMaterialOpaqueVertexAttributes {
     pub normals: bool,
     pub tangents: bool,
     pub color_sets: Option<u32>,
+    /// Number of distinct `TEXCOORD_n` sets present on the mesh.
+    ///
+    /// Stored as (highest index + 1) so `Some(1)` means only `TEXCOORD_0` exists.
     pub uv_sets: Option<u32>,
 }
 
@@ -27,6 +30,8 @@ impl From<&MeshBufferInfo> for ShaderMaterialOpaqueVertexAttributes {
                     _self.color_sets = Some(*count + 1);
                 }
                 MeshBufferVertexAttributeInfo::TexCoords { count, .. } => {
+                    // `count` is the zero-based TEXCOORD set index from glTF,
+                    // so promote it to a human-friendly "number of sets".
                     _self.uv_sets = Some(*count + 1);
                 }
                 MeshBufferVertexAttributeInfo::Joints { .. } => {

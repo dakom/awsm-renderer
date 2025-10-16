@@ -1,56 +1,5 @@
 # Opaque material pass
 
-- needs to check the material meta and early-exit if it's "not me"
-  - which model would be a good test for that?
-    - AI prompt:
-
-      in crates/renderer/src/render_passes/material/opaque/shader/material_opaque_wgsl/compute.wgsl I have a check `pbr_should_run()` which calls `pbr_material_has_any_uvs()` and `pbr_material_uses_uv_count()`.
-
-      Right now these are placeholders, and they should be buggy, but I'm not sure which gltf test model would be the easiest to see problems here.
-
-      The overall idea is that I have a single texture output from the visibility pass that the opaque material pass (compute shader mentioned above) is reading from, where each fragment contains different material info from the visibility pass.
-
-      So, different passes of the compute shader should only work on the fragments that are relevant for that compute pass... if every pass writes every output pixel, it will overwrite other cells.
-
-      I have cloned all the official gltf test models locally in `media/glTF-Sample-Assets/Models`. Please do not waste time inspecting all the binaries - but the `.gltf` files are generally there and informative, as are READMEs.
-
-      Note that I want the *simplest reproducible case* that exposes the bug, not necessarily the most complex model that uses all the features.
-
-      So, for example, a model that uses an `extension` is not as ideal as a model without extensions, even if the extension is not relevant to the bug itself.
-      Similarly, models that use normals and lighting calculations are not as ideal as models that just use base color textures, even if the bug is not related to lighting.
-
-    - response:
-
-        A good minimal repro is still in the Khronos pack: load media/glTF-Sample-Assets/Models/TextureTransformMultiTest/glTF/TextureTransformMultiTest.gltf, but focus on the EmissionSample
-        column only. That mesh (EmissionSample primitive, media/.../TextureTransformMultiTest.gltf:1300) carries normals, tangents, and a single UV set. Its material (EmissionSampleMat, media/.../
-        TextureTransformMultiTest.gltf:627) has no baseColorTexture, only an emissive map. Because the placeholder pbr_material_has_any_uvs/pbr_material_uses_uv_count only look at has_base_color_texture, the
-        two-UV/tangent-aware shader variant bails out, and the UV‑less variant runs instead. That variant assumes a layout without tangents, so _texture_uv_per_vertex reads the tangent xyz as if they were
-        UVs – you’ll see the “Sample” checkmark turn into streaks/garbage even when the camera keeps the other geometry out of the way.
-
-        The file does list KHR_texture_transform (other rows use it), but the specific EmissionSampleMat we’re using doesn’t touch any extensions, so you don’t need transform support to repro. If you want a
-        completely extension-free copy, duplicate the GLTF and keep only that mesh/material pair; the artefact still appears until pbr_material_has_any_uvs and pbr_material_uses_uv_count get updated to flag
-        emissive-only materials as UV users.
-
-        • With KHR_texture_transform disabled the rows that relied on that extension will (predictably) fall back to their untransformed look, but the regression you’re chasing is still visible in the emission
-          row and you can treat it as a pass/fail indicator:
-
-          Failing (current placeholder logic).
-
-          - In EmissionSample (media/glTF-Sample-Assets/Models/TextureTransformMultiTest/glTF/TextureTransformMultiTest.gltf:1300), the short “Sample” column should show a clean green checkmark. Instead you’ll
-            see streaked/garbled colors or repeated blocks, because the UV-less shader variant is writing over those pixels and sampling tangents as if they were UVs.
-          - The UV0/UV1 emissive columns both look wrong or identical – the “UV1” box never shows the rotated/offset pattern its texCoord: 1 map encodes.
-
-          Passing (after pbr_material_has_any_uvs/pbr_material_uses_uv_count are fixed).
-
-          - The Sample column regains the crisp green checkmark, matching the reference screenshot in TextureTransformMultiTest/README.md.
-          - The UV0 and UV1 emissive boxes differ: UV0 shows the baseline checkmark, UV1 shows the variant that uses TEXCOORD_1. Even with transforms disabled the two columns still render distinct orientations
-            because the underlying UV sets differ.
-
-          So: disable the extension, fly the camera back to face the wall, and look at those three emission boxes. If the Sample patch is smeared or the UV1 patch doesn’t differ from UV0, the bug is still
-          present. Once both emissive boxes look like deliberate checkmarks and the Sample patch is clean, you’ve got a passing run.
-
-
-  - material_has_any_uvs / material_uses_uv_count
 - get Texture settings test working
   - wrap modes
   - filter modes
@@ -59,6 +8,10 @@
 - get basic lighting working
   - Calculate world position
   - don't worry about morphed normals yet
+- metallic/roughness
+- normal textures
+- occlusion
+
 
 
 # Transparent material pass

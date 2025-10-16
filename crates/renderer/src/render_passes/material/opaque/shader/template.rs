@@ -12,6 +12,8 @@ use crate::{
 #[derive(Template, Debug)]
 #[template(path = "material_opaque_wgsl/compute.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateMaterialOpaque {
+    /// Offset (in floats) within the packed vertex attribute array
+    /// where the first UV component lives for each vertex.
     pub uv_sets_index: u32,
     pub total_atlas_index: u32,
     pub texture_bindings: Vec<TextureBinding>,
@@ -19,6 +21,8 @@ pub struct ShaderTemplateMaterialOpaque {
     pub normals: bool,
     pub tangents: bool,
     pub color_sets: Option<u32>,
+    /// Number of UV sets available on the mesh. `None` means the mesh
+    /// supplied no TEXCOORD attributes.
     pub uv_sets: Option<u32>,
 }
 
