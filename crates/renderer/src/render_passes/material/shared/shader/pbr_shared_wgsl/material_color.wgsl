@@ -7,13 +7,43 @@ struct PbrMaterialColor {
     emissive: vec3<f32>,
 };
 
-fn pbr_get_material_color(attribute_indices_offset: u32, attribute_data_offset: u32, triangle_index: u32, material: PbrMaterial, barycentric: vec3<f32>, vertex_attribute_stride: u32) -> PbrMaterialColor {
+// Each texture fetch can now choose its own mip level (computed in the compute pass). Keeping
+// them bundled together makes it easy to forward through the material helpers.
+struct PbrMaterialMipLevels {
+    base_color: f32,
+    metallic_roughness: f32,
+    normal: f32,
+    occlusion: f32,
+    emissive: f32,
+}
+
+fn pbr_get_material_color(attribute_indices_offset: u32, attribute_data_offset: u32, triangle_index: u32, material: PbrMaterial, barycentric: vec3<f32>, vertex_attribute_stride: u32, mip_levels: PbrMaterialMipLevels) -> PbrMaterialColor {
     // get the vertex indices for this triangle
     let base_triangle_index = attribute_indices_offset + (triangle_index * 3u);
     let triangle_indices = vec3<u32>(attribute_indices[base_triangle_index], attribute_indices[base_triangle_index + 1], attribute_indices[base_triangle_index + 2]);
 
-    let base = _pbr_material_base_color(material, texture_uv(attribute_data_offset, triangle_indices, barycentric, material.base_color_tex_info, vertex_attribute_stride));
-    let emissive = _pbr_material_emissive_color(material, texture_uv(attribute_data_offset, triangle_indices, barycentric, material.emissive_tex_info, vertex_attribute_stride));
+    let base = _pbr_material_base_color(
+        material,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            material.base_color_tex_info,
+            vertex_attribute_stride,
+        ),
+        mip_levels.base_color,
+    );
+    let emissive = _pbr_material_emissive_color(
+        material,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            material.emissive_tex_info,
+            vertex_attribute_stride,
+        ),
+        mip_levels.emissive,
+    );
 
     return PbrMaterialColor(
         base,
@@ -24,10 +54,11 @@ fn pbr_get_material_color(attribute_indices_offset: u32, attribute_data_offset: 
     );
 }
 // Base Color
-fn _pbr_material_base_color(material: PbrMaterial, attribute_uv: vec2<f32>) -> vec4<f32> {
+fn _pbr_material_base_color(material: PbrMaterial, attribute_uv: vec2<f32>, mip_level: f32) -> vec4<f32> {
     var color = material.base_color_factor;
     if material.has_base_color_texture {
-        color *= texture_load_atlas_srgb(material.base_color_tex_info, attribute_uv);
+        color *=
+            texture_load_atlas_srgb(material.base_color_tex_info, attribute_uv, mip_level);
     }
 
     // alpha_mode: 0=opaque, 1=mask, 2=blend
@@ -39,10 +70,15 @@ fn _pbr_material_base_color(material: PbrMaterial, attribute_uv: vec2<f32>) -> v
     return color;
 }
 
-fn _pbr_material_emissive_color(material: PbrMaterial, attribute_uv: vec2<f32>) -> vec3<f32> {
+fn _pbr_material_emissive_color(
+    material: PbrMaterial,
+    attribute_uv: vec2<f32>,
+    mip_level: f32,
+) -> vec3<f32> {
     var color = material.emissive_factor;
     if material.has_emissive_texture {
-        color *= texture_load_atlas_srgb(material.emissive_tex_info, attribute_uv).rgb;
+        color *=
+            texture_load_atlas_srgb(material.emissive_tex_info, attribute_uv, mip_level).rgb;
     }
     return color;
 }

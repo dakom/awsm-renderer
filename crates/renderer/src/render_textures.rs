@@ -308,11 +308,15 @@ impl RenderTexturesInner {
                 &TextureDescriptor::new(
                     render_texture_formats.depth,
                     Extent3d::new(width, Some(height), Some(1)),
-                    TextureUsage::new().with_render_attachment(),
+                    TextureUsage::new()
+                        .with_render_attachment()
+                        .with_texture_binding(),
                 )
                 .with_label("Depth")
                 .into(),
             )
+            // Keeping the depth buffer bindable allows later passes (e.g. compute shading) to
+            // sample it directly for world-position reconstruction.
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
         let composite = gpu

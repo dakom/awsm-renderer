@@ -2,7 +2,6 @@ use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
 use crate::shaders::ShaderCompilationMessage;
-#[cfg(feature = "texture-export")]
 use crate::texture::TextureFormat;
 
 pub type Result<T> = std::result::Result<T, AwsmCoreError>;
@@ -160,6 +159,9 @@ pub enum AwsmCoreError {
 
     #[error("[gpu] texture export unsupported format: {0:?}")]
     TextureClearUnsupportedFormat(TextureFormat),
+
+    #[error("[gpu] mipmap generation unsupported format: {0:?}")]
+    MipmapUnsupportedFormat(TextureFormat),
 }
 
 impl AwsmCoreError {

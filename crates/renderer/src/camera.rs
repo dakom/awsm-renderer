@@ -1,7 +1,7 @@
 use awsm_renderer_core::buffers::{BufferDescriptor, BufferUsage};
 use awsm_renderer_core::error::AwsmCoreError;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
-use glam::{Mat4, Vec2, Vec3};
+use glam::{Mat4, Vec2, Vec3, Vec4};
 use thiserror::Error;
 
 use crate::bind_groups::{AwsmBindGroupError, BindGroups};
@@ -51,7 +51,17 @@ impl CameraMatrices {
 }
 
 impl CameraBuffer {
-    pub const BYTE_SIZE: usize = 336; // see `update()` for details
+    // Layout:
+    //  view                (mat4)  64 bytes
+    //  projection          (mat4)  64 bytes
+    //  view_projection     (mat4)  64 bytes
+    //  inv_view_projection (mat4)  64 bytes
+    //  inv_projection      (mat4)  64 bytes
+    //  inv_view            (mat4)  64 bytes
+    //  position (vec3) + frame_count (u32 padded) 16 bytes
+    //  frustum corner rays (4 * vec4) 64 bytes
+    // Total = 464 bytes (already 16-byte aligned for WGSL uniform layout)
+    pub const BYTE_SIZE: usize = 464;
 
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let gpu_buffer = gpu.create_buffer(
@@ -114,39 +124,41 @@ impl CameraBuffer {
             camera_matrices.projection = jitter_matrix * camera_matrices.projection;
         }
 
-        // View: 16 floats
-        // Projection: 16 floats
-        // ViewProjection: 16 floats
-        // Inverse ViewProjection: 16 floats
-        // Inverse View: 16 floats
-        // Position: 3 floats
-        // altogether that's 83 floats: (16*5) + 3
-        // or 332 bytes: 83 * 4
-        // however, we need to pad it to a multiple of 16 (https://www.w3.org/TR/WGSL/#address-space-layout-constraints)
-        // so we need to add 4 bytes of padding (this will effectively make the `position` a vec4 instead of vec3 in wgsl side)
-        // 332 + 4 = 336
+        // Layout written below (mirrors `CameraUniform` in WGSL). The additional inverse
+        // projection and frustum rays let compute passes reconstruct per-pixel view/world
+        // positions directly from the depth buffer.
+
+        let inv_projection = camera_matrices.projection.inverse();
+        let inv_view_projection = camera_matrices.inv_view_projection();
+        let inv_view = camera_matrices.view.inverse();
+        let frustum_rays = compute_view_frustum_rays(inv_projection);
 
         let mut offset = 0;
 
-        let mut write_to_data = |values: &[f32]| {
-            let len = values.len() * 4;
+        let view = camera_matrices.view.to_cols_array();
+        write_f32_slice(&mut self.raw_data, &mut offset, &view);
+        let projection = camera_matrices.projection.to_cols_array();
+        write_f32_slice(&mut self.raw_data, &mut offset, &projection);
+        let view_projection = camera_matrices.view_projection().to_cols_array();
+        write_f32_slice(&mut self.raw_data, &mut offset, &view_projection);
+        let inv_view_projection_cols = inv_view_projection.to_cols_array();
+        write_f32_slice(&mut self.raw_data, &mut offset, &inv_view_projection_cols);
+        let inv_projection_cols = inv_projection.to_cols_array();
+        write_f32_slice(&mut self.raw_data, &mut offset, &inv_projection_cols);
+        let inv_view_cols = inv_view.to_cols_array();
+        write_f32_slice(&mut self.raw_data, &mut offset, &inv_view_cols);
+        let position = camera_matrices.position_world.to_array();
+        write_f32_slice(&mut self.raw_data, &mut offset, &position);
+        write_u32(
+            &mut self.raw_data,
+            &mut offset,
+            render_textures.frame_count(),
+        );
 
-            let values_u8 =
-                unsafe { std::slice::from_raw_parts(values.as_ptr() as *const u8, len) };
-
-            self.raw_data[offset..offset + len].copy_from_slice(values_u8);
-
-            offset += len;
-        };
-
-        write_to_data(&camera_matrices.view.to_cols_array());
-        write_to_data(&camera_matrices.projection.to_cols_array());
-        write_to_data(&camera_matrices.view_projection().to_cols_array());
-        write_to_data(&camera_matrices.inv_view_projection().to_cols_array());
-        write_to_data(&camera_matrices.view.inverse().to_cols_array());
-        write_to_data(&camera_matrices.position_world.to_array());
-        self.raw_data[offset..offset + 4]
-            .copy_from_slice(&render_textures.frame_count().to_ne_bytes());
+        for ray in frustum_rays.iter() {
+            let ray_values = ray.to_array();
+            write_f32_slice(&mut self.raw_data, &mut offset, &ray_values);
+        }
 
         self.gpu_dirty = true;
 
@@ -199,6 +211,42 @@ fn halton(mut index: u32, base: u32) -> f32 {
     }
 
     result
+}
+
+fn compute_view_frustum_rays(inv_projection: Mat4) -> [Vec4; 4] {
+    // Reproject the clip-space corners of the near plane back into view space. These serve as
+    // canonical ray directions that the compute shader can bilinearly interpolate per pixel.
+    let ndc_corners = [
+        Vec4::new(-1.0, -1.0, 1.0, 1.0),
+        Vec4::new(1.0, -1.0, 1.0, 1.0),
+        Vec4::new(-1.0, 1.0, 1.0, 1.0),
+        Vec4::new(1.0, 1.0, 1.0, 1.0),
+    ];
+
+    let mut rays = [Vec4::ZERO; 4];
+    for (i, corner) in ndc_corners.iter().enumerate() {
+        let view_space = inv_projection * *corner;
+        let view_space = view_space / view_space.w;
+        rays[i] = Vec4::new(view_space.x, view_space.y, view_space.z, 0.0);
+    }
+
+    rays
+}
+
+fn write_f32_slice(buffer: &mut [u8], offset: &mut usize, values: &[f32]) {
+    // All matrices/vectors in the camera buffer are tightly packed f32 arrays. Writing them this
+    // way keeps the CPU-side layout authoritative and avoids duplicating offset math.
+    let byte_len = values.len() * std::mem::size_of::<f32>();
+    let bytes = unsafe { std::slice::from_raw_parts(values.as_ptr() as *const u8, byte_len) };
+    buffer[*offset..*offset + byte_len].copy_from_slice(bytes);
+    *offset += byte_len;
+}
+
+fn write_u32(buffer: &mut [u8], offset: &mut usize, value: u32) {
+    // WGSL requires 16-byte alignment. We store the frame counter alongside the camera position,
+    // treating it as a padded vec4 on the shader side.
+    buffer[*offset..*offset + 4].copy_from_slice(&value.to_ne_bytes());
+    *offset += 4;
 }
 
 type Result<T> = std::result::Result<T, AwsmCameraError>;

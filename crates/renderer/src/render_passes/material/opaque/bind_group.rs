@@ -88,6 +88,26 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            BindGroupLayoutCacheKeyEntry {
+                // Camera uniform gives us inverse matrices + frustum rays for depth reprojection.
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
+            BindGroupLayoutCacheKeyEntry {
+                // Depth texture from the visibility pass – sampled during the compute shading stage.
+                resource: BindGroupLayoutResource::Texture(
+                    TextureBindingLayout::new()
+                        .with_view_dimension(TextureViewDimension::N2d)
+                        .with_sample_type(TextureSampleType::Depth),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
         ];
 
         let texture_bindings = ctx.textures.mega_texture.get_bindings(
@@ -239,6 +259,15 @@ impl MaterialOpaqueBindGroups {
                         )),
                     ),
                 ]);
+
+                entries.push(BindGroupEntry::new(
+                    entries.len() as u32,
+                    BindGroupResource::Buffer(BufferBinding::new(&ctx.camera.gpu_buffer)),
+                ));
+                entries.push(BindGroupEntry::new(
+                    entries.len() as u32,
+                    BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.depth)),
+                ));
             }
 
             let group_idx_u32 = group_idx as u32;

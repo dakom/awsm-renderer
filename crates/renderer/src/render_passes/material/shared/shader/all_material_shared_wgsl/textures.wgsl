@@ -61,16 +61,18 @@ fn _texture_uv_per_vertex(attribute_data_offset: u32, set_index: u32, vertex_ind
 }
 
 
-fn texture_load_atlas_srgb(info: TextureInfo, attribute_uv: vec2<f32>) -> vec4<f32> {
-    let raw_color = _texture_load_atlas(info, attribute_uv);
+// Sampling helpers for the mega-texture atlas. Every fetch receives an explicit LOD so the compute
+// pass can emulate hardware derivative selection.
+fn texture_load_atlas_srgb(info: TextureInfo, attribute_uv: vec2<f32>, mip_level: f32) -> vec4<f32> {
+    let raw_color = _texture_load_atlas(info, attribute_uv, mip_level);
     return vec4<f32>(srgb_to_linear(raw_color.rgb), raw_color.a);
 }
 
-fn _texture_load_atlas(info: TextureInfo, attribute_uv: vec2<f32>) -> vec4<f32> {
+fn _texture_load_atlas(info: TextureInfo, attribute_uv: vec2<f32>, mip_level: f32) -> vec4<f32> {
     switch info.atlas_index {
         {% for i in 0..total_atlas_index %}
             case {{ i }}u: {
-                return _texture_load_atlas_binding(info, atlas_tex_{{ i }}, info.sampler_index, attribute_uv);
+                return _texture_load_atlas_binding(info, atlas_tex_{{ i }}, info.sampler_index, attribute_uv, mip_level);
             }
         {% endfor %}
         default: {
@@ -86,11 +88,8 @@ fn _texture_load_atlas_binding(
     atlas_tex: texture_2d_array<f32>,
     sampler_index: u32,
     attribute_uv: vec2<f32>,
+    mip_level: f32,
 ) -> vec4<f32> {
-    // We currently sample the base mip level. When per-pixel derivatives become available inside
-    // the compute pass we can replace this `0` with an analytically chosen LOD.
-    let mip_level = 0.0;
-
     let color = _texture_sample_with_sampler(
         atlas_tex,
         sampler_index,

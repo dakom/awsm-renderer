@@ -30,13 +30,92 @@ struct MipmapPipeline {
 
 thread_local! {
     static MIPMAP_PIPELINE: RefCell<HashMap<LookupKey, MipmapPipeline>> = RefCell::new(HashMap::new());
-    static MIPMAP_SHADER_MODULE: RefCell<Option<web_sys::GpuShaderModule>> = const { RefCell::new(None) };
 }
 
 #[derive(Hash, Debug, Eq, PartialEq)]
 struct LookupKey {
     pub texture_format: String,
     pub is_array: bool,
+}
+
+fn storage_format_to_wgsl(format: TextureFormat) -> Result<&'static str> {
+    match format {
+        TextureFormat::Rgba8unorm => Ok("rgba8unorm"),
+        TextureFormat::Rgba16float => Ok("rgba16float"),
+        TextureFormat::Rgba32float => Ok("rgba32float"),
+        _ => Err(AwsmCoreError::MipmapUnsupportedFormat(format)),
+    }
+}
+
+fn mipmap_shader_source(format: TextureFormat, is_array: bool) -> Result<String> {
+    let storage_format = storage_format_to_wgsl(format)?;
+
+    if is_array {
+        Ok(format!(
+            r#"
+@group(0) @binding(0) var input_texture: texture_2d_array<f32>;
+@group(0) @binding(1) var input_sampler: sampler;
+@group(0) @binding(2) var output_texture: texture_storage_2d_array<{storage_format}, write>;
+
+@compute @workgroup_size(8, 8, 1)
+fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {{
+    let output_size = textureDimensions(output_texture);
+
+    if (global_id.x >= output_size.x || global_id.y >= output_size.y) {{
+        return;
+    }}
+
+    let layer = i32(global_id.z);
+    let input_size = textureDimensions(input_texture);
+
+    let input_coord = vec2<f32>(global_id.xy) * 2.0 + 0.5;
+    let base_uv = input_coord / vec2<f32>(input_size.xy);
+    let texel_size = 1.0 / vec2<f32>(input_size.xy);
+
+    let sample_00 = textureSampleLevel(input_texture, input_sampler, base_uv + vec2<f32>(-0.5, -0.5) * texel_size, layer, 0.0);
+    let sample_01 = textureSampleLevel(input_texture, input_sampler, base_uv + vec2<f32>(0.5, -0.5) * texel_size, layer, 0.0);
+    let sample_10 = textureSampleLevel(input_texture, input_sampler, base_uv + vec2<f32>(-0.5, 0.5) * texel_size, layer, 0.0);
+    let sample_11 = textureSampleLevel(input_texture, input_sampler, base_uv + vec2<f32>(0.5, 0.5) * texel_size, layer, 0.0);
+
+    let result = (sample_00 + sample_01 + sample_10 + sample_11) * 0.25;
+
+    textureStore(output_texture, vec2<i32>(global_id.xy), layer, result);
+}}
+"#
+        ))
+    } else {
+        Ok(format!(
+            r#"
+@group(0) @binding(0) var input_texture: texture_2d<f32>;
+@group(0) @binding(1) var input_sampler: sampler;
+@group(0) @binding(2) var output_texture: texture_storage_2d<{storage_format}, write>;
+
+@compute @workgroup_size(8, 8, 1)
+fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {{
+    let output_size = textureDimensions(output_texture);
+
+    if (global_id.x >= output_size.x || global_id.y >= output_size.y) {{
+        return;
+    }}
+
+    let input_size = textureDimensions(input_texture, 0);
+
+    let input_coord = vec2<f32>(global_id.xy) * 2.0 + 0.5;
+    let base_uv = input_coord / vec2<f32>(input_size);
+    let texel_size = 1.0 / vec2<f32>(input_size);
+
+    let sample_00 = textureSampleLevel(input_texture, input_sampler, base_uv + vec2<f32>(-0.5, -0.5) * texel_size, 0.0);
+    let sample_01 = textureSampleLevel(input_texture, input_sampler, base_uv + vec2<f32>(0.5, -0.5) * texel_size, 0.0);
+    let sample_10 = textureSampleLevel(input_texture, input_sampler, base_uv + vec2<f32>(-0.5, 0.5) * texel_size, 0.0);
+    let sample_11 = textureSampleLevel(input_texture, input_sampler, base_uv + vec2<f32>(0.5, 0.5) * texel_size, 0.0);
+
+    let result = (sample_00 + sample_01 + sample_10 + sample_11) * 0.25;
+
+    textureStore(output_texture, vec2<i32>(global_id.xy), result);
+}}
+"#
+        ))
+    }
 }
 
 pub async fn generate_mipmaps(
@@ -75,20 +154,24 @@ pub async fn generate_mipmaps(
         };
 
         // Create texture views for input (previous mip) and output (current mip)
-        let input_view_descriptor = TextureViewDescriptor::new(Some("Input Mipmap View"))
+        let mut input_view_descriptor = TextureViewDescriptor::new(Some("Input Mipmap View"))
             .with_base_mip_level(mip_level - 1)
             .with_dimension(view_dimension)
-            .with_mip_level_count(1)
-            .with_array_layer_count(array_layers);
+            .with_mip_level_count(1);
+        if is_array {
+            input_view_descriptor = input_view_descriptor.with_array_layer_count(array_layers);
+        }
         let input_view = texture
             .create_view_with_descriptor(&input_view_descriptor.into())
             .map_err(AwsmCoreError::create_texture_view)?;
 
-        let output_view_descriptor = TextureViewDescriptor::new(Some("Output Mipmap View"))
+        let mut output_view_descriptor = TextureViewDescriptor::new(Some("Output Mipmap View"))
             .with_base_mip_level(mip_level)
             .with_dimension(view_dimension)
-            .with_mip_level_count(1)
-            .with_array_layer_count(array_layers);
+            .with_mip_level_count(1);
+        if is_array {
+            output_view_descriptor = output_view_descriptor.with_array_layer_count(array_layers);
+        }
         let output_view = texture
             .create_view_with_descriptor(&output_view_descriptor.into())
             .map_err(AwsmCoreError::create_texture_view)?;
@@ -144,42 +227,24 @@ pub async fn generate_mipmaps(
 async fn get_mipmap_pipeline(
     gpu: &AwsmRendererWebGpu,
     format: TextureFormat,
-    is_array: bool, // Add this parameter
+    is_array: bool,
 ) -> Result<MipmapPipeline> {
-    // Create a composite key that includes both format and array status
     let key = LookupKey {
         texture_format: format!("{format:?}"),
         is_array,
     };
 
-    let pipeline = MIPMAP_PIPELINE.with(|pipeline_cell| pipeline_cell.borrow().get(&key).cloned());
-
-    if let Some(pipeline) = pipeline {
+    if let Some(pipeline) =
+        MIPMAP_PIPELINE.with(|pipeline_cell| pipeline_cell.borrow().get(&key).cloned())
+    {
         return Ok(pipeline);
     }
 
-    let shader_module = MIPMAP_SHADER_MODULE.with(|shader_module| shader_module.borrow().clone());
+    let shader_source = mipmap_shader_source(format.clone(), is_array)?;
+    let shader_module = gpu
+        .compile_shader(&ShaderModuleDescriptor::new(&shader_source, Some("Mipmap Shader")).into());
 
-    let shader_module = match shader_module {
-        Some(module) => module,
-        None => {
-            let shader_module = gpu.compile_shader(
-                &ShaderModuleDescriptor::new(
-                    include_str!("./mipmap/shader.wgsl"),
-                    Some("Mipmap Shader"),
-                )
-                .into(),
-            );
-
-            shader_module.validate_shader().await?;
-
-            MIPMAP_SHADER_MODULE.with(|shader_module_rc| {
-                *shader_module_rc.borrow_mut() = Some(shader_module.clone());
-            });
-
-            shader_module
-        }
-    };
+    shader_module.validate_shader().await?;
 
     let compute = ProgrammableStage::new(&shader_module, None);
 

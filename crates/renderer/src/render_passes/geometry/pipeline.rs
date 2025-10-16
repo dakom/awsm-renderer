@@ -72,7 +72,6 @@ impl GeometryPipelines {
             .with_cull_mode(CullMode::None);
 
         let color_targets = [
-            // TODO - will revisit this to add more targets if necessary
             ColorTargetState::new(ctx.render_texture_formats.visiblity_data),
             ColorTargetState::new(ctx.render_texture_formats.taa_clip_position),
         ];
