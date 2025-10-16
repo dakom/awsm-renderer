@@ -10,12 +10,14 @@ use crate::{
         shader_cache_key::ShaderCacheKeyRenderPass,
     },
     shaders::ShaderCacheKey,
+    textures::SamplerBindings,
 };
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyMaterialOpaque {
     pub attributes: ShaderMaterialOpaqueVertexAttributes,
     pub texture_bindings: MegaTextureBindings,
+    pub sampler_bindings: SamplerBindings,
 }
 
 impl From<ShaderCacheKeyMaterialOpaque> for ShaderCacheKey {

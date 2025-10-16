@@ -40,16 +40,18 @@ impl GltfMaterialInfo {
         let pbr = gltf_material.pbr_metallic_roughness();
 
         if let Some(tex) = pbr.base_color_texture().map(GltfTextureInfo::from) {
-            let (uv_index, texture_cache_key) =
+            let (uv_index, texture_cache_key, sampler_key) =
                 tex.create_material_cache_key(renderer, ctx).await?;
             material.base_color_tex = Some(texture_cache_key);
+            material.base_color_sampler = Some(sampler_key);
             material.base_color_uv_index = Some(uv_index as u32);
         }
 
         if let Some(tex) = pbr.metallic_roughness_texture().map(GltfTextureInfo::from) {
-            let (uv_index, texture_cache_key) =
+            let (uv_index, texture_cache_key, sampler_key) =
                 tex.create_material_cache_key(renderer, ctx).await?;
             material.metallic_roughness_tex = Some(texture_cache_key);
+            material.metallic_roughness_sampler = Some(sampler_key);
             material.metallic_roughness_uv_index = Some(uv_index as u32);
         }
 
@@ -58,8 +60,9 @@ impl GltfMaterialInfo {
                 index: normal_tex.texture().index(),
                 tex_coord_index: normal_tex.tex_coord() as usize,
             };
-            let (uv_index, tex) = tex.create_material_cache_key(renderer, ctx).await?;
+            let (uv_index, tex, sampler_key) = tex.create_material_cache_key(renderer, ctx).await?;
             material.normal_tex = Some(tex);
+            material.normal_sampler = Some(sampler_key);
             material.normal_uv_index = Some(uv_index as u32);
         }
 
@@ -68,8 +71,9 @@ impl GltfMaterialInfo {
                 index: occlusion_tex.texture().index(),
                 tex_coord_index: occlusion_tex.tex_coord() as usize,
             };
-            let (uv_index, tex) = tex.create_material_cache_key(renderer, ctx).await?;
+            let (uv_index, tex, sampler_key) = tex.create_material_cache_key(renderer, ctx).await?;
             material.occlusion_tex = Some(tex);
+            material.occlusion_sampler = Some(sampler_key);
             material.occlusion_uv_index = Some(uv_index as u32);
         }
 
@@ -78,8 +82,9 @@ impl GltfMaterialInfo {
                 index: emissive_tex.texture().index(),
                 tex_coord_index: emissive_tex.tex_coord() as usize,
             };
-            let (uv_index, tex) = tex.create_material_cache_key(renderer, ctx).await?;
+            let (uv_index, tex, sampler_key) = tex.create_material_cache_key(renderer, ctx).await?;
             material.emissive_tex = Some(tex);
+            material.emissive_sampler = Some(sampler_key);
             material.emissive_uv_index = Some(uv_index as u32);
         }
 
@@ -122,7 +127,7 @@ impl GltfTextureInfo {
         &self,
         renderer: &mut AwsmRenderer,
         ctx: &GltfPopulateContext,
-    ) -> Result<(UvIndex, TextureKey)> {
+    ) -> Result<(UvIndex, TextureKey, SamplerKey)> {
         let texture_key = {
             let textures = ctx.textures.lock().unwrap();
             textures.get(&self.index).cloned()
@@ -152,7 +157,9 @@ impl GltfTextureInfo {
             }
         };
 
-        Ok((self.tex_coord_index, texture_key))
+        let sampler_key = self.create_sampler_key(renderer, ctx)?;
+
+        Ok((self.tex_coord_index, texture_key, sampler_key))
     }
 
     fn create_sampler_key(
@@ -177,6 +184,11 @@ impl GltfTextureInfo {
             mipmap_filter: Some(MipmapFilterMode::Linear),
             ..Default::default()
         };
+        // glTF allows omitting the wrap mode; the spec states the default is repeat. Record that
+        // here so downstream shader logic can faithfully emulate it if the sampler isn't cached yet.
+        sampler_cache_key.address_mode_u = Some(AddressMode::Repeat);
+        sampler_cache_key.address_mode_v = Some(AddressMode::Repeat);
+        sampler_cache_key.address_mode_w = Some(AddressMode::Repeat);
 
         if let Some(mag_filter) = gltf_sampler.mag_filter() {
             match mag_filter {

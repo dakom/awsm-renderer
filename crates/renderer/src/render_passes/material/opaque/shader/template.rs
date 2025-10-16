@@ -7,6 +7,7 @@ use crate::{
         attributes::ShaderMaterialOpaqueVertexAttributes, cache_key::ShaderCacheKeyMaterialOpaque,
     },
     shaders::{print_shader_source, AwsmShaderError, Result},
+    textures::SamplerBindings,
 };
 
 #[derive(Template, Debug)]
@@ -17,6 +18,8 @@ pub struct ShaderTemplateMaterialOpaque {
     pub uv_sets_index: u32,
     pub total_atlas_index: u32,
     pub texture_bindings: Vec<TextureBinding>,
+    pub sampler_bindings: Vec<SamplerBinding>,
+    pub default_sampler_index: Option<u32>,
     pub has_atlas: bool,
     pub normals: bool,
     pub tangents: bool,
@@ -32,6 +35,13 @@ pub struct TextureBinding {
     group: u32,
     binding: u32,
     atlas_index: u32,
+}
+
+#[derive(Debug)]
+pub struct SamplerBinding {
+    group: u32,
+    binding: u32,
+    sampler_index: u32,
 }
 
 impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
@@ -67,6 +77,40 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             }
         }
 
+        let SamplerBindings {
+            start_group: sampler_start_group,
+            start_binding: sampler_start_binding,
+            bind_group_bindings_len: sampler_bindings_len,
+        } = &value.sampler_bindings;
+
+        let mut sampler_bindings = Vec::new();
+        let mut total_sampler_index = 0u32;
+        for (sampler_group_index, &len) in sampler_bindings_len.iter().enumerate() {
+            if len == 0 {
+                continue;
+            }
+
+            let group = sampler_start_group + sampler_group_index as u32;
+            let binding_start = if sampler_group_index == 0 {
+                *sampler_start_binding
+            } else {
+                0
+            };
+
+            for i in 0..len {
+                sampler_bindings.push(SamplerBinding {
+                    group,
+                    binding: binding_start + i as u32,
+                    sampler_index: total_sampler_index,
+                });
+                total_sampler_index += 1;
+            }
+        }
+
+        let default_sampler_index = sampler_bindings
+            .first()
+            .map(|binding| binding.sampler_index);
+
         // see `impl Ord for MeshBufferVertexAttributeInfo`
         // for ordering here
         let mut uv_sets_index = 0;
@@ -80,6 +124,8 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
 
         let _self = Self {
             texture_bindings,
+            sampler_bindings,
+            default_sampler_index,
             total_atlas_index,
             uv_sets_index,
             has_atlas: total_atlas_index > 0,

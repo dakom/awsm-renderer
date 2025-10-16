@@ -20,10 +20,10 @@ use crate::{
         visibility::convert_to_visibility_buffer,
     },
     mesh::{
-        MeshBufferGeometryMorphInfo, MeshBufferAttributeIndexInfo, MeshBufferInfo,
+        MeshBufferAttributeIndexInfo, MeshBufferGeometryMorphInfo, MeshBufferInfo,
         MeshBufferMaterialMorphAttributes, MeshBufferMaterialMorphInfo, MeshBufferSkinInfo,
-        MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, 
-        MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
+        MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo,
+        MeshBufferVertexInfo,
     },
 };
 
@@ -89,9 +89,7 @@ pub struct MeshBufferVertexInfoWithOffset {
 
 impl From<MeshBufferVertexInfoWithOffset> for MeshBufferVertexInfo {
     fn from(info: MeshBufferVertexInfoWithOffset) -> Self {
-        MeshBufferVertexInfo {
-            count: info.count,
-        }
+        MeshBufferVertexInfo { count: info.count }
     }
 }
 
@@ -135,9 +133,7 @@ impl MeshBufferAttributeIndexInfoWithOffset {
 
 impl From<MeshBufferAttributeIndexInfoWithOffset> for MeshBufferAttributeIndexInfo {
     fn from(info: MeshBufferAttributeIndexInfoWithOffset) -> Self {
-        MeshBufferAttributeIndexInfo {
-            count: info.count,
-        }
+        MeshBufferAttributeIndexInfo { count: info.count }
     }
 }
 
@@ -248,14 +244,17 @@ impl GltfBuffers {
                     .unwrap_or(FrontFace::Ccw) // Default to CCW if no node found
             };
             for primitive in mesh.primitives() {
-                let index: MeshBufferAttributeIndexInfoWithOffset = match GltfMeshBufferIndexInfo::maybe_new(
-                    &primitive,
-                    &buffers,
-                    &mut index_bytes,
-                )? {
-                    Some(info) => info.into(),
-                    None => generate_fresh_indices_from_primitive(&primitive, &mut index_bytes)?,
-                };
+                let index: MeshBufferAttributeIndexInfoWithOffset =
+                    match GltfMeshBufferIndexInfo::maybe_new(
+                        &primitive,
+                        &buffers,
+                        &mut index_bytes,
+                    )? {
+                        Some(info) => info.into(),
+                        None => {
+                            generate_fresh_indices_from_primitive(&primitive, &mut index_bytes)?
+                        }
+                    };
 
                 // Step 2: Convert to visibility buffer format
                 let visibility_buffer_info = convert_to_visibility_buffer(

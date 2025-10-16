@@ -46,14 +46,14 @@ impl GltfMeshBufferIndexInfo {
                 match accessor.data_type() {
                     gltf::accessor::DataType::U32 => {
                         index_bytes.extend_from_slice(&accessor_bytes);
-                    },
+                    }
 
                     gltf::accessor::DataType::U16 => {
                         let u16_values = u8_to_u16_vec(&accessor_bytes);
                         for value in u16_values {
                             index_bytes.extend_from_slice(&u32::from(value).to_le_bytes());
                         }
-                    },
+                    }
 
                     gltf::accessor::DataType::I16 => {
                         let i16_values = u8_to_i16_vec(&accessor_bytes);
@@ -114,10 +114,7 @@ pub fn generate_fresh_indices_from_primitive(
         .unwrap_or(0);
 
     if vertex_count == 0 {
-        return Ok(MeshBufferAttributeIndexInfoWithOffset {
-            offset,
-            count: 0,
-        });
+        return Ok(MeshBufferAttributeIndexInfoWithOffset { offset, count: 0 });
     }
 
     let start_offset = index_bytes.len();

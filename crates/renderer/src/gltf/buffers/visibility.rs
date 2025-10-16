@@ -8,23 +8,21 @@ use std::collections::{BTreeMap, HashMap};
 use crate::buffer::helpers::{
     i16_to_i32_vec, slice_zeroes, u16_to_u32_vec, u8_to_i16_vec, u8_to_u16_vec,
 };
-use crate::gltf::buffers::attributes::{
-    load_attribute_data_by_kind, pack_vertex_attributes,
-};
+use crate::gltf::buffers::attributes::{load_attribute_data_by_kind, pack_vertex_attributes};
 use crate::gltf::buffers::index::extract_triangle_indices;
 use crate::gltf::buffers::morph::convert_morph_targets;
 use crate::gltf::buffers::normals::{compute_normals, ensure_normals};
 use crate::gltf::buffers::skin::convert_skin;
 use crate::gltf::buffers::triangle::pack_triangle_data;
 use crate::gltf::buffers::{
-    MeshBufferAttributeIndexInfoWithOffset, MeshBufferInfoWithOffset, MeshBufferTriangleDataInfoWithOffset,
-    MeshBufferTriangleInfoWithOffset, 
+    MeshBufferAttributeIndexInfoWithOffset, MeshBufferInfoWithOffset,
+    MeshBufferTriangleDataInfoWithOffset, MeshBufferTriangleInfoWithOffset,
     MeshBufferVertexInfoWithOffset,
 };
 use crate::gltf::error::AwsmGltfError;
 use crate::mesh::{
-    MeshBufferAttributeIndexInfo, MeshBufferInfo, MeshBufferTriangleDataInfo, MeshBufferTriangleInfo,
-    MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
+    MeshBufferAttributeIndexInfo, MeshBufferInfo, MeshBufferTriangleDataInfo,
+    MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
 };
 
 use super::accessor::accessor_to_bytes;
@@ -59,7 +57,11 @@ pub(super) fn convert_to_visibility_buffer(
     let attribute_data_by_kind = load_attribute_data_by_kind(&gltf_attributes, buffers)?;
 
     // Step 3: Ensure normals exist (compute if missing)
-    let attribute_data_by_kind = ensure_normals(attribute_data_by_kind, vertex_attribute_index, vertex_attribute_index_bytes)?;
+    let attribute_data_by_kind = ensure_normals(
+        attribute_data_by_kind,
+        vertex_attribute_index,
+        vertex_attribute_index_bytes,
+    )?;
 
     // Step 4: Create visibility vertices (positions + triangle_index + barycentric)
     // These are expanded such that each vertex gets its own visibility vertex (triangle_index will be repeated for all 3)
@@ -145,13 +147,13 @@ fn create_visibility_vertices(
         [0.0, 0.0], // Third vertex: (0, 0, 1) - z = 1-0-0 = 1
     ];
     // Get positions data
-    let positions = attribute_data.iter().find_map(|(attr_info, data)| {
-        match attr_info {
+    let positions = attribute_data
+        .iter()
+        .find_map(|(attr_info, data)| match attr_info {
             MeshBufferVertexAttributeInfo::Positions { .. } => Some(&data[..]),
-            _ => None
-        }
-    })
-    .ok_or_else(|| AwsmGltfError::Positions("missing positions".to_string()))?;
+            _ => None,
+        })
+        .ok_or_else(|| AwsmGltfError::Positions("missing positions".to_string()))?;
 
     // Validate positions buffer (must be Float32x3 format)
     if positions.len() % 12 != 0 {

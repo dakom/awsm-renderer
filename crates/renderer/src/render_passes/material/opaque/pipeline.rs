@@ -67,15 +67,13 @@ impl MaterialOpaquePipelines {
         let shader_cache_key = ShaderCacheKeyMaterialOpaque {
             attributes: mesh_buffer_info.into(),
             texture_bindings: material_opaque_bind_groups.texture_bindings.clone(),
+            sampler_bindings: material_opaque_bind_groups.sampler_bindings.clone(),
         };
 
         let shader_key = shaders
             .get_key(
                 gpu,
-                ShaderCacheKeyMaterial::Opaque(ShaderCacheKeyMaterialOpaque {
-                    attributes: mesh_buffer_info.into(),
-                    texture_bindings: material_opaque_bind_groups.texture_bindings.clone(),
-                }),
+                ShaderCacheKeyMaterial::Opaque(shader_cache_key.clone()),
             )
             .await?;
 

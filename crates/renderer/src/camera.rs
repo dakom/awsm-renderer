@@ -8,7 +8,7 @@ use crate::bind_groups::{AwsmBindGroupError, BindGroups};
 use crate::render_textures::RenderTextures;
 use crate::{AwsmRenderer, AwsmRendererLogging};
 
-const APPLY_JITTER:bool = false;
+const APPLY_JITTER: bool = false;
 
 impl AwsmRenderer {
     pub fn update_camera(&mut self, camera_matrices: CameraMatrices) -> Result<()> {

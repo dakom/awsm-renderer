@@ -4,7 +4,7 @@ use crate::buffer::helpers::slice_zeroes;
 use crate::gltf::buffers::accessor::accessor_to_bytes;
 use crate::gltf::buffers::index::extract_triangle_indices;
 use crate::gltf::buffers::{
-    MeshBufferGeometryMorphInfoWithOffset, MeshBufferAttributeIndexInfoWithOffset,
+    MeshBufferAttributeIndexInfoWithOffset, MeshBufferGeometryMorphInfoWithOffset,
     MeshBufferMaterialMorphInfoWithOffset,
 };
 use crate::gltf::error::{AwsmGltfError, Result};
@@ -214,7 +214,7 @@ pub(super) fn convert_morph_targets(
                 if morph_attributes.normal {
                     push_material_morph_data(
                         MeshBufferVertexAttributeInfo::Normals {
-                            data_size: 4, // f32
+                            data_size: 4,     // f32
                             component_len: 3, // vec3
                         },
                         morph_target_buffer_data.normals.as_ref(),
@@ -223,7 +223,7 @@ pub(super) fn convert_morph_targets(
                 if morph_attributes.tangent {
                     push_material_morph_data(
                         MeshBufferVertexAttributeInfo::Tangents {
-                            data_size: 4, // f32
+                            data_size: 4,     // f32
                             component_len: 3, // vec3
                         },
                         morph_target_buffer_data.tangents.as_ref(),

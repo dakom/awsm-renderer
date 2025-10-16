@@ -6,6 +6,7 @@ use awsm_renderer_core::{
     },
     buffers::{BufferDescriptor, BufferUsage},
     renderer::AwsmRendererWebGpu,
+    sampler::AddressMode,
     texture::{mega_texture::MegaTextureEntryInfo, TextureSampleType, TextureViewDimension},
 };
 
@@ -24,19 +25,24 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct PbrMaterial {
     pub base_color_tex: Option<TextureKey>,
+    pub base_color_sampler: Option<SamplerKey>,
     pub base_color_uv_index: Option<u32>,
     pub base_color_factor: [f32; 4],
     pub metallic_roughness_tex: Option<TextureKey>,
+    pub metallic_roughness_sampler: Option<SamplerKey>,
     pub metallic_roughness_uv_index: Option<u32>,
     pub metallic_factor: f32,
     pub roughness_factor: f32,
     pub normal_tex: Option<TextureKey>,
+    pub normal_sampler: Option<SamplerKey>,
     pub normal_uv_index: Option<u32>,
     pub normal_scale: f32,
     pub occlusion_tex: Option<TextureKey>,
+    pub occlusion_sampler: Option<SamplerKey>,
     pub occlusion_uv_index: Option<u32>,
     pub occlusion_strength: f32,
     pub emissive_tex: Option<TextureKey>,
+    pub emissive_sampler: Option<SamplerKey>,
     pub emissive_uv_index: Option<u32>,
     pub emissive_factor: [f32; 3],
     // these come from initial settings which affects bind group, mesh pipeline etc.
@@ -47,7 +53,9 @@ pub struct PbrMaterial {
 
 impl PbrMaterial {
     pub const INITIAL_ELEMENTS: usize = 32; // 32 elements is a good starting point
-    pub const BYTE_SIZE: usize = 224; // must be under Materials::MAX_SIZE
+                                            // NOTE: keep this in sync with `PbrMaterialRaw` in WGSL. Each texture packs 36 bytes
+                                            // (including sampler + address mode metadata) so 5 textures + 60 byte header + padding = 240.
+    pub const BYTE_SIZE: usize = 240; // must be under Materials::MAX_SIZE
 
     pub const TEXTURE_BITMASK_BASE_COLOR: u32 = 1;
     pub const TEXTURE_BITMASK_METALIC_ROUGHNESS: u32 = 1 << 1;
@@ -60,19 +68,24 @@ impl PbrMaterial {
             alpha_mode,
             double_sided,
             base_color_tex: None,
+            base_color_sampler: None,
             base_color_uv_index: None,
             base_color_factor: [1.0, 1.0, 1.0, 1.0],
             metallic_roughness_tex: None,
+            metallic_roughness_sampler: None,
             metallic_roughness_uv_index: None,
             metallic_factor: 1.0,
             roughness_factor: 1.0,
             normal_tex: None,
+            normal_sampler: None,
             normal_uv_index: None,
             normal_scale: 1.0,
             occlusion_tex: None,
+            occlusion_sampler: None,
             occlusion_uv_index: None,
             occlusion_strength: 1.0,
             emissive_tex: None,
+            emissive_sampler: None,
             emissive_uv_index: None,
             emissive_factor: [0.0, 0.0, 0.0],
         }
@@ -118,6 +131,9 @@ impl PbrMaterial {
             Texture {
                 entry_info: &'a MegaTextureEntryInfo<TextureKey>,
                 uv_index: u32,
+                sampler_index: u32,
+                address_mode_u: u32,
+                address_mode_v: u32,
             },
             SkipTexture,
         }
@@ -133,11 +149,14 @@ impl PbrMaterial {
             }
         }
 
-        impl<'a> From<(&'a MegaTextureEntryInfo<TextureKey>, u32)> for Value<'a> {
-            fn from(value: (&'a MegaTextureEntryInfo<TextureKey>, u32)) -> Self {
+        impl<'a> From<(&'a MegaTextureEntryInfo<TextureKey>, u32, u32, u32, u32)> for Value<'a> {
+            fn from(value: (&'a MegaTextureEntryInfo<TextureKey>, u32, u32, u32, u32)) -> Self {
                 Value::Texture {
                     entry_info: value.0,
                     uv_index: value.1,
+                    sampler_index: value.2,
+                    address_mode_u: value.3,
+                    address_mode_v: value.4,
                 }
             }
         }
@@ -158,6 +177,9 @@ impl PbrMaterial {
                     Value::Texture {
                         entry_info,
                         uv_index,
+                        sampler_index,
+                        address_mode_u,
+                        address_mode_v,
                     } => {
                         offset = write_inner(data, entry_info.pixel_offset[0].into(), offset);
                         offset = write_inner(data, entry_info.pixel_offset[1].into(), offset);
@@ -170,9 +192,12 @@ impl PbrMaterial {
 
                         offset = write_inner(data, packed_index_1.into(), offset);
                         offset = write_inner(data, packed_index_2.into(), offset);
+                        offset = write_inner(data, sampler_index.into(), offset);
+                        offset = write_inner(data, address_mode_u.into(), offset);
+                        offset = write_inner(data, address_mode_v.into(), offset);
                     }
                     Value::SkipTexture => {
-                        offset += 24;
+                        offset += 36;
                     }
                 }
 
@@ -204,12 +229,42 @@ impl PbrMaterial {
         write(self.emissive_factor[1].into());
         write(self.emissive_factor[2].into());
 
+        // Encode the WebGPU address mode so the shader can reproduce clamp/repeat/mirror behaviour
+        // after the sampling coordinates are adjusted to the mega texture tile.
+        let encode_address_mode = |mode: Option<AddressMode>| -> u32 {
+            match mode.unwrap_or(AddressMode::Repeat) {
+                AddressMode::ClampToEdge => 0,
+                AddressMode::Repeat => 1,
+                AddressMode::MirrorRepeat => 2,
+                // WebGPU exposes additional vendor-specific variants behind feature flags. If we
+                // ever see one, treat it as repeat so rendering keeps working instead of crashing.
+                _ => 1,
+            }
+        };
+
         let mut texture_bitmask = 0u32;
 
         if let Some(tex) = self
             .base_color_tex
             .and_then(|key| textures.get_entry(key).ok())
-            .and_then(|entry_info| self.base_color_uv_index.map(|index| (entry_info, index)))
+            .and_then(|entry_info| {
+                Some((
+                    entry_info,
+                    self.base_color_uv_index?,
+                    self.base_color_sampler?,
+                ))
+            })
+            .map(|(entry_info, uv_index, sampler_key)| {
+                let sampler_index = textures.sampler_index(sampler_key).unwrap_or(0);
+                let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+                (
+                    entry_info,
+                    uv_index,
+                    sampler_index,
+                    encode_address_mode(address_mode_u),
+                    encode_address_mode(address_mode_v),
+                )
+            })
         {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_BASE_COLOR;
@@ -221,8 +276,22 @@ impl PbrMaterial {
             .metallic_roughness_tex
             .and_then(|key| textures.get_entry(key).ok())
             .and_then(|entry_info| {
-                self.metallic_roughness_uv_index
-                    .map(|index| (entry_info, index))
+                Some((
+                    entry_info,
+                    self.metallic_roughness_uv_index?,
+                    self.metallic_roughness_sampler?,
+                ))
+            })
+            .map(|(entry_info, uv_index, sampler_key)| {
+                let sampler_index = textures.sampler_index(sampler_key).unwrap_or(0);
+                let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+                (
+                    entry_info,
+                    uv_index,
+                    sampler_index,
+                    encode_address_mode(address_mode_u),
+                    encode_address_mode(address_mode_v),
+                )
             })
         {
             write(tex.into());
@@ -234,7 +303,18 @@ impl PbrMaterial {
         if let Some(tex) = self
             .normal_tex
             .and_then(|key| textures.get_entry(key).ok())
-            .and_then(|entry_info| self.normal_uv_index.map(|index| (entry_info, index)))
+            .and_then(|entry_info| Some((entry_info, self.normal_uv_index?, self.normal_sampler?)))
+            .map(|(entry_info, uv_index, sampler_key)| {
+                let sampler_index = textures.sampler_index(sampler_key).unwrap_or(0);
+                let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+                (
+                    entry_info,
+                    uv_index,
+                    sampler_index,
+                    encode_address_mode(address_mode_u),
+                    encode_address_mode(address_mode_v),
+                )
+            })
         {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_NORMAL;
@@ -245,7 +325,24 @@ impl PbrMaterial {
         if let Some(tex) = self
             .occlusion_tex
             .and_then(|key| textures.get_entry(key).ok())
-            .and_then(|entry_info| self.occlusion_uv_index.map(|index| (entry_info, index)))
+            .and_then(|entry_info| {
+                Some((
+                    entry_info,
+                    self.occlusion_uv_index?,
+                    self.occlusion_sampler?,
+                ))
+            })
+            .map(|(entry_info, uv_index, sampler_key)| {
+                let sampler_index = textures.sampler_index(sampler_key).unwrap_or(0);
+                let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+                (
+                    entry_info,
+                    uv_index,
+                    sampler_index,
+                    encode_address_mode(address_mode_u),
+                    encode_address_mode(address_mode_v),
+                )
+            })
         {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_OCCLUSION;
@@ -256,7 +353,20 @@ impl PbrMaterial {
         if let Some(tex) = self
             .emissive_tex
             .and_then(|key| textures.get_entry(key).ok())
-            .and_then(|entry_info| self.emissive_uv_index.map(|index| (entry_info, index)))
+            .and_then(|entry_info| {
+                Some((entry_info, self.emissive_uv_index?, self.emissive_sampler?))
+            })
+            .map(|(entry_info, uv_index, sampler_key)| {
+                let sampler_index = textures.sampler_index(sampler_key).unwrap_or(0);
+                let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+                (
+                    entry_info,
+                    uv_index,
+                    sampler_index,
+                    encode_address_mode(address_mode_u),
+                    encode_address_mode(address_mode_v),
+                )
+            })
         {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_EMISSIVE;

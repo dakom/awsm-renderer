@@ -96,7 +96,24 @@ pub struct Textures {
     textures: SlotMap<TextureKey, MegaTextureEntryInfo<TextureKey>>,
     samplers: SlotMap<SamplerKey, web_sys::GpuSampler>,
     sampler_cache: HashMap<SamplerCacheKey, SamplerKey>,
+    sampler_indices: SecondaryMap<SamplerKey, u32>,
+    sampler_keys: Vec<SamplerKey>,
+    // We keep a mirror of the sampler address modes so that materials can adjust UVs manually when
+    // sampling inside the mega texture. This is especially important for clamp/mirror behaviour.
+    sampler_address_modes: SecondaryMap<SamplerKey, (Option<AddressMode>, Option<AddressMode>)>,
     gpu_dirty: bool,
+}
+
+#[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
+pub struct SamplerBindings {
+    // First sampler binding group index. Mirrors MegaTextureBindings so the shader template can
+    // generate matching @group declarations.
+    pub start_group: u32,
+    // Offset within the first group where additional sampler bindings should start.
+    pub start_binding: u32,
+    // Number of sampler bindings in each group, in order. Allows splitting samplers across
+    // multiple bind groups when device limits are tight.
+    pub bind_group_bindings_len: Vec<u32>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -137,6 +154,9 @@ impl Textures {
             textures: SlotMap::with_key(),
             samplers: SlotMap::with_key(),
             sampler_cache: HashMap::new(),
+            sampler_indices: SecondaryMap::new(),
+            sampler_keys: Vec::new(),
+            sampler_address_modes: SecondaryMap::new(),
             gpu_dirty: false,
         }
     }
@@ -223,7 +243,16 @@ impl Textures {
         let sampler = gpu.create_sampler(Some(&descriptor.into()));
 
         let key = self.samplers.insert(sampler);
+        let address_mode_u = cache_key.address_mode_u;
+        let address_mode_v = cache_key.address_mode_v;
         self.sampler_cache.insert(cache_key, key);
+        let index = self.sampler_keys.len() as u32;
+        self.sampler_indices.insert(key, index);
+        self.sampler_keys.push(key);
+        // Persist the original (U,V) wrap modes so that shader-side helpers can reproduce the
+        // desired behaviour after UVs are remapped into the mega texture atlas.
+        self.sampler_address_modes
+            .insert(key, (address_mode_u, address_mode_v));
 
         Ok(key)
     }
@@ -236,6 +265,60 @@ impl Textures {
 
     pub fn remove_sampler(&mut self, key: SamplerKey) {
         self.samplers.remove(key);
+        self.sampler_indices.remove(key);
+        self.sampler_address_modes.remove(key);
+    }
+
+    pub fn sampler_index(&self, key: SamplerKey) -> Option<u32> {
+        self.sampler_indices.get(key).copied()
+    }
+
+    pub fn sampler_keys(&self) -> &[SamplerKey] {
+        &self.sampler_keys
+    }
+
+    pub fn sampler_address_modes(
+        &self,
+        key: SamplerKey,
+    ) -> (Option<AddressMode>, Option<AddressMode>) {
+        self.sampler_address_modes
+            .get(key)
+            .copied()
+            .unwrap_or((None, None))
+    }
+
+    pub fn sampler_bindings(
+        &self,
+        limits: &GpuSupportedLimits,
+        start_group: u32,
+        start_binding: u32,
+    ) -> SamplerBindings {
+        // We mirror what `MegaTextureBindings` does for texture views, but with samplers. The
+        // shader/template layer relies on this to emit @group/@binding declarations that line up
+        // with the bind group layouts assembled during render-pass creation.
+        let max_samplers_per_group = limits.max_samplers_per_shader_stage();
+        let mut remaining = self.sampler_keys.len() as u32;
+        let mut current_binding = start_binding;
+        let mut bindings = Vec::new();
+
+        while remaining > 0 {
+            let available = max_samplers_per_group.saturating_sub(current_binding);
+            if available == 0 {
+                current_binding = 0;
+                continue;
+            }
+
+            let samplers_in_group = remaining.min(available);
+            bindings.push(samplers_in_group);
+            remaining -= samplers_in_group;
+            current_binding = 0;
+        }
+
+        SamplerBindings {
+            start_group,
+            start_binding,
+            bind_group_bindings_len: bindings,
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-// 24 bytes
+// 36 bytes
 struct TextureInfoRaw {
     pixel_offset_x: u32,
     pixel_offset_y: u32,
@@ -6,6 +6,9 @@ struct TextureInfoRaw {
     height: u32,
     atlas_layer_index: u32,
     entry_attribute_uv_set_index: u32,
+    sampler_index: u32,
+    address_mode_u: u32,
+    address_mode_v: u32,
 }
 
 struct TextureInfo {
@@ -15,6 +18,9 @@ struct TextureInfo {
     layer_index: u32,
     entry_index: u32,
     attribute_uv_set_index: u32,
+    sampler_index: u32,
+    address_mode_u: u32,
+    address_mode_v: u32,
 }
 
 fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
@@ -25,6 +31,9 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
         (raw.atlas_layer_index >> 16u) & 0xFFFFu, // layer_index (16 bits)
         raw.entry_attribute_uv_set_index & 0xFFFFu,    // entry_index (16 bits)
         (raw.entry_attribute_uv_set_index >> 16u) & 0xFFFFu, // attribute_uv_index (16 bits)
+        raw.sampler_index,
+        raw.address_mode_u,
+        raw.address_mode_v,
     );
 }
 
@@ -61,10 +70,12 @@ fn _texture_load_atlas(info: TextureInfo, attribute_uv: vec2<f32>) -> vec4<f32> 
     switch info.atlas_index {
         {% for i in 0..total_atlas_index %}
             case {{ i }}u: {
-                return _texture_load_atlas_binding(info, atlas_tex_{{ i }}, attribute_uv);
+                return _texture_load_atlas_binding(info, atlas_tex_{{ i }}, info.sampler_index, attribute_uv);
             }
         {% endfor %}
         default: {
+            // If we somehow reference an out-of-range sampler (should not happen), return black to
+            // avoid propagating NaNs that could poison later colour math.
             return vec4<f32>(0.0, 0.0, 0.0, 0.0);
         }
     }
@@ -73,19 +84,100 @@ fn _texture_load_atlas(info: TextureInfo, attribute_uv: vec2<f32>) -> vec4<f32> 
 fn _texture_load_atlas_binding(
     info: TextureInfo,
     atlas_tex: texture_2d_array<f32>,
+    sampler_index: u32,
     attribute_uv: vec2<f32>,
 ) -> vec4<f32> {
-    let mip_level = 0u; // TODO: Handle mip levels
-
-    let cell_size = vec2<f32>(info.size);
-    let cell_offset = attribute_uv * cell_size;
-
-    var coords = info.pixel_offset + vec2<u32>(cell_offset);
-
-    var color = textureLoad(atlas_tex, coords, info.layer_index, mip_level);
-
-    color.a = 1.0;
+    let color = _texture_sample_with_sampler(
+        atlas_tex,
+        sampler_index,
+        attribute_uv,
+        info.pixel_offset,
+        info.size,
+        info.layer_index,
+        info.address_mode_u,
+        info.address_mode_v,
+    );
 
     return color;
+}
 
+fn _texture_sample_with_sampler(
+    atlas_tex: texture_2d_array<f32>,
+    sampler_index: u32,
+    attribute_uv: vec2<f32>,
+    pixel_offset: vec2<u32>,
+    pixel_size: vec2<u32>,
+    layer_index: u32,
+    address_mode_u: u32,
+    address_mode_v: u32,
+) -> vec4<f32> {
+    // Each slice inside the mega texture re-uses a single sampler. When individual GLTF textures
+    // request clamp/mirror behaviour we need to reproduce it manually before fetching from the
+    // atlas region.
+    let wrapped_uv = vec2<f32>(
+        apply_address_mode(attribute_uv.x, address_mode_u),
+        apply_address_mode(attribute_uv.y, address_mode_v),
+    );
+
+    let atlas_dimensions = vec2<f32>(textureDimensions(atlas_tex, 0u));
+    let texel_offset = vec2<f32>(pixel_offset);
+    let texel_size = vec2<f32>(pixel_size);
+    // Map attribute_uv in [0, 1] to texel centers within the sub-rectangle.
+    let texel_coords = texel_offset
+        + wrapped_uv * max(texel_size - vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 0.0))
+        + vec2<f32>(0.5, 0.5);
+    let uv = texel_coords / atlas_dimensions;
+
+    switch sampler_index {
+        {% for s in sampler_bindings %}
+            case {{ s.sampler_index }}u: {
+                return textureSampleLevel(
+                    atlas_tex,
+                    atlas_sampler_{{ s.sampler_index }},
+                    uv,
+                    i32(layer_index),
+                    0.0,
+                );
+            }
+        {% endfor %}
+        default: {
+            return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+        }
+    }
+}
+
+// Encoded address mode values must stay in sync with `encode_address_mode` in `pbr::material.rs`.
+const ADDRESS_MODE_CLAMP_TO_EDGE: u32 = 0u;
+const ADDRESS_MODE_REPEAT: u32 = 1u;
+const ADDRESS_MODE_MIRROR_REPEAT: u32 = 2u;
+
+fn apply_address_mode(coord: f32, mode: u32) -> f32 {
+    switch mode {
+        case ADDRESS_MODE_CLAMP_TO_EDGE: {
+            return clamp(coord, 0.0, 1.0);
+        }
+        case ADDRESS_MODE_MIRROR_REPEAT: {
+            return wrap_mirror(coord);
+        }
+        default: {
+            // Treat any unknown value as repeat. This matches the CPU encoding fallback and keeps
+            // behaviour predictable even if new address modes are added in the API.
+            return wrap_repeat(coord);
+        }
+    }
+}
+
+fn wrap_repeat(coord: f32) -> f32 {
+    return fract(coord);
+}
+
+fn wrap_mirror(coord: f32) -> f32 {
+    let floored = floor(coord);
+    let frac = coord - floored;
+    let is_odd = (i32(floored) & 1) != 0;
+    // `floor` increments every whole repeat. Odd tiles should flip the fractional component.
+    if (is_odd) {
+        return 1.0 - frac;
+    }
+    return frac;
 }

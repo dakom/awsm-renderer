@@ -18,6 +18,9 @@
 {% for b in texture_bindings %}
     @group({{ b.group }}u) @binding({{ b.binding }}u) var atlas_tex_{{ b.atlas_index }}: texture_2d_array<f32>;
 {% endfor %}
+{% for s in sampler_bindings %}
+    @group({{ s.group }}u) @binding({{ s.binding }}u) var atlas_sampler_{{ s.sampler_index }}: sampler;
+{% endfor %}
 
 
 const f32_max = 2139095039u;

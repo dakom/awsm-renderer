@@ -128,7 +128,7 @@ impl AwsmRendererBuilder {
         Self {
             gpu: gpu.into(),
             logging: AwsmRendererLogging::default(),
-            render_texture_formats: None, 
+            render_texture_formats: None,
             clear_color: Color::BLACK,
         }
     }
