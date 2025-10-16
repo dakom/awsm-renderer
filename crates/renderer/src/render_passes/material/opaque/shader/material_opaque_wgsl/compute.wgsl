@@ -89,6 +89,9 @@ fn main(
     textureStore(opaque_tex, coords, vec4<f32>(color, material_color.base.a));
 }
 
+// Decide whether we have enough UV inputs to evaluate every texture referenced by the material.
+// Each branch checks the number of TEXCOORD sets exposed by the mesh (see `attributes.rs`) against
+// what the material expects, and returns false when sampling would read garbage data.
 fn pbr_should_run(material: PbrMaterial) -> bool {
     {%- match uv_sets %}
         {% when Some with (uv_sets) %}
@@ -99,6 +102,7 @@ fn pbr_should_run(material: PbrMaterial) -> bool {
 }
 
 fn pbr_material_has_any_uvs(material: PbrMaterial) -> bool {
+    // When the mesh supplies zero UV sets we can only shade materials that also skip every UV-backed texture.
     return material.has_base_color_texture ||
         material.has_metallic_roughness_texture ||
         material.has_normal_texture ||
@@ -107,6 +111,7 @@ fn pbr_material_has_any_uvs(material: PbrMaterial) -> bool {
 }
 
 fn pbr_material_uses_uv_count(material: PbrMaterial, uv_set_count: u32) -> bool {
+    // Validate every texture's UV requirements individually so that a single mismatched binding aborts shading.
     if !texture_fits_uv_budget(material.has_base_color_texture, material.base_color_tex_info, uv_set_count) {
         return false;
     }
@@ -135,6 +140,6 @@ fn texture_fits_uv_budget(has_texture: bool, info: TextureInfo, uv_set_count: u3
         return true;
     }
 
-    // When the mesh exposes fewer TEXCOORD sets than a texture expects, we cannot sample safely.
+    // Reject textures that reference UV sets the mesh never uploaded.
     return info.attribute_uv_set_index < uv_set_count;
 }

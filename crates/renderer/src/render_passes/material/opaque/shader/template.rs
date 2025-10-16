@@ -21,8 +21,9 @@ pub struct ShaderTemplateMaterialOpaque {
     pub normals: bool,
     pub tangents: bool,
     pub color_sets: Option<u32>,
-    /// Number of UV sets available on the mesh. `None` means the mesh
-    /// supplied no TEXCOORD attributes.
+    /// Number of UV sets available on the mesh.
+    /// `None` means the mesh supplied no TEXCOORD attributes, which triggers the
+    /// `pbr_material_has_any_uvs` branch inside `pbr_should_run`.
     pub uv_sets: Option<u32>,
 }
 

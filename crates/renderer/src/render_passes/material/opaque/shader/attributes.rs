@@ -8,6 +8,7 @@ pub struct ShaderMaterialOpaqueVertexAttributes {
     /// Number of distinct `TEXCOORD_n` sets present on the mesh.
     ///
     /// Stored as (highest index + 1) so `Some(1)` means only `TEXCOORD_0` exists.
+    /// The shader uses this to decide whether `pbr_should_run` can safely sample every texture.
     pub uv_sets: Option<u32>,
 }
 
@@ -32,6 +33,7 @@ impl From<&MeshBufferInfo> for ShaderMaterialOpaqueVertexAttributes {
                 MeshBufferVertexAttributeInfo::TexCoords { count, .. } => {
                     // `count` is the zero-based TEXCOORD set index from glTF,
                     // so promote it to a human-friendly "number of sets".
+                    // `pbr_should_run` compares this against the texture metadata.
                     _self.uv_sets = Some(*count + 1);
                 }
                 MeshBufferVertexAttributeInfo::Joints { .. } => {
