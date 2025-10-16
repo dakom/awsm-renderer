@@ -1,23 +1,16 @@
-# Opaque material pass
+# Switch material for normals debugging
 
-- get Texture settings test working
-  - wrap modes
-  - filter modes
-  - http://127.0.0.1:9080/app/model/TextureSettings
-- alpha cutoff (not full alpha blend test, just cutoff, rest depends on transparent pass)
+# Opaque material pass
 - get basic lighting working
-  - Calculate world position
-  - don't worry about morphed normals yet
+  - actually pass it in
+  - point, spot, directional
 - metallic/roughness
 - normal textures
 - occlusion
 
-
-
 # Transparent material pass
+- cutoff
 - complete getting alpha blend mode working again
-
-# Load mip level in compute shader pass
 
 # Ensure normals are being recalculated
   - test with some model that has morphs
