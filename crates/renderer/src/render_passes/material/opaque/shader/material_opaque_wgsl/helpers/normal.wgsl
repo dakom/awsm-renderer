@@ -4,6 +4,7 @@ fn get_normal(
     attribute_data_offset: u32,
     vertex_attribute_stride: u32,
     pbr_material: PbrMaterial,
+    normal_matrix: mat3x3<f32>,
 ) -> vec3<f32> {
     var vertex_normal = get_vertex_normal(
         attribute_data_offset,
@@ -14,7 +15,8 @@ fn get_normal(
 
     // TODO - normal map?
 
-    return vertex_normal;
+    let world_normal = normal_matrix * vertex_normal;
+    return normalize(world_normal);
 
 }
 
@@ -30,7 +32,15 @@ fn _get_vertex_normal(attribute_data_offset: u32, vertex_index: u32, vertex_attr
     // First get to the right vertex, THEN to the right normal within that vertex
     let vertex_start = attribute_data_offset + (vertex_index * vertex_attribute_stride);
 
-    // normals are always the first attribute if they exist
-    let index = vertex_start;
+    let index = vertex_start + ATTRIBUTE_NORMAL_OFFSET;
     return vec3<f32>(attribute_data[index], attribute_data[index + 1], attribute_data[index + 2]);
+}
+
+fn safe_normalize(normal: vec3<f32>) -> vec3<f32> {
+    let len_sq = dot(normal, normal);
+    if (len_sq > 0.0) {
+        return normal * inverseSqrt(len_sq);
+    }
+    // fallback: up vector to avoid NaNs; scene lighting expects unit normal
+    return vec3<f32>(0.0, 0.0, 1.0);
 }

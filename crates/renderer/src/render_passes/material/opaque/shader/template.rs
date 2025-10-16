@@ -16,6 +16,8 @@ pub struct ShaderTemplateMaterialOpaque {
     /// Offset (in floats) within the packed vertex attribute array
     /// where the first UV component lives for each vertex.
     pub uv_sets_index: u32,
+    pub position_offset: u32,
+    pub normal_offset: u32,
     pub total_atlas_index: u32,
     pub texture_bindings: Vec<TextureBinding>,
     pub sampler_bindings: Vec<SamplerBinding>,
@@ -113,10 +115,15 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
 
         // see `impl Ord for MeshBufferVertexAttributeInfo`
         // for ordering here
-        let mut uv_sets_index = 0;
-        if value.attributes.normals {
-            uv_sets_index += 3; // normals use 3 floats
-        }
+        let position_offset = 0;
+        let mut uv_sets_index = 3; // positions always consume 3 floats
+        let normal_offset = if value.attributes.normals {
+            let offset = uv_sets_index;
+            uv_sets_index += 3;
+            offset
+        } else {
+            0
+        };
         if value.attributes.tangents {
             uv_sets_index += 4; // tangents use 4 floats
         }
@@ -128,6 +135,8 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             default_sampler_index,
             total_atlas_index,
             uv_sets_index,
+            position_offset,
+            normal_offset,
             has_atlas: total_atlas_index > 0,
             normals: value.attributes.normals,
             tangents: value.attributes.tangents,

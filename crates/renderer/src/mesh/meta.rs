@@ -96,6 +96,7 @@ impl MeshMeta {
         let material_morph_key = mesh.material_morph_key;
         let skin_key = mesh.skin_key;
         let material_key = mesh.material_key;
+        let transform_offset = transforms.buffer_offset(transform_key)?;
 
         // TODO
         // should be basically Vec<MeshBufferVertexAttributeInfo>
@@ -106,6 +107,7 @@ impl MeshMeta {
             buffer_info,
             attribute_indices_offset,
             attribute_data_offset,
+            transform_offset,
             materials,
             morphs,
         }

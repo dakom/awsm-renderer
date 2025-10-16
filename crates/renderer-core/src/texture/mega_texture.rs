@@ -89,6 +89,7 @@ pub struct MegaTextureEntry<ID> {
     pub pixel_offset: [u32; 2],
     pub image_data: ImageData,
     pub id: ID,
+    pub is_srgb_encoded: bool,
 }
 
 impl<ID> MegaTextureEntry<ID>
@@ -243,7 +244,7 @@ where
 
     pub fn add_entries(
         &mut self,
-        mut images: Vec<(ImageData, ID)>,
+        mut images: Vec<(ImageData, ID, IsSrgbEncoded)>,
     ) -> Result<Vec<MegaTextureEntryInfo<ID>>> {
         if self.atlases.is_empty() {
             self.atlases.push(MegaTextureAtlas::new(
@@ -300,6 +301,8 @@ where
     }
 }
 
+type IsSrgbEncoded = bool;
+
 impl<ID> MegaTextureAtlas<ID>
 where
     ID: std::hash::Hash + Eq + Clone + std::fmt::Debug,
@@ -318,15 +321,16 @@ where
         &mut self,
         lookup: &mut HashMap<ID, MegaTextureIndex>,
         atlas_index: usize,
-        images: Vec<(ImageData, ID)>,
+        images: Vec<(ImageData, ID, IsSrgbEncoded)>,
         new_entries: &mut Vec<MegaTextureEntryInfo<ID>>,
-    ) -> Result<Vec<(ImageData, ID)>> {
+    ) -> Result<Vec<(ImageData, ID, IsSrgbEncoded)>> {
         if images.is_empty() {
             return Ok(images);
         }
 
         // allows us to have a stable index and mutable vec that we can take from
-        let mut images: Vec<Option<(ImageData, ID)>> = images.into_iter().map(Some).collect();
+        let mut images: Vec<Option<(ImageData, ID, IsSrgbEncoded)>> =
+            images.into_iter().map(Some).collect();
 
         let padding = self.padding as i32;
         let padding_width_x2 = padding * 2;
@@ -382,7 +386,7 @@ where
             }
 
             for rect in inserted.into_iter() {
-                let (image_data, id) = images[rect.id() as usize].take().unwrap();
+                let (image_data, id, is_srgb_encoded) = images[rect.id() as usize].take().unwrap();
 
                 let index = MegaTextureIndex {
                     atlas: atlas_index
@@ -410,6 +414,7 @@ where
                     pixel_offset: [pixel_offset.0 as u32, pixel_offset.1 as u32],
                     id,
                     image_data,
+                    is_srgb_encoded,
                 };
 
                 new_entries.push(entry.into_info(index));
@@ -423,7 +428,7 @@ where
             }
 
             if layer_index as u32 >= self.max_depth {
-                let rejected_images: Vec<(ImageData, ID)> = rejected
+                let rejected_images: Vec<(ImageData, ID, IsSrgbEncoded)> = rejected
                     .into_iter()
                     .filter_map(|dim| images[dim.id() as usize].take())
                     .collect();

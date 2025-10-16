@@ -14,7 +14,7 @@ use crate::{
 
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_NORMAL: u32 = 1;
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_TANGENT: u32 = 1 << 1;
-pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 40;
+pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 44;
 pub const MATERIAL_MESH_META_BYTE_ALIGNMENT: usize = MATERIAL_MESH_META_BYTE_SIZE; // storage buffer is less strict
 
 pub static MATERIAL_BUFFER_USAGE: LazyLock<BufferUsage> =
@@ -27,6 +27,7 @@ pub struct MaterialMeshMeta<'a> {
     pub material_morph_key: Option<MaterialMorphKey>,
     pub attribute_indices_offset: usize,
     pub attribute_data_offset: usize,
+    pub transform_offset: usize,
     pub buffer_info: &'a MeshBufferInfo,
     pub materials: &'a Materials,
     pub morphs: &'a Morphs,
@@ -43,6 +44,7 @@ impl<'a> MaterialMeshMeta<'a> {
             buffer_info,
             attribute_indices_offset,
             attribute_data_offset,
+            transform_offset,
             materials,
             morphs,
         } = self;
@@ -97,6 +99,9 @@ impl<'a> MaterialMeshMeta<'a> {
 
         // Material (4 bytes)
         push_u32(materials.buffer_offset(material_key)? as u32);
+
+        // Transform offset (4 bytes)
+        push_u32(transform_offset as u32);
 
         // Vertex attribute offsets (8 bytes)
         push_u32(attribute_indices_offset as u32);

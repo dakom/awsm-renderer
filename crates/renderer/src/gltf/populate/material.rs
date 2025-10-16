@@ -149,7 +149,33 @@ impl GltfTextureInfo {
                     .get(texture_index)
                     .ok_or(AwsmGltfError::MissingTextureIndex(texture_index))?;
 
-                let texture_key = renderer.textures.add_image(image_data.clone())?;
+                let is_srgb_encoded = {
+                    // for BaseColor and Emissive, use sRGB
+                    // for everything else, use linear
+
+                    let mut is_srgb_encoded = false;
+                    for material in ctx.data.doc.materials() {
+                        let pbr = material.pbr_metallic_roughness();
+                        if let Some(tex) = pbr.base_color_texture() {
+                            if tex.texture().index() == self.index {
+                                is_srgb_encoded = true;
+                                break;
+                            }
+                        }
+                        if let Some(tex) = material.emissive_texture() {
+                            if tex.texture().index() == self.index {
+                                is_srgb_encoded = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    is_srgb_encoded
+                };
+
+                let texture_key = renderer
+                    .textures
+                    .add_image(image_data.clone(), is_srgb_encoded)?;
 
                 ctx.textures.lock().unwrap().insert(self.index, texture_key);
 

@@ -13,6 +13,9 @@
 {% include "material_opaque_wgsl/helpers/standard.wgsl" %}
 {% include "material_opaque_wgsl/helpers/normal.wgsl" %}
 
+const ATTRIBUTE_POSITION_OFFSET: u32 = {{ position_offset }}u;
+const ATTRIBUTE_NORMAL_OFFSET: u32 = {{ normal_offset }}u;
+
 // Mirrors the CPU-side `CameraBuffer` layout. The extra inverse matrices and frustum rays give
 // us everything needed to reconstruct world-space positions from a depth value inside this
 // compute pass.
@@ -34,8 +37,9 @@ struct CameraUniform {
 @group(0) @binding(3) var<storage, read> materials: array<PbrMaterialRaw>; // TODO - just raw data, derive PbrMaterialRaw if that's what we have?
 @group(0) @binding(4) var<storage, read> attribute_indices: array<u32>;
 @group(0) @binding(5) var<storage, read> attribute_data: array<f32>;
-@group(0) @binding(6) var<uniform> camera: CameraUniform;
-@group(0) @binding(7) var depth_tex: texture_depth_2d;
+@group(0) @binding(6) var<storage, read> model_transforms: array<mat4x4<f32>>;
+@group(0) @binding(7) var<uniform> camera: CameraUniform;
+@group(0) @binding(8) var depth_tex: texture_depth_2d;
 {% for b in texture_bindings %}
     @group({{ b.group }}u) @binding({{ b.binding }}u) var atlas_tex_{{ b.atlas_index }}: texture_2d_array<f32>;
 {% endfor %}
@@ -43,10 +47,53 @@ struct CameraUniform {
     @group({{ s.group }}u) @binding({{ s.binding }}u) var atlas_sampler_{{ s.sampler_index }}: sampler;
 {% endfor %}
 
+fn get_model_transform(byte_offset: u32) -> mat4x4<f32> {
+    return model_transforms[byte_offset / 64u];
+}
+
+fn normal_matrix_from_model(model: mat4x4<f32>) -> mat3x3<f32> {
+    let upper = mat3x3<f32>(
+        model[0].xyz,
+        model[1].xyz,
+        model[2].xyz,
+    );
+    return transpose(inverse_mat3(upper));
+}
+
+fn inverse_mat3(m: mat3x3<f32>) -> mat3x3<f32> {
+    let a00 = m[0][0]; let a01 = m[0][1]; let a02 = m[0][2];
+    let a10 = m[1][0]; let a11 = m[1][1]; let a12 = m[1][2];
+    let a20 = m[2][0]; let a21 = m[2][1]; let a22 = m[2][2];
+
+    let det = a00 * (a11 * a22 - a12 * a21) -
+              a01 * (a10 * a22 - a12 * a20) +
+              a02 * (a10 * a21 - a11 * a20);
+
+    let inv_det = 1.0 / det;
+
+    return mat3x3<f32>(
+        vec3<f32>(
+            (a11 * a22 - a12 * a21) * inv_det,
+            (a02 * a21 - a01 * a22) * inv_det,
+            (a01 * a12 - a02 * a11) * inv_det
+        ),
+        vec3<f32>(
+            (a12 * a20 - a10 * a22) * inv_det,
+            (a00 * a22 - a02 * a20) * inv_det,
+            (a02 * a10 - a00 * a12) * inv_det
+        ),
+        vec3<f32>(
+            (a10 * a21 - a11 * a20) * inv_det,
+            (a01 * a20 - a00 * a21) * inv_det,
+            (a00 * a11 - a01 * a10) * inv_det
+        )
+    );
+}
+
 
 const f32_max = 2139095039u;
 
-const ambient = vec3<f32>(1.0); // TODO - make this settable, or get from IBL
+const ambient = vec3<f32>(0.3); // TODO - make this settable, or get from IBL
 
 
 @compute @workgroup_size(8, 8)
@@ -75,6 +122,8 @@ fn main(
 
     let mesh_meta = mesh_metas[material_meta_offset / meta_size_in_bytes];
     let material_offset = mesh_meta.material_offset;
+    let model_transform = get_model_transform(mesh_meta.transform_offset);
+    let normal_matrix = normal_matrix_from_model(model_transform);
 
     let pbr_material = pbr_get_material(material_offset);
 
@@ -100,7 +149,12 @@ fn main(
             attribute_data_offset,
             vertex_attribute_stride,
             pbr_material,
+            normal_matrix,
         );
+
+        // DEBUGGING, JUST SHOW NORMAL AS COLOR
+        // textureStore(opaque_tex, coords, vec4<f32>(normal * 0.5 + 0.5, 1.0));
+        // return;
     {% else %}
         let normal = vec3<f32>(1.0, 1.0, 1.0);
     {% endif %}
@@ -115,7 +169,8 @@ fn main(
         attribute_indices_offset,
         attribute_data_offset,
         vertex_attribute_stride,
-        screen_dims_i32
+        screen_dims_i32,
+        model_transform
     );
 
     let material_color = pbr_get_material_color(
@@ -137,11 +192,13 @@ fn main(
         let light_brdf = light_to_brdf(get_light(i), normal, standard_coordinates.world_position);
 
         if (light_brdf.n_dot_l > 0.0001) {
-            color += brdf(material_color, light_brdf, ambient, standard_coordinates.surface_to_camera);
+            color += brdf(material_color, light_brdf, standard_coordinates.surface_to_camera);
         } else {
             color += unlit(material_color, ambient, standard_coordinates.surface_to_camera);
         }
     }
+
+    //color = unlit(material_color, vec3<f32>(1.0), standard_coordinates.surface_to_camera);
 
     // Write to output texture
     textureStore(opaque_tex, coords, vec4<f32>(color, material_color.base.a));

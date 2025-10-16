@@ -160,6 +160,9 @@ impl BindGroups {
             || self
                 .create_list
                 .contains(&BindGroupCreate::MaterialMorphTargetValuesResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::TransformsResize)
         {
             render_passes.material_opaque.bind_groups.recreate(&ctx)?;
             render_passes

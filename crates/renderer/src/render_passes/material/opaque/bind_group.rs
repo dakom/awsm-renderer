@@ -89,6 +89,16 @@ impl MaterialOpaqueBindGroups {
                 visibility_compute: true,
             },
             BindGroupLayoutCacheKeyEntry {
+                // Per-mesh model matrices needed to rotate normals into world space.
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
+            BindGroupLayoutCacheKeyEntry {
                 // Camera uniform gives us inverse matrices + frustum rays for depth reprojection.
                 resource: BindGroupLayoutResource::Buffer(
                     BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
@@ -221,45 +231,46 @@ impl MaterialOpaqueBindGroups {
             if group_idx == 0 {
                 // Group 0 always carries the shared buffers + visibility textures used by the
                 // compute material pass. Extra texture/sampler bindings are appended below.
-                entries.extend_from_slice(&[
-                    BindGroupEntry::new(
-                        0,
-                        BindGroupResource::Buffer(BufferBinding::new(
-                            &ctx.meshes.meta.material_gpu_buffer(),
-                        )),
-                    ),
-                    BindGroupEntry::new(
-                        1,
-                        BindGroupResource::TextureView(Cow::Borrowed(
-                            &ctx.render_texture_views.visibility_data,
-                        )),
-                    ),
-                    BindGroupEntry::new(
-                        2,
-                        BindGroupResource::TextureView(Cow::Borrowed(
-                            &ctx.render_texture_views.opaque_color,
-                        )),
-                    ),
-                    BindGroupEntry::new(
-                        3,
-                        BindGroupResource::Buffer(BufferBinding::new(
-                            &ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
-                        )),
-                    ),
-                    BindGroupEntry::new(
-                        4,
-                        BindGroupResource::Buffer(BufferBinding::new(
-                            &ctx.meshes.attribute_index_gpu_buffer(),
-                        )),
-                    ),
-                    BindGroupEntry::new(
-                        5,
-                        BindGroupResource::Buffer(BufferBinding::new(
-                            &ctx.meshes.attribute_data_gpu_buffer(),
-                        )),
-                    ),
-                ]);
-
+                entries.push(BindGroupEntry::new(
+                    entries.len() as u32,
+                    BindGroupResource::Buffer(BufferBinding::new(
+                        &ctx.meshes.meta.material_gpu_buffer(),
+                    )),
+                ));
+                entries.push(BindGroupEntry::new(
+                    entries.len() as u32,
+                    BindGroupResource::TextureView(Cow::Borrowed(
+                        &ctx.render_texture_views.visibility_data,
+                    )),
+                ));
+                entries.push(BindGroupEntry::new(
+                    entries.len() as u32,
+                    BindGroupResource::TextureView(Cow::Borrowed(
+                        &ctx.render_texture_views.opaque_color,
+                    )),
+                ));
+                entries.push(BindGroupEntry::new(
+                    entries.len() as u32,
+                    BindGroupResource::Buffer(BufferBinding::new(
+                        &ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
+                    )),
+                ));
+                entries.push(BindGroupEntry::new(
+                    entries.len() as u32,
+                    BindGroupResource::Buffer(BufferBinding::new(
+                        &ctx.meshes.attribute_index_gpu_buffer(),
+                    )),
+                ));
+                entries.push(BindGroupEntry::new(
+                    entries.len() as u32,
+                    BindGroupResource::Buffer(BufferBinding::new(
+                        &ctx.meshes.attribute_data_gpu_buffer(),
+                    )),
+                ));
+                entries.push(BindGroupEntry::new(
+                    entries.len() as u32,
+                    BindGroupResource::Buffer(BufferBinding::new(&ctx.transforms.gpu_buffer)),
+                ));
                 entries.push(BindGroupEntry::new(
                     entries.len() as u32,
                     BindGroupResource::Buffer(BufferBinding::new(&ctx.camera.gpu_buffer)),

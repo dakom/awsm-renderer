@@ -1,84 +1,121 @@
-//--------------------------------------------------------------------
-//  helpers (snake_case all the way)
-//--------------------------------------------------------------------
+// -------------------------------------------------------------
+// PBR (metal/roughness) BRDF with IBL stubs (WGSL)
+// Clean version: NO final saturate, safe for HDR + post tonemapping
+// -------------------------------------------------------------
 
-fn fresnel_schlick(cos_theta: f32, f0: vec3<f32>) -> vec3<f32> {
-    return f0 + (1.0 - f0) * pow(1.0 - cos_theta, 5.0);
+
+// --- microfacet helpers ---
+fn fresnel_schlick(cos_theta: f32, F0: vec3<f32>) -> vec3<f32> {
+    let ct = saturate(cos_theta);
+    let one_minus = 1.0 - ct;
+    return F0 + (1.0 - F0) * pow(one_minus, 5.0);
 }
 
 fn distribution_ggx(n_dot_h: f32, alpha: f32) -> f32 {
-    let a2 = alpha * alpha;
-    let d  = n_dot_h * n_dot_h * (a2 - 1.0) + 1.0;
-    return a2 / (pi * d * d);
+    let a  = max(alpha, 0.001);
+    let a2 = a * a;
+    let ndh = saturate(n_dot_h);
+    let d  = ndh * ndh * (a2 - 1.0) + 1.0;
+    return a2 / (PI * d * d + EPSILON);
 }
 
 fn geometry_schlick_ggx(n_dot_x: f32, alpha: f32) -> f32 {
-    let k = pow(alpha + 1.0, 2.0) * 0.125;   // (alpha+1)^2 / 8
-    return n_dot_x / (n_dot_x * (1.0 - k) + k);
+    let a = max(alpha, 0.001);
+    let k = ((a + 1.0) * (a + 1.0)) * 0.125; // (alpha+1)^2 / 8
+    let ndx = saturate(n_dot_x);
+    return ndx / (ndx * (1.0 - k) + k);
 }
 
-fn geometry_smith(n: vec3<f32>, v: vec3<f32>,
-                  l: vec3<f32>, alpha: f32) -> f32 {
+fn geometry_smith(n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, alpha: f32) -> f32 {
     let n_dot_v = saturate(dot(n, v));
     let n_dot_l = saturate(dot(n, l));
-    return geometry_schlick_ggx(n_dot_v, alpha) *
-           geometry_schlick_ggx(n_dot_l, alpha);
+    return geometry_schlick_ggx(n_dot_v, alpha) * geometry_schlick_ggx(n_dot_l, alpha);
 }
 
+// -------------------------------------------------------------
+// IBL STUBS (replace with real env sampling later)
+// -------------------------------------------------------------
+const ENV_DIFFUSE_COLOR  : vec3<f32> = vec3<f32>(0.22, 0.24, 0.26);
+const ENV_SPECULAR_COLOR : vec3<f32> = vec3<f32>(1.0, 0.98, 0.95);
+const ENV_INTENSITY_DIFF : f32 = 0.3;
+const ENV_INTENSITY_SPEC : f32 = 0.7;
 
-struct LightBrdf {
-    normal: vec3<f32>,
-    n_dot_l: f32,
-    light_dir: vec3<f32>,
-    radiance: vec3<f32>,
-};
+fn sampleIrradianceStub(n: vec3<f32>) -> vec3<f32> {
+    let hemi = 0.5 * (dot(n, vec3<f32>(0.0, 1.0, 0.0)) + 1.0);
+    let tint = mix(vec3<f32>(0.7, 0.7, 0.75), vec3<f32>(1.0, 1.0, 1.0), hemi);
+    return ENV_DIFFUSE_COLOR * tint * ENV_INTENSITY_DIFF;
+}
 
+fn samplePrefilteredEnvStub(R: vec3<f32>, roughness: f32) -> vec3<f32> {
+    let gloss = 1.0 - saturate(roughness);
+    let facing = saturate(R.y * 0.5 + 0.5);
+    let gain = mix(0.35, 1.0, gloss * facing);
+    return ENV_SPECULAR_COLOR * gain * ENV_INTENSITY_SPEC;
+}
 
-//--------------------------------------------------------------------
-//  main brdf (same math as before, but snake_case)
-//--------------------------------------------------------------------
-fn brdf(color: PbrMaterialColor, light_brdf: LightBrdf, ambient: vec3<f32>, surface_to_camera: vec3<f32>) -> vec3<f32> {
-    let n = light_brdf.normal;
-    let v = surface_to_camera;
-    let l = light_brdf.light_dir;
-    let radiance = light_brdf.radiance;
+fn sampleBRDFLUTStub(n_dot_v: f32, roughness: f32) -> vec2<f32> {
+    let ndv = saturate(n_dot_v);
+    let r   = clamp(roughness, 0.0, 1.0);
+    let x = mix(0.95, 0.45, r) * mix(1.0, 0.7, (1.0 - ndv));
+    let y = mix(0.04, 0.55, r) * mix(0.6, 1.0, (1.0 - ndv));
+    return vec2<f32>(x, y);
+}
 
-    let base_color_rgb   = color.base.rgb;
-    let mr           = color.metallic_roughness;
-    let metallic     = mr.x;
-    let roughness    = saturate(mr.y);
-    let alpha        = roughness * roughness;
+// -------------------------------------------------------------
+// Main BRDF
+// -------------------------------------------------------------
+fn brdf(color: PbrMaterialColor,
+        light_brdf: LightBrdf,
+        surface_to_camera: vec3<f32>) -> vec3<f32>
+{
+    let n = normalize(light_brdf.normal);
+    let v = normalize(surface_to_camera);
+    let l = normalize(light_brdf.light_dir);
+    let h = normalize(v + l);
 
-    let h            = normalize(v + l);
-    let n_dot_l      = saturate(dot(n, l));
-    let n_dot_v      = saturate(dot(n, v));
-    let n_dot_h      = saturate(dot(n, h));
-    let v_dot_h      = saturate(dot(v, h));
+    let base_color = color.base.rgb;  // already linear
+    let metallic   = clamp(color.metallic_roughness.x, 0.0, 1.0);
+    let rough_in   = clamp(color.metallic_roughness.y, 0.0, 1.0);
+    let roughness  = max(rough_in, 0.04);
+    let alpha      = roughness * roughness;
 
-    // fresnel base reflectance
-    let f0 = mix(vec3<f32>(0.04), base_color_rgb, metallic);
+    let n_dot_l = max(dot(n, l), 0.0);
+    let n_dot_v = max(dot(n, v), 0.0);
+    let n_dot_h = max(dot(n, h), 0.0);
+    let v_dot_h = max(dot(v, h), 0.0);
 
-    // specular
-    let f     = fresnel_schlick(v_dot_h, f0);
-    let d     = distribution_ggx(n_dot_h, alpha);
-    let g     = geometry_smith(n, v, l, alpha);
-    let spec  = (d * g) / max(4.0 * n_dot_l * n_dot_v, 0.001);
-    let spec_col = f * spec;
+    let F0 = mix(vec3<f32>(0.04), base_color, metallic);
 
-    // diffuse
-    let k_s   = f;
-    let k_d   = (1.0 - k_s) * (1.0 - metallic);
-    let diff_col = k_d * base_color_rgb * (1.0 / pi);
+    // --- direct lighting ---
+    var Lo = vec3<f32>(0.0);
+    if (n_dot_l > 0.0 && n_dot_v > 0.0) {
+        let F = fresnel_schlick(v_dot_h, F0);
+        let D = distribution_ggx(n_dot_h, alpha);
+        let G = geometry_smith(n, v, l, alpha);
 
-    // light contribution
-    let lo = (diff_col + spec_col) * radiance * n_dot_l;
+        let spec = (D * G) / max(4.0 * n_dot_l * n_dot_v, EPSILON);
+        let spec_col = F * spec;
 
-    // ambient + occlusion
-    let ao = color.occlusion;
-    let ambient_col = (diff_col + spec_col) * ambient * ao;
+        let k_d = (vec3<f32>(1.0) - F) * (1.0 - metallic);
+        let diff_col = k_d * base_color * (1.0 / PI);
 
-    // emissive
+        Lo = (diff_col + spec_col) * light_brdf.radiance * n_dot_l;
+    }
+
+    // --- IBL (stubbed) ---
+    let irradiance = sampleIrradianceStub(n);
+    let F_view = fresnel_schlick(n_dot_v, F0);
+    let k_d_indir = (vec3<f32>(1.0) - F_view) * (1.0 - metallic);
+    let Fd_indir = k_d_indir * base_color * (1.0 / PI) * irradiance * color.occlusion;
+
+    let R = reflect(-v, n);
+    let prefiltered = samplePrefilteredEnvStub(R, roughness);
+    let brdf = sampleBRDFLUTStub(n_dot_v, roughness);
+    let Fs_indir = prefiltered * (F0 * brdf.x + brdf.y);
+
+    // --- emissive ---
     let emissive = color.emissive;
 
-    return lo + ambient_col + emissive;
+    // --- final sum (HDR, no clamping) ---
+    return Lo + Fd_indir + Fs_indir + emissive;
 }

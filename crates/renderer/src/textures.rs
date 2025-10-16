@@ -161,10 +161,14 @@ impl Textures {
         }
     }
 
-    pub fn add_image(&mut self, image_data: ImageData) -> Result<TextureKey> {
+    pub fn add_image(
+        &mut self,
+        image_data: ImageData,
+        is_srgb_encoded: bool,
+    ) -> Result<TextureKey> {
         let key = self.textures.try_insert_with_key(|key| {
             self.mega_texture
-                .add_entries(vec![(image_data, key)])
+                .add_entries(vec![(image_data, key, is_srgb_encoded)])
                 .map_err(AwsmTextureError::from)
                 .and_then(|mut entries| entries.pop().ok_or(AwsmTextureError::MegaTexture))
         })?;

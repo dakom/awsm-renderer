@@ -47,12 +47,7 @@ pub(super) fn pack_vertex_attributes(
     vertex_attribute_bytes: &mut Vec<u8>,
 ) -> Result<Vec<MeshBufferVertexAttributeInfo>> {
     let mut per_vertex_attributes: Vec<(&MeshBufferVertexAttributeInfo, &Cow<'_, [u8]>)> =
-        attribute_data
-            .iter()
-            .filter(|(attr_info, _)| {
-                !matches!(attr_info, MeshBufferVertexAttributeInfo::Positions { .. })
-            })
-            .collect();
+        attribute_data.iter().collect();
 
     if per_vertex_attributes.is_empty() {
         return Ok(Vec::new());

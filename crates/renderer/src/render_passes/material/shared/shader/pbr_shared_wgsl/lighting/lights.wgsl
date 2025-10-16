@@ -11,47 +11,52 @@ struct Light {
 };
 
 fn get_light(index: u32) -> Light {
-    // for now, hardcode directional light
-
-    if index == 0u {
-        // Main light: from above-right for good specular highlights
-        return Light(
-            1u,
-            vec3<f32>(1.0, 1.0, 1.0),   // Pure white
-            1.0,
-            vec3<f32>(5.0, 8.0, 3.0),   // Above and to the right
-            100.0,
-            vec3<f32>(-0.5, -0.8, -0.3), // Pointing toward origin
-            0.9,
-            0.85,
-        );
-    } else {
-        // Side light: to illuminate normals and reduce harsh shadows
-        return Light(
-            1u,
-            vec3<f32>(1.0, 1.0, 1.0),   // Pure white
-            0.6,
-            vec3<f32>(-3.0, 2.0, 5.0),  // From the side
-            100.0,
-            vec3<f32>(0.3, -0.2, -0.5), // Pointing toward origin
-            0.9,
-            0.85,
-        );
+    switch (index) {
+        case 0u: { // key directional light
+            return Light(
+                1u,
+                vec3<f32>(1.0, 1.0, 1.0),
+                3.0,
+                vec3<f32>(0.0, 0.0, 0.0),
+                0.0,
+                normalize(vec3<f32>(-0.45, -0.35, -0.8)),
+                0.0,
+                0.0,
+            );
+        }
+        case 1u: { // point fill/highlight
+            return Light(
+                2u,
+                vec3<f32>(1.0, 0.95, 0.9),
+                20.0,
+                vec3<f32>(2.5, 3.0, 2.0),
+                30.0,
+                vec3<f32>(0.0, 0.0, 0.0),
+                0.0,
+                0.0,
+            );
+        }
+        default: {
+            return Light(
+                0u,
+                vec3<f32>(0.0),
+                0.0,
+                vec3<f32>(0.0),
+                0.0,
+                vec3<f32>(0.0),
+                0.0,
+                0.0,
+            );
+        }
     }
-
-    // let offset = index * 16u;
-    // return Light(
-    //     u32(lights[offset + 0u]),
-    //     vec3<f32>(lights[offset + 1u], lights[offset + 2u], lights[offset + 3u]),
-    //     lights[offset + 4u],
-    //     vec3<f32>(lights[offset + 5u], lights[offset + 6u], lights[offset + 7u]),
-    //     lights[offset + 8u],
-    //     vec3<f32>(lights[offset + 9u], lights[offset + 10u], lights[offset + 11u]),
-    //     lights[offset + 12u],
-    //     lights[offset + 13u],
-    //     // 14 and 15 are padding
-    // );
 }
+
+struct LightBrdf {
+    normal: vec3<f32>,
+    n_dot_l: f32,
+    light_dir: vec3<f32>,
+    radiance: vec3<f32>,
+};
 
 fn light_to_brdf(light:Light, normal: vec3<f32>, world_position: vec3<f32>) -> LightBrdf {
     var light_dir: vec3<f32>;

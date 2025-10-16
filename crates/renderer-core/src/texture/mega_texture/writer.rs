@@ -128,6 +128,8 @@ impl<ID> MegaTextureAtlas<ID> {
     }
 }
 
+const UNIFORM_BUFFER_SIZE: usize = 24; // 5 * 4 bytes (u32) + 4 bytes padding
+
 impl<ID> MegaTextureLayer<ID> {
     pub async fn write_texture_to_array(
         &self,
@@ -160,7 +162,7 @@ impl<ID> MegaTextureLayer<ID> {
                 let uniform_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(
                         Some("Atlas Uniform Buffer"),
-                        16,
+                        UNIFORM_BUFFER_SIZE,
                         BufferUsage::new().with_uniform().with_copy_dst(),
                     )
                     .into(),
@@ -179,9 +181,11 @@ impl<ID> MegaTextureLayer<ID> {
                 entry.pixel_offset[1],
                 padding,
                 layer_index,
+                if entry.is_srgb_encoded { 1u32 } else { 0u32 },
+                0u32, // padding to make size 24 bytes
             ];
 
-            let uniform_data: [u8; 16] = entry_data
+            let uniform_data: [u8; UNIFORM_BUFFER_SIZE] = entry_data
                 .iter()
                 .flat_map(|&f| f.to_ne_bytes())
                 .collect::<Vec<u8>>()
@@ -206,7 +210,7 @@ impl<ID> MegaTextureLayer<ID> {
                         BindGroupEntry::new(
                             2,
                             BindGroupResource::Buffer(
-                                BufferBinding::new(&uniform_buffer).with_size(16),
+                                BufferBinding::new(&uniform_buffer).with_size(UNIFORM_BUFFER_SIZE),
                             ),
                         ),
                     ],

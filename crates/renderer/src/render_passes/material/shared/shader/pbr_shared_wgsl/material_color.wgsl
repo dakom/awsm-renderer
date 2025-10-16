@@ -102,7 +102,7 @@ fn _pbr_material_base_color(material: PbrMaterial, attribute_uv: vec2<f32>, mip_
     var color = material.base_color_factor;
     if material.has_base_color_texture {
         color *=
-            texture_load_atlas_srgb(material.base_color_tex_info, attribute_uv, mip_level);
+            texture_load_atlas(material.base_color_tex_info, attribute_uv, mip_level);
     }
 
     // compute pass only deals with fully opaque
@@ -119,7 +119,7 @@ fn _pbr_material_metallic_roughness_color(
 ) -> vec2<f32> {
     var color = vec2<f32>(material.metallic_factor, material.roughness_factor);
     if material.has_metallic_roughness_texture {
-        let tex = texture_load_atlas_srgb(material.metallic_roughness_tex_info, attribute_uv, mip_level);
+        let tex = texture_load_atlas(material.metallic_roughness_tex_info, attribute_uv, mip_level);
         // glTF uses B channel for metallic, G channel for roughness
         color *= vec2<f32>(tex.b, tex.g);
     }
@@ -134,7 +134,7 @@ fn _pbr_normal_color(
 ) -> vec3<f32> {
     let normal_scale = material.normal_scale;
     if material.has_normal_texture {
-        let tex = texture_load_atlas_srgb(material.normal_tex_info, attribute_uv, mip_level);
+        let tex = texture_load_atlas(material.normal_tex_info, attribute_uv, mip_level);
         // normal map is in tangent space, so we need to transform it to world space
         let tangent_normal = normalize(vec3<f32>(tex.r * 2.0 - 1.0, tex.g * 2.0 - 1.0, tex.b));
         // For simplicity, assume TBN matrix is identity, so we just return the tangent normal
@@ -152,7 +152,7 @@ fn _pbr_occlusion_color(
 ) -> f32 {
     var occlusion = 1.0;
     if material.has_occlusion_texture {
-        let tex = texture_load_atlas_srgb(material.occlusion_tex_info, attribute_uv, mip_level);
+        let tex = texture_load_atlas(material.occlusion_tex_info, attribute_uv, mip_level);
         occlusion = mix(1.0, tex.r, material.occlusion_strength);
     }
     return occlusion;
@@ -166,7 +166,7 @@ fn _pbr_material_emissive_color(
     var color = material.emissive_factor;
     if material.has_emissive_texture {
         color *=
-            texture_load_atlas_srgb(material.emissive_tex_info, attribute_uv, mip_level).rgb;
+            texture_load_atlas(material.emissive_tex_info, attribute_uv, mip_level).rgb;
     }
     return color;
 }
