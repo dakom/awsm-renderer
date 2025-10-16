@@ -87,6 +87,10 @@ fn _texture_load_atlas_binding(
     sampler_index: u32,
     attribute_uv: vec2<f32>,
 ) -> vec4<f32> {
+    // We currently sample the base mip level. When per-pixel derivatives become available inside
+    // the compute pass we can replace this `0` with an analytically chosen LOD.
+    let mip_level = 0.0;
+
     let color = _texture_sample_with_sampler(
         atlas_tex,
         sampler_index,
@@ -96,6 +100,7 @@ fn _texture_load_atlas_binding(
         info.layer_index,
         info.address_mode_u,
         info.address_mode_v,
+        mip_level,
     );
 
     return color;
@@ -110,6 +115,7 @@ fn _texture_sample_with_sampler(
     layer_index: u32,
     address_mode_u: u32,
     address_mode_v: u32,
+    mip_level: f32,
 ) -> vec4<f32> {
     // Each slice inside the mega texture re-uses a single sampler. When individual GLTF textures
     // request clamp/mirror behaviour we need to reproduce it manually before fetching from the
@@ -136,7 +142,7 @@ fn _texture_sample_with_sampler(
                     atlas_sampler_{{ s.sampler_index }},
                     uv,
                     i32(layer_index),
-                    0.0,
+                    mip_level,
                 );
             }
         {% endfor %}
