@@ -143,7 +143,7 @@ fn main(
     let triangle_indices = vec3<u32>(attribute_indices[base_triangle_index], attribute_indices[base_triangle_index + 1], attribute_indices[base_triangle_index + 2]);
 
     {% if normals %}
-        let normal = get_normal(
+        let world_normal = get_world_normal(
             triangle_indices,
             barycentric,
             attribute_data_offset,
@@ -153,10 +153,10 @@ fn main(
         );
 
         // DEBUGGING, JUST SHOW NORMAL AS COLOR
-        // textureStore(opaque_tex, coords, vec4<f32>(normal * 0.5 + 0.5, 1.0));
+        // textureStore(opaque_tex, coords, vec4<f32>(world_normal * 0.5 + 0.5, 1.0));
         // return;
     {% else %}
-        let normal = vec3<f32>(1.0, 1.0, 1.0);
+        let world_normal = vec3<f32>(1.0, 1.0, 1.0);
     {% endif %}
 
 
@@ -181,7 +181,7 @@ fn main(
         barycentric,
         vertex_attribute_stride,
         texture_lods,
-        normal
+        world_normal
     );
 
     var color = vec3<f32>(0.0);
@@ -189,7 +189,7 @@ fn main(
     // TODO - lighting
     let n_lights = 2u;
     for(var i = 0u; i < n_lights; i = i + 1u) {
-        let light_brdf = light_to_brdf(get_light(i), normal, standard_coordinates.world_position);
+        let light_brdf = light_to_brdf(get_light(i), world_normal, standard_coordinates.world_position);
 
         if (light_brdf.n_dot_l > 0.0001) {
             color += brdf(material_color, light_brdf, standard_coordinates.surface_to_camera);

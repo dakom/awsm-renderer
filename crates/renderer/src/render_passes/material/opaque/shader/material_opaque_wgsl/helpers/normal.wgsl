@@ -1,4 +1,4 @@
-fn get_normal(
+fn get_world_normal(
     triangle_indices: vec3<u32>,
     barycentric: vec3<f32>,
     attribute_data_offset: u32,
@@ -15,9 +15,7 @@ fn get_normal(
 
     // TODO - normal map?
 
-    let world_normal = normal_matrix * vertex_normal;
-    return normalize(world_normal);
-
+    return safe_normalize(normal_matrix * vertex_normal);
 }
 
 fn get_vertex_normal(attribute_data_offset: u32, triangle_indices: vec3<u32>, barycentric: vec3<f32>, vertex_attribute_stride: u32) -> vec3<f32> {
