@@ -9,10 +9,10 @@ pub mod skin;
 pub mod triangle;
 pub mod visibility;
 
-use super::populate::transforms::transform_gltf_node;
-
 use awsm_renderer_core::pipeline::primitive::{FrontFace, IndexFormat};
+use glam::{Mat4, Quat, Vec3};
 use gltf::Mesh;
+use std::collections::HashMap;
 
 use crate::{
     gltf::buffers::{
@@ -58,6 +58,76 @@ pub struct GltfBuffers {
 
     // first level is mesh, second level is primitive
     pub meshes: Vec<Vec<MeshBufferInfoWithOffset>>,
+}
+
+fn compute_world_matrices(doc: &gltf::Document) -> HashMap<usize, Mat4> {
+    let mut world = HashMap::new();
+
+    for scene in doc.scenes() {
+        for node in scene.nodes() {
+            accumulate_world_matrix(&mut world, &node, Mat4::IDENTITY);
+        }
+    }
+
+    world
+}
+
+fn accumulate_world_matrix(
+    world: &mut HashMap<usize, Mat4>,
+    node: &gltf::Node<'_>,
+    parent_world: Mat4,
+) {
+    let local = node_local_matrix(node);
+    let world_matrix = parent_world * local;
+    world.insert(node.index(), world_matrix);
+
+    for child in node.children() {
+        accumulate_world_matrix(world, &child, world_matrix);
+    }
+}
+
+fn node_local_matrix(node: &gltf::Node<'_>) -> Mat4 {
+    match node.transform() {
+        gltf::scene::Transform::Matrix { matrix } => Mat4::from_cols_array_2d(&matrix),
+        gltf::scene::Transform::Decomposed {
+            translation,
+            rotation,
+            scale,
+        } => {
+            Mat4::from_translation(Vec3::from_array(translation))
+                * Mat4::from_quat(Quat::from_array(rotation))
+                * Mat4::from_scale(Vec3::from_array(scale))
+        }
+    }
+}
+
+fn determine_front_face(
+    mesh_index: usize,
+    doc: &gltf::Document,
+    world_matrices: &HashMap<usize, Mat4>,
+) -> FrontFace {
+    let mut front_face: Option<FrontFace> = None;
+
+    for node in doc.nodes() {
+        if let Some(mesh) = node.mesh() {
+            if mesh.index() == mesh_index {
+                let det = world_matrices
+                    .get(&node.index())
+                    .map(Mat4::determinant)
+                    .unwrap_or_else(|| node_local_matrix(&node).determinant());
+
+                if det < 0.0 {
+                    return FrontFace::Cw;
+                }
+
+                if front_face.is_none() {
+                    front_face = Some(FrontFace::Ccw);
+                }
+            }
+        }
+    }
+
+    front_face.unwrap_or(FrontFace::Ccw)
 }
 
 #[derive(Clone, Debug)]
@@ -218,6 +288,8 @@ impl From<MeshBufferTriangleDataInfoWithOffset> for MeshBufferTriangleDataInfo {
 
 impl GltfBuffers {
     pub fn new(doc: &gltf::Document, buffers: Vec<Vec<u8>>) -> Result<Self> {
+        let world_matrices = compute_world_matrices(doc);
+
         // refactor original buffers into the format we want
         // namely, pack the data in a predictable order
         // arranged by primitive
@@ -235,14 +307,7 @@ impl GltfBuffers {
         for mesh in doc.meshes() {
             let mut primitive_buffer_infos = Vec::new();
 
-            let front_face = {
-                doc.nodes()
-                    .find(|node| {
-                        node.mesh().is_some() && node.mesh().unwrap().index() == mesh.index()
-                    })
-                    .map(|node| transform_gltf_node(&node).winding_order())
-                    .unwrap_or(FrontFace::Ccw) // Default to CCW if no node found
-            };
+            let front_face = determine_front_face(mesh.index(), doc, &world_matrices);
             for primitive in mesh.primitives() {
                 let index: MeshBufferAttributeIndexInfoWithOffset =
                     match GltfMeshBufferIndexInfo::maybe_new(

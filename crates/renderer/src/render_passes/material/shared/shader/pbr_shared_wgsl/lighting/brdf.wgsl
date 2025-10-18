@@ -64,58 +64,49 @@ fn sampleBRDFLUTStub(n_dot_v: f32, roughness: f32) -> vec2<f32> {
 // -------------------------------------------------------------
 // Main BRDF
 // -------------------------------------------------------------
-fn brdf(color: PbrMaterialColor,
-        light_brdf: LightBrdf,
-        surface_to_camera: vec3<f32>) -> vec3<f32>
-{
-    let n = normalize(light_brdf.normal);
-    let v = normalize(surface_to_camera);
-    let l = normalize(light_brdf.light_dir);
-    let h = normalize(v + l);
+//
+fn brdf(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera: vec3<f32>) -> vec3<f32> {
+    let n = safe_normalize(light_brdf.normal);
+    let v = safe_normalize(surface_to_camera);
+    let l = safe_normalize(light_brdf.light_dir);
+    let h = safe_normalize(v + l);
 
-    let base_color = color.base.rgb;  // already linear
+    let base_color = color.base.rgb;    // linear
     let metallic   = clamp(color.metallic_roughness.x, 0.0, 1.0);
     let rough_in   = clamp(color.metallic_roughness.y, 0.0, 1.0);
     let roughness  = max(rough_in, 0.04);
-    let alpha      = roughness * roughness;
+    let alpha      = max(roughness * roughness, 1e-4);
 
     let n_dot_l = max(dot(n, l), 0.0);
-    let n_dot_v = max(dot(n, v), 0.0);
+    let n_dot_v = max(dot(n, v), 1e-4);
     let n_dot_h = max(dot(n, h), 0.0);
     let v_dot_h = max(dot(v, h), 0.0);
 
     let F0 = mix(vec3<f32>(0.04), base_color, metallic);
 
-    // --- direct lighting ---
-    var Lo = vec3<f32>(0.0);
-    if (n_dot_l > 0.0 && n_dot_v > 0.0) {
-        let F = fresnel_schlick(v_dot_h, F0);
-        let D = distribution_ggx(n_dot_h, alpha);
-        let G = geometry_smith(n, v, l, alpha);
+    // Direct
+    let F = fresnel_schlick(v_dot_h, F0);
+    let D = distribution_ggx(n_dot_h, alpha);
+    let G = geometry_smith(n, v, l, alpha);
 
-        let spec = (D * G) / max(4.0 * n_dot_l * n_dot_v, EPSILON);
-        let spec_col = F * spec;
+    let spec     = (D * G) / max(4.0 * n_dot_l * n_dot_v, EPSILON);
+    let spec_col = F * spec;
 
-        let k_d = (vec3<f32>(1.0) - F) * (1.0 - metallic);
-        let diff_col = k_d * base_color * (1.0 / PI);
+    let k_d      = (vec3<f32>(1.0) - F) * (1.0 - metallic);
+    let diff_col = k_d * base_color * (1.0 / PI);
 
-        Lo = (diff_col + spec_col) * light_brdf.radiance * n_dot_l;
-    }
+    let Lo = (diff_col + spec_col) * light_brdf.radiance * n_dot_l;
 
-    // --- IBL (stubbed) ---
+    // IBL stubs (unchanged, but use safe normal and clamped ndv)
     let irradiance = sampleIrradianceStub(n);
-    let F_view = fresnel_schlick(n_dot_v, F0);
-    let k_d_indir = (vec3<f32>(1.0) - F_view) * (1.0 - metallic);
-    let Fd_indir = k_d_indir * base_color * (1.0 / PI) * irradiance * color.occlusion;
+    let F_view     = fresnel_schlick(n_dot_v, F0);
+    let k_d_indir  = (vec3<f32>(1.0) - F_view) * (1.0 - metallic);
+    let Fd_indir   = k_d_indir * base_color * (1.0 / PI) * irradiance * color.occlusion;
 
-    let R = reflect(-v, n);
+    let R          = reflect(-v, n);
     let prefiltered = samplePrefilteredEnvStub(R, roughness);
-    let brdf = sampleBRDFLUTStub(n_dot_v, roughness);
-    let Fs_indir = prefiltered * (F0 * brdf.x + brdf.y);
+    let brdf_lut    = sampleBRDFLUTStub(n_dot_v, roughness);
+    let Fs_indir    = prefiltered * (F0 * brdf_lut.x + brdf_lut.y);
 
-    // --- emissive ---
-    let emissive = color.emissive;
-
-    // --- final sum (HDR, no clamping) ---
-    return Lo + Fd_indir + Fs_indir + emissive;
+    return Lo + Fd_indir + Fs_indir + color.emissive;
 }

@@ -155,7 +155,7 @@ impl Meshes {
         self.visibility_index_dirty = true;
 
         // visibility - data
-        self.visibility_data_buffers.update(key, visibility_data);
+        let visibility_data_offset = self.visibility_data_buffers.update(key, visibility_data);
         self.visibility_data_dirty = true;
 
         // attributes - index
@@ -191,6 +191,7 @@ impl Meshes {
             buffer_info,
             attribute_indices_offset,
             attribute_data_offset,
+            visibility_data_offset,
             materials,
             transforms,
             &self.morphs,
@@ -330,7 +331,10 @@ impl Meshes {
                 self.visibility_data_dirty,
                 &mut self.visibility_data_buffers,
                 &mut self.visibility_data_gpu_buffer,
-                BufferUsage::new().with_copy_dst().with_vertex(),
+                BufferUsage::new()
+                    .with_copy_dst()
+                    .with_vertex()
+                    .with_storage(),
                 "MeshVisibilityData",
                 None,
             ),

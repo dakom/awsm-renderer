@@ -14,6 +14,7 @@ fn get_world_normal(
     );
 
     // TODO - normal map?
+    //
 
     return safe_normalize(normal_matrix * vertex_normal);
 }
@@ -30,7 +31,7 @@ fn _get_vertex_normal(attribute_data_offset: u32, vertex_index: u32, vertex_attr
     // First get to the right vertex, THEN to the right normal within that vertex
     let vertex_start = attribute_data_offset + (vertex_index * vertex_attribute_stride);
 
-    let index = vertex_start + ATTRIBUTE_NORMAL_OFFSET;
+    let index = vertex_start; // normals are first 3 floats in the attribute data for the vertex
     return vec3<f32>(attribute_data[index], attribute_data[index + 1], attribute_data[index + 2]);
 }
 

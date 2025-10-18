@@ -43,6 +43,7 @@ pub enum BindGroupCreate {
     CameraInitOnly,
     LightsResize,
     TransformsResize,
+    TransformNormalsResize,
     GeometryMorphTargetWeightsResize,
     GeometryMorphTargetValuesResize,
     MaterialMorphTargetWeightsResize,
@@ -163,6 +164,9 @@ impl BindGroups {
             || self
                 .create_list
                 .contains(&BindGroupCreate::TransformsResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::TransformNormalsResize)
         {
             render_passes.material_opaque.bind_groups.recreate(&ctx)?;
             render_passes

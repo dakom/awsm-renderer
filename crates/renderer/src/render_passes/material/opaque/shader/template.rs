@@ -16,8 +16,6 @@ pub struct ShaderTemplateMaterialOpaque {
     /// Offset (in floats) within the packed vertex attribute array
     /// where the first UV component lives for each vertex.
     pub uv_sets_index: u32,
-    pub position_offset: u32,
-    pub normal_offset: u32,
     pub total_atlas_index: u32,
     pub texture_bindings: Vec<TextureBinding>,
     pub sampler_bindings: Vec<SamplerBinding>,
@@ -30,6 +28,8 @@ pub struct ShaderTemplateMaterialOpaque {
     /// `None` means the mesh supplied no TEXCOORD attributes, which triggers the
     /// `pbr_material_has_any_uvs` branch inside `pbr_should_run`.
     pub uv_sets: Option<u32>,
+    pub debug: ShaderTemplateMaterialOpaqueDebug,
+    pub mipmap: MipmapMode,
 }
 
 #[derive(Debug)]
@@ -115,15 +115,11 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
 
         // see `impl Ord for MeshBufferVertexAttributeInfo`
         // for ordering here
-        let position_offset = 0;
-        let mut uv_sets_index = 3; // positions always consume 3 floats
-        let normal_offset = if value.attributes.normals {
-            let offset = uv_sets_index;
-            uv_sets_index += 3;
-            offset
-        } else {
-            0
-        };
+        //
+        let mut uv_sets_index = 0;
+        if value.attributes.normals {
+            uv_sets_index += 3; // normals always consume 3 floats
+        }
         if value.attributes.tangents {
             uv_sets_index += 4; // tangents use 4 floats
         }
@@ -135,24 +131,38 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             default_sampler_index,
             total_atlas_index,
             uv_sets_index,
-            position_offset,
-            normal_offset,
             has_atlas: total_atlas_index > 0,
             normals: value.attributes.normals,
             tangents: value.attributes.tangents,
             color_sets: value.attributes.color_sets,
             uv_sets: value.attributes.uv_sets,
+            mipmap: MipmapMode::Lod,
+            debug: ShaderTemplateMaterialOpaqueDebug {
+                ..Default::default()
+            },
         };
 
         Ok(_self)
     }
 }
 
+#[derive(Debug)]
+enum MipmapMode {
+    None,
+    Gradient,
+    Lod,
+}
+
+#[derive(Debug, Default)]
+struct ShaderTemplateMaterialOpaqueDebug {
+    mips: bool,
+}
+
 impl ShaderTemplateMaterialOpaque {
     pub fn into_source(self) -> Result<String> {
         let source = self.render()?;
 
-        //debug_unique_string(1, &source, || print_shader_source(&source, true));
+        //debug_unique_string(1, &source, || print_shader_source(&source, false));
 
         Ok(source)
     }

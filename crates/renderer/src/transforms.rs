@@ -44,7 +44,9 @@ pub struct Transforms {
     gpu_dirty: bool,
     root_node: TransformKey,
     buffer: DynamicUniformBuffer<TransformKey>,
+    normals_buffer: DynamicUniformBuffer<TransformKey>,
     pub(crate) gpu_buffer: web_sys::GpuBuffer,
+    pub(crate) normals_gpu_buffer: web_sys::GpuBuffer,
 }
 
 static BUFFER_USAGE: LazyLock<BufferUsage> =
@@ -53,12 +55,21 @@ static BUFFER_USAGE: LazyLock<BufferUsage> =
 impl Transforms {
     pub const INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
     pub const BYTE_SIZE: usize = 64; // 4x4 matrix of f32 is 64 bytes
+    pub const NORMALS_BYTE_SIZE: usize = 36; // 3x3 matrix of f32 is 36 bytes
 
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let gpu_buffer = gpu.create_buffer(
             &BufferDescriptor::new(
                 Some("Transforms"),
                 Transforms::INITIAL_CAPACITY * Transforms::BYTE_SIZE,
+                *BUFFER_USAGE,
+            )
+            .into(),
+        )?;
+        let normals_gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Normal Transform Matrices"),
+                Transforms::INITIAL_CAPACITY * Transforms::NORMALS_BYTE_SIZE,
                 *BUFFER_USAGE,
             )
             .into(),
@@ -70,6 +81,14 @@ impl Transforms {
             None,
             Some("Transforms".to_string()),
         );
+
+        let normals_buffer = DynamicUniformBuffer::new(
+            Self::INITIAL_CAPACITY,
+            Self::NORMALS_BYTE_SIZE,
+            None,
+            Some("Normal Transform Matrices".to_string()),
+        );
+
         let mut locals = SlotMap::with_capacity_and_key(Self::INITIAL_CAPACITY);
         let mut world_matrices = SecondaryMap::with_capacity(Self::INITIAL_CAPACITY);
         let mut children = SecondaryMap::new();
@@ -88,7 +107,9 @@ impl Transforms {
             gpu_dirty: true,
             root_node,
             buffer,
+            normals_buffer,
             gpu_buffer,
+            normals_gpu_buffer,
         })
     }
 
@@ -102,6 +123,8 @@ impl Transforms {
         self.dirties.insert(key);
 
         self.buffer.update(key, &[0; Self::BYTE_SIZE]);
+        self.normals_buffer
+            .update(key, &[0; Self::NORMALS_BYTE_SIZE]);
 
         self.set_parent(key, parent);
 
@@ -121,6 +144,7 @@ impl Transforms {
         self.children.remove(key);
         self.dirties.remove(&key);
         self.buffer.remove(key);
+        self.normals_buffer.remove(key);
 
         self.gpu_dirty = true;
     }
@@ -219,7 +243,28 @@ impl Transforms {
                 bind_groups.mark_create(BindGroupCreate::TransformsResize);
             }
 
+            if let Some(new_size) = self.normals_buffer.take_gpu_needs_resize() {
+                self.normals_gpu_buffer = gpu.create_buffer(
+                    &BufferDescriptor::new(
+                        Some("Normal Transform Matrices"),
+                        new_size,
+                        *BUFFER_USAGE,
+                    )
+                    .into(),
+                )?;
+
+                bind_groups.mark_create(BindGroupCreate::TransformNormalsResize);
+            }
+
             gpu.write_buffer(&self.gpu_buffer, None, self.buffer.raw_slice(), None, None)?;
+
+            gpu.write_buffer(
+                &self.normals_gpu_buffer,
+                None,
+                self.normals_buffer.raw_slice(),
+                None,
+                None,
+            )?;
 
             self.gpu_dirty = false;
         }
@@ -241,6 +286,12 @@ impl Transforms {
         self.buffer
             .offset(key)
             .ok_or(AwsmTransformError::TransformBufferSlotMissing(key))
+    }
+
+    pub fn normals_buffer_offset(&self, key: TransformKey) -> Result<usize> {
+        self.normals_buffer
+            .offset(key)
+            .ok_or(AwsmTransformError::TransformBufferNormalsSlotMissing(key))
     }
 
     pub fn world_matrices_ref(&self) -> &SecondaryMap<TransformKey, glam::Mat4> {
@@ -277,6 +328,18 @@ impl Transforms {
                 std::slice::from_raw_parts(values.as_ptr() as *const u8, Self::BYTE_SIZE)
             };
             self.buffer.update(key, values_u8);
+
+            let normal_matrix = world_matrix.inverse().transpose();
+            let normal_matrix = glam::Mat3::from_mat4(normal_matrix);
+            let normal_values = normal_matrix.to_cols_array();
+            let normal_values_u8 = unsafe {
+                std::slice::from_raw_parts(
+                    normal_values.as_ptr() as *const u8,
+                    Self::NORMALS_BYTE_SIZE,
+                )
+            };
+
+            self.normals_buffer.update(key, normal_values_u8);
 
             self.dirty_meshes.push(key);
         }
@@ -382,6 +445,9 @@ pub enum AwsmTransformError {
 
     #[error("[transform] buffer slot missing {0:?}")]
     TransformBufferSlotMissing(TransformKey),
+
+    #[error("[transform] normals buffer slot missing {0:?}")]
+    TransformBufferNormalsSlotMissing(TransformKey),
 
     #[error("[transform] cannot get parent of root node")]
     CannotGetParentOfRootNode,

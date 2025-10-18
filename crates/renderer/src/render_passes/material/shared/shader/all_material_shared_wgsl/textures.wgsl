@@ -1,3 +1,5 @@
+// --- TEXTURES STARTS HERE ---
+
 // 36 bytes
 struct TextureInfoRaw {
     pixel_offset_x: u32,
@@ -146,7 +148,6 @@ fn _texture_sample_with_sampler(
     }
 }
 
-// Encoded address mode values must stay in sync with `encode_address_mode` in `pbr::material.rs`.
 const ADDRESS_MODE_CLAMP_TO_EDGE: u32 = 0u;
 const ADDRESS_MODE_REPEAT: u32 = 1u;
 const ADDRESS_MODE_MIRROR_REPEAT: u32 = 2u;
@@ -181,3 +182,5 @@ fn wrap_mirror(coord: f32) -> f32 {
     }
     return frac;
 }
+
+// --- TEXTURES ENDS HERE ---

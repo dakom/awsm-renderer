@@ -32,6 +32,7 @@ pub struct MaterialOpaqueBindGroups {
 impl MaterialOpaqueBindGroups {
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let base_entries = vec![
+            // Mesh Meta (for this pass, different than geometry pass)
             BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::Buffer(
                     BufferBindingLayout::new()
@@ -41,6 +42,7 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            // Visibility data texture
             BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::Texture(
                     TextureBindingLayout::new()
@@ -51,6 +53,7 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            // Opaque color render texture (storage texture for compute write)
             BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::StorageTexture(
                     StorageTextureBindingLayout::new(ctx.render_texture_formats.opaque_color)
@@ -61,6 +64,7 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            // Material data buffer
             BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::Buffer(
                     BufferBindingLayout::new()
@@ -70,6 +74,7 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            // Attribute index buffer
             BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::Buffer(
                     BufferBindingLayout::new()
@@ -79,6 +84,7 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            // Attribute data buffer
             BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::Buffer(
                     BufferBindingLayout::new()
@@ -88,8 +94,8 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            // Transform buffer
             BindGroupLayoutCacheKeyEntry {
-                // Per-mesh model matrices needed to rotate normals into world space.
                 resource: BindGroupLayoutResource::Buffer(
                     BufferBindingLayout::new()
                         .with_binding_type(BufferBindingType::ReadOnlyStorage),
@@ -98,8 +104,18 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            // Normal matrices buffer
             BindGroupLayoutCacheKeyEntry {
-                // Camera uniform gives us inverse matrices + frustum rays for depth reprojection.
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
+            // Camera uniform gives us inverse matrices + frustum rays for depth reprojection.
+            BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::Buffer(
                     BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
                 ),
@@ -107,12 +123,22 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            // Depth texture from the visibility pass – sampled during the compute shading stage.
             BindGroupLayoutCacheKeyEntry {
-                // Depth texture from the visibility pass – sampled during the compute shading stage.
                 resource: BindGroupLayoutResource::Texture(
                     TextureBindingLayout::new()
                         .with_view_dimension(TextureViewDimension::N2d)
                         .with_sample_type(TextureSampleType::Depth),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
+            // Visibility data buffer (positions, triangle-id, barycentric) for mipmap computation
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
                 ),
                 visibility_vertex: false,
                 visibility_fragment: false,
@@ -273,11 +299,23 @@ impl MaterialOpaqueBindGroups {
                 ));
                 entries.push(BindGroupEntry::new(
                     entries.len() as u32,
+                    BindGroupResource::Buffer(BufferBinding::new(
+                        &ctx.transforms.normals_gpu_buffer,
+                    )),
+                ));
+                entries.push(BindGroupEntry::new(
+                    entries.len() as u32,
                     BindGroupResource::Buffer(BufferBinding::new(&ctx.camera.gpu_buffer)),
                 ));
                 entries.push(BindGroupEntry::new(
                     entries.len() as u32,
                     BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.depth)),
+                ));
+                entries.push(BindGroupEntry::new(
+                    entries.len() as u32,
+                    BindGroupResource::Buffer(BufferBinding::new(
+                        &ctx.meshes.visibility_data_gpu_buffer(),
+                    )),
                 ));
             }
 

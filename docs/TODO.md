@@ -1,4 +1,5 @@
-# Normal matrix should be uploaded, not calculated in shader
+# Delete gradient mip mode
+# Fix disappearing textures
 
 # Opaque material pass
 - get basic lighting working

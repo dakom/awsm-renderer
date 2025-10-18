@@ -62,8 +62,10 @@ impl OrthographicCamera {
         self.far = distance + bounding_radius * margin * 2.0;
 
         // eh, whatever
-        self.near = self.near.min(0.001);
-        self.far = self.far.max(1000000.0);
+        // self.near = 0.1;
+        // self.far = 100.0;
+        // self.near = self.near.min(0.001);
+        // self.far = self.far.max(1000000.0);
     }
 
     // Call this method whenever the window is resized.

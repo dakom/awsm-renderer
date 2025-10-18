@@ -71,6 +71,7 @@ pub(super) fn convert_to_visibility_buffer(
         vertex_attribute_index,
         vertex_attribute_index_bytes,
         triangle_count,
+        front_face,
         visibility_vertex_bytes,
     )?;
 
@@ -139,6 +140,7 @@ fn create_visibility_vertices(
     index: &MeshBufferAttributeIndexInfoWithOffset,
     index_bytes: &[u8],
     triangle_count: usize,
+    front_face: FrontFace,
     visibility_vertex_bytes: &mut Vec<u8>,
 ) -> Result<()> {
     static BARYCENTRICS: [[f32; 2]; 3] = [
@@ -168,8 +170,18 @@ fn create_visibility_vertices(
 
     // Process each triangle
     for (triangle_index, triangle) in triangle_indices.iter().enumerate() {
+        let vertex_indices = match front_face {
+            FrontFace::Cw => [triangle[0], triangle[2], triangle[1]],
+            _ => [triangle[0], triangle[1], triangle[2]],
+        };
+
+        let barycentrics = match front_face {
+            FrontFace::Cw => [BARYCENTRICS[0], BARYCENTRICS[2], BARYCENTRICS[1]],
+            _ => BARYCENTRICS,
+        };
+
         // Create 3 visibility vertices for this triangle
-        for (vertex_in_triangle, &vertex_index) in triangle.iter().enumerate() {
+        for (bary, &vertex_index) in barycentrics.iter().zip(vertex_indices.iter()) {
             // Get position for this vertex
             let position = get_position_from_buffer(&positions, vertex_index)?;
 
@@ -184,7 +196,6 @@ fn create_visibility_vertices(
             visibility_vertex_bytes.extend_from_slice(&(triangle_index as u32).to_le_bytes());
 
             // Barycentric coordinates (8 bytes)
-            let bary = BARYCENTRICS[vertex_in_triangle];
             visibility_vertex_bytes.extend_from_slice(&bary[0].to_le_bytes());
             visibility_vertex_bytes.extend_from_slice(&bary[1].to_le_bytes());
         }
