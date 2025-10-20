@@ -330,11 +330,13 @@ impl AppScene {
             .populate_gltf(data, None, self.ctx.generate_mipmaps.get())
             .await?;
 
-        renderer.lights.insert(Light::Directional {
-            color: [1.0, 1.0, 1.0],
-            intensity: 1.0,
-            direction: [-0.5, -0.25, -0.75],
-        });
+        // TODO: Disable punctual lights to see pure IBL contribution
+        // Once IBL is properly implemented, restore this with proper intensity
+        // renderer.lights.insert(Light::Directional {
+        //     color: [1.0, 1.0, 1.0],
+        //     intensity: 1.0,
+        //     direction: [-0.5, -0.25, -0.75],
+        // });
 
         if let Some(ibl) = self.ibl.lock().unwrap().clone() {
             renderer.set_ibl(ibl);
