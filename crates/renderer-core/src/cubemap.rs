@@ -39,12 +39,13 @@ impl CubemapImage {
                 Ok(CubemapImage::Ktx(Arc::new(reader)))
             }
 
+            // returns mip count as well
             pub async fn create_texture_and_view(
                 &self,
                 gpu: &AwsmRendererWebGpu,
                 label: Option<&str>,
-            ) -> Result<(web_sys::GpuTexture, web_sys::GpuTextureView)> {
-                let texture = match self {
+            ) -> Result<(web_sys::GpuTexture, web_sys::GpuTextureView, u32)> {
+                let (texture, mip_count) = match self {
                     CubemapImage::Ktx(reader) => {
                         ktx::create_texture(reader, gpu).await
                     },
@@ -56,7 +57,7 @@ impl CubemapImage {
 
                 let view = create_texture_view(&texture, label)?;
 
-                Ok((texture, view))
+                Ok((texture, view, mip_count))
 
             }
 
@@ -68,15 +69,15 @@ impl CubemapImage {
                 &self,
                 gpu: &AwsmRendererWebGpu,
                 label: Option<&str>,
-            ) -> Result<web_sys::GpuTexture> {
-                let texture = match self {
+            ) -> Result<(web_sys::GpuTexture, web_sys::GpuTextureView, u32)> {
+                let (texture, mip_count) = match self {
                     CubemapImage::Images { z_positive, z_negative, x_positive, x_negative, y_positive, y_negative, mipmaps } => {
                         images::create_texture(gpu, z_positive, z_negative, x_positive, x_negative, y_positive, y_negative, *mipmaps).await
                     }
                 }?;
 
                 let view = create_texture_view(&texture, label)?;
-                Ok((texture, view))
+                Ok((texture, view, mip_count))
 
             }
 

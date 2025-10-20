@@ -9,13 +9,6 @@ use crate::error::{AwsmError, Result};
 use crate::textures::{CubemapTextureKey, SamplerCacheKey, Textures};
 use crate::AwsmRenderer;
 
-impl AwsmRenderer {
-    pub fn set_ibl(&mut self, ibl: Ibl) {
-        self.lights.ibl = ibl;
-        self.bind_groups.mark_create(BindGroupCreate::IblCreate);
-    }
-}
-
 #[derive(Clone)]
 pub struct Ibl {
     pub prefiltered_env: IblTexture,
@@ -36,6 +29,7 @@ pub struct IblTexture {
     pub texture_key: CubemapTextureKey,
     pub texture_view: web_sys::GpuTextureView,
     pub sampler: web_sys::GpuSampler,
+    pub mip_count: u32,
 }
 
 static SAMPLER_CACHE_KEY: LazyLock<SamplerCacheKey> = LazyLock::new(|| SamplerCacheKey {
@@ -58,11 +52,13 @@ impl IblTexture {
         texture_key: CubemapTextureKey,
         texture_view: web_sys::GpuTextureView,
         sampler: web_sys::GpuSampler,
+        mip_count: u32,
     ) -> Self {
         Self {
             texture_key,
             texture_view,
             sampler,
+            mip_count,
         }
     }
 
@@ -71,7 +67,7 @@ impl IblTexture {
         textures: &mut Textures,
         default_colors: CubemapBitmapColors,
     ) -> Result<Self> {
-        let (texture, view) = CubemapImage::new_colors(default_colors, 256, 256)
+        let (texture, view, mip_count) = CubemapImage::new_colors(default_colors, 256, 256)
             .await?
             .create_texture_and_view(gpu, Some("IBL Cubemap"))
             .await?;
@@ -82,6 +78,6 @@ impl IblTexture {
 
         let sampler = textures.get_sampler(sampler_key)?.clone();
 
-        Ok(Self::new(texture_key, view, sampler))
+        Ok(Self::new(texture_key, view, sampler, mip_count))
     }
 }

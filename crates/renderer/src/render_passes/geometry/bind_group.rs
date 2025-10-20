@@ -98,7 +98,7 @@ impl GeometryBindGroupCameraLights {
                 ),
                 BindGroupEntry::new(
                     1,
-                    BindGroupResource::Buffer(BufferBinding::new(&ctx.lights.gpu_buffer)),
+                    BindGroupResource::Buffer(BufferBinding::new(&ctx.lights.gpu_punctual_buffer)),
                 ),
             ],
         );

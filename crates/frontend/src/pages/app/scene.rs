@@ -228,7 +228,7 @@ impl AppScene {
         .await?;
 
         let renderer = &mut *state.renderer.lock().await;
-        let (texture, view) = skybox_cubemap
+        let (texture, view, mip_count) = skybox_cubemap
             .create_texture_and_view(&renderer.gpu, Some("Skybox"))
             .await?;
 
@@ -240,7 +240,7 @@ impl AppScene {
 
         let sampler = renderer.textures.get_sampler(sampler_key)?.clone();
 
-        let skybox = Skybox::new(key, view, sampler);
+        let skybox = Skybox::new(key, view, sampler, mip_count);
 
         *self.skybox.lock().unwrap() = Some(skybox.clone());
 
@@ -275,7 +275,7 @@ impl AppScene {
             renderer: &mut AwsmRenderer,
             cubemap_image: CubemapImage,
         ) -> Result<IblTexture> {
-            let (texture, view) = cubemap_image
+            let (texture, view, mip_count) = cubemap_image
                 .create_texture_and_view(&renderer.gpu, Some("IBL Cubemap"))
                 .await?;
 
@@ -287,7 +287,7 @@ impl AppScene {
 
             let sampler = renderer.textures.get_sampler(sampler_key)?.clone();
 
-            Ok(IblTexture::new(texture_key, view, sampler))
+            Ok(IblTexture::new(texture_key, view, sampler, mip_count))
         }
 
         let ibl = {

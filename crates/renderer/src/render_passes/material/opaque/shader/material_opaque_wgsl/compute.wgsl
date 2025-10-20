@@ -80,8 +80,11 @@ struct CameraUniform {
 @group(0) @binding(12) var ibl_filtered_env_sampler: sampler;
 @group(0) @binding(13) var ibl_irradiance_tex: texture_cube<f32>;
 @group(0) @binding(14) var ibl_irradiance_sampler: sampler;
-@group(0) @binding(15) var depth_tex: texture_depth_2d;
-@group(0) @binding(16) var<storage, read> visibility_data: array<f32>;
+@group(0) @binding(15) var<uniform> ibl_info: IblInfo;
+@group(0) @binding(16) var brdf_lut_tex: texture_2d<f32>;
+@group(0) @binding(17) var brdf_lut_sampler: sampler;
+@group(0) @binding(18) var depth_tex: texture_depth_2d;
+@group(0) @binding(19) var<storage, read> visibility_data: array<f32>;
 {% for i in 0..texture_atlas_len %}
     @group(1) @binding({{ i }}u) var atlas_tex_{{ i }}: texture_2d_array<f32>;
 {% endfor %}
@@ -309,17 +312,29 @@ fn main(
 
     var color = vec3<f32>(0.0);
 
-    // Add lighting from each light
-    // Note: BRDF includes IBL which gets added 4 times (once per light)
-    // We've reduced the IBL intensity in brdf.wgsl to compensate
+    // Add direct lighting from each light
     let n_lights = 4u;
     for(var i = 0u; i < n_lights; i = i + 1u) {
         let light_brdf = light_to_brdf(get_light(i), world_normal, standard_coordinates.world_position);
 
-        // Always add BRDF - it naturally returns zero when n_dot_l is zero
+        // Always add direct BRDF - it naturally returns zero when n_dot_l is zero
         // This avoids any discontinuity from if statements
-        color += brdf(material_color, light_brdf, standard_coordinates.surface_to_camera);
+        color += brdf_direct(material_color, light_brdf, standard_coordinates.surface_to_camera);
     }
+
+    // Add IBL once (indirect lighting + emissive)
+    color += brdf_ibl(
+        material_color,
+        world_normal,
+        standard_coordinates.surface_to_camera,
+        ibl_filtered_env_tex,
+        ibl_filtered_env_sampler,
+        ibl_irradiance_tex,
+        ibl_irradiance_sampler,
+        brdf_lut_tex,
+        brdf_lut_sampler,
+        ibl_info
+    );
 
     //color = unlit(material_color);
 

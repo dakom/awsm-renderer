@@ -75,7 +75,7 @@ pub async fn create_texture(
     y_positive: &ImageData,
     y_negative: &ImageData,
     generate_mipmap: bool,
-) -> Result<web_sys::GpuTexture> {
+) -> Result<(web_sys::GpuTexture, u32)> {
     // Collect all faces in the correct order (required for cubemaps)
     let faces = [
         &x_positive, // +X
@@ -158,5 +158,5 @@ pub async fn create_texture(
         generate_mipmaps(gpu, &texture, width, height, 6, true, mipmap_levels).await?;
     }
 
-    Ok(texture)
+    Ok((texture, mipmap_levels))
 }

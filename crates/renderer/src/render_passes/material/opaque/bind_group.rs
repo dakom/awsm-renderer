@@ -184,6 +184,33 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            // IBL info buffer
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
+            // Brdf lut texture
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Texture(
+                    TextureBindingLayout::new().with_view_dimension(TextureViewDimension::N2d),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
+            // Brdf lut sampler
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Sampler(
+                    SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
             // Depth texture from the visibility pass – sampled during the compute shading stage.
             BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::Texture(
@@ -391,6 +418,22 @@ impl MaterialOpaqueBindGroups {
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Sampler(&ctx.lights.ibl.irradiance.sampler),
+        ));
+
+        // IBL info
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Buffer(BufferBinding::new(&ctx.lights.gpu_ibl_buffer)),
+        ));
+
+        // BRDF lut
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.lights.brdf_lut.view)),
+        ));
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Sampler(&ctx.lights.brdf_lut.sampler),
         ));
 
         // depth

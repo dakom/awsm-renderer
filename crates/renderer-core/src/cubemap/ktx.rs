@@ -30,7 +30,7 @@ pub async fn load_url(url: &str) -> anyhow::Result<ktx2::Reader<Vec<u8>>> {
 pub async fn create_texture(
     reader: &ktx2::Reader<Vec<u8>>,
     gpu: &AwsmRendererWebGpu,
-) -> Result<web_sys::GpuTexture> {
+) -> Result<(web_sys::GpuTexture, u32)> {
     let header = reader.header();
 
     if header.face_count != 6 {
@@ -182,7 +182,7 @@ pub async fn create_texture(
         }
     }
 
-    Ok(texture)
+    Ok((texture, header.level_count))
 }
 
 #[inline]

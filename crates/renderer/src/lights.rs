@@ -3,6 +3,7 @@ pub mod ibl;
 use std::sync::LazyLock;
 
 use awsm_renderer_core::{
+    brdf_lut::generate::BrdfLut,
     buffers::{BufferDescriptor, BufferUsage},
     cubemap::CubemapImage,
     error::AwsmCoreError,
@@ -19,69 +20,100 @@ use crate::{
     AwsmRenderer, AwsmRendererLogging,
 };
 
-static BUFFER_USAGE: LazyLock<BufferUsage> =
+static PUNCTUAL_BUFFER_USAGE: LazyLock<BufferUsage> =
     LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
 
+static IBL_UNIFORM_BUFFER_USAGE: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_uniform().with_copy_dst());
+
+impl AwsmRenderer {
+    pub fn set_brdf_lut(&mut self, brdf_lut: BrdfLut) {
+        self.lights.brdf_lut = brdf_lut;
+        self.bind_groups.mark_create(BindGroupCreate::BrdfLutCreate);
+    }
+    pub fn set_ibl(&mut self, ibl: Ibl) {
+        self.lights.ibl = ibl;
+        self.bind_groups.mark_create(BindGroupCreate::IblCreate);
+        self.lights.ibl_uniform_gpu_dirty = true;
+    }
+}
+
 pub struct Lights {
-    pub(crate) gpu_buffer: web_sys::GpuBuffer,
+    pub gpu_punctual_buffer: web_sys::GpuBuffer,
+    pub gpu_ibl_buffer: web_sys::GpuBuffer,
     pub ibl: Ibl,
+    pub brdf_lut: BrdfLut,
     lights: SlotMap<LightKey, Light>,
     // we use it as a storage buffer, because we need dynamic lengths, but it's a fixed size like a uniform
-    storage_buffer: DynamicUniformBuffer<LightKey>,
-    gpu_dirty: bool,
+    punctual_storage_buffer: DynamicUniformBuffer<LightKey>,
+    punctual_gpu_dirty: bool,
+    ibl_uniform_gpu_dirty: bool,
 }
 
 impl Lights {
     pub const INITIAL_ELEMENTS: usize = 8; // 8 lights is a decent baseline
     pub const BYTE_ALIGNMENT: usize = 64; // we aren't using it as a uniform buffer, so storage rules apply
     pub const BYTE_SIZE: usize = 64;
+    pub const IBL_UNIFORM_SIZE: usize = 8; // 2 * u32 for mipmap counts
 
-    pub fn new(gpu: &AwsmRendererWebGpu, ibl: Ibl) -> Result<Self> {
-        let gpu_buffer = gpu.create_buffer(
+    pub fn new(gpu: &AwsmRendererWebGpu, ibl: Ibl, brdf_lut: BrdfLut) -> Result<Self> {
+        let gpu_punctual_buffer = gpu.create_buffer(
             &BufferDescriptor::new(
-                Some("Lights"),
+                Some("Punctual Lights"),
                 Self::INITIAL_ELEMENTS * Self::BYTE_ALIGNMENT,
-                *BUFFER_USAGE,
+                *PUNCTUAL_BUFFER_USAGE,
+            )
+            .into(),
+        )?;
+
+        let gpu_ibl_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("IBL Lights"),
+                Self::IBL_UNIFORM_SIZE,
+                *IBL_UNIFORM_BUFFER_USAGE,
             )
             .into(),
         )?;
 
         Ok(Lights {
             lights: SlotMap::with_key(),
-            storage_buffer: DynamicUniformBuffer::new(
+            punctual_storage_buffer: DynamicUniformBuffer::new(
                 Self::INITIAL_ELEMENTS,
                 Self::BYTE_SIZE,
                 Some(Self::BYTE_ALIGNMENT),
                 Some("Lights".to_string()),
             ),
             ibl,
-            gpu_dirty: true,
-            gpu_buffer,
+            brdf_lut,
+            punctual_gpu_dirty: true,
+            ibl_uniform_gpu_dirty: true,
+            gpu_punctual_buffer,
+            gpu_ibl_buffer,
         })
     }
 
     pub fn insert(&mut self, light: Light) -> Result<LightKey> {
         let key = self.lights.insert(light.clone());
 
-        self.storage_buffer
+        self.punctual_storage_buffer
             .update(key, &light.storage_buffer_data());
 
-        self.gpu_dirty = true;
+        self.punctual_gpu_dirty = true;
         Ok(key)
     }
 
     pub fn remove(&mut self, key: LightKey) {
-        self.storage_buffer.remove(key);
+        self.punctual_storage_buffer.remove(key);
         self.lights.remove(key);
-        self.gpu_dirty = true;
+        self.punctual_gpu_dirty = true;
     }
 
     pub fn update(&mut self, key: LightKey, f: impl FnOnce(&mut Light)) {
         if let Some(light) = self.lights.get_mut(key) {
             f(light);
-            self.storage_buffer
+            self.punctual_storage_buffer
                 .update(key, &light.storage_buffer_data());
-            self.gpu_dirty = true;
+            self.punctual_gpu_dirty = true;
         }
     }
 
@@ -91,28 +123,31 @@ impl Lights {
         gpu: &AwsmRendererWebGpu,
         bind_groups: &mut BindGroups,
     ) -> Result<()> {
-        if self.gpu_dirty {
+        if self.punctual_gpu_dirty {
             let _maybe_span_guard = if logging.render_timings {
                 Some(
-                    tracing::span!(tracing::Level::INFO, "Lights Storage Buffer GPU write")
-                        .entered(),
+                    tracing::span!(
+                        tracing::Level::INFO,
+                        "Punctual Lights Storage Buffer GPU write"
+                    )
+                    .entered(),
                 )
             } else {
                 None
             };
 
-            if let Some(new_size) = self.storage_buffer.take_gpu_needs_resize() {
-                self.gpu_buffer = gpu.create_buffer(
-                    &BufferDescriptor::new(Some("Lights"), new_size, *BUFFER_USAGE).into(),
+            if let Some(new_size) = self.punctual_storage_buffer.take_gpu_needs_resize() {
+                self.gpu_punctual_buffer = gpu.create_buffer(
+                    &BufferDescriptor::new(Some("Lights"), new_size, *PUNCTUAL_BUFFER_USAGE).into(),
                 )?;
 
                 bind_groups.mark_create(BindGroupCreate::LightsResize);
             }
 
             gpu.write_buffer(
-                &self.gpu_buffer,
+                &self.gpu_punctual_buffer,
                 None,
-                self.storage_buffer.raw_slice(),
+                self.punctual_storage_buffer.raw_slice(),
                 None,
                 None,
             )?;
@@ -126,7 +161,23 @@ impl Lights {
 
             // tracing::info!("n_lights should be {}", self.storage_buffer.raw_slice().len() / (4 * 16));
 
-            self.gpu_dirty = false;
+            self.punctual_gpu_dirty = false;
+        }
+
+        if self.ibl_uniform_gpu_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "IBL Uniform Buffer GPU write").entered())
+            } else {
+                None
+            };
+
+            let mut data = vec![0u8; Self::IBL_UNIFORM_SIZE];
+            data[0..4].copy_from_slice(&self.ibl.prefiltered_env.mip_count.to_ne_bytes());
+            data[4..8].copy_from_slice(&self.ibl.irradiance.mip_count.to_ne_bytes());
+
+            gpu.write_buffer(&self.gpu_ibl_buffer, None, &*data, None, None)?;
+
+            self.ibl_uniform_gpu_dirty = false;
         }
         Ok(())
     }

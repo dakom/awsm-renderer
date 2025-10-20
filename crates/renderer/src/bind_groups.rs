@@ -44,6 +44,7 @@ pub enum BindGroupCreate {
     CameraInitOnly,
     LightsResize,
     IblCreate,
+    BrdfLutCreate,
     EnvironmentSkyboxCreate,
     TransformsResize,
     TransformNormalsResize,
@@ -157,10 +158,6 @@ impl BindGroups {
                 .material_opaque
                 .bind_groups
                 .recreate_samplers(&ctx)?;
-            render_passes
-                .material_transparent
-                .bind_groups
-                .recreate(&ctx)?;
         }
 
         if self
@@ -189,6 +186,7 @@ impl BindGroups {
             || self
                 .create_list
                 .contains(&BindGroupCreate::TransformNormalsResize)
+            || self.create_list.contains(&BindGroupCreate::BrdfLutCreate)
         {
             render_passes
                 .material_opaque

@@ -3,6 +3,10 @@
 // Clean version: NO final saturate, safe for HDR + post tonemapping
 // -------------------------------------------------------------
 
+struct IblInfo {
+    prefiltered_env_mip_count: u32,
+    irradiance_mip_count: u32,
+}
 
 // --- microfacet helpers ---
 fn fresnel_schlick(cos_theta: f32, F0: vec3<f32>) -> vec3<f32> {
@@ -33,39 +37,52 @@ fn geometry_smith(n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, alpha: f32) -> f32 {
 }
 
 // -------------------------------------------------------------
-// IBL STUBS (replace with real env sampling later)
+// Real IBL Sampling Functions
 // -------------------------------------------------------------
-const ENV_DIFFUSE_COLOR  : vec3<f32> = vec3<f32>(0.22, 0.24, 0.26);
-const ENV_SPECULAR_COLOR : vec3<f32> = vec3<f32>(1.0, 0.98, 0.95);
-const ENV_INTENSITY_DIFF : f32 = 0.075;  // Reduced from 0.3 (divided by 4)
-const ENV_INTENSITY_SPEC : f32 = 0.175;  // Reduced from 0.7 (divided by 4)
 
-fn sampleIrradianceStub(n: vec3<f32>) -> vec3<f32> {
-    let hemi = 0.5 * (dot(n, vec3<f32>(0.0, 1.0, 0.0)) + 1.0);
-    let tint = mix(vec3<f32>(0.7, 0.7, 0.75), vec3<f32>(1.0, 1.0, 1.0), hemi);
-    return ENV_DIFFUSE_COLOR * tint * ENV_INTENSITY_DIFF;
+// Sample irradiance map for diffuse IBL contribution
+fn sampleIrradiance(
+    n: vec3<f32>,
+    irradiance_tex: texture_cube<f32>,
+    irradiance_sampler: sampler
+) -> vec3<f32> {
+    // Use textureSampleLevel with mip 0 for compute shader compatibility
+    return textureSampleLevel(irradiance_tex, irradiance_sampler, n, 0.0).rgb;
 }
 
-fn samplePrefilteredEnvStub(R: vec3<f32>, roughness: f32) -> vec3<f32> {
-    let gloss = 1.0 - saturate(roughness);
-    let facing = saturate(R.y * 0.5 + 0.5);
-    let gain = mix(0.35, 1.0, gloss * facing);
-    return ENV_SPECULAR_COLOR * gain * ENV_INTENSITY_SPEC;
+// Sample prefiltered environment map for specular IBL contribution
+// Uses roughness to select appropriate mip level (split-sum approximation)
+fn samplePrefilteredEnv(
+    R: vec3<f32>,
+    roughness: f32,
+    filtered_env_tex: texture_cube<f32>,
+    filtered_env_sampler: sampler,
+    ibl_info: IblInfo
+) -> vec3<f32> {
+    // Map roughness to mip level (0 = sharpest reflection, max = most blurred)
+    let max_mip = f32(ibl_info.prefiltered_env_mip_count - 1u);
+    let mip_level = roughness * max_mip;
+    return textureSampleLevel(filtered_env_tex, filtered_env_sampler, R, mip_level).rgb;
 }
 
-fn sampleBRDFLUTStub(n_dot_v: f32, roughness: f32) -> vec2<f32> {
-    let ndv = saturate(n_dot_v);
-    let r   = clamp(roughness, 0.0, 1.0);
-    let x = mix(0.95, 0.45, r) * mix(1.0, 0.7, (1.0 - ndv));
-    let y = mix(0.04, 0.55, r) * mix(0.6, 1.0, (1.0 - ndv));
-    return vec2<f32>(x, y);
+// Sample BRDF integration LUT for split-sum approximation
+// Returns vec2(scale, bias) for F0 * scale + bias
+fn sampleBRDFLUT(
+    n_dot_v: f32,
+    roughness: f32,
+    brdf_lut_tex: texture_2d<f32>,
+    brdf_lut_sampler: sampler
+) -> vec2<f32> {
+    let uv = vec2<f32>(saturate(n_dot_v), saturate(roughness));
+    // Use textureSampleLevel with mip 0 for compute shader compatibility
+    return textureSampleLevel(brdf_lut_tex, brdf_lut_sampler, uv, 0.0).rg;
 }
 
 // -------------------------------------------------------------
-// Main BRDF
+// Direct Lighting BRDF
 // -------------------------------------------------------------
-//
-fn brdf(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera: vec3<f32>) -> vec3<f32> {
+// Computes direct lighting contribution from a single light source
+fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera: vec3<f32>) -> vec3<f32> {
     let n = safe_normalize(light_brdf.normal);
     let v = safe_normalize(surface_to_camera);
     let l = safe_normalize(light_brdf.light_dir);
@@ -84,7 +101,7 @@ fn brdf(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera: vec3<
 
     let F0 = mix(vec3<f32>(0.04), base_color, metallic);
 
-    // Direct
+    // Cook-Torrance BRDF
     let F = fresnel_schlick(v_dot_h, F0);
     let D = distribution_ggx(n_dot_h, alpha);
     let G = geometry_smith(n, v, l, alpha);
@@ -95,18 +112,49 @@ fn brdf(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera: vec3<
     let k_d      = (vec3<f32>(1.0) - F) * (1.0 - metallic);
     let diff_col = k_d * base_color * (1.0 / PI);
 
-    let Lo = (diff_col + spec_col) * light_brdf.radiance * n_dot_l;
+    // Direct lighting output (Lo)
+    return (diff_col + spec_col) * light_brdf.radiance * n_dot_l;
+}
 
-    // IBL stubs (unchanged, but use safe normal and clamped ndv)
-    let irradiance = sampleIrradianceStub(n);
+// -------------------------------------------------------------
+// Image-Based Lighting (IBL)
+// -------------------------------------------------------------
+// Computes indirect lighting contribution from environment maps
+fn brdf_ibl(
+    color: PbrMaterialColor,
+    normal: vec3<f32>,
+    surface_to_camera: vec3<f32>,
+    ibl_filtered_env_tex: texture_cube<f32>,
+    ibl_filtered_env_sampler: sampler,
+    ibl_irradiance_tex: texture_cube<f32>,
+    ibl_irradiance_sampler: sampler,
+    brdf_lut_tex: texture_2d<f32>,
+    brdf_lut_sampler: sampler,
+    ibl_info: IblInfo
+) -> vec3<f32> {
+    let n = safe_normalize(normal);
+    let v = safe_normalize(surface_to_camera);
+
+    let base_color = color.base.rgb;
+    let metallic   = clamp(color.metallic_roughness.x, 0.0, 1.0);
+    let rough_in   = clamp(color.metallic_roughness.y, 0.0, 1.0);
+    let roughness  = max(rough_in, 0.04);
+
+    let n_dot_v = max(dot(n, v), 1e-4);
+    let F0 = mix(vec3<f32>(0.04), base_color, metallic);
+
+    // Diffuse IBL (irradiance)
+    let irradiance = sampleIrradiance(n, ibl_irradiance_tex, ibl_irradiance_sampler);
     let F_view     = fresnel_schlick(n_dot_v, F0);
     let k_d_indir  = (vec3<f32>(1.0) - F_view) * (1.0 - metallic);
     let Fd_indir   = k_d_indir * base_color * (1.0 / PI) * irradiance * color.occlusion;
 
+    // Specular IBL (prefiltered environment + BRDF LUT)
     let R          = reflect(-v, n);
-    let prefiltered = samplePrefilteredEnvStub(R, roughness);
-    let brdf_lut    = sampleBRDFLUTStub(n_dot_v, roughness);
+    let prefiltered = samplePrefilteredEnv(R, roughness, ibl_filtered_env_tex, ibl_filtered_env_sampler, ibl_info);
+    let brdf_lut    = sampleBRDFLUT(n_dot_v, roughness, brdf_lut_tex, brdf_lut_sampler);
     let Fs_indir    = prefiltered * (F0 * brdf_lut.x + brdf_lut.y);
 
-    return Lo + Fd_indir + Fs_indir + color.emissive;
+    // Return indirect lighting + emissive
+    return Fd_indir + Fs_indir + color.emissive;
 }

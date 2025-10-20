@@ -32,6 +32,7 @@ pub mod gltf;
 pub mod animation;
 
 use awsm_renderer_core::{
+    brdf_lut::generate::{BrdfLut, BrdfLutOptions},
     command::color::Color,
     cubemap::images::CubemapBitmapColors,
     renderer::{AwsmRendererWebGpu, AwsmRendererWebGpuBuilder},
@@ -108,6 +109,7 @@ pub struct AwsmRendererBuilder {
     gpu: AwsmRendererGpuBuilderKind,
     logging: AwsmRendererLogging,
     render_texture_formats: Option<RenderTextureFormats>,
+    brdf_lut_options: BrdfLutOptions,
     clear_color: Color,
     // all these colors are typically replaced when loading external textures
     // but we want something to show by default
@@ -140,6 +142,7 @@ impl AwsmRendererBuilder {
             logging: AwsmRendererLogging::default(),
             render_texture_formats: None,
             clear_color: Color::BLACK,
+            brdf_lut_options: BrdfLutOptions::default(),
             skybox_colors: CubemapBitmapColors {
                 z_positive: Color::from_hex_rgb(0xFF0000), // red
                 z_negative: Color::from_hex_rgb(0x00FF00), // green
@@ -174,6 +177,21 @@ impl AwsmRendererBuilder {
         }
     }
 
+    pub fn with_brdf_lut_options(mut self, options: BrdfLutOptions) -> Self {
+        self.brdf_lut_options = options;
+        self
+    }
+
+    pub fn with_ibl_filtered_env_colors(mut self, colors: CubemapBitmapColors) -> Self {
+        self.ibl_filtered_env_colors = colors;
+        self
+    }
+
+    pub fn with_ibl_irradiance_colors(mut self, colors: CubemapBitmapColors) -> Self {
+        self.ibl_irradiance_colors = colors;
+        self
+    }
+
     pub fn with_skybox_colors(mut self, colors: CubemapBitmapColors) -> Self {
         self.skybox_colors = colors;
         self
@@ -199,6 +217,7 @@ impl AwsmRendererBuilder {
             gpu,
             logging,
             render_texture_formats,
+            brdf_lut_options,
             clear_color,
             skybox_colors,
             ibl_filtered_env_colors,
@@ -234,6 +253,7 @@ impl AwsmRendererBuilder {
                 IblTexture::new_colors(&gpu, &mut textures, ibl_filtered_env_colors).await?,
                 IblTexture::new_colors(&gpu, &mut textures, ibl_irradiance_colors).await?,
             ),
+            BrdfLut::new(&gpu, brdf_lut_options).await?,
         )?;
         let mut meshes = Meshes::new(&gpu)?;
         let mut transforms = Transforms::new(&gpu)?;

@@ -10,7 +10,7 @@ fn frag_main(in: FragmentInput) -> @location(0) vec4<f32> {
 
     let color: vec4<f32> = textureLoad(composite_texture, coords, 0);
 
-    let rgb = color.rgb;
+    let rgb = linear_to_srgb(color.rgb);
 
     // Apply tone mapping to compress HDR to displayable range
     let mapped = khronos_pbr_neutral_tonemap(rgb);

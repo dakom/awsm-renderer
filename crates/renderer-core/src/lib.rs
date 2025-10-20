@@ -1,5 +1,6 @@
 pub mod alignment;
 pub mod bind_groups;
+pub mod brdf_lut;
 pub mod buffers;
 pub mod command;
 pub mod compare;
