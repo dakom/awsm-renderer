@@ -64,4 +64,6 @@ impl PerspectiveCamera {
     pub fn projection_matrix(&self) -> Mat4 {
         Mat4::perspective_rh(self.fov_y, self.aspect, self.near, self.far)
     }
+
+    pub fn setup_from_gltf(&mut self, doc: &gltf::Document) {}
 }

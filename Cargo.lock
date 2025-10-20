@@ -372,6 +372,7 @@ dependencies = [
  "gloo-net",
  "gloo-render",
  "gloo-timers",
+ "gltf",
  "js-sys",
  "serde",
  "serde-wasm-bindgen",

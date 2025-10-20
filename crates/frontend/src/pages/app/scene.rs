@@ -35,6 +35,7 @@ pub struct AppScene {
     pub ctx: AppContext,
     pub renderer: futures::lock::Mutex<AwsmRenderer>,
     pub gltf_loader: Mutex<HashMap<GltfId, GltfLoader>>,
+    pub latest_gltf_data: Mutex<Option<GltfData>>,
     pub ibl: Mutex<Option<Ibl>>,
     pub skybox: Mutex<Option<Skybox>>,
     pub camera: Mutex<Option<Camera>>,
@@ -43,6 +44,7 @@ pub struct AppScene {
     pub last_request_animation_frame: Cell<Option<f64>>,
     pub event_listeners: Mutex<Vec<EventListener>>,
     last_size: Cell<(f64, f64)>,
+    last_camera_id: Cell<CameraId>,
     last_shader_kind: Cell<Option<FragmentShaderKind>>,
 }
 
@@ -54,6 +56,7 @@ impl AppScene {
             ctx,
             renderer: futures::lock::Mutex::new(renderer),
             gltf_loader: Mutex::new(HashMap::new()),
+            latest_gltf_data: Mutex::new(None),
             camera: Mutex::new(None),
             ibl: Mutex::new(None),
             skybox: Mutex::new(None),
@@ -62,6 +65,7 @@ impl AppScene {
             last_request_animation_frame: Cell::new(None),
             event_listeners: Mutex::new(Vec::new()),
             last_size: Cell::new((0.0, 0.0)),
+            last_camera_id: Cell::new(CameraId::default()),
             last_shader_kind: Cell::new(None),
         });
 
@@ -146,15 +150,20 @@ impl AppScene {
 
         spawn_local(clone!(state => async move {
             let last_size = state.last_size.get();
+            let last_camera_id = state.last_camera_id.get();
+            let camera_id = state.ctx.camera_id.get();
 
             {
                 let renderer = state.renderer.lock().await;
                 let (canvas_width, canvas_height) = renderer.gpu.canvas_size();
-                if (canvas_width, canvas_height) == last_size {
+                if (canvas_width, canvas_height) == last_size && camera_id == last_camera_id {
                     return;
                 }
                 state.last_size.set((canvas_width, canvas_height));
+                state.last_camera_id.set(camera_id);
             }
+
+
             if let Err(err) = state.setup_viewport().await {
                 tracing::error!("Failed to setup scene after canvas resize: {:?}", err);
             }
@@ -300,16 +309,23 @@ impl AppScene {
         Ok(())
     }
 
-    pub async fn upload_data(
-        self: &Arc<Self>,
-        gltf_id: GltfId,
-        loader: GltfLoader,
-    ) -> Result<GltfData> {
-        Ok(loader.into_data()?)
+    pub async fn upload_data(self: &Arc<Self>, gltf_id: GltfId, loader: GltfLoader) -> Result<()> {
+        let data = loader.into_data()?;
+
+        *self.latest_gltf_data.lock().unwrap() = Some(data);
+
+        Ok(())
     }
 
-    pub async fn populate(self: &Arc<Self>, data: GltfData) -> Result<()> {
+    pub async fn populate(self: &Arc<Self>) -> Result<()> {
+        let data = self.latest_gltf_data.lock().unwrap();
+        let data = data
+            .as_ref()
+            .expect("No GLTF data to populate")
+            .heavy_clone();
+
         let mut renderer = self.renderer.lock().await;
+
         renderer
             .populate_gltf(data, None, self.ctx.generate_mipmaps.get())
             .await?;
@@ -371,16 +387,27 @@ impl AppScene {
             }
         }
 
-        let mut camera = self.camera.lock().unwrap();
+        let gltf_doc = self
+            .latest_gltf_data
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|data| data.doc.clone());
+
         let camera_aspect = canvas_width as f32 / canvas_height as f32;
-        if let Some(scene_aabb) = scene_aabb.clone() {
-            match self.ctx.camera_id.get() {
-                CameraId::Orthographic => {
-                    *camera = Some(Camera::new_orthographic(scene_aabb, camera_aspect));
-                }
-                CameraId::Perspective => {
-                    *camera = Some(Camera::new_perspective(scene_aabb, camera_aspect));
-                }
+        let mut camera = self.camera.lock().unwrap();
+        match self.ctx.camera_id.get() {
+            CameraId::Orthographic => {
+                tracing::info!("setting new orthographic camera");
+                *camera = Some(Camera::new_orthographic(
+                    scene_aabb,
+                    gltf_doc,
+                    camera_aspect,
+                ));
+            }
+            CameraId::Perspective => {
+                tracing::info!("setting new perspective camera");
+                *camera = Some(Camera::new_perspective(scene_aabb, gltf_doc, camera_aspect));
             }
         }
 

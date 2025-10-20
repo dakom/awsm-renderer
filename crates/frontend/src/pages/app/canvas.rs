@@ -123,18 +123,16 @@ impl AppCanvas {
 
                         state.display_text.set(format!("Uploading data: {}", gltf_id));
 
-                        let data = match scene.upload_data(gltf_id, loader).await {
-                            Ok(data) => data,
-                            Err(err) => {
-                                tracing::error!("{:?}", err);
-                                state.display_text.set(format!("Error uploading data: {}", gltf_id));
-                                return;
-                            }
-                        };
+                        if let Err(err) = scene.upload_data(gltf_id, loader).await {
+                            tracing::error!("{:?}", err);
+                            state.display_text.set(format!("Error uploading data: {}", gltf_id));
+                            return;
+                        }
 
                         state.display_text.set(format!("Populating data: {}", gltf_id));
 
-                        if let Err(err) = scene.populate(data).await {
+
+                        if let Err(err) = scene.populate().await {
                             tracing::error!("{:?}", err);
                             state.display_text.set(format!("Error populating data: {}", gltf_id));
                             return;

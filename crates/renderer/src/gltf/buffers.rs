@@ -60,6 +60,22 @@ pub struct GltfBuffers {
     pub meshes: Vec<Vec<MeshBufferInfoWithOffset>>,
 }
 
+impl GltfBuffers {
+    pub fn heavy_clone(&self) -> Self {
+        Self {
+            raw: self.raw.clone(),
+            index_bytes: self.index_bytes.clone(),
+            visibility_vertex_bytes: self.visibility_vertex_bytes.clone(),
+            attribute_vertex_bytes: self.attribute_vertex_bytes.clone(),
+            triangle_data_bytes: self.triangle_data_bytes.clone(),
+            geometry_morph_bytes: self.geometry_morph_bytes.clone(),
+            material_morph_bytes: self.material_morph_bytes.clone(),
+            skin_joint_index_weight_bytes: self.skin_joint_index_weight_bytes.clone(),
+            meshes: self.meshes.clone(),
+        }
+    }
+}
+
 fn compute_world_matrices(doc: &gltf::Document) -> HashMap<usize, Mat4> {
     let mut world = HashMap::new();
 

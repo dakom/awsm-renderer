@@ -68,19 +68,10 @@ pub async fn create_texture(
 
     let format = match map_ktx_format(ktx_format) {
         Some(format) => {
-            tracing::info!("KTX2 format detected: {:?} -> {:?}", ktx_format, format);
-            tracing::info!(
-                "KTX2 dimensions: {}x{}, {} faces, {} mip levels",
-                header.pixel_width,
-                header.pixel_height,
-                header.face_count,
-                header.level_count
-            );
-
-            // Check for KTX metadata that might indicate exposure/scaling
-            for (key, value) in reader.key_value_data() {
-                tracing::info!("metadata key: {key}");
-            }
+            // // Check for KTX metadata that might indicate exposure/scaling
+            // for (key, value) in reader.key_value_data() {
+            //     tracing::info!("metadata key: {key}");
+            // }
 
             format
         }

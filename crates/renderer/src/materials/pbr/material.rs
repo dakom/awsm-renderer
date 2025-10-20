@@ -253,12 +253,6 @@ impl PbrMaterial {
             let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
             let uv_index = self.base_color_uv_index?;
             let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
-            tracing::info!(
-                "sampler index: {}, address modes: {:?} and {:?}",
-                sampler_index,
-                address_mode_u,
-                address_mode_v
-            );
             Some((
                 entry_info,
                 uv_index,

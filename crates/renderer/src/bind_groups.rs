@@ -165,7 +165,10 @@ impl BindGroups {
 
         if self
             .create_list
-            .contains(&BindGroupCreate::EnvironmentSkyboxCreate)
+            .contains(&BindGroupCreate::TextureViewResize)
+            || self
+                .create_list
+                .contains(&BindGroupCreate::EnvironmentSkyboxCreate)
             || self.create_list.contains(&BindGroupCreate::IblCreate)
             || self
                 .create_list

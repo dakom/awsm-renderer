@@ -16,19 +16,12 @@ pub struct OrthographicCamera {
 
 impl OrthographicCamera {
     pub fn new_aabb(view: &CameraView, aabb: &Aabb, margin: f32, aspect: f32) -> Self {
-        let size = aabb.size();
+        // Use the bounding sphere radius instead of direct XY dimensions
+        // This works correctly regardless of model rotation
+        let bounding_radius = aabb.size().length() * 0.5;
 
-        let width = size.x;
-        let height = size.y;
-        //let aspect = width / height;
-        let mut half_w = width * 0.5;
-        let mut half_h = height * 0.5;
-
-        if half_w / half_h > aspect {
-            half_h = half_w / aspect;
-        } else {
-            half_w = half_h * aspect;
-        }
+        let mut half_h = bounding_radius;
+        let mut half_w = half_h * aspect;
 
         half_w *= margin;
         half_h *= margin;
@@ -109,4 +102,6 @@ impl OrthographicCamera {
         self.bottom = cy - half_h;
         self.top = cy + half_h;
     }
+
+    pub fn setup_from_gltf(&mut self, doc: &gltf::Document) {}
 }
