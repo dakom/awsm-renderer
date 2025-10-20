@@ -18,6 +18,7 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
             GltfId::MetalRoughSpheres,
             // GltfId::TextureTransformTest,
             GltfId::TextureTransformMultiTest,
+            GltfId::DamagedHelmet,
         ],
     );
 
@@ -142,6 +143,7 @@ pub enum GltfId {
     BoxVertexColors,
     Cube,
     RiggedFigure,
+    DamagedHelmet,
 
     // EXTENSION TESTS
     EnvironmentTest,
@@ -233,6 +235,7 @@ impl GltfId {
             Self::BoxVertexColors => "BoxVertexColors/glTF/BoxVertexColors.gltf",
             Self::Cube => "Cube/glTF/Cube.gltf",
             Self::RiggedFigure => "RiggedFigure/glTF/RiggedFigure.gltf",
+            Self::DamagedHelmet => "DamagedHelmet/glTF/DamagedHelmet.gltf",
 
             // Extension Tests
             Self::EnvironmentTest => "EnvironmentTest/glTF/EnvironmentTest.gltf",
@@ -285,6 +288,7 @@ impl GltfId {
             Self::BoxVertexColors => "Box vertex colors",
             Self::Cube => "Cube",
             Self::RiggedFigure => "Rigged figure",
+            Self::DamagedHelmet => "Damaged helmet",
 
             // Extension Tests
             Self::EnvironmentTest => "Environment test",
