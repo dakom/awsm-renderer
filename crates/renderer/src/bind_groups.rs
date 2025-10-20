@@ -11,8 +11,8 @@ use strum::{EnumIter, IntoEnumIterator};
 use thiserror::Error;
 
 use crate::{
-    bind_group_layout::BindGroupLayouts, camera::CameraBuffer, lights::Lights,
-    materials::Materials, mesh::Meshes, render_passes::RenderPasses,
+    bind_group_layout::BindGroupLayouts, camera::CameraBuffer, environment::Environment,
+    lights::Lights, materials::Materials, mesh::Meshes, render_passes::RenderPasses,
     render_textures::RenderTextureViews, textures::Textures, transforms::Transforms,
 };
 
@@ -34,6 +34,7 @@ pub struct BindGroupRecreateContext<'a> {
     pub bind_group_layouts: &'a BindGroupLayouts,
     pub meshes: &'a Meshes,
     pub camera: &'a CameraBuffer,
+    pub environment: &'a Environment,
     pub lights: &'a Lights,
     pub transforms: &'a Transforms,
 }
@@ -42,6 +43,8 @@ pub struct BindGroupRecreateContext<'a> {
 pub enum BindGroupCreate {
     CameraInitOnly,
     LightsResize,
+    IblCreate,
+    EnvironmentSkyboxCreate,
     TransformsResize,
     TransformNormalsResize,
     GeometryMorphTargetWeightsResize,
@@ -145,9 +148,25 @@ impl BindGroups {
             render_passes.display.bind_groups.recreate(&ctx)?;
         }
 
+        if self.create_list.contains(&BindGroupCreate::MegaTexture) {
+            render_passes
+                .material_opaque
+                .bind_groups
+                .recreate_textures(&ctx)?;
+            render_passes
+                .material_opaque
+                .bind_groups
+                .recreate_samplers(&ctx)?;
+            render_passes
+                .material_transparent
+                .bind_groups
+                .recreate(&ctx)?;
+        }
+
         if self
             .create_list
-            .contains(&BindGroupCreate::TextureViewResize)
+            .contains(&BindGroupCreate::EnvironmentSkyboxCreate)
+            || self.create_list.contains(&BindGroupCreate::IblCreate)
             || self
                 .create_list
                 .contains(&BindGroupCreate::MaterialMeshMetaResize)
@@ -168,7 +187,10 @@ impl BindGroups {
                 .create_list
                 .contains(&BindGroupCreate::TransformNormalsResize)
         {
-            render_passes.material_opaque.bind_groups.recreate(&ctx)?;
+            render_passes
+                .material_opaque
+                .bind_groups
+                .recreate_main(&ctx)?;
             render_passes
                 .material_transparent
                 .bind_groups

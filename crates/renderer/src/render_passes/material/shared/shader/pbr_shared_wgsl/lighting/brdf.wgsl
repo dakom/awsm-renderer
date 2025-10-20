@@ -37,8 +37,8 @@ fn geometry_smith(n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, alpha: f32) -> f32 {
 // -------------------------------------------------------------
 const ENV_DIFFUSE_COLOR  : vec3<f32> = vec3<f32>(0.22, 0.24, 0.26);
 const ENV_SPECULAR_COLOR : vec3<f32> = vec3<f32>(1.0, 0.98, 0.95);
-const ENV_INTENSITY_DIFF : f32 = 0.3;
-const ENV_INTENSITY_SPEC : f32 = 0.7;
+const ENV_INTENSITY_DIFF : f32 = 0.075;  // Reduced from 0.3 (divided by 4)
+const ENV_INTENSITY_SPEC : f32 = 0.175;  // Reduced from 0.7 (divided by 4)
 
 fn sampleIrradianceStub(n: vec3<f32>) -> vec3<f32> {
     let hemi = 0.5 * (dot(n, vec3<f32>(0.0, 1.0, 0.0)) + 1.0);

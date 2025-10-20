@@ -69,8 +69,13 @@ impl PbrMaterialBuffers {
         textures: &Textures,
     ) {
         self.uniform_buffer.update_with(key, |_, data| {
-            let values = pbr_material.uniform_buffer_data(textures);
-            data[..values.len()].copy_from_slice(&values);
+            match pbr_material.uniform_buffer_data(textures) {
+                Ok(values) => {
+                    data[..values.len()].copy_from_slice(&values);
+                }, Err(e) => {
+                    tracing::error!("Failed to get PBR material uniform buffer data for material key {:?}: {:?}", key, e);
+                }
+            }
         });
 
         self.uniform_buffer_gpu_dirty = true;

@@ -107,7 +107,6 @@ impl<'a> MaterialMeshMeta<'a> {
         // Transform offset (4 bytes)
         push_u32(transform_offset as u32);
         // Normal matrix offset (4 bytes)
-        tracing::info!("normal matrix offset: {}", normal_matrix_offset);
         push_u32(normal_matrix_offset as u32);
 
         // Vertex attribute offsets (8 bytes)

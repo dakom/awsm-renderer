@@ -1,4 +1,3 @@
-// ---- START MIPMAP HERE ----
 // ============================================================================
 // mipmap.wgsl — Analytic mip selection in compute (atlas-aware, WGSL-safe)
 // ============================================================================
@@ -439,10 +438,10 @@ fn eval_plane(plane: PlaneCoefficients, point: vec2<f32>) -> f32 {
 // Extend this switch when you add more atlas bindings.
 fn get_atlas_info(atlas_index: u32) -> AtlasInfo {
     switch (atlas_index) {
-        {% for b in texture_bindings %}
-        case {{ b.atlas_index }}u: {
-            let dims = vec2<f32>(textureDimensions(atlas_tex_{{ b.atlas_index }}, 0u));
-            let lvls = f32(textureNumLevels(atlas_tex_{{ b.atlas_index }}));
+        {% for i in 0..texture_atlas_len %}
+        case {{ i }}u: {
+            let dims = vec2<f32>(textureDimensions(atlas_tex_{{ i }}, 0u));
+            let lvls = f32(textureNumLevels(atlas_tex_{{ i }}));
             return AtlasInfo(dims, lvls, true);
         }
         {% endfor %}
@@ -451,104 +450,3 @@ fn get_atlas_info(atlas_index: u32) -> AtlasInfo {
         }
     }
 }
-
-// --- Gradient helpers ------------------------------------------------
-
-// Convert local-UV grads → atlas-UV grads (so they match coords for textureSampleGrad).
-fn get_atlas_gradients(
-    tex_info: TextureInfo,
-    triangle_indices: vec3<u32>,
-    attribute_data_offset: u32,
-    vertex_attribute_stride: u32,
-    cache: MipCache
-) -> Grad2 {
-    var g_out = Grad2(vec2<f32>(0.0), vec2<f32>(0.0));
-    if (!cache.valid) { return g_out; }
-
-    // Local [0,1] UV derivatives
-    let g_local = get_texture_gradients(
-        tex_info,
-        triangle_indices,
-        attribute_data_offset,
-        vertex_attribute_stride,
-        cache
-    );
-
-    let atlas = get_atlas_info(tex_info.atlas_index);
-    if (!atlas.valid) { return g_out; }
-
-    // atlas_transform() maps local UV [0,1] to atlas UV space
-    // The mapping is: atlas_uv = (texel_offset + wrapped_uv * span + 0.5) / atlas_dims
-    // where span = max(size - 1, 0)
-    // So d(atlas_uv)/d(local_uv) = span / atlas_dims
-    let span  = max(vec2<f32>(f32(tex_info.size.x), f32(tex_info.size.y)) - vec2<f32>(1.0, 1.0),
-                    vec2<f32>(0.0, 0.0));
-    let scale = span / atlas.dims;
-
-    g_out.dudx_dvdx = vec2<f32>(g_local.dudx_dvdx.x * scale.x,
-                                g_local.dudx_dvdx.y * scale.y);
-    g_out.dudy_dvdy = vec2<f32>(g_local.dudy_dvdy.x * scale.x,
-                                g_local.dudy_dvdy.y * scale.y);
-    return g_out;
-}
-
-fn _texture_sample_grad_with_sampler(
-    atlas_tex: texture_2d_array<f32>,
-    sampler_index: u32,
-    uv_atlas: vec2<f32>,
-    layer: i32,
-    ddx: vec2<f32>,
-    ddy: vec2<f32>
-) -> vec4<f32> {
-    switch sampler_index {
-        {% for s in sampler_bindings %}
-            case {{ s.sampler_index }}u: {
-                // NOTE: array layer comes BEFORE gradients
-                return textureSampleGrad(
-                    atlas_tex,
-                    atlas_sampler_{{ s.sampler_index }},
-                    uv_atlas,
-                    layer,
-                    ddx,
-                    ddy
-                );
-            }
-        {% endfor %}
-        default: { return vec4<f32>(0.0); }
-    }
-}
-
-// Sample the atlas using gradients (atlas-aware; mirrors texture_load_atlas mapping).
-fn texture_sample_grad_atlas(
-    info: TextureInfo,
-    attribute_uv_local: vec2<f32>,
-    grads_atlas: Grad2
-) -> vec4<f32> {
-    // Build atlas-space UV
-    let atlas = get_atlas_info(info.atlas_index);
-    if (!atlas.valid) { return vec4<f32>(0.0); }
-    let uv_atlas = atlas_transform(info, attribute_uv_local, atlas.dims);
-
-    let ddx = grads_atlas.dudx_dvdx; // vec2(dudx, dvdx) in atlas UV
-    let ddy = grads_atlas.dudy_dvdy; // vec2(dudy, dvdy) in atlas UV
-    let layer = i32(info.layer_index);
-
-    switch info.atlas_index {
-        {% for i in 0..total_atlas_index %}
-            case {{ i }}u: {
-                return _texture_sample_grad_with_sampler(
-                    atlas_tex_{{ i }},
-                    info.sampler_index,
-                    uv_atlas,
-                    layer,
-                    ddx,
-                    ddy
-                );
-            }
-        {% endfor %}
-        default: { return vec4<f32>(0.0); }
-    }
-}
-
-
-// ---- END MIPMAP HERE ----

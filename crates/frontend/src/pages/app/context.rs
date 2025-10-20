@@ -8,6 +8,7 @@ pub struct AppContext {
     pub scene: Mutable<Option<Arc<AppScene>>>,
     pub generate_mipmaps: Mutable<bool>,
     pub material: MutableMaterial,
+    pub environment_name: Mutable<String>,
 }
 
 #[derive(Clone)]
@@ -24,6 +25,7 @@ impl Default for AppContext {
             material: MutableMaterial {
                 debug_normals: Mutable::new(false),
             },
+            environment_name: Mutable::new(CONFIG.initial_environment.clone()),
         }
     }
 }

@@ -1,7 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use awsm_renderer_core::{
     compare::CompareFunction,
+    cubemap::CubemapImage,
     error::AwsmCoreError,
     image::ImageData,
     renderer::AwsmRendererWebGpu,
@@ -93,27 +94,16 @@ pub struct Textures {
     pub gpu_texture_arrays: Vec<web_sys::GpuTexture>,
     pub gpu_texture_array_views: Vec<web_sys::GpuTextureView>,
     pub mega_texture: MegaTexture<TextureKey>,
+    pub mega_texture_sampler_set: BTreeSet<SamplerKey>,
     textures: SlotMap<TextureKey, MegaTextureEntryInfo<TextureKey>>,
+    cubemaps: SlotMap<CubemapTextureKey, web_sys::GpuTexture>,
     samplers: SlotMap<SamplerKey, web_sys::GpuSampler>,
     sampler_cache: HashMap<SamplerCacheKey, SamplerKey>,
-    sampler_indices: SecondaryMap<SamplerKey, u32>,
-    sampler_keys: Vec<SamplerKey>,
     // We keep a mirror of the sampler address modes so that materials can adjust UVs manually when
     // sampling inside the mega texture. This is especially important for clamp/mirror behaviour.
     sampler_address_modes: SecondaryMap<SamplerKey, (Option<AddressMode>, Option<AddressMode>)>,
+    texture_samplers: SecondaryMap<TextureKey, SamplerKey>,
     gpu_dirty: bool,
-}
-
-#[derive(Hash, Debug, Clone, PartialEq, Eq, Default)]
-pub struct SamplerBindings {
-    // First sampler binding group index. Mirrors MegaTextureBindings so the shader template can
-    // generate matching @group declarations.
-    pub start_group: u32,
-    // Offset within the first group where additional sampler bindings should start.
-    pub start_binding: u32,
-    // Number of sampler bindings in each group, in order. Allows splitting samplers across
-    // multiple bind groups when device limits are tight.
-    pub bind_group_bindings_len: Vec<u32>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -151,12 +141,13 @@ impl Textures {
             gpu_texture_arrays: Vec::new(),
             gpu_texture_array_views: Vec::new(),
             mega_texture: MegaTexture::new(&gpu.device.limits(), 8),
+            mega_texture_sampler_set: BTreeSet::new(),
             textures: SlotMap::with_key(),
             samplers: SlotMap::with_key(),
+            cubemaps: SlotMap::with_key(),
             sampler_cache: HashMap::new(),
-            sampler_indices: SecondaryMap::new(),
-            sampler_keys: Vec::new(),
             sampler_address_modes: SecondaryMap::new(),
+            texture_samplers: SecondaryMap::new(),
             gpu_dirty: false,
         }
     }
@@ -165,6 +156,7 @@ impl Textures {
         &mut self,
         image_data: ImageData,
         is_srgb_encoded: bool,
+        sampler_key: SamplerKey,
     ) -> Result<TextureKey> {
         let key = self.textures.try_insert_with_key(|key| {
             self.mega_texture
@@ -173,9 +165,22 @@ impl Textures {
                 .and_then(|mut entries| entries.pop().ok_or(AwsmTextureError::MegaTexture))
         })?;
 
+        self.texture_samplers.insert(key, sampler_key);
+        self.mega_texture_sampler_set.insert(sampler_key);
+
         self.gpu_dirty = true;
 
         Ok(key)
+    }
+
+    pub fn insert_cubemap(&mut self, texture: web_sys::GpuTexture) -> CubemapTextureKey {
+        self.cubemaps.insert(texture)
+    }
+
+    pub fn get_cubemap(&self, key: CubemapTextureKey) -> Result<&web_sys::GpuTexture> {
+        self.cubemaps
+            .get(key)
+            .ok_or(AwsmTextureError::CubemapTextureNotFound(key))
     }
 
     async fn write_gpu_textures(
@@ -215,6 +220,13 @@ impl Textures {
         Ok(was_gpu_dirty)
     }
 
+    pub fn get_texture_sampler_key(&self, texture_key: TextureKey) -> Result<SamplerKey> {
+        self.texture_samplers
+            .get(texture_key)
+            .copied()
+            .ok_or(AwsmTextureError::SamplerForTextureNotFound(texture_key))
+    }
+
     pub fn get_entry(&self, key: TextureKey) -> Result<&MegaTextureEntryInfo<TextureKey>> {
         self.textures
             .get(key)
@@ -250,9 +262,6 @@ impl Textures {
         let address_mode_u = cache_key.address_mode_u;
         let address_mode_v = cache_key.address_mode_v;
         self.sampler_cache.insert(cache_key, key);
-        let index = self.sampler_keys.len() as u32;
-        self.sampler_indices.insert(key, index);
-        self.sampler_keys.push(key);
         // Persist the original (U,V) wrap modes so that shader-side helpers can reproduce the
         // desired behaviour after UVs are remapped into the mega texture atlas.
         self.sampler_address_modes
@@ -267,20 +276,6 @@ impl Textures {
             .ok_or(AwsmTextureError::SamplerNotFound(key))
     }
 
-    pub fn remove_sampler(&mut self, key: SamplerKey) {
-        self.samplers.remove(key);
-        self.sampler_indices.remove(key);
-        self.sampler_address_modes.remove(key);
-    }
-
-    pub fn sampler_index(&self, key: SamplerKey) -> Option<u32> {
-        self.sampler_indices.get(key).copied()
-    }
-
-    pub fn sampler_keys(&self) -> &[SamplerKey] {
-        &self.sampler_keys
-    }
-
     pub fn sampler_address_modes(
         &self,
         key: SamplerKey,
@@ -290,40 +285,6 @@ impl Textures {
             .copied()
             .unwrap_or((None, None))
     }
-
-    pub fn sampler_bindings(
-        &self,
-        limits: &GpuSupportedLimits,
-        start_group: u32,
-        start_binding: u32,
-    ) -> SamplerBindings {
-        // We mirror what `MegaTextureBindings` does for texture views, but with samplers. The
-        // shader/template layer relies on this to emit @group/@binding declarations that line up
-        // with the bind group layouts assembled during render-pass creation.
-        let max_samplers_per_group = limits.max_samplers_per_shader_stage();
-        let mut remaining = self.sampler_keys.len() as u32;
-        let mut current_binding = start_binding;
-        let mut bindings = Vec::new();
-
-        while remaining > 0 {
-            let available = max_samplers_per_group.saturating_sub(current_binding);
-            if available == 0 {
-                current_binding = 0;
-                continue;
-            }
-
-            let samplers_in_group = remaining.min(available);
-            bindings.push(samplers_in_group);
-            remaining -= samplers_in_group;
-            current_binding = 0;
-        }
-
-        SamplerBindings {
-            start_group,
-            start_binding,
-            bind_group_bindings_len: bindings,
-        }
-    }
 }
 
 new_key_type! {
@@ -332,6 +293,10 @@ new_key_type! {
 
 new_key_type! {
     pub struct SamplerKey;
+}
+
+new_key_type! {
+    pub struct CubemapTextureKey;
 }
 
 pub type Result<T> = std::result::Result<T, AwsmTextureError>;
@@ -349,4 +314,10 @@ pub enum AwsmTextureError {
 
     #[error("[texture] texture not found: {0:?}")]
     TextureNotFound(TextureKey),
+
+    #[error("[texture] sampler for texture not found: {0:?}")]
+    SamplerForTextureNotFound(TextureKey),
+
+    #[error("[texture] subemap texture not found: {0:?}")]
+    CubemapTextureNotFound(CubemapTextureKey),
 }

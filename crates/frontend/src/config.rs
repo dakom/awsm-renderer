@@ -21,9 +21,12 @@ pub struct Config {
     pub debug: ConfigDebug,
     pub media_baseurl: String,
     pub gltf_url: String,
+    pub environment_url: String,
     pub generate_mipmaps: bool,
     pub initial_sidebar_open: Option<SidebarSection>,
     pub post_processing_enabled: bool,
+    pub initial_environment: String,
+    pub cache_buster: bool,
 }
 
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
@@ -50,11 +53,18 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         } else {
             "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/refs/heads/main/Models".to_string()
         },
+        environment_url: if cfg!(debug_assertions) {
+            "http://localhost:9082/awsm-renderer-assets".to_string()
+        } else {
+            "https://dakom.github.io/awsm-renderer-assets".to_string()
+        },
 
         generate_mipmaps: true,
         //initial_sidebar_open: Some(SidebarSection::Gltf),
         initial_sidebar_open: Some(SidebarSection::PostProcessing),
         post_processing_enabled: true,
+        initial_environment: "photo_studio".to_string(),
+        cache_buster: if cfg!(debug_assertions) { true } else { false },
     };
 
     config

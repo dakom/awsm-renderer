@@ -103,6 +103,7 @@ dependencies = [
  "half",
  "image",
  "js-sys",
+ "ktx2",
  "ordered-float",
  "serde",
  "serde-wasm-bindgen",
@@ -698,6 +699,15 @@ checksum = "1cfaf33c695fc6e08064efbc1f72ec937429614f25eef83af942d0e227c3a28f"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "ktx2"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff7f53bdf698e7aa7ec916411bbdc8078135da11b66db5182675b2227f6c0d07"
+dependencies = [
+ "bitflags 2.9.1",
 ]
 
 [[package]]

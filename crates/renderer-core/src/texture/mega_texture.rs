@@ -116,14 +116,6 @@ pub struct MegaTextureEntryInfo<ID> {
     pub id: ID,
 }
 
-// Just a convenience to help generate a sane list of bind group bindings
-#[derive(Hash, Debug, Clone, PartialEq, Eq)]
-pub struct MegaTextureBindings {
-    pub start_group: u32,
-    pub start_binding: u32,
-    pub bind_group_bindings_len: Vec<u32>,
-}
-
 #[derive(Clone, Debug)]
 pub struct MegaTextureInfo<ID>
 where
@@ -213,32 +205,17 @@ where
             .map(|entry| entry.into_info(index))
     }
 
-    pub fn get_bindings(
-        &self,
-        limits: &web_sys::GpuSupportedLimits,
-        start_group: u32,
-        start_binding: u32,
-    ) -> MegaTextureBindings {
-        let max_bindings_per_group = limits.max_sampled_textures_per_shader_stage();
-        let total_textures = self.atlases.len() as u32;
+    pub fn bindings_len(&self, limits: &web_sys::GpuSupportedLimits) -> Result<u32> {
+        let max_atlases = limits.max_sampled_textures_per_shader_stage();
+        let total_atlases = self.atlases.len() as u32;
 
-        let mut bind_group_bindings_len = Vec::new();
-        let mut remaining_textures = total_textures;
-        let mut current_binding = start_binding;
-
-        while remaining_textures > 0 {
-            let available_slots = max_bindings_per_group - current_binding;
-            let textures_in_this_group = remaining_textures.min(available_slots);
-
-            bind_group_bindings_len.push(textures_in_this_group);
-            remaining_textures -= textures_in_this_group;
-            current_binding = 0; // Reset for subsequent groups
-        }
-
-        MegaTextureBindings {
-            start_group,
-            start_binding,
-            bind_group_bindings_len,
+        if total_atlases > max_atlases {
+            Err(AwsmCoreError::MegaTextureTooManyAtlases {
+                total_atlases,
+                max_atlases,
+            })
+        } else {
+            Ok(total_atlases)
         }
     }
 

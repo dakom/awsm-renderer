@@ -1,7 +1,10 @@
+pub mod ibl;
+
 use std::sync::LazyLock;
 
 use awsm_renderer_core::{
     buffers::{BufferDescriptor, BufferUsage},
+    cubemap::CubemapImage,
     error::AwsmCoreError,
     renderer::AwsmRendererWebGpu,
 };
@@ -11,15 +14,122 @@ use thiserror::Error;
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
     buffer::dynamic_uniform::DynamicUniformBuffer,
-    AwsmRendererLogging,
+    lights::ibl::Ibl,
+    textures::CubemapTextureKey,
+    AwsmRenderer, AwsmRendererLogging,
 };
+
+static BUFFER_USAGE: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
 
 pub struct Lights {
     pub(crate) gpu_buffer: web_sys::GpuBuffer,
+    pub ibl: Ibl,
     lights: SlotMap<LightKey, Light>,
     // we use it as a storage buffer, because we need dynamic lengths, but it's a fixed size like a uniform
     storage_buffer: DynamicUniformBuffer<LightKey>,
     gpu_dirty: bool,
+}
+
+impl Lights {
+    pub const INITIAL_ELEMENTS: usize = 8; // 8 lights is a decent baseline
+    pub const BYTE_ALIGNMENT: usize = 64; // we aren't using it as a uniform buffer, so storage rules apply
+    pub const BYTE_SIZE: usize = 64;
+
+    pub fn new(gpu: &AwsmRendererWebGpu, ibl: Ibl) -> Result<Self> {
+        let gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Lights"),
+                Self::INITIAL_ELEMENTS * Self::BYTE_ALIGNMENT,
+                *BUFFER_USAGE,
+            )
+            .into(),
+        )?;
+
+        Ok(Lights {
+            lights: SlotMap::with_key(),
+            storage_buffer: DynamicUniformBuffer::new(
+                Self::INITIAL_ELEMENTS,
+                Self::BYTE_SIZE,
+                Some(Self::BYTE_ALIGNMENT),
+                Some("Lights".to_string()),
+            ),
+            ibl,
+            gpu_dirty: true,
+            gpu_buffer,
+        })
+    }
+
+    pub fn insert(&mut self, light: Light) -> Result<LightKey> {
+        let key = self.lights.insert(light.clone());
+
+        self.storage_buffer
+            .update(key, &light.storage_buffer_data());
+
+        self.gpu_dirty = true;
+        Ok(key)
+    }
+
+    pub fn remove(&mut self, key: LightKey) {
+        self.storage_buffer.remove(key);
+        self.lights.remove(key);
+        self.gpu_dirty = true;
+    }
+
+    pub fn update(&mut self, key: LightKey, f: impl FnOnce(&mut Light)) {
+        if let Some(light) = self.lights.get_mut(key) {
+            f(light);
+            self.storage_buffer
+                .update(key, &light.storage_buffer_data());
+            self.gpu_dirty = true;
+        }
+    }
+
+    pub fn write_gpu(
+        &mut self,
+        logging: &AwsmRendererLogging,
+        gpu: &AwsmRendererWebGpu,
+        bind_groups: &mut BindGroups,
+    ) -> Result<()> {
+        if self.gpu_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(
+                    tracing::span!(tracing::Level::INFO, "Lights Storage Buffer GPU write")
+                        .entered(),
+                )
+            } else {
+                None
+            };
+
+            if let Some(new_size) = self.storage_buffer.take_gpu_needs_resize() {
+                self.gpu_buffer = gpu.create_buffer(
+                    &BufferDescriptor::new(Some("Lights"), new_size, *BUFFER_USAGE).into(),
+                )?;
+
+                bind_groups.mark_create(BindGroupCreate::LightsResize);
+            }
+
+            gpu.write_buffer(
+                &self.gpu_buffer,
+                None,
+                self.storage_buffer.raw_slice(),
+                None,
+                None,
+            )?;
+
+            // for (index, chunk) in self.storage_buffer.raw_slice().chunks_exact(64).enumerate() {
+            //     let values = unsafe {
+            //         std::slice::from_raw_parts(chunk.as_ptr() as *const f32, 16)
+            //     };
+            //     tracing::info!("{}: {:?}", index, values);
+            // }
+
+            // tracing::info!("n_lights should be {}", self.storage_buffer.raw_slice().len() / (4 * 16));
+
+            self.gpu_dirty = false;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -171,109 +281,6 @@ impl Light {
         }
 
         data
-    }
-}
-
-static BUFFER_USAGE: LazyLock<BufferUsage> =
-    LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
-
-impl Lights {
-    pub const INITIAL_ELEMENTS: usize = 8; // 8 lights is a decent baseline
-    pub const BYTE_ALIGNMENT: usize = 64; // we aren't using it as a uniform buffer, so storage rules apply
-    pub const BYTE_SIZE: usize = 64;
-
-    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let gpu_buffer = gpu.create_buffer(
-            &BufferDescriptor::new(
-                Some("Lights"),
-                Self::INITIAL_ELEMENTS * Self::BYTE_ALIGNMENT,
-                *BUFFER_USAGE,
-            )
-            .into(),
-        )?;
-
-        Ok(Lights {
-            lights: SlotMap::with_key(),
-            storage_buffer: DynamicUniformBuffer::new(
-                Self::INITIAL_ELEMENTS,
-                Self::BYTE_SIZE,
-                Some(Self::BYTE_ALIGNMENT),
-                Some("Lights".to_string()),
-            ),
-            gpu_dirty: true,
-            gpu_buffer,
-        })
-    }
-
-    pub fn insert(&mut self, light: Light) -> Result<LightKey> {
-        let key = self.lights.insert(light.clone());
-
-        self.storage_buffer
-            .update(key, &light.storage_buffer_data());
-
-        self.gpu_dirty = true;
-        Ok(key)
-    }
-
-    pub fn remove(&mut self, key: LightKey) {
-        self.storage_buffer.remove(key);
-        self.lights.remove(key);
-        self.gpu_dirty = true;
-    }
-
-    pub fn update(&mut self, key: LightKey, f: impl FnOnce(&mut Light)) {
-        if let Some(light) = self.lights.get_mut(key) {
-            f(light);
-            self.storage_buffer
-                .update(key, &light.storage_buffer_data());
-            self.gpu_dirty = true;
-        }
-    }
-
-    pub fn write_gpu(
-        &mut self,
-        logging: &AwsmRendererLogging,
-        gpu: &AwsmRendererWebGpu,
-        bind_groups: &mut BindGroups,
-    ) -> Result<()> {
-        if self.gpu_dirty {
-            let _maybe_span_guard = if logging.render_timings {
-                Some(
-                    tracing::span!(tracing::Level::INFO, "Lights Storage Buffer GPU write")
-                        .entered(),
-                )
-            } else {
-                None
-            };
-
-            if let Some(new_size) = self.storage_buffer.take_gpu_needs_resize() {
-                self.gpu_buffer = gpu.create_buffer(
-                    &BufferDescriptor::new(Some("Lights"), new_size, *BUFFER_USAGE).into(),
-                )?;
-
-                bind_groups.mark_create(BindGroupCreate::LightsResize);
-            }
-
-            gpu.write_buffer(
-                &self.gpu_buffer,
-                None,
-                self.storage_buffer.raw_slice(),
-                None,
-                None,
-            )?;
-
-            // for (index, chunk) in self.storage_buffer.raw_slice().chunks_exact(64).enumerate() {
-            //     let values = unsafe {
-            //         std::slice::from_raw_parts(chunk.as_ptr() as *const f32, 16)
-            //     };
-            //     tracing::info!("{}: {:?}", index, values);
-            // }
-
-            // tracing::info!("n_lights should be {}", self.storage_buffer.raw_slice().len() / (4 * 16));
-
-            self.gpu_dirty = false;
-        }
-        Ok(())
     }
 }
 

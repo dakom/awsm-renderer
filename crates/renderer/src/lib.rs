@@ -6,6 +6,7 @@ pub mod bounds;
 pub mod buffer;
 pub mod camera;
 pub mod debug;
+pub mod environment;
 pub mod error;
 pub mod instances;
 pub mod lights;
@@ -32,6 +33,7 @@ pub mod animation;
 
 use awsm_renderer_core::{
     command::color::Color,
+    cubemap::images::CubemapBitmapColors,
     renderer::{AwsmRendererWebGpu, AwsmRendererWebGpuBuilder},
 };
 use bind_groups::BindGroups;
@@ -49,6 +51,8 @@ use transforms::Transforms;
 use crate::{
     bind_group_layout::BindGroupLayouts,
     debug::AwsmRendererLogging,
+    environment::{Environment, Skybox},
+    lights::ibl::{Ibl, IblTexture},
     pipeline_layouts::PipelineLayouts,
     render_passes::{
         geometry::bind_group::GeometryBindGroups, RenderPassInitContext, RenderPasses,
@@ -73,6 +77,7 @@ pub struct AwsmRenderer {
     pub logging: AwsmRendererLogging,
     pub render_textures: RenderTextures,
     pub render_passes: RenderPasses,
+    pub environment: Environment,
     // we pick between these on the fly
     _clear_color_perceptual_to_linear: Color,
     _clear_color: Color,
@@ -104,6 +109,11 @@ pub struct AwsmRendererBuilder {
     logging: AwsmRendererLogging,
     render_texture_formats: Option<RenderTextureFormats>,
     clear_color: Color,
+    // all these colors are typically replaced when loading external textures
+    // but we want something to show by default
+    skybox_colors: CubemapBitmapColors,
+    ibl_filtered_env_colors: CubemapBitmapColors,
+    ibl_irradiance_colors: CubemapBitmapColors,
 }
 
 pub enum AwsmRendererGpuBuilderKind {
@@ -130,7 +140,43 @@ impl AwsmRendererBuilder {
             logging: AwsmRendererLogging::default(),
             render_texture_formats: None,
             clear_color: Color::BLACK,
+            skybox_colors: CubemapBitmapColors {
+                z_positive: Color::from_hex_rgb(0xFF0000), // red
+                z_negative: Color::from_hex_rgb(0x00FF00), // green
+                x_positive: Color::from_hex_rgb(0x0000FF), // blue
+                x_negative: Color::from_hex_rgb(0xFFFF00), // yellow
+                y_positive: Color::from_hex_rgb(0xFF00FF), // magenta
+                y_negative: Color::from_hex_rgb(0x00FFFF), // cyan
+            },
+            ibl_filtered_env_colors: CubemapBitmapColors {
+                z_positive: Color::BLACK,
+                z_negative: Color::BLACK,
+                x_positive: Color::BLACK,
+                x_negative: Color::BLACK,
+                y_positive: Color::BLACK,
+                y_negative: Color::BLACK,
+            },
+            ibl_irradiance_colors: CubemapBitmapColors {
+                z_positive: Color::BLACK,
+                z_negative: Color::BLACK,
+                x_positive: Color::BLACK,
+                x_negative: Color::BLACK,
+                y_positive: Color::BLACK,
+                y_negative: Color::BLACK,
+            }, // skybox_colors: CubemapBitmapColors {
+               //     z_positive: Color::BLACK,
+               //     z_negative: Color::BLACK,
+               //     x_positive: Color::BLACK,
+               //     x_negative: Color::BLACK,
+               //     y_positive: Color::BLACK,
+               //     y_negative: Color::BLACK,
+               // },
         }
+    }
+
+    pub fn with_skybox_colors(mut self, colors: CubemapBitmapColors) -> Self {
+        self.skybox_colors = colors;
+        self
     }
 
     pub fn with_logging(mut self, logging: AwsmRendererLogging) -> Self {
@@ -154,6 +200,9 @@ impl AwsmRendererBuilder {
             logging,
             render_texture_formats,
             clear_color,
+            skybox_colors,
+            ibl_filtered_env_colors,
+            ibl_irradiance_colors,
         } = self;
 
         let mut gpu = match gpu {
@@ -179,11 +228,19 @@ impl AwsmRendererBuilder {
 
         let mut textures = Textures::new(&gpu);
         let mut camera = camera::CameraBuffer::new(&gpu)?;
-        let mut lights = Lights::new(&gpu)?;
+        let mut lights = Lights::new(
+            &gpu,
+            Ibl::new(
+                IblTexture::new_colors(&gpu, &mut textures, ibl_filtered_env_colors).await?,
+                IblTexture::new_colors(&gpu, &mut textures, ibl_irradiance_colors).await?,
+            ),
+        )?;
         let mut meshes = Meshes::new(&gpu)?;
         let mut transforms = Transforms::new(&gpu)?;
         let mut instances = Instances::new(&gpu)?;
         let mut materials = Materials::new(&gpu)?;
+        let mut environment =
+            Environment::new(Skybox::new_colors(&gpu, &mut textures, skybox_colors).await?);
 
         // temporarily push into an init struct for creating render passes
         // we'll then destructure it to get our values back
@@ -200,6 +257,7 @@ impl AwsmRendererBuilder {
 
         let bind_groups = BindGroups::new();
         let render_textures = RenderTextures::new(render_texture_formats);
+
         #[cfg(feature = "gltf")]
         let gltf = gltf::cache::GltfCache::default();
         #[cfg(feature = "animation")]
@@ -219,6 +277,7 @@ impl AwsmRendererBuilder {
             pipelines,
             lights,
             textures,
+            environment,
             render_passes,
             _clear_color: clear_color.clone(),
             _clear_color_perceptual_to_linear: clear_color.perceptual_to_linear(),

@@ -2,6 +2,7 @@
 dist
 .build-artifacts
 glTF-Sample-Assets
+awsm-renderer-assets
 
 ####### Secrets
 .env
@@ -22,7 +23,7 @@ target
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
-####### IDE cruft 
+####### IDE cruft
 # VS Code
 .vscode
 *.code-workspace

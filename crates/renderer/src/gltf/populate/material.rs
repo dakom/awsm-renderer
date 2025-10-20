@@ -133,8 +133,11 @@ impl GltfTextureInfo {
             textures.get(&self.index).cloned()
         };
 
-        let texture_key = match texture_key {
-            Some(texture_key) => texture_key,
+        let (texture_key, sampler_key) = match texture_key {
+            Some(texture_key) => {
+                let sampler_key = renderer.textures.get_texture_sampler_key(texture_key)?;
+                (texture_key, sampler_key)
+            }
             None => {
                 let gltf_texture = ctx
                     .data
@@ -173,17 +176,19 @@ impl GltfTextureInfo {
                     is_srgb_encoded
                 };
 
-                let texture_key = renderer
-                    .textures
-                    .add_image(image_data.clone(), is_srgb_encoded)?;
+                let sampler_key = self.create_sampler_key(renderer, ctx)?;
+
+                let texture_key = renderer.textures.add_image(
+                    image_data.clone(),
+                    is_srgb_encoded,
+                    sampler_key,
+                )?;
 
                 ctx.textures.lock().unwrap().insert(self.index, texture_key);
 
-                texture_key
+                (texture_key, sampler_key)
             }
         };
-
-        let sampler_key = self.create_sampler_key(renderer, ctx)?;
 
         Ok((self.tex_coord_index, texture_key, sampler_key))
     }

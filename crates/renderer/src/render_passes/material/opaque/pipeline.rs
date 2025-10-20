@@ -26,8 +26,11 @@ impl MaterialOpaquePipelines {
         ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &MaterialOpaqueBindGroups,
     ) -> Result<Self> {
-        let pipeline_layout_cache_key =
-            PipelineLayoutCacheKey::new(bind_groups.bind_group_layout_keys.clone());
+        let pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
+            bind_groups.main_bind_group_layout_key,
+            bind_groups.texture_bind_group_layout_key,
+            bind_groups.sampler_bind_group_layout_key,
+        ]);
         let pipeline_layout_key = ctx.pipeline_layouts.get_key(
             &ctx.gpu,
             &ctx.bind_group_layouts,
@@ -66,8 +69,8 @@ impl MaterialOpaquePipelines {
 
         let shader_cache_key = ShaderCacheKeyMaterialOpaque {
             attributes: mesh_buffer_info.into(),
-            texture_bindings: material_opaque_bind_groups.texture_bindings.clone(),
-            sampler_bindings: material_opaque_bind_groups.sampler_bindings.clone(),
+            texture_atlas_len: material_opaque_bind_groups.texture_atlas_len,
+            sampler_atlas_len: material_opaque_bind_groups.texture_sampler_keys.len() as u32,
         };
 
         let shader_key = shaders

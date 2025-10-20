@@ -6,11 +6,14 @@ use std::ops::Deref;
 
 use awsm_renderer::bounds::Aabb;
 use awsm_renderer::core::command::color::Color;
+use awsm_renderer::core::cubemap::CubemapImage;
 use awsm_renderer::core::renderer;
 use awsm_renderer::core::texture::TextureFormat;
+use awsm_renderer::environment::Skybox;
 use awsm_renderer::gltf::data::GltfData;
 use awsm_renderer::gltf::loader::GltfLoader;
-use awsm_renderer::lights::Light;
+use awsm_renderer::lights::ibl::IblTexture;
+use awsm_renderer::lights::{ibl::Ibl, Light};
 use awsm_renderer::mesh::MeshKey;
 use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
 use awsm_web::dom::resize::ResizeObserver;
@@ -32,6 +35,8 @@ pub struct AppScene {
     pub ctx: AppContext,
     pub renderer: futures::lock::Mutex<AwsmRenderer>,
     pub gltf_loader: Mutex<HashMap<GltfId, GltfLoader>>,
+    pub ibl: Mutex<Option<Ibl>>,
+    pub skybox: Mutex<Option<Skybox>>,
     pub camera: Mutex<Option<Camera>>,
     pub resize_observer: Mutex<Option<ResizeObserver>>,
     pub request_animation_frame: Mutex<Option<gloo_render::AnimationFrame>>,
@@ -50,6 +55,8 @@ impl AppScene {
             renderer: futures::lock::Mutex::new(renderer),
             gltf_loader: Mutex::new(HashMap::new()),
             camera: Mutex::new(None),
+            ibl: Mutex::new(None),
+            skybox: Mutex::new(None),
             resize_observer: Mutex::new(None),
             request_animation_frame: Mutex::new(None),
             last_request_animation_frame: Cell::new(None),
@@ -125,6 +132,12 @@ impl AppScene {
             }))).await;
         }));
 
+        spawn_local(clone!(state => async move {
+            if let Err(e) = state.load_skybox(&CONFIG.initial_environment).await {
+                tracing::error!("Failed to load initial skybox: {:?}", e);
+            }
+        }));
+
         state
     }
 
@@ -164,10 +177,16 @@ impl AppScene {
         renderer.render();
     }
 
-    pub async fn load(self: &Arc<Self>, gltf_id: GltfId) -> Result<GltfLoader> {
+    pub async fn load_gltf(self: &Arc<Self>, gltf_id: GltfId) -> Result<GltfLoader> {
         let state = self;
 
-        if let Some(loader) = state.gltf_loader.lock().unwrap().get(&gltf_id).cloned() {
+        if let Some(loader) = state
+            .gltf_loader
+            .lock()
+            .unwrap()
+            .get(&gltf_id)
+            .map(|loader| loader.heavy_clone())
+        {
             return Ok(loader);
         }
 
@@ -179,9 +198,106 @@ impl AppScene {
             .gltf_loader
             .lock()
             .unwrap()
-            .insert(gltf_id, loader.clone());
+            .insert(gltf_id, loader.heavy_clone());
 
         Ok(loader)
+    }
+
+    async fn load_skybox(self: &Arc<Self>, environment_path: &str) -> Result<()> {
+        let state = self;
+
+        let filename = if CONFIG.cache_buster {
+            format!("skybox.ktx2?cb={}", js_sys::Date::now())
+        } else {
+            "skybox.ktx2".to_string()
+        };
+
+        let skybox_cubemap = CubemapImage::load_url_ktx(&format!(
+            "{}/{}/{}",
+            CONFIG.environment_url, environment_path, filename
+        ))
+        .await?;
+
+        let renderer = &mut *state.renderer.lock().await;
+        let (texture, view) = skybox_cubemap
+            .create_texture_and_view(&renderer.gpu, Some("Skybox"))
+            .await?;
+
+        let key = renderer.textures.insert_cubemap(texture);
+
+        let sampler_key = renderer
+            .textures
+            .get_sampler_key(&renderer.gpu, Skybox::sampler_cache_key())?;
+
+        let sampler = renderer.textures.get_sampler(sampler_key)?.clone();
+
+        let skybox = Skybox::new(key, view, sampler);
+
+        *self.skybox.lock().unwrap() = Some(skybox.clone());
+
+        renderer.set_skybox(skybox);
+
+        Ok(())
+    }
+
+    pub async fn load_ibl(self: &Arc<Self>, environment_path: &str) -> Result<()> {
+        if self.ibl.lock().unwrap().is_some() {
+            return Ok(());
+        }
+
+        async fn load_ibl_image(filename: &str, environment_path: &str) -> Result<CubemapImage> {
+            let filename = if CONFIG.cache_buster {
+                format!("{filename}?cb={}", js_sys::Date::now())
+            } else {
+                filename.to_string()
+            };
+
+            CubemapImage::load_url_ktx(&format!(
+                "{}/{}/{}",
+                CONFIG.environment_url, environment_path, filename
+            ))
+            .await
+        }
+
+        let prefiltered_env_image = load_ibl_image("env.ktx2", environment_path).await?;
+        let irradiance_image = load_ibl_image("irradiance.ktx2", environment_path).await?;
+
+        async fn create_ibl_texture(
+            renderer: &mut AwsmRenderer,
+            cubemap_image: CubemapImage,
+        ) -> Result<IblTexture> {
+            let (texture, view) = cubemap_image
+                .create_texture_and_view(&renderer.gpu, Some("IBL Cubemap"))
+                .await?;
+
+            let texture_key = renderer.textures.insert_cubemap(texture);
+
+            let sampler_key = renderer
+                .textures
+                .get_sampler_key(&renderer.gpu, IblTexture::sampler_cache_key())?;
+
+            let sampler = renderer.textures.get_sampler(sampler_key)?.clone();
+
+            Ok(IblTexture::new(texture_key, view, sampler))
+        }
+
+        let ibl = {
+            let mut renderer = self.renderer.lock().await;
+
+            let prefiltered_env_texture =
+                create_ibl_texture(&mut renderer, prefiltered_env_image).await?;
+            let irradiance_texture = create_ibl_texture(&mut renderer, irradiance_image).await?;
+
+            let ibl = Ibl::new(prefiltered_env_texture, irradiance_texture);
+
+            renderer.set_ibl(ibl.clone());
+
+            ibl
+        };
+
+        *self.ibl.lock().unwrap() = Some(ibl);
+
+        Ok(())
     }
 
     pub async fn upload_data(
@@ -203,6 +319,14 @@ impl AppScene {
             intensity: 1.0,
             direction: [-0.5, -0.25, -0.75],
         });
+
+        if let Some(ibl) = self.ibl.lock().unwrap().clone() {
+            renderer.set_ibl(ibl);
+        }
+
+        if let Some(skybox) = self.skybox.lock().unwrap().clone() {
+            renderer.set_skybox(skybox);
+        }
 
         Ok(())
     }

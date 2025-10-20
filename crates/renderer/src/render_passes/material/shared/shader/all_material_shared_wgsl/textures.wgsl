@@ -1,5 +1,3 @@
-// --- TEXTURES STARTS HERE ---
-
 // 36 bytes
 struct TextureInfoRaw {
     pixel_offset_x: u32,
@@ -65,11 +63,11 @@ fn _texture_uv_per_vertex(attribute_data_offset: u32, set_index: u32, vertex_ind
 
 // Sampling helpers for the mega-texture atlas. Every fetch receives an explicit LOD so the compute
 // pass can emulate hardware derivative selection.
-fn texture_load_atlas(info: TextureInfo, attribute_uv: vec2<f32>, mip_level: f32) -> vec4<f32> {
+fn texture_sample_atlas(info: TextureInfo, attribute_uv: vec2<f32>, mip_level: f32) -> vec4<f32> {
     switch info.atlas_index {
-        {% for i in 0..total_atlas_index %}
+        {% for i in 0..texture_atlas_len %}
             case {{ i }}u: {
-                return _texture_load_atlas_binding(info, atlas_tex_{{ i }}, info.sampler_index, attribute_uv, mip_level);
+                return _texture_sample_atlas(info, atlas_tex_{{ i }}, attribute_uv, mip_level);
             }
         {% endfor %}
         default: {
@@ -80,64 +78,37 @@ fn texture_load_atlas(info: TextureInfo, attribute_uv: vec2<f32>, mip_level: f32
     }
 }
 
-fn _texture_load_atlas_binding(
+fn _texture_sample_atlas(
     info: TextureInfo,
     atlas_tex: texture_2d_array<f32>,
-    sampler_index: u32,
     attribute_uv: vec2<f32>,
-    mip_level: f32,
-) -> vec4<f32> {
-    let color = _texture_sample_with_sampler(
-        atlas_tex,
-        sampler_index,
-        attribute_uv,
-        info.pixel_offset,
-        info.size,
-        info.layer_index,
-        info.address_mode_u,
-        info.address_mode_v,
-        mip_level,
-    );
-
-    return color;
-}
-
-fn _texture_sample_with_sampler(
-    atlas_tex: texture_2d_array<f32>,
-    sampler_index: u32,
-    attribute_uv: vec2<f32>,
-    pixel_offset: vec2<u32>,
-    pixel_size: vec2<u32>,
-    layer_index: u32,
-    address_mode_u: u32,
-    address_mode_v: u32,
     mip_level: f32,
 ) -> vec4<f32> {
     // Each slice inside the mega texture re-uses a single sampler. When individual GLTF textures
     // request clamp/mirror behaviour we need to reproduce it manually before fetching from the
     // atlas region.
     let wrapped_uv = vec2<f32>(
-        apply_address_mode(attribute_uv.x, address_mode_u),
-        apply_address_mode(attribute_uv.y, address_mode_v),
+        apply_address_mode(attribute_uv.x, info.address_mode_u),
+        apply_address_mode(attribute_uv.y, info.address_mode_v),
     );
 
     let atlas_dimensions = vec2<f32>(textureDimensions(atlas_tex, 0u));
-    let texel_offset = vec2<f32>(pixel_offset);
-    let texel_size = vec2<f32>(pixel_size);
+    let texel_offset = vec2<f32>(info.pixel_offset);
+    let texel_size = vec2<f32>(info.size);
     // Map attribute_uv in [0, 1] to texel centers within the sub-rectangle.
     let texel_coords = texel_offset
         + wrapped_uv * max(texel_size - vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 0.0))
         + vec2<f32>(0.5, 0.5);
     let uv = texel_coords / atlas_dimensions;
 
-    switch sampler_index {
-        {% for s in sampler_bindings %}
-            case {{ s.sampler_index }}u: {
+    switch info.sampler_index {
+        {% for i in 0..sampler_atlas_len %}
+            case {{ i }}u: {
                 return textureSampleLevel(
                     atlas_tex,
-                    atlas_sampler_{{ s.sampler_index }},
+                    atlas_sampler_{{ i }},
                     uv,
-                    i32(layer_index),
+                    i32(info.layer_index),
                     mip_level,
                 );
             }
@@ -182,5 +153,3 @@ fn wrap_mirror(coord: f32) -> f32 {
     }
     return frac;
 }
-
-// --- TEXTURES ENDS HERE ---

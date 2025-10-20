@@ -103,6 +103,13 @@ pub enum AwsmCoreError {
     #[error("[gpu] Failed to create js value from exr image data: {0}")]
     ExrImageToJsValue(String),
 
+    #[cfg(feature = "ktx")]
+    #[error("[gpu] ktx error: {0}")]
+    Ktx(String),
+
+    #[error("[gpu] cubemap error: {0}")]
+    Cubemap(String),
+
     #[cfg(feature = "mega-texture")]
     #[error("[gpu] Largest Image {largest_img_width}x{largest_img_height} (padding {padding}) was too large to fit in mega texture atlas {atlas_width}x{atlas_height}")]
     MegaTextureAtlasSize {
@@ -123,6 +130,20 @@ pub enum AwsmCoreError {
     #[cfg(feature = "mega-texture")]
     #[error("[gpu] mega texture index size: {0:?}")]
     MegaTextureIndexSize(std::num::TryFromIntError),
+
+    #[cfg(feature = "mega-texture")]
+    #[error("[gpu] mega texture too many atlases: {total_atlases} (max {max_atlases})")]
+    MegaTextureTooManyAtlases {
+        total_atlases: u32,
+        max_atlases: u32,
+    },
+
+    #[cfg(feature = "mega-texture")]
+    #[error("[gpu] mega texture too many samplers: {total_samplers} (max {max_samplers})")]
+    MegaTextureTooManySamplers {
+        total_samplers: u32,
+        max_samplers: u32,
+    },
 
     #[cfg(feature = "texture-export")]
     #[error("[gpu] texture export unsupported format: {0:?}")]

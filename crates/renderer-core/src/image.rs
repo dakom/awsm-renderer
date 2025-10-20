@@ -1,21 +1,25 @@
 use crate::command::copy_texture::Origin3d;
+use crate::cubemap::CubemapImage;
 use crate::error::Result;
 use crate::renderer::AwsmRendererWebGpu;
 use crate::texture::mipmap::generate_mipmaps;
 use crate::texture::{
     mipmap, Extent3d, TextureAspect, TextureDescriptor, TextureFormat, TextureUsage,
 };
+use cfg_if::cfg_if;
 use std::borrow::Cow;
+#[cfg(feature = "exr")]
+use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 
 pub mod bitmap;
 #[cfg(feature = "exr")]
 pub mod exr;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum ImageData {
     #[cfg(feature = "exr")]
-    Exr(Box<exr::ExrImage>),
+    Exr(Arc<exr::ExrImage>),
     Bitmap {
         image: web_sys::ImageBitmap,
         options: Option<ImageBitmapOptions>,
@@ -43,7 +47,7 @@ impl ImageData {
             pub async fn load_url(url:&str, options: Option<ImageBitmapOptions>) -> anyhow::Result<Self> {
                 if url.contains(".exr") {
                     let exr_image = exr::ExrImage::load_url(url).await?;
-                    Ok(Self::Exr(Box::new(exr_image)))
+                    Ok(Self::Exr(Arc::new(exr_image)))
                 } else {
                     let image = bitmap::load(url.to_string(), options.clone()).await?;
                     Ok(Self::Bitmap{image, options})

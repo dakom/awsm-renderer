@@ -121,7 +121,7 @@ impl PbrMaterial {
         matches!(self.alpha_mode, MaterialAlphaMode::Blend)
     }
 
-    pub fn uniform_buffer_data(&self, textures: &Textures) -> [u8; Self::BYTE_SIZE] {
+    pub fn uniform_buffer_data(&self, textures: &Textures) -> Result<[u8; Self::BYTE_SIZE]> {
         let mut data = [0u8; Self::BYTE_SIZE];
         let mut offset = 0;
 
@@ -244,130 +244,110 @@ impl PbrMaterial {
 
         let mut texture_bitmask = 0u32;
 
-        if let Some(tex) = self
-            .base_color_tex
-            .and_then(|key| textures.get_entry(key).ok())
-            .and_then(|entry_info| {
-                Some((
-                    entry_info,
-                    self.base_color_uv_index?,
-                    self.base_color_sampler?,
-                ))
-            })
-            .map(|(entry_info, uv_index, sampler_key)| {
-                let sampler_index = textures.sampler_index(sampler_key).unwrap_or(0);
-                let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
-                (
-                    entry_info,
-                    uv_index,
-                    sampler_index,
-                    encode_address_mode(address_mode_u),
-                    encode_address_mode(address_mode_v),
-                )
-            })
-        {
+        let sampler_key_list: Vec<SamplerKey> =
+            textures.mega_texture_sampler_set.iter().cloned().collect();
+
+        if let Some(tex) = self.base_color_tex.and_then(|texture_key| {
+            let entry_info = textures.get_entry(texture_key).ok()?;
+            let sampler_key = self.base_color_sampler?;
+            let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
+            let uv_index = self.base_color_uv_index?;
+            let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+            tracing::info!(
+                "sampler index: {}, address modes: {:?} and {:?}",
+                sampler_index,
+                address_mode_u,
+                address_mode_v
+            );
+            Some((
+                entry_info,
+                uv_index,
+                sampler_index,
+                encode_address_mode(address_mode_u),
+                encode_address_mode(address_mode_v),
+            ))
+        }) {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_BASE_COLOR;
         } else {
             write(Value::SkipTexture);
         }
 
-        if let Some(tex) = self
-            .metallic_roughness_tex
-            .and_then(|key| textures.get_entry(key).ok())
-            .and_then(|entry_info| {
-                Some((
-                    entry_info,
-                    self.metallic_roughness_uv_index?,
-                    self.metallic_roughness_sampler?,
-                ))
-            })
-            .map(|(entry_info, uv_index, sampler_key)| {
-                let sampler_index = textures.sampler_index(sampler_key).unwrap_or(0);
-                let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
-                (
-                    entry_info,
-                    uv_index,
-                    sampler_index,
-                    encode_address_mode(address_mode_u),
-                    encode_address_mode(address_mode_v),
-                )
-            })
-        {
+        if let Some(tex) = self.metallic_roughness_tex.and_then(|texture_key| {
+            let entry_info = textures.get_entry(texture_key).ok()?;
+            let sampler_key = self.metallic_roughness_sampler?;
+            let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
+            let uv_index = self.metallic_roughness_uv_index?;
+            let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+
+            Some((
+                entry_info,
+                uv_index,
+                sampler_index,
+                encode_address_mode(address_mode_u),
+                encode_address_mode(address_mode_v),
+            ))
+        }) {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_METALIC_ROUGHNESS;
         } else {
             write(Value::SkipTexture);
         }
 
-        if let Some(tex) = self
-            .normal_tex
-            .and_then(|key| textures.get_entry(key).ok())
-            .and_then(|entry_info| Some((entry_info, self.normal_uv_index?, self.normal_sampler?)))
-            .map(|(entry_info, uv_index, sampler_key)| {
-                let sampler_index = textures.sampler_index(sampler_key).unwrap_or(0);
-                let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
-                (
-                    entry_info,
-                    uv_index,
-                    sampler_index,
-                    encode_address_mode(address_mode_u),
-                    encode_address_mode(address_mode_v),
-                )
-            })
-        {
+        if let Some(tex) = self.normal_tex.and_then(|texture_key| {
+            let entry_info = textures.get_entry(texture_key).ok()?;
+            let sampler_key = self.normal_sampler?;
+            let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
+            let uv_index = self.normal_uv_index?;
+            let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+            Some((
+                entry_info,
+                uv_index,
+                sampler_index,
+                encode_address_mode(address_mode_u),
+                encode_address_mode(address_mode_v),
+            ))
+        }) {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_NORMAL;
         } else {
             write(Value::SkipTexture);
         }
 
-        if let Some(tex) = self
-            .occlusion_tex
-            .and_then(|key| textures.get_entry(key).ok())
-            .and_then(|entry_info| {
-                Some((
-                    entry_info,
-                    self.occlusion_uv_index?,
-                    self.occlusion_sampler?,
-                ))
-            })
-            .map(|(entry_info, uv_index, sampler_key)| {
-                let sampler_index = textures.sampler_index(sampler_key).unwrap_or(0);
-                let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
-                (
-                    entry_info,
-                    uv_index,
-                    sampler_index,
-                    encode_address_mode(address_mode_u),
-                    encode_address_mode(address_mode_v),
-                )
-            })
-        {
+        if let Some(tex) = self.occlusion_tex.and_then(|texture_key| {
+            let entry_info = textures.get_entry(texture_key).ok()?;
+            let sampler_key = self.occlusion_sampler?;
+            let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
+            let uv_index = self.occlusion_uv_index?;
+            let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+            Some((
+                entry_info,
+                uv_index,
+                sampler_index,
+                encode_address_mode(address_mode_u),
+                encode_address_mode(address_mode_v),
+            ))
+        }) {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_OCCLUSION;
         } else {
             write(Value::SkipTexture);
         }
 
-        if let Some(tex) = self
-            .emissive_tex
-            .and_then(|key| textures.get_entry(key).ok())
-            .and_then(|entry_info| {
-                Some((entry_info, self.emissive_uv_index?, self.emissive_sampler?))
-            })
-            .map(|(entry_info, uv_index, sampler_key)| {
-                let sampler_index = textures.sampler_index(sampler_key).unwrap_or(0);
-                let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
-                (
-                    entry_info,
-                    uv_index,
-                    sampler_index,
-                    encode_address_mode(address_mode_u),
-                    encode_address_mode(address_mode_v),
-                )
-            })
-        {
+        if let Some(tex) = self.emissive_tex.and_then(|texture_key| {
+            let entry_info = textures.get_entry(texture_key).ok()?;
+            let sampler_key = self.emissive_sampler?;
+            let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
+            let uv_index = self.emissive_uv_index?;
+            let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+            Some((
+                entry_info,
+                uv_index,
+                sampler_index,
+                encode_address_mode(address_mode_u),
+                encode_address_mode(address_mode_v),
+            ))
+        }) {
             write(tex.into());
             texture_bitmask |= Self::TEXTURE_BITMASK_EMISSIVE;
         } else {
@@ -376,6 +356,6 @@ impl PbrMaterial {
 
         write(texture_bitmask.into());
 
-        data
+        Ok(data)
     }
 }

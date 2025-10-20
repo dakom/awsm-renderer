@@ -2,7 +2,6 @@ use awsm_renderer_core::image::ImageData;
 
 use super::{buffers::GltfBuffers, error::Result, loader::GltfLoader};
 
-#[derive(Debug)]
 pub struct GltfData {
     pub doc: gltf::Document,
     pub buffers: GltfBuffers,

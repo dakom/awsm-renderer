@@ -1,5 +1,3 @@
-use awsm_renderer_core::texture::mega_texture::MegaTextureBindings;
-
 use crate::{
     mesh::{MeshBufferInfo, MeshBufferVertexAttributeInfo},
     render_passes::{
@@ -10,14 +8,13 @@ use crate::{
         shader_cache_key::ShaderCacheKeyRenderPass,
     },
     shaders::ShaderCacheKey,
-    textures::SamplerBindings,
 };
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyMaterialOpaque {
     pub attributes: ShaderMaterialOpaqueVertexAttributes,
-    pub texture_bindings: MegaTextureBindings,
-    pub sampler_bindings: SamplerBindings,
+    pub texture_atlas_len: u32,
+    pub sampler_atlas_len: u32,
 }
 
 impl From<ShaderCacheKeyMaterialOpaque> for ShaderCacheKey {

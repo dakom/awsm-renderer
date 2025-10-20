@@ -12,26 +12,50 @@ struct Light {
 
 fn get_light(index: u32) -> Light {
     switch (index) {
-        case 0u: { // key directional light
+        case 0u: { // key light from front-top
             return Light(
                 1u,
                 vec3<f32>(1.0, 1.0, 1.0),
-                3.0,
+                3.5,
                 vec3<f32>(0.0, 0.0, 0.0),
                 0.0,
-                normalize(vec3<f32>(-0.45, -0.35, -0.8)),
+                normalize(vec3<f32>(0.3, -0.5, -1.0)),
                 0.0,
                 0.0,
             );
         }
-        case 1u: { // point fill/highlight
+        case 1u: { // fill from back
             return Light(
-                2u,
-                vec3<f32>(1.0, 0.95, 0.9),
-                20.0,
-                vec3<f32>(2.5, 3.0, 2.0),
-                30.0,
+                1u,
+                vec3<f32>(1.0, 1.0, 1.0),
+                2.2,
                 vec3<f32>(0.0, 0.0, 0.0),
+                0.0,
+                normalize(vec3<f32>(-0.2, -0.4, 0.9)),
+                0.0,
+                0.0,
+            );
+        }
+        case 2u: { // rim from side
+            return Light(
+                1u,
+                vec3<f32>(1.0, 1.0, 1.0),
+                1.5,
+                vec3<f32>(0.0, 0.0, 0.0),
+                0.0,
+                normalize(vec3<f32>(-1.0, -0.2, 0.2)),
+                0.0,
+                0.0,
+            );
+        }
+        case 3u: { // bottom bounce
+            return Light(
+                1u,
+                vec3<f32>(1.0, 1.0, 1.0),
+                1.2,
+                vec3<f32>(0.0, 0.0, 0.0),
+                0.0,
+                normalize(vec3<f32>(0.1, 0.9, 0.2)),
                 0.0,
                 0.0,
             );
@@ -59,9 +83,9 @@ struct LightBrdf {
 };
 
 fn light_to_brdf(light:Light, normal: vec3<f32>, world_position: vec3<f32>) -> LightBrdf {
-    var light_dir: vec3<f32>;
-    var radiance: vec3<f32>;
-    var n_dot_l: f32;
+    var light_dir: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
+    var radiance: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
+    var n_dot_l: f32 = 0.0;
 
     switch (light.kind) {
         case 0u: {

@@ -1,4 +1,4 @@
-const AMBIENT = vec3<f32>(1.0); // TODO - make this settable, or get from IBL
+const AMBIENT = vec3<f32>(0.05); // Very low ambient - mainly to prevent pure black
 
 fn unlit(color: PbrMaterialColor) -> vec3<f32> {
     // Apply occlusion to ambient lighting

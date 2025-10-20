@@ -4,6 +4,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{Blob, BlobPropertyBag, ImageBitmap};
 
+use crate::command::color::Color;
 use crate::error::{AwsmCoreError, Result};
 
 use super::ImageBitmapOptions;
@@ -176,6 +177,52 @@ pub async fn load_f64<T: AsRef<[f64]>>(
         options,
     )
     .await
+}
+
+pub async fn create_color(
+    color: Color,
+    width: u32,
+    height: u32,
+    options: Option<ImageBitmapOptions>,
+) -> Result<web_sys::ImageBitmap> {
+    // Convert f64 color values (0.0-1.0) to u8 (0-255)
+    let r = (color.r.clamp(0.0, 1.0) * 255.0) as u8;
+    let g = (color.g.clamp(0.0, 1.0) * 255.0) as u8;
+    let b = (color.b.clamp(0.0, 1.0) * 255.0) as u8;
+    let a = (color.a.clamp(0.0, 1.0) * 255.0) as u8;
+
+    // Create RGBA pixel data
+    let pixel_count = (width * height) as usize;
+    let mut data = Vec::with_capacity(pixel_count * 4);
+
+    for _ in 0..pixel_count {
+        data.push(r);
+        data.push(g);
+        data.push(b);
+        data.push(a);
+    }
+
+    // Create ImageData from the pixel data
+    let uint8_array = js_sys::Uint8ClampedArray::from(data.as_slice());
+    let image_data = web_sys::ImageData::new_with_js_u8_clamped_array(&uint8_array, width)
+        .map_err(AwsmCoreError::create_image_bitmap)?;
+
+    // Create ImageBitmap from ImageData
+    let promise = WINDOW
+        .with(|window| match options {
+            Some(options) => window.create_image_bitmap_with_image_data_and_image_bitmap_options(
+                &image_data,
+                &options.into(),
+            ),
+            None => window.create_image_bitmap_with_image_data(&image_data),
+        })
+        .map_err(AwsmCoreError::create_image_bitmap)?;
+
+    let js_value = JsFuture::from(promise)
+        .await
+        .map_err(AwsmCoreError::create_image_bitmap)?;
+
+    Ok(js_value.unchecked_into())
 }
 
 fn _same_origin(url: &str) -> Result<bool> {
