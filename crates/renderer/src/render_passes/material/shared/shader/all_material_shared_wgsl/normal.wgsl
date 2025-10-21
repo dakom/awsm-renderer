@@ -1,3 +1,6 @@
+// Get the interpolated geometry normal (vertex normal) in world space.
+// NOTE: This is the geometry normal, NOT the normal-mapped normal.
+// Normal mapping is applied separately in _pbr_normal_color() which returns material_color.normal
 fn get_world_normal(
     triangle_indices: vec3<u32>,
     barycentric: vec3<f32>,
@@ -13,9 +16,6 @@ fn get_world_normal(
         vertex_attribute_stride,
     );
 
-    // TODO - normal map?
-    //
-
     return safe_normalize(normal_matrix * vertex_normal);
 }
 
@@ -27,11 +27,11 @@ fn get_vertex_normal(attribute_data_offset: u32, triangle_indices: vec3<u32>, ba
     return barycentric.x * n0 + barycentric.y * n1 + barycentric.z * n2;
 }
 
+// Read normal from packed attribute buffer
+// Attribute layout per vertex: [normal.xyz (3 floats), tangent.xyzw (4 floats), ...]
 fn _get_vertex_normal(attribute_data_offset: u32, vertex_index: u32, vertex_attribute_stride: u32) -> vec3<f32> {
-    // First get to the right vertex, THEN to the right normal within that vertex
     let vertex_start = attribute_data_offset + (vertex_index * vertex_attribute_stride);
-
-    let index = vertex_start; // normals are first 3 floats in the attribute data for the vertex
+    let index = vertex_start; // normals are first 3 floats in the attribute data
     return vec3<f32>(attribute_data[index], attribute_data[index + 1], attribute_data[index + 2]);
 }
 

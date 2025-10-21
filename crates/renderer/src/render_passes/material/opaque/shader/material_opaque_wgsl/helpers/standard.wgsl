@@ -25,10 +25,27 @@ fn get_standard_coordinates(coords: vec2<i32>, screen_dims: vec2<u32>) -> Standa
 
     let world_position = (camera.inv_view * vec4<f32>(view_position, 1.0)).xyz;
 
-    let to_camera = camera.position - world_position;
-    let surface_to_camera = select(vec3<f32>(0.0, 0.0, 1.0),
-                                   safe_normalize(to_camera),
-                                   dot(to_camera, to_camera) > 0.0);
+    // Compute surface-to-camera direction for lighting calculations
+    // This differs fundamentally between projection types:
+    // - Orthographic: parallel rays (constant direction across all pixels): proj[3][3]=1.0
+    // - Perspective: diverging rays from camera origin: proj[3][3]=0.0
+    // we compare to 0.9 to allow for some numerical imprecision
+    let is_ortho = camera.proj[3][3] > 0.9;
+
+    var surface_to_camera: vec3<f32>;
+    if (is_ortho) {
+        // For orthographic projection, transform view-space forward direction (0,0,-1) to world space
+        // This simplifies to just the third column (z-axis) of the inverse view matrix
+        surface_to_camera = normalize(camera.inv_view[2].xyz);
+    } else {
+        // For perspective projection, compute direction from surface to camera position
+        let to_camera = camera.position - world_position;
+        surface_to_camera = select(
+            vec3<f32>(0.0, 0.0, 1.0),
+            safe_normalize(to_camera),
+            dot(to_camera, to_camera) > 0.0
+        );
+    }
 
     return StandardCoordinates(
         uv,

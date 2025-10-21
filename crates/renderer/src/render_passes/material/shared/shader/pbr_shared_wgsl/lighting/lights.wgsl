@@ -12,50 +12,50 @@ struct Light {
 
 fn get_light(index: u32) -> Light {
     switch (index) {
-        case 0u: { // key light from front-top
+        case 0u: { // key from camera/front
             return Light(
                 1u,
-                vec3<f32>(1.0, 1.0, 1.0),
-                3.5,
+                vec3<f32>(1.0, 0.97, 0.92),
+                1.4,
                 vec3<f32>(0.0, 0.0, 0.0),
                 0.0,
-                normalize(vec3<f32>(0.3, -0.5, -1.0)),
+                normalize(vec3<f32>(0.1, -0.35, -1.0)),
                 0.0,
                 0.0,
             );
         }
-        case 1u: { // fill from back
+        case 1u: { // camera fill
             return Light(
                 1u,
-                vec3<f32>(1.0, 1.0, 1.0),
-                2.2,
+                vec3<f32>(0.9, 0.95, 1.0),
+                0.6,
                 vec3<f32>(0.0, 0.0, 0.0),
                 0.0,
-                normalize(vec3<f32>(-0.2, -0.4, 0.9)),
+                normalize(vec3<f32>(0.0, -0.2, -1.0)),
                 0.0,
                 0.0,
             );
         }
-        case 2u: { // rim from side
+        case 2u: { // back fill
             return Light(
                 1u,
-                vec3<f32>(1.0, 1.0, 1.0),
-                1.5,
+                vec3<f32>(0.8, 0.9, 1.0),
+                0.7,
+                vec3<f32>(0.0, 0.0, 0.0),
+                0.0,
+                normalize(vec3<f32>(-0.05, -0.25, 1.0)),
+                0.0,
+                0.0,
+            );
+        }
+        case 3u: { // rim
+            return Light(
+                1u,
+                vec3<f32>(1.0, 0.96, 0.9),
+                0.5,
                 vec3<f32>(0.0, 0.0, 0.0),
                 0.0,
                 normalize(vec3<f32>(-1.0, -0.2, 0.2)),
-                0.0,
-                0.0,
-            );
-        }
-        case 3u: { // bottom bounce
-            return Light(
-                1u,
-                vec3<f32>(1.0, 1.0, 1.0),
-                1.2,
-                vec3<f32>(0.0, 0.0, 0.0),
-                0.0,
-                normalize(vec3<f32>(0.1, 0.9, 0.2)),
                 0.0,
                 0.0,
             );

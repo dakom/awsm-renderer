@@ -151,7 +151,8 @@ impl AppScene {
                         if let Err(e) = state.load_skybox(SkyboxId::SameAsIbl).await {
                             tracing::error!("Failed to load Skybox {:?}: {:?}", ibl_id, e);
                         }
-                    }
+                    },
+                    SkyboxId::None => { /* do nothing */}
                 }
             }))).await;
         }));
@@ -235,63 +236,70 @@ impl AppScene {
     }
 
     async fn load_skybox(self: &Arc<Self>, skybox_id: SkyboxId) -> Result<()> {
-        let skybox = match skybox_id {
+        match skybox_id {
             SkyboxId::SameAsIbl => {
-                let ibl_id = self.ctx.ibl_id.get_cloned();
-                let maybe_cached = {
-                    // need to drop this lock before awaiting
-                    self.skybox_by_ibl_cache
-                        .lock()
-                        .unwrap()
-                        .get(&ibl_id)
-                        .cloned()
-                };
-                match maybe_cached {
-                    Some(skybox) => skybox,
-                    None => {
-                        let skybox_cubemap = match ibl_id {
-                            IblId::PhotoStudio => skybox::load_from_path("photo_studio").await?,
-                            IblId::AllWhite => {
-                                skybox::load_from_colors(CubemapBitmapColors::all(Color::WHITE))
-                                    .await?
-                            }
-                            IblId::SimpleSky => skybox::load_simple_sky().await?,
-                        };
-
-                        let skybox = {
-                            let (texture, view, mip_count) = {
-                                let mut renderer = &mut *self.renderer.lock().await;
-                                skybox_cubemap
-                                    .create_texture_and_view(&renderer.gpu, Some("Skybox"))
-                                    .await?
-                            };
-
-                            {
-                                let mut renderer = &mut *self.renderer.lock().await;
-                                let key = renderer.textures.insert_cubemap(texture);
-
-                                let sampler_key = renderer
-                                    .textures
-                                    .get_sampler_key(&renderer.gpu, Skybox::sampler_cache_key())?;
-
-                                let sampler = renderer.textures.get_sampler(sampler_key)?.clone();
-
-                                Skybox::new(key, view, sampler, mip_count)
-                            }
-                        };
-
+                let skybox = {
+                    let ibl_id = self.ctx.ibl_id.get_cloned();
+                    let maybe_cached = {
+                        // need to drop this lock before awaiting
                         self.skybox_by_ibl_cache
                             .lock()
                             .unwrap()
-                            .insert(ibl_id, skybox.clone());
+                            .get(&ibl_id)
+                            .cloned()
+                    };
+                    match maybe_cached {
+                        Some(skybox) => skybox,
+                        None => {
+                            let skybox_cubemap = match ibl_id {
+                                IblId::PhotoStudio => {
+                                    skybox::load_from_path("photo_studio").await?
+                                }
+                                IblId::AllWhite => {
+                                    skybox::load_from_colors(CubemapBitmapColors::all(Color::WHITE))
+                                        .await?
+                                }
+                                IblId::SimpleSky => skybox::load_simple_sky().await?,
+                            };
 
-                        skybox
+                            let skybox = {
+                                let (texture, view, mip_count) = {
+                                    let mut renderer = &mut *self.renderer.lock().await;
+                                    skybox_cubemap
+                                        .create_texture_and_view(&renderer.gpu, Some("Skybox"))
+                                        .await?
+                                };
+
+                                {
+                                    let mut renderer = &mut *self.renderer.lock().await;
+                                    let key = renderer.textures.insert_cubemap(texture);
+
+                                    let sampler_key = renderer.textures.get_sampler_key(
+                                        &renderer.gpu,
+                                        Skybox::sampler_cache_key(),
+                                    )?;
+
+                                    let sampler =
+                                        renderer.textures.get_sampler(sampler_key)?.clone();
+
+                                    Skybox::new(key, view, sampler, mip_count)
+                                }
+                            };
+
+                            self.skybox_by_ibl_cache
+                                .lock()
+                                .unwrap()
+                                .insert(ibl_id, skybox.clone());
+
+                            skybox
+                        }
                     }
-                }
-            }
-        };
+                };
 
-        self.renderer.lock().await.set_skybox(skybox);
+                self.renderer.lock().await.set_skybox(skybox);
+            }
+            SkyboxId::None => {}
+        };
 
         Ok(())
     }
@@ -306,6 +314,7 @@ impl AppScene {
                         let skybox_cache = self.skybox_by_ibl_cache.lock().unwrap();
                         skybox_cache.contains_key(&ibl_id)
                     }
+                    SkyboxId::None => true,
                 }
             };
 

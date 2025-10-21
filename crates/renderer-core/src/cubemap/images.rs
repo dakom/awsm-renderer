@@ -97,7 +97,7 @@ pub async fn new_colors(
             options: None,
         },
 
-        mipmaps: false,
+        mipmaps: true,
     })
 }
 
@@ -176,7 +176,7 @@ pub async fn new_sky_gradient(
             options: None,
         },
 
-        mipmaps: false,
+        mipmaps: true,
     })
 }
 

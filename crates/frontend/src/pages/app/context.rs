@@ -29,6 +29,8 @@ pub enum IblId {
 pub enum SkyboxId {
     #[default]
     SameAsIbl,
+    // Not a real mode, just for debugging to use original default from renderer
+    None,
 }
 
 impl Default for AppContext {

@@ -19,6 +19,8 @@ pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::n
             // GltfId::TextureTransformTest,
             GltfId::TextureTransformMultiTest,
             GltfId::DamagedHelmet,
+            GltfId::NormalTangent,
+            GltfId::NormalTangentMirror,
         ],
     );
 

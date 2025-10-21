@@ -199,7 +199,12 @@ fn uv_derivs_local(
     vertex_stride: u32,
     cache: MipCache
 ) -> UvDerivs {
+    // NOTE: Don't return zero derivatives! This causes a discontinuity when cache becomes invalid.
+    // Instead, we'll compute what we can and let the caller handle any remaining edge cases.
     var out = UvDerivs(0.0, 0.0, 0.0, 0.0);
+
+    // If cache is invalid, we can't compute screen-space derivatives
+    // Caller should use uv_derivs_barycentric as fallback
     if (!cache.valid) { return out; }
 
     let uv0 = _texture_uv_per_vertex(attribute_data_offset, tex_info.attribute_uv_set_index, tri.x, vertex_stride);
@@ -237,6 +242,8 @@ fn uv_derivs_local(
 
     let det = e01_screen.x * e02_screen.y - e01_screen.y * e02_screen.x;
 
+    // If determinant is too small, triangle is degenerate in screen space
+    // Return zero derivatives - caller will use fallback
     if (abs(det) < MIPMAP_MIN_DET) {
         return out;
     }
@@ -321,14 +328,23 @@ fn compute_texture_lod_atlas_space(
 ) -> f32 {
     let uv_center_local = texture_uv(attribute_data_offset, tri, barycentric, tex, vertex_stride);
 
-    var d: UvDerivs;
-    if (cache.valid) {
-        d = uv_derivs_local(tex, tri, attribute_data_offset, vertex_stride, cache);
-    } else {
-        d = uv_derivs_barycentric(tex, tri, barycentric, attribute_data_offset, vertex_stride, screen_dims);
-    }
+    // Try to compute accurate screen-space derivatives first
+    var d: UvDerivs = uv_derivs_local(tex, tri, attribute_data_offset, vertex_stride, cache);
+
+    // Check if we got valid derivatives
+    let has_valid_derivs = (d.dudx != 0.0 || d.dudy != 0.0 || d.dvdx != 0.0 || d.dvdy != 0.0);
 
     let atlas = get_atlas_info(tex.atlas_index);
+
+    // If we don't have valid derivatives, return a conservative mid-level LOD
+    // This avoids harsh discontinuities from jumping to mip 0
+    if (!has_valid_derivs) {
+        // Use a conservative LOD that's reasonable for most cases
+        // Mip level 1-2 is usually a good middle ground
+        let conservative_lod = 1.5 + MIPMAP_GLOBAL_LOD_BIAS;
+        let max_lod = max(atlas.levels_f - 1.0, 0.0);
+        return clamp(conservative_lod, 0.0, max_lod);
+    }
 
     if (!atlas.valid) {
         let uv0 = _texture_uv_per_vertex(attribute_data_offset, tex.attribute_uv_set_index, tri.x, vertex_stride);
@@ -366,6 +382,10 @@ fn compute_texture_lod_atlas_space(
     // Empirically, we're getting values ~5-6x too large.
     // This suggests we need to scale down by approximately sqrt(2) * 2 ≈ 2.8
     // Let's use 0.35 as a correction factor (1/2.8 ≈ 0.35)
+    //
+    // NOTE: If you see banding artifacts at certain zoom levels, try adjusting this value.
+    // Higher values (e.g., 0.5) = sharper textures but more aliasing
+    // Lower values (e.g., 0.25) = blurrier textures but smoother transitions
     let corrected_gradient = gradient * 0.35;
 
     var lod = log2(max(corrected_gradient, 1e-6)) + MIPMAP_GLOBAL_LOD_BIAS;
