@@ -10,6 +10,7 @@ use crate::{
     texture::{Extent3d, TextureDescriptor, TextureDimension, TextureUsage},
 };
 
+#[derive(Clone, Debug)]
 pub struct CubemapBitmapColors {
     pub z_positive: Color,
     pub z_negative: Color,
@@ -17,6 +18,19 @@ pub struct CubemapBitmapColors {
     pub x_negative: Color,
     pub y_positive: Color,
     pub y_negative: Color,
+}
+
+impl CubemapBitmapColors {
+    pub fn all(color: Color) -> Self {
+        Self {
+            z_positive: color.clone(),
+            z_negative: color.clone(),
+            x_positive: color.clone(),
+            x_negative: color.clone(),
+            y_positive: color.clone(),
+            y_negative: color.clone(),
+        }
+    }
 }
 
 pub async fn new_colors(

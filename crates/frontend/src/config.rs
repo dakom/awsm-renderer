@@ -5,7 +5,10 @@ use std::{
 };
 
 use crate::{
-    pages::app::sidebar::SidebarSection,
+    pages::app::{
+        context::{IblId, SkyboxId},
+        sidebar::SidebarSection,
+    },
     route::{AppRoute, Route},
 };
 use anyhow::{Context, Result};
@@ -25,7 +28,8 @@ pub struct Config {
     pub generate_mipmaps: bool,
     pub initial_sidebar_open: Option<SidebarSection>,
     pub post_processing_enabled: bool,
-    pub initial_environment: String,
+    pub initial_ibl: IblId,
+    pub initial_skybox: SkyboxId,
     pub cache_buster: bool,
 }
 
@@ -63,7 +67,8 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         //initial_sidebar_open: Some(SidebarSection::Gltf),
         initial_sidebar_open: Some(SidebarSection::PostProcessing),
         post_processing_enabled: true,
-        initial_environment: "photo_studio".to_string(),
+        initial_ibl: IblId::default(),
+        initial_skybox: SkyboxId::default(),
         cache_buster: if cfg!(debug_assertions) { true } else { false },
     };
 

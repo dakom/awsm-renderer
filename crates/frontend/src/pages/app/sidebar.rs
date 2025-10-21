@@ -1,5 +1,6 @@
 mod camera;
 mod gltf;
+mod lighting;
 pub mod material;
 mod post_processing;
 mod textures;
@@ -10,7 +11,10 @@ use material::SidebarMaterial;
 
 use crate::{
     models::collections::{GltfId, GLTF_SETS},
-    pages::app::sidebar::{post_processing::SidebarPostProcessing, textures::SidebarTextures},
+    pages::app::sidebar::{
+        lighting::SidebarLighting, post_processing::SidebarPostProcessing,
+        textures::SidebarTextures,
+    },
     prelude::*,
 };
 
@@ -85,10 +89,7 @@ impl AppSidebar {
                                         .class([FontSize::Lg.class(), ColorText::SidebarHeader.class()])
                                         .text("TODO")
                                     }),
-                                    SidebarSection::Lighting => html!("div", {
-                                        .class([FontSize::Lg.class(), ColorText::SidebarHeader.class()])
-                                        .text("TODO")
-                                    }),
+                                    SidebarSection::Lighting =>  SidebarLighting::new(state.ctx.clone()).render(),
                                     SidebarSection::PostProcessing => SidebarPostProcessing::new(state.ctx.clone()).render(),
                                     SidebarSection::Camera => SidebarCamera::new(state.ctx.clone()).render(),
                                     SidebarSection::Textures => SidebarTextures::new(state.ctx.clone()).render(),

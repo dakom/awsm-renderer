@@ -323,7 +323,7 @@ fn main(
     }
 
     // Add IBL once (indirect lighting + emissive)
-    color += brdf_ibl(
+    let ibl_contribution = brdf_ibl(
         material_color,
         world_normal,
         standard_coordinates.surface_to_camera,
@@ -335,6 +335,8 @@ fn main(
         brdf_lut_sampler,
         ibl_info
     );
+    color += ibl_contribution;
+
 
     //color = unlit(material_color);
 

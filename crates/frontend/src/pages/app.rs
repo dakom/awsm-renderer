@@ -1,5 +1,5 @@
 mod canvas;
-mod context;
+pub mod context;
 mod scene;
 pub mod sidebar;
 

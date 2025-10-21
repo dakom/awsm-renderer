@@ -140,20 +140,31 @@ fn brdf_ibl(
     let rough_in   = clamp(color.metallic_roughness.y, 0.0, 1.0);
     let roughness  = max(rough_in, 0.04);
 
-    let n_dot_v = max(dot(n, v), 1e-4);
+    // Clamp n_dot_v but don't use abs - back faces should naturally be darker
+    let n_dot_v_raw = dot(n, v);
+    let n_dot_v_clamped = max(n_dot_v_raw, 0.01); // small positive minimum
     let F0 = mix(vec3<f32>(0.04), base_color, metallic);
 
     // Diffuse IBL (irradiance)
     let irradiance = sampleIrradiance(n, ibl_irradiance_tex, ibl_irradiance_sampler);
-    let F_view     = fresnel_schlick(n_dot_v, F0);
+    let F_view     = fresnel_schlick(n_dot_v_clamped, F0);
     let k_d_indir  = (vec3<f32>(1.0) - F_view) * (1.0 - metallic);
     let Fd_indir   = k_d_indir * base_color * (1.0 / PI) * irradiance * color.occlusion;
 
     // Specular IBL (prefiltered environment + BRDF LUT)
     let R          = reflect(-v, n);
     let prefiltered = samplePrefilteredEnv(R, roughness, ibl_filtered_env_tex, ibl_filtered_env_sampler, ibl_info);
-    let brdf_lut    = sampleBRDFLUT(n_dot_v, roughness, brdf_lut_tex, brdf_lut_sampler);
-    let Fs_indir    = prefiltered * (F0 * brdf_lut.x + brdf_lut.y);
+
+    // TEST: Use analytic approximation instead of BRDF LUT (Karis 2013)
+    let a = roughness;
+    let r = max(1.0 - a, 0.0);
+    let scale = mix(r, 1.0, pow(1.0 - n_dot_v_clamped, 5.0));
+    let bias = (1.0 - r) * pow(1.0 - n_dot_v_clamped, 5.0);
+    let Fs_indir = prefiltered * (F0 * scale + vec3<f32>(bias));
+
+    // ORIGINAL: Use BRDF LUT texture
+    // let brdf_lut    = sampleBRDFLUT(n_dot_v_clamped, roughness, brdf_lut_tex, brdf_lut_sampler);
+    // let Fs_indir    = prefiltered * (F0 * brdf_lut.x + brdf_lut.y);
 
     // Return indirect lighting + emissive
     return Fd_indir + Fs_indir + color.emissive;

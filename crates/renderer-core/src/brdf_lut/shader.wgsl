@@ -31,13 +31,13 @@ fn importance_sample_ggx(xi: vec2f, a: f32) -> vec3f {
   // N = (0,0,1), so tangent-to-world is identity
   return h;
 }
-fn geometry_schlick_ggx(ndot_v: f32, k: f32) -> f32 {
+fn geometry_schlick_ggx(ndot_v: f32, alpha: f32) -> f32 {
+  let a = max(alpha, 0.001);
+  let k = ((a + 1.0) * (a + 1.0)) * 0.125; // (alpha+1)^2 / 8 - must match brdf.wgsl
   return ndot_v / (ndot_v * (1.0 - k) + k);
 }
-fn geometry_smith(ndot_v: f32, ndot_l: f32, roughness: f32) -> f32 {
-  let a = roughness + 1.0;
-  let k = (a * a) * 0.125; // UE4/Disney
-  return geometry_schlick_ggx(ndot_v, k) * geometry_schlick_ggx(ndot_l, k);
+fn geometry_smith(ndot_v: f32, ndot_l: f32, alpha: f32) -> f32 {
+  return geometry_schlick_ggx(ndot_v, alpha) * geometry_schlick_ggx(ndot_l, alpha);
 }
 
 @fragment
@@ -52,9 +52,11 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   var a: f32 = 0.0;
   var b: f32 = 0.0;
 
+  let alpha = roughness * roughness;
+
   for (var i: u32 = 0u; i < sample_count; i = i + 1u) {
     let xi = hammersley(i, sample_count);
-    let h = importance_sample_ggx(xi, roughness);
+    let h = importance_sample_ggx(xi, alpha);
     let l = normalize(2.0 * dot(v, h) * h - v);
 
     let no_l = max(l.z, 0.0);
@@ -63,7 +65,7 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     let no_v_ = max(v.z, 0.0);
 
     if (no_l > 0.0) {
-      let g = geometry_smith(no_v_, no_l, roughness);
+      let g = geometry_smith(no_v_, no_l, alpha);
       let g_vis = (g * vo_h) / max(no_h * no_v_, 1e-4);
       let fc = pow(1.0 - vo_h, 5.0);
       a = a + (1.0 - fc) * g_vis;

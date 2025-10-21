@@ -101,15 +101,11 @@ impl AppCanvas {
 
                         scene.clear().await;
 
-                        state.display_text.set(format!("Loading Environment"));
-                        match scene.load_ibl(&scene.ctx.environment_name.get_cloned()).await {
-                            Ok(loader) => loader,
-                            Err(err) => {
-                                tracing::error!("{:?}", err);
-                                state.display_text.set(format!("Error loading environment"));
-                                return;
-                            }
-                        }
+                        state.display_text.set(format!("Loading IBL"));
+                        scene.wait_for_ibl_loaded().await;
+
+                        state.display_text.set(format!("Loading Skybox"));
+                        scene.wait_for_skybox_loaded().await;
 
                         state.display_text.set(format!("Loading Model: {}", gltf_id));
                         let loader = match scene.load_gltf(gltf_id.clone()).await {
