@@ -1,6 +1,6 @@
 use crate::command::color::Color;
 use crate::cubemap::CubemapImage;
-use crate::image::bitmap::create_color;
+use crate::image::bitmap::{create_color, create_vertical_gradient};
 use crate::image::ImageData;
 use crate::texture::mipmap::{calculate_mipmap_levels, generate_mipmaps};
 use crate::{
@@ -33,6 +33,27 @@ impl CubemapBitmapColors {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct CubemapSkyGradient {
+    pub zenith: Color,
+    pub nadir: Color,
+}
+
+impl CubemapSkyGradient {
+    pub fn new(zenith: Color, nadir: Color) -> Self {
+        Self { zenith, nadir }
+    }
+}
+
+impl Default for CubemapSkyGradient {
+    fn default() -> Self {
+        Self {
+            zenith: Color::new_values(0.75, 0.86, 1.0, 1.0),
+            nadir: Color::new_values(0.08, 0.07, 0.05, 1.0),
+        }
+    }
+}
+
 pub async fn new_colors(
     colors: CubemapBitmapColors,
     width: u32,
@@ -44,6 +65,85 @@ pub async fn new_colors(
     let x_negative = create_color(colors.x_negative, width, height, None).await?;
     let y_positive = create_color(colors.y_positive, width, height, None).await?;
     let y_negative = create_color(colors.y_negative, width, height, None).await?;
+
+    Ok(CubemapImage::Images {
+        z_positive: ImageData::Bitmap {
+            image: z_positive,
+            options: None,
+        },
+
+        z_negative: ImageData::Bitmap {
+            image: z_negative,
+            options: None,
+        },
+
+        x_positive: ImageData::Bitmap {
+            image: x_positive,
+            options: None,
+        },
+
+        x_negative: ImageData::Bitmap {
+            image: x_negative,
+            options: None,
+        },
+
+        y_positive: ImageData::Bitmap {
+            image: y_positive,
+            options: None,
+        },
+
+        y_negative: ImageData::Bitmap {
+            image: y_negative,
+            options: None,
+        },
+
+        mipmaps: false,
+    })
+}
+
+pub async fn new_sky_gradient(
+    colors: CubemapSkyGradient,
+    width: u32,
+    height: u32,
+) -> Result<CubemapImage> {
+    let zenith_color = colors.zenith.clone();
+    let nadir_color = colors.nadir.clone();
+
+    let x_positive = create_vertical_gradient(
+        zenith_color.clone(),
+        nadir_color.clone(),
+        width,
+        height,
+        None,
+    )
+    .await?;
+    let x_negative = create_vertical_gradient(
+        zenith_color.clone(),
+        nadir_color.clone(),
+        width,
+        height,
+        None,
+    )
+    .await?;
+    let z_positive = create_vertical_gradient(
+        zenith_color.clone(),
+        nadir_color.clone(),
+        width,
+        height,
+        None,
+    )
+    .await?;
+    let z_negative = create_vertical_gradient(
+        zenith_color.clone(),
+        nadir_color.clone(),
+        width,
+        height,
+        None,
+    )
+    .await?;
+
+    let y_positive = create_color(zenith_color, width, height, None).await?;
+    let y_negative = create_color(nadir_color, width, height, None).await?;
 
     Ok(CubemapImage::Images {
         z_positive: ImageData::Bitmap {

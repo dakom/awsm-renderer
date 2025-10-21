@@ -51,6 +51,7 @@ impl SidebarLighting {
                 .with_options([
                     ("Photo Studio".to_string(), IblId::PhotoStudio),
                     ("All White".to_string(), IblId::AllWhite),
+                    ("Simple Sky".to_string(), IblId::SimpleSky),
                 ])
                 .render(),
         )

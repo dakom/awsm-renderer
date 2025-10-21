@@ -8,7 +8,7 @@ cfg_if::cfg_if! {
 pub mod images;
 
 use crate::{
-    cubemap::images::CubemapBitmapColors,
+    cubemap::images::{CubemapBitmapColors, CubemapSkyGradient},
     error::{AwsmCoreError, Result},
     image::ImageData,
     renderer::AwsmRendererWebGpu,
@@ -64,6 +64,10 @@ impl CubemapImage {
             pub async fn new_colors(colors: CubemapBitmapColors, width: u32, height: u32) -> Result<Self> {
                 images::new_colors(colors, width, height).await
             }
+
+            pub async fn new_sky_gradient(colors: CubemapSkyGradient, width: u32, height: u32) -> Result<Self> {
+                images::new_sky_gradient(colors, width, height).await
+            }
         } else {
             pub async fn create_texture_and_view(
                 &self,
@@ -83,6 +87,10 @@ impl CubemapImage {
 
             pub async fn new_colors(colors: CubemapBitmapColors, width: u32, height: u32) -> Result<Self> {
                 images::new_colors(colors, width, height).await
+            }
+
+            pub async fn new_sky_gradient(colors: CubemapSkyGradient, width: u32, height: u32) -> Result<Self> {
+                images::new_sky_gradient(colors, width, height).await
             }
         }
     }

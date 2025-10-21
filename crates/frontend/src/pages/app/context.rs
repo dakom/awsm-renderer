@@ -1,5 +1,3 @@
-use awsm_renderer::core::{command::color::Color, cubemap::images::CubemapBitmapColors};
-
 use crate::{pages::app::sidebar::material::FragmentShaderKind, prelude::*};
 
 use super::scene::{camera::CameraId, AppScene};
@@ -24,22 +22,7 @@ pub enum IblId {
     #[default]
     PhotoStudio,
     AllWhite,
-}
-
-impl IblId {
-    pub fn path(&self) -> Option<&'static str> {
-        match self {
-            IblId::PhotoStudio => Some("photo_studio"),
-            IblId::AllWhite => None,
-        }
-    }
-
-    pub fn cubemap_colors(&self) -> Option<CubemapBitmapColors> {
-        match self {
-            IblId::PhotoStudio => None,
-            IblId::AllWhite => Some(CubemapBitmapColors::all(Color::WHITE)),
-        }
-    }
+    SimpleSky,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

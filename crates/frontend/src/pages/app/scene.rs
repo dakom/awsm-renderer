@@ -8,6 +8,7 @@ use std::ops::Deref;
 
 use awsm_renderer::bounds::Aabb;
 use awsm_renderer::core::command::color::Color;
+use awsm_renderer::core::cubemap::images::CubemapBitmapColors;
 use awsm_renderer::core::cubemap::CubemapImage;
 use awsm_renderer::core::renderer;
 use awsm_renderer::core::texture::TextureFormat;
@@ -248,17 +249,13 @@ impl AppScene {
                 match maybe_cached {
                     Some(skybox) => skybox,
                     None => {
-                        let skybox_cubemap = match ibl_id.path() {
-                            Some(path) => skybox::load_from_path(path).await?,
-                            None => match ibl_id.cubemap_colors() {
-                                Some(colors) => skybox::load_from_colors(colors).await?,
-                                None => {
-                                    return Err(anyhow!(
-                                        "No skybox path or colors for IBL ID {:?}",
-                                        ibl_id
-                                    ))
-                                }
-                            },
+                        let skybox_cubemap = match ibl_id {
+                            IblId::PhotoStudio => skybox::load_from_path("photo_studio").await?,
+                            IblId::AllWhite => {
+                                skybox::load_from_colors(CubemapBitmapColors::all(Color::WHITE))
+                                    .await?
+                            }
+                            IblId::SimpleSky => skybox::load_simple_sky().await?,
                         };
 
                         let skybox = {
@@ -349,17 +346,12 @@ impl AppScene {
             match maybe_cached {
                 Some(ibl) => ibl.clone(),
                 None => {
-                    let ibl_cubemaps = match ibl_id.path() {
-                        Some(path) => ibl::load_from_path(path).await?,
-                        None => match ibl_id.cubemap_colors() {
-                            Some(colors) => ibl::load_from_colors(colors).await?,
-                            None => {
-                                return Err(anyhow!(
-                                    "No IBL path or colors for IBL ID {:?}",
-                                    ibl_id
-                                ))
-                            }
-                        },
+                    let ibl_cubemaps = match ibl_id {
+                        IblId::PhotoStudio => ibl::load_from_path("photo_studio").await?,
+                        IblId::AllWhite => {
+                            ibl::load_from_colors(CubemapBitmapColors::all(Color::WHITE)).await?
+                        }
+                        IblId::SimpleSky => ibl::load_simple_sky().await?,
                     };
 
                     let ibl = {

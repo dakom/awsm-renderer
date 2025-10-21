@@ -1,9 +1,5 @@
-use awsm_renderer::{
-    core::cubemap::{images::CubemapBitmapColors, CubemapImage},
-    environment::Skybox,
-    lights::ibl::{Ibl, IblTexture},
-    AwsmRenderer,
-};
+use awsm_renderer::core::cubemap::images::{CubemapBitmapColors, CubemapSkyGradient};
+use awsm_renderer::core::cubemap::CubemapImage;
 
 use crate::prelude::*;
 
@@ -23,4 +19,8 @@ pub async fn load_from_path(path: &str) -> Result<CubemapImage> {
 
 pub async fn load_from_colors(colors: CubemapBitmapColors) -> Result<CubemapImage> {
     Ok(CubemapImage::new_colors(colors, 1024, 1024).await?)
+}
+
+pub async fn load_simple_sky() -> Result<CubemapImage> {
+    Ok(CubemapImage::new_sky_gradient(CubemapSkyGradient::default(), 1024, 1024).await?)
 }

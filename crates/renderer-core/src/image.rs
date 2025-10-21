@@ -1,12 +1,10 @@
 use crate::command::copy_texture::Origin3d;
-use crate::cubemap::CubemapImage;
 use crate::error::Result;
 use crate::renderer::AwsmRendererWebGpu;
 use crate::texture::mipmap::generate_mipmaps;
 use crate::texture::{
     mipmap, Extent3d, TextureAspect, TextureDescriptor, TextureFormat, TextureUsage,
 };
-use cfg_if::cfg_if;
 use std::borrow::Cow;
 #[cfg(feature = "exr")]
 use std::sync::Arc;

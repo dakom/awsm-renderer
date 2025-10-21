@@ -1,8 +1,5 @@
-use awsm_renderer::{
-    core::cubemap::{images::CubemapBitmapColors, CubemapImage},
-    lights::ibl::{Ibl, IblTexture},
-    AwsmRenderer,
-};
+use awsm_renderer::core::cubemap::images::{CubemapBitmapColors, CubemapSkyGradient};
+use awsm_renderer::core::cubemap::CubemapImage;
 
 use crate::prelude::*;
 
@@ -36,5 +33,14 @@ pub async fn load_from_colors(colors: CubemapBitmapColors) -> Result<IblCubemaps
     Ok(IblCubemaps {
         prefiltered_env: CubemapImage::new_colors(colors.clone(), 1024, 1024).await?,
         irradiance: CubemapImage::new_colors(colors, 32, 32).await?,
+    })
+}
+
+pub async fn load_simple_sky() -> Result<IblCubemaps> {
+    let gradient = CubemapSkyGradient::default();
+
+    Ok(IblCubemaps {
+        prefiltered_env: CubemapImage::new_sky_gradient(gradient.clone(), 1024, 1024).await?,
+        irradiance: CubemapImage::new_sky_gradient(gradient, 32, 32).await?,
     })
 }
