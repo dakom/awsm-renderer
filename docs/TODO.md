@@ -6,7 +6,6 @@
 - get basic lighting working
   - actually pass it in
   - point, spot, directional
-- normal mapping
 - occlusion
 - emissive
 
