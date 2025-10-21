@@ -3,31 +3,19 @@
   - test with some model that has skins
 
 # Opaque material pass
-- get basic lighting working
+- take lighting as storage buffer
   - actually pass it in
   - point, spot, directional
-- occlusion
-- emissive
+- occlusion test
+- emissive test
 
 # Transparent material pass
 - like opaque
 - cutoff
 - complete getting alpha blend mode working again
 
+# Bring back TAA
 
+------
 
-# Get started with light culling pass
-
-1. Write light
-2. Use in opaque material pass
-
-# get rid of 256 byte alignment for mesh meta?
-
-- maybe only necessary for uniforms?
-
-# Multithreading
-
-Dynamic/Uniform storages could be SharedArrayBuffer
-Requires more design/thought (don't want to expose raw manipulation)
-
-# KHR_texture_transform support maybe
+At this point, can merge to main, delete this file, and continue with [ROADMAP.md](./roadmap.md)

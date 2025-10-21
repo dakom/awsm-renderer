@@ -1,43 +1,53 @@
 # Next up
 
 - Rewrite entire pipeline to match README doc (Visiblity+)
+  - See [TODO.md](TODO.md)
+
+- get demo working again
+  - fix "dev-release" mode (just base path?)
 
 - Megatexture tool/load
 
-- materials cont'd
-    - normal texture
-    - metal roughness texture
+- at this point can probably use for demos :)
 
-- IBL
+- load lights via KHR_lights_punctual
+  - point, spot, directional
 
-- Is it right that specular isn't moving across sphere test when camera moves?
+- Get started with light culling pass
+  - research best practices
+  - should optimize for opaque pass (i.e. only light fragments that made it to the screen?)
 
-- fix "dev-release" mode (just base path?)
+- get rid of 256 byte alignment for mesh meta?
+  - maybe only necessary for uniforms?
 
+- make it easier to configure initial sizes for dynamic buffers
+  - derive from scanning gltf?
 
-- Initial allocation?
-    - derive from gltf?
+# Multithreading
 
-## Approach 
+Dynamic/Uniform storages could be SharedArrayBuffer
+Requires more design/thought (don't want to expose raw manipulation)
+
+## Approach
 
 High-level, approach is to keep going through gltf models, one at a time, making them each work starting with minimal and feature-tests.
 
 As more features are added, support is added into the core engine.
 
-## GLTF Support 
+## GLTF Support
 
 If it's supported here, corresponding core functionality is also supported
 
 - Loaders
-    - [x] document 
-    - [x] buffers 
+    - [x] document
+    - [x] buffers
     - [x] images
 - Caching
     - [x] Shaders by ShaderKey
     - [x] RenderPipelines by RenderPipelineKey
-    - [x] PipelineLayouts by PipelineLayoutKey 
+    - [x] PipelineLayouts by PipelineLayoutKey
 - Accessors
-    - [x] basic 
+    - [x] basic
     - [x] sparse
 - Hierarchy
     - [x] transforms
@@ -60,25 +70,79 @@ If it's supported here, corresponding core functionality is also supported
         - [ ] Directional
         - [ ] Point
         - [ ] Spot
-    - [ ]  more at https://github.com/KhronosGroup/glTF/blob/main/extensions/README.md#ratified-khronos-extensions 
+    - [ ]  more at https://github.com/KhronosGroup/glTF/blob/main/extensions/README.md#ratified-khronos-extensions
 - Materials
     - [ ] PBR metallic-roughness
         - [x] base color
-        - [ ] metallic
-        - [ ] roughness
-        - [ ] normal
-        - [ ] occlusion
-        - [ ] emissive
+        - [x] metallic
+        - [x] roughness
+        - [x] normal
+        - [ ] occlusion (need to test)
+        - [ ] emissive (need to test)
     - [x] mipmaps
-- Lighting (TODO - fill this out as we go)
-- Skybox (TODO - fill this out as we go)
+- Lighting
+    - [x] IBL
+        - [x] diffuse irradiance
+        - [x] specular prefiltered
+        - [x] BRDF LUT
+    - [x] punctual lights
+
+
+## Drawing
+- [x] non-indexed
+- [x] indexed
+- [x] instancing
+- [ ] Early z pre-pass
+- [x] Opaque front to back
+- [x] Transparent back to front
+
+## Textures
+- [x] 2D textures
+- [x] Mipmaps (port https://github.com/JolifantoBambla/webgpu-spd)
+- [ ] Tool to precreate megatextures
+- [ ] Load precreated megatextures
+
+## Skybox
+- [x] load ktf
+- [x] generate colors
+- [x] generate pseudo-sky
+
+## IBL Helpers
+- [x] Load ktf
+- [x] generate colors
+- [x] Document third-party tooling and easy flow
+
+## Animation system
+- [x] Players
+    - [x] speed control
+    - [x] loop control
+    - [x] play/pause
+        - [ ] test
+    - [x] direction
+        - [ ] test
+- [x] Clips and samplers (see gltf features for details)
+- [ ] Events
+
+## Post-processing
+- [x] Basic render-texture support
+- [x] Tonemapping
+- [ ] SSAO
+- [ ] Bloom
+- [x] TAA
+- [ ] DOF
+
+## Demo-only
+
+- [x] Camera
+    - [x] Orbit controls
+    - [x] Orthographic
+    - [x] Perspective
+    - [x] Initial fit for AABB (not perfect, but good enough)
 
 ## Optimizations
 
 - [ ] Multithreading
 - [x] MegaTextures
-    - [ ] Tool to precreate megatextures
-    - [ ] Load precreated megatextures
 - [x] Dynamic buffer primitives
     - Single gpu binding
     - Offset-driven
@@ -97,53 +161,9 @@ If it's supported here, corresponding core functionality is also supported
     - One vertex buffer
     - One index buffer
     - Gpu gating on dirty flag
-- [x] Instancing
+- [x] Transform instancing
     - One dynamic uniform bind group for transforms
     - Gpu gating on dirty flag
-    - [ ] support different materials 
 - Camera
-    - [x] Single uniform buffer 
+    - [x] Single uniform buffer
     - [ ] Frustum culling
-
-## Drawing
-- [x] non-indexed
-- [x] indexed
-- [x] instancing
-- [ ] Early z pre-pass
-- [x] Opaque front to back
-- [x] Transparent back to front
-
-## Textures
-- [x] 2D textures
-- [ ] 3D textures
-- [x] Mipmaps (port https://github.com/JolifantoBambla/webgpu-spd)
-
-## Skybox
-- [ ] Cubemap
-
-## Animation system 
-- [x] Players
-    - [x] speed control
-    - [x] loop control
-    - [x] play/pause
-        - [ ] test 
-    - [x] direction 
-        - [ ] test 
-- [x] Clips and samplers (see gltf features for details)
-- [ ] Events
-
-## Post-processing
-- [x] Basic render-texture support
-- [x] Tonemapping
-- [ ] SSAO
-- [ ] Bloom
-- [x] TAA 
-- [ ] DOF
-
-## Demo-only
-
-- [x] Camera
-    - [x] Orbit controls 
-    - [x] Orthographic
-    - [x] Perspective
-    - [x] Initial fit for AABB (not perfect, but good enough) 
