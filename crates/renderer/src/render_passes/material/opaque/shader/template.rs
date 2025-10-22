@@ -70,6 +70,12 @@ enum MipmapMode {
 #[derive(Debug, Default)]
 struct ShaderTemplateMaterialOpaqueDebug {
     mips: bool,
+    n_dot_v: bool,
+    normals: bool,
+    solid_color: bool,
+    view_direction: bool,
+    irradiance_sample: bool,
+    ibl_only: bool,
 }
 
 impl ShaderTemplateMaterialOpaque {

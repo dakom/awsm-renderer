@@ -218,27 +218,43 @@ fn main(
 
     var color = vec3<f32>(0.0);
 
-    // Direct lighting: accumulate contributions from all lights
-    // Note: Hardcoded to 4 lights (see lights.wgsl for definitions)
-    let n_lights = 4u;
-    for(var i = 0u; i < n_lights; i = i + 1u) {
-        let light_brdf = light_to_brdf(get_light(i), material_color.normal, standard_coordinates.world_position);
-        color += brdf_direct(material_color, light_brdf, standard_coordinates.surface_to_camera);
-    }
+    {% if debug.ibl_only %}
+        // IBL only - skip direct lighting to isolate the issue
+        color = brdf_ibl(
+            material_color,
+            material_color.normal,
+            standard_coordinates.surface_to_camera,
+            ibl_filtered_env_tex,
+            ibl_filtered_env_sampler,
+            ibl_irradiance_tex,
+            ibl_irradiance_sampler,
+            brdf_lut_tex,
+            brdf_lut_sampler,
+            ibl_info
+        );
+    {% else %}
+        // Direct lighting: accumulate contributions from all lights
+        // Note: Hardcoded to 4 lights (see lights.wgsl for definitions)
+        let n_lights = 4u;
+        for(var i = 0u; i < n_lights; i = i + 1u) {
+            let light_brdf = light_to_brdf(get_light(i), material_color.normal, standard_coordinates.world_position);
+            color += brdf_direct(material_color, light_brdf, standard_coordinates.surface_to_camera);
+        }
 
-    // Indirect lighting: IBL contribution (includes emissive)
-    color += brdf_ibl(
-        material_color,
-        material_color.normal,
-        standard_coordinates.surface_to_camera,
-        ibl_filtered_env_tex,
-        ibl_filtered_env_sampler,
-        ibl_irradiance_tex,
-        ibl_irradiance_sampler,
-        brdf_lut_tex,
-        brdf_lut_sampler,
-        ibl_info
-    );
+        // Indirect lighting: IBL contribution (includes emissive)
+        color += brdf_ibl(
+            material_color,
+            material_color.normal,
+            standard_coordinates.surface_to_camera,
+            ibl_filtered_env_tex,
+            ibl_filtered_env_sampler,
+            ibl_irradiance_tex,
+            ibl_irradiance_sampler,
+            brdf_lut_tex,
+            brdf_lut_sampler,
+            ibl_info
+        );
+    {% endif %}
 
     {% if debug.mips %}
         let i = i32(floor(texture_lods.base_color + 0.5)); // nearest mip
@@ -246,6 +262,39 @@ fn main(
         let max_mip_level = select(15.0, atlas_info.levels_f - 1.0, atlas_info.valid && atlas_info.levels_f > 1.0);
         let level = f32(i) / max_mip_level;
         color = vec3<f32>(level, level, level);
+    {% endif %}
+
+    {% if debug.n_dot_v %}
+        let n = safe_normalize(material_color.normal);
+        let v = safe_normalize(standard_coordinates.surface_to_camera);
+        let n_dot_v_val = saturate(dot(n, v));
+        // Show n_dot_v as grayscale, but also show it in green channel for visibility
+        // R = n_dot_v, G = n_dot_v * 2 for emphasis, B = 0
+        color = vec3<f32>(n_dot_v_val, n_dot_v_val * 2.0, 0.0);
+    {% endif %}
+
+    {% if debug.normals %}
+        // Visualize normals as RGB (map from [-1,1] to [0,1])
+        let n = safe_normalize(material_color.normal);
+        color = n * 0.5 + 0.5;
+    {% endif %}
+
+    {% if debug.solid_color %}
+        // Just output bright magenta to verify debug system works
+        color = vec3<f32>(1.0, 0.0, 1.0);
+    {% endif %}
+
+    {% if debug.view_direction %}
+        // Visualize view direction (surface_to_camera) as RGB
+        let v = safe_normalize(standard_coordinates.surface_to_camera);
+        color = v * 0.5 + 0.5;
+    {% endif %}
+
+    {% if debug.irradiance_sample %}
+        // Sample the irradiance map directly using the normal
+        let n = safe_normalize(material_color.normal);
+        let irradiance = textureSampleLevel(ibl_irradiance_tex, ibl_irradiance_sampler, n, 0.0).rgb;
+        color = irradiance;
     {% endif %}
 
     // Write to output texture

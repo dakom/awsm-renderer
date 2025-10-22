@@ -3,105 +3,133 @@ use std::hash::Hash;
 
 use crate::prelude::*;
 
-pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::new(|| {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GltfSetId {
+    Todo,
+    Standard,
+    Animation,
+    Basics,
+    Extensions,
+}
+
+impl GltfSetId {
+    pub fn list() -> Vec<GltfSetId> {
+        vec![
+            GltfSetId::Todo,
+            GltfSetId::Standard,
+            GltfSetId::Animation,
+            GltfSetId::Basics,
+            GltfSetId::Extensions,
+        ]
+    }
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Todo => "Todo",
+            Self::Standard => "Standard",
+            Self::Animation => "Animation",
+            Self::Basics => "Basics",
+            Self::Extensions => "Extensions",
+        }
+    }
+}
+pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(|| {
     let mut h = HashMap::new();
 
     h.insert(
-        "Todo",
+        GltfSetId::Todo,
         vec![
-            GltfId::TextureSettings,
-            GltfId::Triangle,
-            GltfId::TextureLinearInterpolation,
-            GltfId::BoxTextured,
-            GltfId::AlphaBlendMode,
-            GltfId::MetalRoughSpheresTextureless,
-            GltfId::MetalRoughSpheres,
-            // GltfId::TextureTransformTest,
-            GltfId::TextureTransformMultiTest,
-            GltfId::DamagedHelmet,
+            GltfId::MorphStressTest,
+            GltfId::RiggedSimple,
+            GltfId::SimpleSkin,
+            GltfId::RiggedFigure,
             GltfId::NormalTangent,
             GltfId::NormalTangentMirror,
-        ],
-    );
-
-    // h.insert(
-    //     "Feature tests",
-    //     vec![
-    //         GltfId::AlphaBlendMode,
-    //         GltfId::BoomBoxAxes,
-    //         //GltfId::MetalRoughSpheres,
-    //         //GltfId::MetalRoughSpheresTextureless,
-    //         GltfId::MorphPrimitives,
-    //         //GltfId::MorphStressTest,
-    //         GltfId::MultiUv,
-    //         //GltfId::NegativeScale,
-    //         // GltfId::NormalTangent,
-    //         // GltfId::NormalTangentMirror,
-    //         GltfId::Orientation,
-    //         //GltfId::RecursiveSkeletons,
-    //         GltfId::TextureCoordinate,
-    //         GltfId::TextureLinearInterpolation,
-    //         GltfId::TextureSettings,
-    //         GltfId::VertexColor,
-    //     ],
-    // );
-
-    h.insert(
-        "Simple",
-        vec![
-            GltfId::TextureCoordinate,
-            GltfId::TriangleWithoutIndices,
-            GltfId::SimpleSparseAccessor,
-            GltfId::SimpleMeshes,
-            GltfId::SimpleTexture,
-            GltfId::SimpleInstancing,
-            GltfId::SimpleMaterial,
-            GltfId::MorphPrimitives,
+            GltfId::AlphaBlendMode,
+            GltfId::VertexColor,
         ],
     );
 
     h.insert(
-        "Animation",
+        GltfSetId::Standard,
         vec![
-            GltfId::SimpleSkin,
+            GltfId::DamagedHelmet,
+            //GltfId::AlphaBlendMode
+        ],
+    );
+
+    h.insert(
+        GltfSetId::Animation,
+        vec![
+            //GltfId::SimpleSkin,
             GltfId::SimpleMorph,
             GltfId::AnimatedTriangle,
             GltfId::AnimatedMorphCube,
             GltfId::InterpolationTest,
-            GltfId::RiggedFigure,
+            //GltfId::RiggedSimple,
+            //GltfId::RiggedFigure,
             GltfId::RecursiveSkeletons,
+            //GltfId::MorphStressTest,
         ],
     );
 
-    // h.insert(
-    //     "Standard",
-    //     vec![
-    //         GltfId::Box,
-    //         GltfId::BoxInterleaved,
-    //         GltfId::BoxTextured,
-    //         GltfId::BoxTexturedNpoT,
-    //         GltfId::BoxWithSpaces,
-    //         GltfId::BoxVertexColors,
-    //         GltfId::Cube,
-    //     ],
-    // );
+    h.insert(
+        GltfSetId::Basics,
+        vec![
+            GltfId::TextureCoordinate,
+            GltfId::TextureLinearInterpolation,
+            GltfId::TextureSettings,
+            //GltfId::VertexColor,
+            GltfId::BoomBoxAxes,
+            GltfId::TriangleWithoutIndices,
+            GltfId::SimpleSparseAccessor,
+            GltfId::SimpleMeshes,
+            GltfId::SimpleTexture,
+            GltfId::SimpleMaterial,
+            GltfId::MorphPrimitives,
+            GltfId::MultiUv,
+            GltfId::NegativeScale,
+            GltfId::Orientation,
+            // GltfId::NormalTangent,
+            // GltfId::NormalTangentMirror,
+            GltfId::Triangle,
+            GltfId::BoxTextured,
+            GltfId::MetalRoughSpheresTextureless,
+            GltfId::MetalRoughSpheres,
+            GltfId::Box,
+            GltfId::BoxInterleaved,
+            GltfId::BoxTexturedNpoT,
+            GltfId::BoxWithSpaces,
+            GltfId::BoxVertexColors,
+            GltfId::Cube,
+        ],
+    );
 
-    // h.insert(
-    //     "Extension Tests",
-    //     vec![
-    //         // GltfId::EnvironmentTest,
-    //         // GltfId::EnvironmentIblTest,
-    //         // GltfId::TextureTransformMultiTest,
-    //     ],
-    // );
+    h.insert(
+        GltfSetId::Extensions,
+        vec![
+            GltfId::SimpleInstancing,
+            GltfId::TextureTransformMultiTest,
+            GltfId::TextureTransformTest,
+            GltfId::EnvironmentTest,
+            GltfId::EnvironmentIblTest,
+        ],
+    );
+
+    // make sure no ids are in multiple sets
+    let mut all_ids = std::collections::HashSet::new();
+    for (set_id, ids) in &h {
+        for id in ids {
+            if !all_ids.insert(id) {
+                panic!("[{:?}] is in multiple sets!", id);
+            }
+        }
+    }
 
     h
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GltfId {
-    // FEATURE TESTS
-    // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#feature-tests
     AlphaBlendMode,
     BoomBoxAxes,
     MetalRoughSpheres,
@@ -118,9 +146,6 @@ pub enum GltfId {
     TextureLinearInterpolation,
     TextureSettings,
     VertexColor,
-
-    // MINIMAL
-    // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#minimal-tests
     TriangleWithoutIndices,
     Triangle,
     SimpleSparseAccessor,
@@ -133,10 +158,6 @@ pub enum GltfId {
     SimpleTexture,
     SimpleMaterial,
     InterpolationTest,
-    // skipping unicode test...
-
-    // STANDARD
-    // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#standard
     Box,
     BoxInterleaved,
     BoxTextured,
@@ -145,9 +166,8 @@ pub enum GltfId {
     BoxVertexColors,
     Cube,
     RiggedFigure,
+    RiggedSimple,
     DamagedHelmet,
-
-    // EXTENSION TESTS
     EnvironmentTest,
     EnvironmentIblTest,
     TextureTransformTest,
@@ -178,14 +198,13 @@ impl std::fmt::Display for GltfId {
 }
 
 impl GltfId {
-    pub fn find_set_label(&self) -> &'static str {
+    pub fn find_set(&self) -> GltfSetId {
         let res = GLTF_SETS.iter().find(|x| x.1.contains(self));
-        res.unwrap().0
+        *res.unwrap().0
     }
 
     pub fn filepath(&self) -> &'static str {
         match self {
-            // Feature tests
             Self::AlphaBlendMode => "AlphaBlendModeTest/glTF/AlphaBlendModeTest.gltf",
             Self::BoomBoxAxes => "BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf",
             Self::MetalRoughSpheres => "MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
@@ -212,7 +231,6 @@ impl GltfId {
                 "TextureTransformMultiTest/glTF/TextureTransformMultiTest.gltf"
             }
             Self::VertexColor => "VertexColorTest/glTF/VertexColorTest.gltf",
-            // Minimal
             Self::TriangleWithoutIndices => {
                 "TriangleWithoutIndices/glTF/TriangleWithoutIndices.gltf"
             }
@@ -227,8 +245,6 @@ impl GltfId {
             Self::AnimatedMorphCube => "AnimatedMorphCube/glTF/AnimatedMorphCube.gltf",
             Self::SimpleSkin => "SimpleSkin/glTF/SimpleSkin.gltf",
             Self::InterpolationTest => "InterpolationTest/glTF/InterpolationTest.gltf",
-
-            // Standard
             Self::Box => "Box/glTF/Box.gltf",
             Self::BoxInterleaved => "BoxInterleaved/glTF/BoxInterleaved.gltf",
             Self::BoxTextured => "BoxTextured/glTF/BoxTextured.gltf",
@@ -237,9 +253,8 @@ impl GltfId {
             Self::BoxVertexColors => "BoxVertexColors/glTF/BoxVertexColors.gltf",
             Self::Cube => "Cube/glTF/Cube.gltf",
             Self::RiggedFigure => "RiggedFigure/glTF/RiggedFigure.gltf",
+            Self::RiggedSimple => "RiggedSimple/glTF/RiggedSimple.gltf",
             Self::DamagedHelmet => "DamagedHelmet/glTF/DamagedHelmet.gltf",
-
-            // Extension Tests
             Self::EnvironmentTest => "EnvironmentTest/glTF/EnvironmentTest.gltf",
             Self::EnvironmentIblTest => "EnvironmentTest/glTF-IBL/EnvironmentTest.gltf",
         }
@@ -247,7 +262,6 @@ impl GltfId {
 
     pub fn label(&self) -> &'static str {
         match self {
-            // feature tests
             Self::AlphaBlendMode => "Alpha blend mode",
             Self::BoomBoxAxes => "Boom box w/ axes",
             Self::MetalRoughSpheres => "Metal rough spheres",
@@ -266,8 +280,6 @@ impl GltfId {
             Self::TextureTransformTest => "Texture transform test",
             Self::TextureTransformMultiTest => "Texture transform multi test",
             Self::VertexColor => "Vertex colors",
-
-            // Minimal
             Self::TriangleWithoutIndices => "Triangle without indices",
             Self::Triangle => "Triangle",
             Self::SimpleSparseAccessor => "Simple Sparse Accessor",
@@ -280,8 +292,6 @@ impl GltfId {
             Self::AnimatedMorphCube => "Animated Morph Cube",
             Self::SimpleSkin => "Simple Skin",
             Self::InterpolationTest => "Interpolation Test",
-
-            // Standard
             Self::Box => "Box",
             Self::BoxInterleaved => "BoxInterleaved",
             Self::BoxTextured => "BoxTextured",
@@ -290,9 +300,8 @@ impl GltfId {
             Self::BoxVertexColors => "Box vertex colors",
             Self::Cube => "Cube",
             Self::RiggedFigure => "Rigged figure",
+            Self::RiggedSimple => "Rigged simple",
             Self::DamagedHelmet => "Damaged helmet",
-
-            // Extension Tests
             Self::EnvironmentTest => "Environment test",
             Self::EnvironmentIblTest => "Environment ibl test",
         }
