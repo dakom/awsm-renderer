@@ -31,7 +31,9 @@ impl AwsmRenderer {
             .cloned()
             .unwrap();
 
-        for gltf_animation in ctx.data.doc.animations() {
+        // TEMPORARY WORKAROUND: Only load the first animation
+        // TODO: Add proper API for selecting/controlling which animations to play
+        if let Some(gltf_animation) = ctx.data.doc.animations().next() {
             for channel in gltf_animation.channels() {
                 if channel.target().node().index() == gltf_node.index() {
                     match channel.target().property() {

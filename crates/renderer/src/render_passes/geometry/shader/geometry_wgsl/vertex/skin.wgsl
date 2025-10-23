@@ -1,6 +1,6 @@
 //***** SKINS *****
 @group(3) @binding(2)
-var<storage, read> skin_joint_matrices: array<mat4x4<f32>>; 
+var<storage, read> skin_joint_matrices: array<mat4x4<f32>>;
 
 // Joint buffer - exploded per vertex (matches morph pattern)
 // However, to stay under bind group limits, we interleave indices with weights

@@ -10,28 +10,29 @@ use crate::gltf::buffers::{
 use crate::gltf::error::{AwsmGltfError, Result};
 use crate::mesh::{MeshBufferMaterialMorphAttributes, MeshBufferVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo};
 
-/// Converts GLTF morph targets into separate geometry and material buffers
+/// Converts GLTF morph targets into geometry buffer with exploded triangle-corner format
 ///
-/// KEY CONCEPT - Two Different Access Patterns:
+/// KEY CONCEPT - Unified Exploded Format:
 ///
-/// GEOMETRY MORPHS (Position only):
-/// - Used in visibility/geometry pass for vertex positioning
-/// - Needs per-triangle-corner data (exploded) to match visibility buffer
-/// - Layout: Triangle0[Corner0[T0_pos, T1_pos], Corner1[...], Corner2[...]]
+/// ALL MORPHS (Position + Normal + Tangent):
+/// - All are "visibility" attributes that define geometry shape
+/// - All need per-triangle-corner data (exploded) to match visibility buffer
+/// - Layout per triangle corner: [Target0[pos, norm, tang], Target1[pos, norm, tang], ...]
+/// - This keeps all geometry-defining morphs together in one buffer
 ///
-/// MATERIAL MORPHS (Normals + Tangents):
-/// - Used in material/shading pass for surface properties  
-/// - Can use original per-vertex data (non-exploded) for efficiency
-/// - Layout: Vertex0[T0_norm, T0_tang, T1_norm, T1_tang], Vertex1[...], etc.
-/// - Material pass interpolates between original vertices anyway
+/// Data is interleaved per triangle corner:
+/// Triangle0:
+///   Corner0: [T0_pos(3), T0_norm(3), T0_tang(4), T1_pos(3), T1_norm(3), T1_tang(4), ...]
+///   Corner1: [T0_pos(3), T0_norm(3), T0_tang(4), T1_pos(3), T1_norm(3), T1_tang(4), ...]
+///   Corner2: [T0_pos(3), T0_norm(3), T0_tang(4), T1_pos(3), T1_norm(3), T1_tang(4), ...]
 pub(super) fn convert_morph_targets(
     primitive: &gltf::Primitive,
     buffers: &[Vec<u8>],
     index: &MeshBufferAttributeIndexInfoWithOffset,
     index_bytes: &[u8],
     triangle_count: usize,
-    geometry_morph_bytes: &mut Vec<u8>, // Exploded position morphs only
-    material_morph_bytes: &mut Vec<u8>, // Non-exploded normal/tangent morphs
+    geometry_morph_bytes: &mut Vec<u8>, // Exploded position + normal + tangent morphs
+    material_morph_bytes: &mut Vec<u8>, // DEPRECATED - kept for API compatibility
 ) -> Result<(
     Option<MeshBufferGeometryMorphInfoWithOffset>,
     Option<MeshBufferMaterialMorphInfoWithOffset>,
@@ -86,39 +87,43 @@ pub(super) fn convert_morph_targets(
         .map(|(_, accessor)| accessor.count())
         .unwrap_or(0);
 
-    // GEOMETRY MORPHS: Convert positions to exploded triangle-corner format
-    let geometry_morph_info = if has_any_position_morph {
+    // UNIFIED MORPHS: Convert all morph targets (position, normal, tangent) to exploded triangle-corner format
+    let geometry_morph_info = if has_any_position_morph || has_any_normal_morph || has_any_tangent_morph {
         let geometry_values_offset = geometry_morph_bytes.len();
 
         // Get triangles with ORIGINAL vertex indices for explosion
         let triangle_indices = extract_triangle_indices(index, index_bytes)?;
 
-        // Size of position data for ONE triangle, ONE target (3 vertices * vec3<f32>)
-        let size_per_target_per_triangle = 36; // 3 vertices * 12 bytes (vec3<f32>)
+        // Size of data for ONE triangle corner, ONE target:
+        // position (3 floats) + normal (3 floats) + tangent (4 floats) = 10 floats = 40 bytes
+        let size_per_target_per_corner = 40;
 
-        // Size of position data for ONE triangle, ALL targets
-        let triangle_stride_size = size_per_target_per_triangle * targets_len;
+        // Size of data for ONE triangle corner, ALL targets
+        let corner_stride_size = size_per_target_per_corner * targets_len;
 
-        // TRIANGLE EXPLOSION FOR POSITIONS
-        // Convert from original indexed position morphs to exploded triangle-corner data
+        // Size of data for ONE triangle (3 corners), ALL targets
+        let triangle_stride_size = corner_stride_size * 3;
+
+        // TRIANGLE EXPLOSION FOR ALL MORPH ATTRIBUTES
+        // Convert from original indexed morphs to exploded triangle-corner data
         //
-        // INTERLEAVING PATTERN (for visibility buffer):
+        // INTERLEAVING PATTERN (unified visibility buffer):
         // Triangle 0:
-        //   Corner 0: [MorphTarget0_pos, MorphTarget1_pos, MorphTarget2_pos, ...]
-        //   Corner 1: [MorphTarget0_pos, MorphTarget1_pos, MorphTarget2_pos, ...]
-        //   Corner 2: [MorphTarget0_pos, MorphTarget1_pos, MorphTarget2_pos, ...]
+        //   Corner 0: [T0_pos(3), T0_norm(3), T0_tang(4), T1_pos(3), T1_norm(3), T1_tang(4), ...]
+        //   Corner 1: [T0_pos(3), T0_norm(3), T0_tang(4), T1_pos(3), T1_norm(3), T1_tang(4), ...]
+        //   Corner 2: [T0_pos(3), T0_norm(3), T0_tang(4), T1_pos(3), T1_norm(3), T1_tang(4), ...]
         // Triangle 1:
-        //   Corner 0: [MorphTarget0_pos, MorphTarget1_pos, MorphTarget2_pos, ...]
+        //   Corner 0: [T0_pos(3), T0_norm(3), T0_tang(4), T1_pos(3), T1_norm(3), T1_tang(4), ...]
         //   ... etc
         for triangle in &triangle_indices {
             // For each vertex corner in this triangle (3 corners per triangle)
             for vertex_index in triangle {
                 // For each morph target (interleaved per vertex corner)
                 for morph_target_buffer_data in &morph_targets_buffer_data {
+                    // Position (3 floats = 12 bytes)
                     match &morph_target_buffer_data.positions {
                         Some(position_data) => {
-                            // Look up the position delta using the ORIGINAL vertex index
-                            let data_byte_offset = vertex_index * 12; // vec3<f32> = 12 bytes
+                            let data_byte_offset = vertex_index * 12;
                             if data_byte_offset + 12 > position_data.len() {
                                 return Err(AwsmGltfError::ConstructNormals(format!(
                                     "Position morph data out of bounds for vertex {}",
@@ -130,8 +135,47 @@ pub(super) fn convert_morph_targets(
                             geometry_morph_bytes.extend_from_slice(position_bytes);
                         }
                         None => {
-                            // Fill with zeros if this target doesn't have positions
                             geometry_morph_bytes.extend_from_slice(slice_zeroes(12));
+                        }
+                    }
+
+                    // Normal (3 floats = 12 bytes)
+                    match &morph_target_buffer_data.normals {
+                        Some(normal_data) => {
+                            let data_byte_offset = vertex_index * 12;
+                            if data_byte_offset + 12 > normal_data.len() {
+                                return Err(AwsmGltfError::ConstructNormals(format!(
+                                    "Normal morph data out of bounds for vertex {}",
+                                    vertex_index
+                                )));
+                            }
+                            let normal_bytes =
+                                &normal_data[data_byte_offset..data_byte_offset + 12];
+                            geometry_morph_bytes.extend_from_slice(normal_bytes);
+                        }
+                        None => {
+                            geometry_morph_bytes.extend_from_slice(slice_zeroes(12));
+                        }
+                    }
+
+                    // Tangent (3 floats in GLTF morph, padded to 4 floats = 16 bytes for vec4)
+                    match &morph_target_buffer_data.tangents {
+                        Some(tangent_data) => {
+                            let data_byte_offset = vertex_index * 12; // GLTF tangent morphs are vec3
+                            if data_byte_offset + 12 > tangent_data.len() {
+                                return Err(AwsmGltfError::ConstructNormals(format!(
+                                    "Tangent morph data out of bounds for vertex {}",
+                                    vertex_index
+                                )));
+                            }
+                            let tangent_bytes =
+                                &tangent_data[data_byte_offset..data_byte_offset + 12];
+                            geometry_morph_bytes.extend_from_slice(tangent_bytes);
+                            // Pad with 4 zero bytes to make vec4 (w component is 0 for morphs)
+                            geometry_morph_bytes.extend_from_slice(&[0u8; 4]);
+                        }
+                        None => {
+                            geometry_morph_bytes.extend_from_slice(slice_zeroes(16));
                         }
                     }
                 }
@@ -150,104 +194,7 @@ pub(super) fn convert_morph_targets(
         None
     };
 
-    let morph_attributes = MeshBufferMaterialMorphAttributes {
-        normal: has_any_normal_morph,
-        tangent: has_any_tangent_morph,
-    };
-
-    // MATERIAL MORPHS: Keep normals + tangents in original per-vertex format
-    let material_morph_info = if morph_attributes.normal || morph_attributes.tangent {
-        let material_values_offset = material_morph_bytes.len();
-
-        // Size of material data for ONE vertex, ONE target
-        let mut size_per_target_per_vertex = 0;
-        if morph_attributes.normal {
-            size_per_target_per_vertex += 12; // vec3<f32>
-        }
-        if morph_attributes.tangent {
-            size_per_target_per_vertex += 12; // vec3<f32> (no w component in morph targets)
-        }
-
-        // Size of material data for ONE vertex, ALL targets
-        let vertex_stride_size = size_per_target_per_vertex * targets_len;
-
-        // NON-EXPLODED LAYOUT FOR MATERIALS
-        // Keep original per-vertex structure since material pass interpolates anyway
-        //
-        // INTERLEAVING PATTERN (for material pass):
-        // Vertex 0: [Target0_norm, Target0_tang, Target1_norm, Target1_tang, ...]
-        // Vertex 1: [Target0_norm, Target0_tang, Target1_norm, Target1_tang, ...]
-        // Vertex 2: [Target0_norm, Target0_tang, Target1_norm, Target1_tang, ...]
-        // ... etc (original vertex order preserved)
-        for original_vertex_index in 0..original_vertex_count {
-            // For each morph target (interleaved per original vertex)
-            for morph_target_buffer_data in &morph_targets_buffer_data {
-                // Helper to push material attribute data
-                let mut push_material_morph_data =
-                    |attribute_info: MeshBufferVertexAttributeInfo,
-                     data: Option<&Cow<'_, [u8]>>|
-                     -> Result<()> {
-                        let vertex_size = attribute_info.vertex_size();
-                        match data {
-                            Some(data) => {
-                                // Look up the morph delta using the ORIGINAL vertex index
-                                let data_byte_offset = original_vertex_index * vertex_size;
-                                if data_byte_offset + vertex_size > data.len() {
-                                    return Err(AwsmGltfError::ConstructNormals(format!(
-                                    "Material morph data out of bounds for vertex {} in attribute {:?}",
-                                    original_vertex_index, attribute_info
-                                )));
-                                }
-                                let data_bytes =
-                                    &data[data_byte_offset..data_byte_offset + vertex_size];
-                                material_morph_bytes.extend_from_slice(data_bytes);
-                            }
-                            None => {
-                                // Fill with zeros if this target doesn't have this attribute
-                                material_morph_bytes.extend_from_slice(slice_zeroes(vertex_size));
-                            }
-                        }
-                        Ok(())
-                    };
-
-                // Push material attributes in consistent order FOR THIS TARGET
-                if morph_attributes.normal {
-                    push_material_morph_data(
-                        MeshBufferVertexAttributeInfo::Visibility(
-                            MeshBufferVisibilityVertexAttributeInfo::Normals {
-                                data_size: 4,     // f32
-                                component_len: 3, // vec3
-                            },
-                        ),
-                        morph_target_buffer_data.normals.as_ref(),
-                    )?;
-                }
-                if morph_attributes.tangent {
-                    push_material_morph_data(
-                        MeshBufferVertexAttributeInfo::Visibility(
-                            MeshBufferVisibilityVertexAttributeInfo::Tangents {
-                                data_size: 4,     // f32
-                                component_len: 3, // vec3
-                            },
-                        ),
-                        morph_target_buffer_data.tangents.as_ref(),
-                    )?;
-                }
-            }
-        }
-
-        let material_values_size = material_morph_bytes.len() - material_values_offset;
-
-        Some(MeshBufferMaterialMorphInfoWithOffset {
-            attributes: morph_attributes,
-            targets_len,
-            vertex_stride_size,
-            values_size: material_values_size,
-            values_offset: material_values_offset,
-        })
-    } else {
-        None
-    };
-
-    Ok((geometry_morph_info, material_morph_info))
+    // Material morphs are now deprecated - all morphs are in geometry buffer
+    // Return None for material_morph_info to maintain API compatibility
+    Ok((geometry_morph_info, None))
 }

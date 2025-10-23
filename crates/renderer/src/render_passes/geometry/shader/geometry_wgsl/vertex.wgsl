@@ -41,9 +41,13 @@ fn vert_main(vertex_orig: VertexInput) -> VertexOutput {
     var normal = vertex_orig.normal;
     var tangent = vertex_orig.tangent;
 
-    // Apply geometry morphs to position
+    // Apply morphs to position, normal, and tangent
     if mesh_meta.morph_geometry_target_len != 0 {
         vertex = apply_position_morphs(vertex);
+
+        // Apply morphed normals (correct behavior)
+        normal = apply_normal_morphs(vertex_orig, normal);
+        tangent = apply_tangent_morphs(vertex_orig, tangent);
     }
 
     // Apply skinning to position, normal, and tangent

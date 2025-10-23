@@ -120,27 +120,8 @@ impl AwsmRenderer {
             }
         };
 
-        let material_morph_key = match primitive_buffer_info.material_morph.clone() {
-            None => None,
-            Some(morph_buffer_info) => {
-                let values = &ctx.data.buffers.material_morph_bytes;
-                let values = &values[morph_buffer_info.values_offset
-                    ..morph_buffer_info.values_offset + morph_buffer_info.values_size];
-
-                // from spec: "The number of array elements MUST match the number of morph targets."
-                // this is generally verified in the insert() call too
-                let weights = gltf_mesh.weights().unwrap();
-                let weights_u8 = unsafe {
-                    std::slice::from_raw_parts(weights.as_ptr() as *const u8, (weights.len() * 4))
-                };
-
-                Some(self.meshes.morphs.material.insert_raw(
-                    morph_buffer_info.into(),
-                    weights_u8,
-                    values,
-                )?)
-            }
-        };
+        // Material morphs are deprecated - all morphs (position, normal, tangent) are now in geometry_morph
+        let material_morph_key = None;
 
         let skin_key = match (skin_transform, primitive_buffer_info.skin.clone()) {
             (None, None) => None,
@@ -247,7 +228,9 @@ impl AwsmRenderer {
             )?
         };
 
-        for gltf_animation in ctx.data.doc.animations() {
+        // TEMPORARY WORKAROUND: Only load the first animation
+        // TODO: Add proper API for selecting/controlling which animations to play
+        if let Some(gltf_animation) = ctx.data.doc.animations().next() {
             for channel in gltf_animation.channels() {
                 if channel.target().node().index() == gltf_node.index() {
                     match channel.target().property() {
