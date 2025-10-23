@@ -1,7 +1,3 @@
-# Ensure normals are being recalculated
-  - test with some model that has morphs
-  - test with some model that has skins
-
 # Opaque material pass
 - take lighting as storage buffer
   - actually pass it in
@@ -9,12 +5,14 @@
 - occlusion test
 - emissive test
 
+# Bring back TAA
+- Very obvious on MorphStressTest
+
 # Transparent material pass
 - like opaque
 - cutoff
 - complete getting alpha blend mode working again
 
-# Bring back TAA
 
 ------
 
