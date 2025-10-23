@@ -50,7 +50,9 @@ pub(super) fn pack_vertex_attributes(
         attribute_data
             .iter()
             .filter(|(attr_info, _)| {
-                !matches!(attr_info, MeshBufferVertexAttributeInfo::Positions { .. })
+                // Only include custom attributes (UVs, colors, joints, weights).
+                // Visibility attributes (positions, normals, tangents) go in visibility_data buffer.
+                attr_info.is_custom_attribute()
             })
             .collect();
 
@@ -106,38 +108,54 @@ pub(super) fn convert_attribute_kind(
     semantic: &gltf::Semantic,
     accessor: &gltf::Accessor<'_>,
 ) -> MeshBufferVertexAttributeInfo {
+    use crate::mesh::{MeshBufferVisibilityVertexAttributeInfo, MeshBufferCustomVertexAttributeInfo};
+
     match semantic {
-        Semantic::Positions => MeshBufferVertexAttributeInfo::Positions {
-            data_size: accessor.data_type().size(),
-            component_len: accessor.dimensions().multiplicity() as usize,
-        },
-        Semantic::Normals => MeshBufferVertexAttributeInfo::Normals {
-            data_size: accessor.data_type().size(),
-            component_len: accessor.dimensions().multiplicity() as usize,
-        },
-        Semantic::Tangents => MeshBufferVertexAttributeInfo::Tangents {
-            data_size: accessor.data_type().size(),
-            component_len: accessor.dimensions().multiplicity() as usize,
-        },
-        Semantic::Colors(count) => MeshBufferVertexAttributeInfo::Colors {
-            data_size: accessor.data_type().size(),
-            component_len: accessor.dimensions().multiplicity() as usize,
-            count: *count,
-        },
-        Semantic::TexCoords(count) => MeshBufferVertexAttributeInfo::TexCoords {
-            data_size: accessor.data_type().size(),
-            component_len: accessor.dimensions().multiplicity() as usize,
-            count: *count,
-        },
-        Semantic::Joints(count) => MeshBufferVertexAttributeInfo::Joints {
-            data_size: accessor.data_type().size(),
-            component_len: accessor.dimensions().multiplicity() as usize,
-            count: *count,
-        },
-        Semantic::Weights(count) => MeshBufferVertexAttributeInfo::Weights {
-            data_size: accessor.data_type().size(),
-            component_len: accessor.dimensions().multiplicity() as usize,
-            count: *count,
-        },
+        Semantic::Positions => MeshBufferVertexAttributeInfo::Visibility(
+            MeshBufferVisibilityVertexAttributeInfo::Positions {
+                data_size: accessor.data_type().size(),
+                component_len: accessor.dimensions().multiplicity() as usize,
+            },
+        ),
+        Semantic::Normals => MeshBufferVertexAttributeInfo::Visibility(
+            MeshBufferVisibilityVertexAttributeInfo::Normals {
+                data_size: accessor.data_type().size(),
+                component_len: accessor.dimensions().multiplicity() as usize,
+            },
+        ),
+        Semantic::Tangents => MeshBufferVertexAttributeInfo::Visibility(
+            MeshBufferVisibilityVertexAttributeInfo::Tangents {
+                data_size: accessor.data_type().size(),
+                component_len: accessor.dimensions().multiplicity() as usize,
+            },
+        ),
+        Semantic::Colors(count) => MeshBufferVertexAttributeInfo::Custom(
+            MeshBufferCustomVertexAttributeInfo::Colors {
+                data_size: accessor.data_type().size(),
+                component_len: accessor.dimensions().multiplicity() as usize,
+                count: *count,
+            },
+        ),
+        Semantic::TexCoords(count) => MeshBufferVertexAttributeInfo::Custom(
+            MeshBufferCustomVertexAttributeInfo::TexCoords {
+                data_size: accessor.data_type().size(),
+                component_len: accessor.dimensions().multiplicity() as usize,
+                count: *count,
+            },
+        ),
+        Semantic::Joints(count) => MeshBufferVertexAttributeInfo::Custom(
+            MeshBufferCustomVertexAttributeInfo::Joints {
+                data_size: accessor.data_type().size(),
+                component_len: accessor.dimensions().multiplicity() as usize,
+                count: *count,
+            },
+        ),
+        Semantic::Weights(count) => MeshBufferVertexAttributeInfo::Custom(
+            MeshBufferCustomVertexAttributeInfo::Weights {
+                data_size: accessor.data_type().size(),
+                component_len: accessor.dimensions().multiplicity() as usize,
+                count: *count,
+            },
+        ),
     }
 }

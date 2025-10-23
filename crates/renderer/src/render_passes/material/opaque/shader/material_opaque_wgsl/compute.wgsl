@@ -85,6 +85,8 @@ struct CameraUniform {
 @group(0) @binding(17) var brdf_lut_sampler: sampler;
 @group(0) @binding(18) var depth_tex: texture_depth_2d;
 @group(0) @binding(19) var<storage, read> visibility_data: array<f32>;
+@group(0) @binding(20) var geometry_normal_tex: texture_2d<f32>;
+@group(0) @binding(21) var geometry_tangent_tex: texture_2d<f32>;
 {% for i in 0..texture_atlas_len %}
     @group(1) @binding({{ i }}u) var atlas_tex_{{ i }}: texture_2d_array<f32>;
 {% endfor %}
@@ -145,19 +147,8 @@ fn main(
     let base_triangle_index = attribute_indices_offset + (triangle_index * 3u);
     let triangle_indices = vec3<u32>(attribute_indices[base_triangle_index], attribute_indices[base_triangle_index + 1], attribute_indices[base_triangle_index + 2]);
 
-    {% if normals %}
-        // Get the interpolated vertex normal (geometry normal, not yet perturbed by normal maps)
-        let world_normal = get_world_normal(
-            triangle_indices,
-            barycentric,
-            attribute_data_offset,
-            vertex_attribute_stride,
-            pbr_material,
-            transforms.world_normal,
-        );
-    {% else %}
-        let world_normal = vec3<f32>(1.0, 1.0, 1.0);
-    {% endif %}
+    // Load world-space normal directly from geometry pass output (already transformed with morphs/skins)
+    let world_normal = textureLoad(geometry_normal_tex, coords, 0).xyz;
 
 
     let os_vertices = get_object_space_vertices(visibility_data_offset, triangle_index);

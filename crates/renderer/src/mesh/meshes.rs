@@ -51,7 +51,15 @@ impl Meshes {
     // Initial sizes assume ~1000 vertices per mesh
     // but this is just an allocation, can be divided many ways
     const INDICES_INITIAL_SIZE: usize = MESH_META_INITIAL_CAPACITY * 3 * 1000;
-    const VERTICES_INITIAL_SIZE: usize = Self::INDICES_INITIAL_SIZE * 24;
+
+    // Visibility buffer size uses MeshBufferVertexInfo::BYTE_SIZE (52 bytes per vertex)
+    const VISIBILITY_INITIAL_SIZE: usize = Self::INDICES_INITIAL_SIZE * MeshBufferVertexInfo::BYTE_SIZE;
+
+    // Attribute data is much smaller - only custom attributes (UVs, colors, joints, weights).
+    // Estimate: 2 UV sets (8 bytes each) = 16 bytes per vertex as a reasonable starting point.
+    // For textureless models this will be 0, but buffer will grow as needed.
+    const ATTRIBUTE_DATA_INITIAL_SIZE: usize = Self::INDICES_INITIAL_SIZE * 16;
+
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Self {
             list: DenseSlotMap::with_key(),
@@ -59,13 +67,13 @@ impl Meshes {
             buffer_infos: MeshBufferInfos::new(),
             // visibility data
             visibility_data_buffers: DynamicStorageBuffer::new(
-                Self::VERTICES_INITIAL_SIZE,
+                Self::VISIBILITY_INITIAL_SIZE,
                 Some("MeshVisibilityData".to_string()),
             ),
             visibility_data_gpu_buffer: gpu.create_buffer(
                 &BufferDescriptor::new(
                     Some("MeshVisibilityData"),
-                    Self::VERTICES_INITIAL_SIZE,
+                    Self::VISIBILITY_INITIAL_SIZE,
                     BufferUsage::new().with_copy_dst().with_vertex(),
                 )
                 .into(),
@@ -87,13 +95,13 @@ impl Meshes {
             visibility_index_dirty: true,
             // attribute data
             attribute_data_buffers: DynamicStorageBuffer::new(
-                Self::VERTICES_INITIAL_SIZE,
+                Self::ATTRIBUTE_DATA_INITIAL_SIZE,
                 Some("MeshAttributeData".to_string()),
             ),
             attribute_data_gpu_buffer: gpu.create_buffer(
                 &BufferDescriptor::new(
                     Some("MeshAttributeData"),
-                    Self::VERTICES_INITIAL_SIZE,
+                    Self::ATTRIBUTE_DATA_INITIAL_SIZE,
                     BufferUsage::new().with_copy_dst().with_storage(),
                 )
                 .into(),

@@ -33,16 +33,23 @@ fn get_object_space_vertices(visibility_data_offset: u32, triangle_index: u32) -
 }
 
 fn _get_vertex_position(visibility_data_offset: u32, triangle_index: u32, vertex_index: u32) -> vec3<f32> {
-    // Each triangle has 3 vertices, each vertex has 6 floats (3 position, 1 triangle-id, 2 barycentric)
-    const floats_per_vertex = 6u;
+    // Visibility buffer layout per vertex (52 bytes = 13 floats):
+    // - positions (vec3<f32>), 3 floats
+    // - triangle_index (u32), 1 float
+    // - barycentric (vec2<f32>), 2 floats
+    // - normals (vec3<f32>), 3 floats
+    // - tangents (vec4<f32>), 4 floats
+    // Total: 3 + 1 + 2 + 3 + 4 = 13 floats per vertex
+    const floats_per_vertex = 13u;
     const vertices_per_triangle = 3u;
-    const floats_per_triangle = floats_per_vertex * vertices_per_triangle; // 18
+    const floats_per_triangle = floats_per_vertex * vertices_per_triangle; // 39
 
     // first get to the right triangle
     let triangle_start = visibility_data_offset + (triangle_index * floats_per_triangle);
     // then each position for each vertex within that triangle
     let vertex_start = triangle_start + (vertex_index * floats_per_vertex);
 
+    // Position is at offset 0 within each vertex
     return vec3<f32>(
         visibility_data[vertex_start],
         visibility_data[vertex_start + 1u],

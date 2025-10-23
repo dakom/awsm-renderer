@@ -48,23 +48,38 @@ impl GeometryRenderPass {
     }
 
     pub fn render(&self, ctx: &RenderContext, renderables: &[Renderable]) -> Result<()> {
+        let mut color_attachments = vec![
+            ColorAttachment::new(
+                &ctx.render_texture_views.visibility_data,
+                LoadOp::Clear,
+                StoreOp::Store,
+            )
+            .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
+            ColorAttachment::new(
+                &ctx.render_texture_views.taa_clip_positions[ctx.render_texture_views.curr_index],
+                LoadOp::Clear,
+                StoreOp::Store,
+            ),
+            ColorAttachment::new(
+                &ctx.render_texture_views.geometry_normal,
+                LoadOp::Clear,
+                StoreOp::Store,
+            ),
+        ];
+
+        // Only add separate tangent attachment in full-fidelity mode
+        if ctx.render_texture_views.use_separate_normal_tangent {
+            color_attachments.push(ColorAttachment::new(
+                &ctx.render_texture_views.geometry_tangent,
+                LoadOp::Clear,
+                StoreOp::Store,
+            ));
+        }
+
         let render_pass = ctx.command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 label: Some("Geometry Render Pass"),
-                color_attachments: vec![
-                    ColorAttachment::new(
-                        &ctx.render_texture_views.visibility_data,
-                        LoadOp::Clear,
-                        StoreOp::Store,
-                    )
-                    .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
-                    ColorAttachment::new(
-                        &ctx.render_texture_views.taa_clip_positions
-                            [ctx.render_texture_views.curr_index],
-                        LoadOp::Clear,
-                        StoreOp::Store,
-                    ),
-                ],
+                color_attachments,
                 depth_stencil_attachment: Some(
                     DepthStencilAttachment::new(&ctx.render_texture_views.depth)
                         .with_depth_load_op(LoadOp::Clear)

@@ -232,6 +232,28 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            // Geometry normal texture (world-space normals from geometry pass)
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Texture(
+                    TextureBindingLayout::new()
+                        .with_view_dimension(TextureViewDimension::N2d)
+                        .with_sample_type(TextureSampleType::UnfilterableFloat),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
+            // Geometry tangent texture (world-space tangents from geometry pass)
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Texture(
+                    TextureBindingLayout::new()
+                        .with_view_dimension(TextureViewDimension::N2d)
+                        .with_sample_type(TextureSampleType::UnfilterableFloat),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
         ];
 
         let main_bind_group_layout_key = ctx.bind_group_layouts.get_key(
@@ -445,6 +467,16 @@ impl MaterialOpaqueBindGroups {
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(BufferBinding::new(&ctx.meshes.visibility_data_gpu_buffer())),
+        ));
+        // geometry normal texture
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.geometry_normal)),
+        ));
+        // geometry tangent texture
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.geometry_tangent)),
         ));
 
         let descriptor = BindGroupDescriptor::new(

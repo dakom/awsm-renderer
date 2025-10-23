@@ -5,13 +5,17 @@ struct FragmentInput {
     @location(1) clip_position: vec4<f32>,
     @location(2) @interpolate(flat) triangle_index: u32,
     @location(3) barycentric: vec2<f32>,  // Full barycentric coordinates
+    @location(4) world_normal: vec3<f32>,     // Transformed world-space normal
+    @location(5) world_tangent: vec4<f32>,    // Transformed world-space tangent (w = handedness)
 }
 
 struct FragmentOutput {
     // Ideally RGBA32Float target, possibly RGBA16Float
     @location(0) visibility_data: vec4<f32>,    // triangle_index, material_offset, bary.xy
-    // RGBA16Float
-    @location(1) taa_clip_position: vec4<f32>,      // Exact clip coords for TAA reprojection
+    // RG16Float - xy clip coords only (z in depth buffer, w not needed)
+    @location(1) taa_clip_position: vec2<f32>,      // Exact clip coords for TAA reprojection
+    @location(2) geometry_normal: vec4<f32>,        // xyz = world normal, w unused
+    @location(3) geometry_tangent: vec4<f32>,       // xyzw = world tangent (w = handedness)
 }
 
 @fragment
@@ -35,8 +39,12 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
         input.barycentric.y  // z = 1.0 - x - y
     );
 
-    // Store exact clip position for TAA (not the interpolated @builtin(position))
-    out.taa_clip_position = input.clip_position;
+    // Store exact clip position for TAA (only xy needed, z in depth buffer)
+    out.taa_clip_position = input.clip_position.xy;
+
+    // Store transformed world-space normal and tangent
+    out.geometry_normal = vec4<f32>(normalize(input.world_normal), 0.0);
+    out.geometry_tangent = vec4<f32>(normalize(input.world_tangent.xyz), input.world_tangent.w);
 
     return out;
 }

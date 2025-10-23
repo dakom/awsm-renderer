@@ -148,14 +148,33 @@ fn create_visibility_vertices(
         [0.0, 1.0], // Second vertex: (0, 1, 0) - z = 1-0-1 = 0
         [0.0, 0.0], // Third vertex: (0, 0, 1) - z = 1-0-0 = 1
     ];
+    use crate::mesh::MeshBufferVisibilityVertexAttributeInfo;
+
     // Get positions data
     let positions = attribute_data
         .iter()
         .find_map(|(attr_info, data)| match attr_info {
-            MeshBufferVertexAttributeInfo::Positions { .. } => Some(&data[..]),
+            MeshBufferVertexAttributeInfo::Visibility(MeshBufferVisibilityVertexAttributeInfo::Positions { .. }) => Some(&data[..]),
             _ => None,
         })
         .ok_or_else(|| AwsmGltfError::Positions("missing positions".to_string()))?;
+
+    // Get normals data (ensured to exist by ensure_normals() call)
+    let normals = attribute_data
+        .iter()
+        .find_map(|(attr_info, data)| match attr_info {
+            MeshBufferVertexAttributeInfo::Visibility(MeshBufferVisibilityVertexAttributeInfo::Normals { .. }) => Some(&data[..]),
+            _ => None,
+        })
+        .ok_or_else(|| AwsmGltfError::AttributeData("missing normals".to_string()))?;
+
+    // Get tangents data (optional)
+    let tangents = attribute_data
+        .iter()
+        .find_map(|(attr_info, data)| match attr_info {
+            MeshBufferVertexAttributeInfo::Visibility(MeshBufferVisibilityVertexAttributeInfo::Tangents { .. }) => Some(&data[..]),
+            _ => None,
+        });
 
     // Validate positions buffer (must be Float32x3 format)
     if positions.len() % 12 != 0 {
@@ -163,6 +182,24 @@ fn create_visibility_vertices(
             "Position buffer length ({}) is not a multiple of 12 (3 * f32).",
             positions.len()
         )));
+    }
+
+    // Validate normals buffer (must be Float32x3 format)
+    if normals.len() % 12 != 0 {
+        return Err(AwsmGltfError::AttributeData(format!(
+            "Normal buffer length ({}) is not a multiple of 12 (3 * f32).",
+            normals.len()
+        )));
+    }
+
+    // Validate tangents buffer if present (must be Float32x4 format)
+    if let Some(tangents) = tangents {
+        if tangents.len() % 16 != 0 {
+            return Err(AwsmGltfError::AttributeData(format!(
+                "Tangent buffer length ({}) is not a multiple of 16 (4 * f32).",
+                tangents.len()
+            )));
+        }
     }
 
     // Extract all triangle indices at once
@@ -185,7 +222,17 @@ fn create_visibility_vertices(
             // Get position for this vertex
             let position = get_position_from_buffer(&positions, vertex_index)?;
 
-            // Write vertex data: position (12 bytes) + triangle_index (4 bytes) + barycentric (8 bytes)
+            // Get normal for this vertex
+            let normal = get_vec3_from_buffer(&normals, vertex_index, "normal")?;
+
+            // Get tangent for this vertex (or default to [0, 0, 0, 1])
+            let tangent = if let Some(tangents) = tangents {
+                get_vec4_from_buffer(tangents, vertex_index, "tangent")?
+            } else {
+                [0.0, 0.0, 0.0, 1.0] // Default tangent
+            };
+
+            // Write vertex data: position (12) + triangle_index (4) + barycentric (8) + normal (12) + tangent (16) = 52 bytes
 
             // Position (12 bytes)
             visibility_vertex_bytes.extend_from_slice(&position[0].to_le_bytes());
@@ -198,6 +245,17 @@ fn create_visibility_vertices(
             // Barycentric coordinates (8 bytes)
             visibility_vertex_bytes.extend_from_slice(&bary[0].to_le_bytes());
             visibility_vertex_bytes.extend_from_slice(&bary[1].to_le_bytes());
+
+            // Normal (12 bytes)
+            visibility_vertex_bytes.extend_from_slice(&normal[0].to_le_bytes());
+            visibility_vertex_bytes.extend_from_slice(&normal[1].to_le_bytes());
+            visibility_vertex_bytes.extend_from_slice(&normal[2].to_le_bytes());
+
+            // Tangent (16 bytes)
+            visibility_vertex_bytes.extend_from_slice(&tangent[0].to_le_bytes());
+            visibility_vertex_bytes.extend_from_slice(&tangent[1].to_le_bytes());
+            visibility_vertex_bytes.extend_from_slice(&tangent[2].to_le_bytes());
+            visibility_vertex_bytes.extend_from_slice(&tangent[3].to_le_bytes());
         }
     }
 
@@ -210,7 +268,7 @@ fn get_position_from_buffer(positions: &[u8], vertex_index: usize) -> Result<[f3
     let vertex_count = positions.len() / 12;
     if vertex_index >= vertex_count {
         return Err(AwsmGltfError::Positions(format!(
-            "Position data out of bounds for vertex {}. Buffer has {} vertices ({} bytes), requested vertex {}", 
+            "Position data out of bounds for vertex {}. Buffer has {} vertices ({} bytes), requested vertex {}",
             vertex_index, vertex_count, positions.len(), vertex_index
         )));
     }
@@ -247,4 +305,90 @@ fn get_position_from_buffer(positions: &[u8], vertex_index: usize) -> Result<[f3
     ]);
 
     Ok([x, y, z])
+}
+
+fn get_vec3_from_buffer(buffer: &[u8], vertex_index: usize, name: &str) -> Result<[f32; 3]> {
+    let offset = vertex_index * 12; // 3 f32s = 12 bytes
+
+    let vertex_count = buffer.len() / 12;
+    if vertex_index >= vertex_count {
+        return Err(AwsmGltfError::AttributeData(format!(
+            "{} data out of bounds for vertex {}. Buffer has {} vertices ({} bytes), requested vertex {}",
+            name, vertex_index, vertex_count, buffer.len(), vertex_index
+        )));
+    }
+
+    if offset + 12 > buffer.len() {
+        return Err(AwsmGltfError::AttributeData(format!(
+            "{} data out of bounds for vertex {}. Offset {} + 12 > buffer size {}",
+            name, vertex_index, offset, buffer.len()
+        )));
+    }
+
+    let x = f32::from_le_bytes([
+        buffer[offset],
+        buffer[offset + 1],
+        buffer[offset + 2],
+        buffer[offset + 3],
+    ]);
+    let y = f32::from_le_bytes([
+        buffer[offset + 4],
+        buffer[offset + 5],
+        buffer[offset + 6],
+        buffer[offset + 7],
+    ]);
+    let z = f32::from_le_bytes([
+        buffer[offset + 8],
+        buffer[offset + 9],
+        buffer[offset + 10],
+        buffer[offset + 11],
+    ]);
+
+    Ok([x, y, z])
+}
+
+fn get_vec4_from_buffer(buffer: &[u8], vertex_index: usize, name: &str) -> Result<[f32; 4]> {
+    let offset = vertex_index * 16; // 4 f32s = 16 bytes
+
+    let vertex_count = buffer.len() / 16;
+    if vertex_index >= vertex_count {
+        return Err(AwsmGltfError::AttributeData(format!(
+            "{} data out of bounds for vertex {}. Buffer has {} vertices ({} bytes), requested vertex {}",
+            name, vertex_index, vertex_count, buffer.len(), vertex_index
+        )));
+    }
+
+    if offset + 16 > buffer.len() {
+        return Err(AwsmGltfError::AttributeData(format!(
+            "{} data out of bounds for vertex {}. Offset {} + 16 > buffer size {}",
+            name, vertex_index, offset, buffer.len()
+        )));
+    }
+
+    let x = f32::from_le_bytes([
+        buffer[offset],
+        buffer[offset + 1],
+        buffer[offset + 2],
+        buffer[offset + 3],
+    ]);
+    let y = f32::from_le_bytes([
+        buffer[offset + 4],
+        buffer[offset + 5],
+        buffer[offset + 6],
+        buffer[offset + 7],
+    ]);
+    let z = f32::from_le_bytes([
+        buffer[offset + 8],
+        buffer[offset + 9],
+        buffer[offset + 10],
+        buffer[offset + 11],
+    ]);
+    let w = f32::from_le_bytes([
+        buffer[offset + 12],
+        buffer[offset + 13],
+        buffer[offset + 14],
+        buffer[offset + 15],
+    ]);
+
+    Ok([x, y, z, w])
 }

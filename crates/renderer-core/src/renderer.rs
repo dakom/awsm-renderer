@@ -119,6 +119,7 @@ pub struct DeviceRequestLimits {
     pub max_sampled_textures_per_shader_stage: bool,
     pub max_buffer_size: bool,
     pub max_bind_groups: bool,
+    pub max_storage_buffer_binding_size: bool,
 }
 
 impl DeviceRequestLimits {
@@ -130,6 +131,14 @@ impl DeviceRequestLimits {
             max_sampled_textures_per_shader_stage: true,
             max_buffer_size: true,
             max_bind_groups: true,
+            max_storage_buffer_binding_size: true,
+        }
+    }
+
+    pub fn max_storage_buffer_binding_size() -> Self {
+        Self {
+            max_storage_buffer_binding_size: true,
+            ..Default::default()
         }
     }
 
@@ -181,6 +190,14 @@ impl DeviceRequestLimits {
                 &obj,
                 &"maxBufferSize".into(),
                 &JsValue::from_f64(limits.max_buffer_size()),
+            )
+            .unwrap();
+        }
+        if self.max_storage_buffer_binding_size {
+            js_sys::Reflect::set(
+                &obj,
+                &"maxStorageBufferBindingSize".into(),
+                &JsValue::from_f64(limits.max_storage_buffer_binding_size() as f64),
             )
             .unwrap();
         }

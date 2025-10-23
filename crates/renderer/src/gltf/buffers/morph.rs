@@ -8,7 +8,7 @@ use crate::gltf::buffers::{
     MeshBufferMaterialMorphInfoWithOffset,
 };
 use crate::gltf::error::{AwsmGltfError, Result};
-use crate::mesh::{MeshBufferMaterialMorphAttributes, MeshBufferVertexAttributeInfo};
+use crate::mesh::{MeshBufferMaterialMorphAttributes, MeshBufferVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo};
 
 /// Converts GLTF morph targets into separate geometry and material buffers
 ///
@@ -213,19 +213,23 @@ pub(super) fn convert_morph_targets(
                 // Push material attributes in consistent order FOR THIS TARGET
                 if morph_attributes.normal {
                     push_material_morph_data(
-                        MeshBufferVertexAttributeInfo::Normals {
-                            data_size: 4,     // f32
-                            component_len: 3, // vec3
-                        },
+                        MeshBufferVertexAttributeInfo::Visibility(
+                            MeshBufferVisibilityVertexAttributeInfo::Normals {
+                                data_size: 4,     // f32
+                                component_len: 3, // vec3
+                            },
+                        ),
                         morph_target_buffer_data.normals.as_ref(),
                     )?;
                 }
                 if morph_attributes.tangent {
                     push_material_morph_data(
-                        MeshBufferVertexAttributeInfo::Tangents {
-                            data_size: 4,     // f32
-                            component_len: 3, // vec3
-                        },
+                        MeshBufferVertexAttributeInfo::Visibility(
+                            MeshBufferVisibilityVertexAttributeInfo::Tangents {
+                                data_size: 4,     // f32
+                                component_len: 3, // vec3
+                            },
+                        ),
                         morph_target_buffer_data.tangents.as_ref(),
                     )?;
                 }

@@ -1,4 +1,4 @@
-use crate::mesh::{MeshBufferInfo, MeshBufferVertexAttributeInfo};
+use crate::mesh::{MeshBufferInfo, MeshBufferVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo, MeshBufferCustomVertexAttributeInfo};
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ShaderMaterialOpaqueVertexAttributes {
@@ -16,32 +16,54 @@ impl From<&MeshBufferInfo> for ShaderMaterialOpaqueVertexAttributes {
     fn from(mesh_buffer_info: &MeshBufferInfo) -> Self {
         let mut _self = Self::default();
 
+        // NOTE: We iterate over ALL attributes (including visibility attributes like positions/normals/tangents)
+        // to detect their *presence* on the mesh. However, visibility attributes are NOT stored in the
+        // attribute_data buffer - they go in visibility_data and geometry textures instead.
+        //
+        // The shader template uses these flags differently:
+        // - normals/tangents presence is used for validation (pbr_should_run checks)
+        // - BUT they are NOT included in uv_sets_index calculation since they're not in attribute_data
+        //
+        // Only custom attributes (colors, UVs, joints, weights) affect the attribute_data layout.
+
         for attr in &mesh_buffer_info.triangles.vertex_attributes {
             match attr {
-                MeshBufferVertexAttributeInfo::Positions { .. } => {
-                    // not part of material shader requiremenets
-                }
-                MeshBufferVertexAttributeInfo::Normals { .. } => {
-                    _self.normals = true;
-                }
-                MeshBufferVertexAttributeInfo::Tangents { .. } => {
-                    _self.tangents = true;
-                }
-                MeshBufferVertexAttributeInfo::Colors { count, .. } => {
-                    _self.color_sets = Some(*count + 1);
-                }
-                MeshBufferVertexAttributeInfo::TexCoords { count, .. } => {
-                    // `count` is the zero-based TEXCOORD set index from glTF,
-                    // so promote it to a human-friendly "number of sets".
-                    // `pbr_should_run` compares this against the texture metadata.
-                    _self.uv_sets = Some(*count + 1);
-                }
-                MeshBufferVertexAttributeInfo::Joints { .. } => {
-                    // not part of material shader requirements
-                }
-                MeshBufferVertexAttributeInfo::Weights { .. } => {
-                    // not part of material shader requirements
-                }
+                MeshBufferVertexAttributeInfo::Visibility(vis) => match vis {
+                    MeshBufferVisibilityVertexAttributeInfo::Positions { .. } => {
+                        // Visibility attribute - goes in visibility_data buffer, not attribute_data
+                    }
+                    MeshBufferVisibilityVertexAttributeInfo::Normals { .. } => {
+                        // Visibility attribute - goes in visibility_data buffer, not attribute_data
+                        // We still track its presence for shader validation
+                        _self.normals = true;
+                    }
+                    MeshBufferVisibilityVertexAttributeInfo::Tangents { .. } => {
+                        // Visibility attribute - goes in visibility_data buffer, not attribute_data
+                        // We still track its presence for shader validation
+                        _self.tangents = true;
+                    }
+                },
+                MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
+                    MeshBufferCustomVertexAttributeInfo::Colors { count, .. } => {
+                        // Custom attribute - goes in attribute_data buffer
+                        _self.color_sets = Some(*count + 1);
+                    }
+                    MeshBufferCustomVertexAttributeInfo::TexCoords { count, .. } => {
+                        // Custom attribute - goes in attribute_data buffer
+                        // `count` is the zero-based TEXCOORD set index from glTF,
+                        // so promote it to a human-friendly "number of sets".
+                        // `pbr_should_run` compares this against the texture metadata.
+                        _self.uv_sets = Some(*count + 1);
+                    }
+                    MeshBufferCustomVertexAttributeInfo::Joints { .. } => {
+                        // Custom attribute - goes in attribute_data buffer
+                        // Not currently used in material shader offset calculations
+                    }
+                    MeshBufferCustomVertexAttributeInfo::Weights { .. } => {
+                        // Custom attribute - goes in attribute_data buffer
+                        // Not currently used in material shader offset calculations
+                    }
+                },
             }
         }
 

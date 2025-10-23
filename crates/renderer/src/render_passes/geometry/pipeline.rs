@@ -71,33 +71,52 @@ impl GeometryPipelines {
             .with_front_face(FrontFace::Ccw)
             .with_cull_mode(CullMode::None);
 
-        let color_targets = [
+        let mut color_targets = vec![
             ColorTargetState::new(ctx.render_texture_formats.visiblity_data),
             ColorTargetState::new(ctx.render_texture_formats.taa_clip_position),
+            ColorTargetState::new(ctx.render_texture_formats.geometry_normal),
         ];
+
+        // Only add separate tangent target in full-fidelity mode
+        if ctx.render_texture_formats.use_separate_normal_tangent {
+            color_targets.push(ColorTargetState::new(ctx.render_texture_formats.geometry_tangent));
+        }
 
         let vertex_buffer_layout = VertexBufferLayout {
             // this is the stride across all of the attributes
+            // position (12) + triangle_index (4) + barycentric (8) + normal (12) + tangent (16) = 52 bytes
             array_stride: MeshBufferVertexInfo::BYTE_SIZE as u64,
             step_mode: None,
             attributes: vec![
-                // Position (vec3<f32>)
+                // Position (vec3<f32>) at offset 0
                 VertexAttribute {
                     format: VertexFormat::Float32x3,
                     offset: 0,
                     shader_location: 0,
                 },
-                // Triangle ID (u32)
+                // Triangle ID (u32) at offset 12
                 VertexAttribute {
                     format: VertexFormat::Uint32,
                     offset: 12,
                     shader_location: 1,
                 },
-                // Barycentric coordinates (vec2<f32>)
+                // Barycentric coordinates (vec2<f32>) at offset 16
                 VertexAttribute {
                     format: VertexFormat::Float32x2,
                     offset: 16,
                     shader_location: 2,
+                },
+                // Normal (vec3<f32>) at offset 24
+                VertexAttribute {
+                    format: VertexFormat::Float32x3,
+                    offset: 24,
+                    shader_location: 3,
+                },
+                // Tangent (vec4<f32>) at offset 36
+                VertexAttribute {
+                    format: VertexFormat::Float32x4,
+                    offset: 36,
+                    shader_location: 4,
                 },
             ],
         };
@@ -115,55 +134,55 @@ impl GeometryPipelines {
                 .push(VertexAttribute {
                     format: VertexFormat::Float32x4,
                     offset: i * 16,
-                    shader_location: 3 + i as u32,
+                    shader_location: 5 + i as u32,  // Locations 5-8 (after normal at 3 and tangent at 4)
                 });
         }
+
+        let depth_stencil = DepthStencilState::new(ctx.render_texture_formats.depth)
+            .with_depth_write_enabled(true)
+            .with_depth_compare(CompareFunction::LessEqual);
 
         let mut pipeline_cache_key_cull_back =
             RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
                 .with_primitive(primitive_state_cull_back.clone())
                 .with_push_vertex_buffer_layout(vertex_buffer_layout.clone())
-                .with_depth_stencil(
-                    DepthStencilState::new(ctx.render_texture_formats.depth)
-                        .with_depth_write_enabled(true)
-                        .with_depth_compare(CompareFunction::LessEqual),
-                )
-                .with_push_fragment_targets(color_targets.clone());
+                .with_depth_stencil(depth_stencil.clone());
+
+        for target in &color_targets {
+            pipeline_cache_key_cull_back = pipeline_cache_key_cull_back.with_push_fragment_targets(vec![target.clone()]);
+        }
 
         let mut pipeline_cache_key_cull_back_instancing =
             RenderPipelineCacheKey::new(shader_key_instancing, pipeline_layout_key)
                 .with_primitive(primitive_state_cull_back)
                 .with_push_vertex_buffer_layout(vertex_buffer_layout.clone())
                 .with_push_vertex_buffer_layout(vertex_buffer_layout_instancing.clone())
-                .with_depth_stencil(
-                    DepthStencilState::new(ctx.render_texture_formats.depth)
-                        .with_depth_write_enabled(true)
-                        .with_depth_compare(CompareFunction::LessEqual),
-                )
-                .with_push_fragment_targets(color_targets.clone());
+                .with_depth_stencil(depth_stencil.clone());
+
+        for target in &color_targets {
+            pipeline_cache_key_cull_back_instancing = pipeline_cache_key_cull_back_instancing.with_push_fragment_targets(vec![target.clone()]);
+        }
 
         let mut pipeline_cache_key_cull_none =
             RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
                 .with_primitive(primitive_state_cull_none.clone())
                 .with_push_vertex_buffer_layout(vertex_buffer_layout.clone())
-                .with_depth_stencil(
-                    DepthStencilState::new(ctx.render_texture_formats.depth)
-                        .with_depth_write_enabled(true)
-                        .with_depth_compare(CompareFunction::LessEqual),
-                )
-                .with_push_fragment_targets(color_targets.clone());
+                .with_depth_stencil(depth_stencil.clone());
+
+        for target in &color_targets {
+            pipeline_cache_key_cull_none = pipeline_cache_key_cull_none.with_push_fragment_targets(vec![target.clone()]);
+        }
 
         let mut pipeline_cache_key_cull_none_instancing =
             RenderPipelineCacheKey::new(shader_key_instancing, pipeline_layout_key)
                 .with_primitive(primitive_state_cull_none)
                 .with_push_vertex_buffer_layout(vertex_buffer_layout)
                 .with_push_vertex_buffer_layout(vertex_buffer_layout_instancing)
-                .with_depth_stencil(
-                    DepthStencilState::new(ctx.render_texture_formats.depth)
-                        .with_depth_write_enabled(true)
-                        .with_depth_compare(CompareFunction::LessEqual),
-                )
-                .with_push_fragment_targets(color_targets);
+                .with_depth_stencil(depth_stencil);
+
+        for target in &color_targets {
+            pipeline_cache_key_cull_none_instancing = pipeline_cache_key_cull_none_instancing.with_push_fragment_targets(vec![target.clone()]);
+        }
 
         let render_pipeline_key_cull_back = ctx
             .pipelines

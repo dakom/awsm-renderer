@@ -18,7 +18,10 @@ pub struct RenderTextureFormats {
     pub visiblity_data: TextureFormat,
     pub taa_clip_position: TextureFormat,
     pub geometry_normal: TextureFormat,  // Transformed normals with morphs/skins
-    pub geometry_tangent: TextureFormat, // Transformed tangents with morphs/skins
+    pub geometry_tangent: TextureFormat, // Transformed tangents with morphs/skins (or None if packed)
+
+    // Feature flags
+    pub use_separate_normal_tangent: bool, // true = full fidelity, false = octahedral packed
 
     // Output from opaque shading pass
     pub opaque_color: TextureFormat,
@@ -57,11 +60,48 @@ impl RenderTextureFormats {
                 Err(_) => TextureFormat::Rgba16float,
             }
         };
+
+        // Detect color attachment byte limit
+        // Try to get limits from device (defaulting to 32 if unavailable)
+        let max_color_attachment_bytes_per_sample = {
+            let limits = device.limits();
+            // Try to use the web_sys API getter (requires unstable APIs enabled)
+            limits.max_color_attachment_bytes_per_sample()
+        };
+
+        // Calculate bytes for full-fidelity mode:
+        // visibility_data (RGBA32Float=16) + taa_clip (RG16Float=4) + normal (RGBA16Float=8) + tangent (RGBA16Float=8) = 36 bytes
+        let full_fidelity_bytes = 16 + 4 + 8 + 8; // actual_rgba32_format size + 4 + 8 + 8
+
+        let use_separate_normal_tangent = max_color_attachment_bytes_per_sample >= full_fidelity_bytes;
+
+        // Log which mode was selected (can be viewed in browser console)
+        // Full fidelity: 36 bytes (separate normal + tangent textures)
+        // Packed: 28 bytes (octahedral encoding)
+
+        let (geometry_normal, geometry_tangent) = if use_separate_normal_tangent {
+            // Full fidelity mode - separate textures
+            (
+                TextureFormat::Rgba16float,  // xyz = normal, w unused
+                TextureFormat::Rgba16float,  // xyzw = tangent (w = handedness)
+            )
+        } else {
+            // Packed mode - octahedral encoding
+            // visibility_data (16) + taa_clip (4) + normal_tangent_packed (8) = 28 bytes
+            // TODO: Implement octahedral encoding/decoding shaders
+            // For now, this will fail at runtime if triggered
+            (
+                TextureFormat::Rgba16float,  // xy = octahedral normal, z = tangent handedness, w unused
+                TextureFormat::Rgba16float,  // Unused, but kept for API consistency
+            )
+        };
+
         Self {
             visiblity_data: actual_rgba32_format,
-            taa_clip_position: TextureFormat::Rgba16float,
-            geometry_normal: TextureFormat::Rgba16float,  // xyz = normal, w unused
-            geometry_tangent: TextureFormat::Rgba16float, // xyzw = tangent (w = handedness)
+            taa_clip_position: TextureFormat::Rg16float,  // xy clip coords only (z in depth buffer)
+            geometry_normal,
+            geometry_tangent,
+            use_separate_normal_tangent,
             opaque_color: TextureFormat::Rgba16float,     // HDR format for bloom/tonemapping
             oit_rgb: TextureFormat::Rgba16float,          // HDR format for bloom/tonemapping
             oit_alpha: TextureFormat::R32float,           // Alpha channel for OIT
@@ -122,6 +162,7 @@ impl RenderTextures {
             current_size.0,
             current_size.1,
             size_changed,
+            self.formats.use_separate_normal_tangent,
         ))
     }
 
@@ -143,6 +184,9 @@ pub struct RenderTextureViews {
     pub taa_clip_positions: [web_sys::GpuTextureView; 2],
     pub geometry_normal: web_sys::GpuTextureView,
     pub geometry_tangent: web_sys::GpuTextureView,
+
+    // Feature flags
+    pub use_separate_normal_tangent: bool,
 
     // Output from opaque shading pass
     pub opaque_color: web_sys::GpuTextureView,
@@ -169,6 +213,7 @@ impl RenderTextureViews {
         width: u32,
         height: u32,
         size_changed: bool,
+        use_separate_normal_tangent: bool,
     ) -> Self {
         let curr_index = if ping_pong { 0 } else { 1 };
         let prev_index = if ping_pong { 1 } else { 0 };
@@ -177,6 +222,7 @@ impl RenderTextureViews {
             taa_clip_positions: inner.taa_clip_position_views.clone(),
             geometry_normal: inner.geometry_normal_view.clone(),
             geometry_tangent: inner.geometry_tangent_view.clone(),
+            use_separate_normal_tangent,
             opaque_color: inner.opaque_color_view.clone(),
             oit_rgb: inner.oit_rgb_view.clone(),
             oit_alpha: inner.oit_alpha_view.clone(),

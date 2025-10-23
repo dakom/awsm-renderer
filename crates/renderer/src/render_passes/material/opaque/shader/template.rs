@@ -31,16 +31,26 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
     type Error = AwsmShaderError;
 
     fn try_from(value: &ShaderCacheKeyMaterialOpaque) -> Result<Self> {
-        // see `impl Ord for MeshBufferVertexAttributeInfo`
-        // for ordering here
+        // Calculate the offset (in floats) to the first UV set within the packed custom attribute data.
         //
+        // IMPORTANT: Normals and tangents are NO LONGER in attribute_data - they go in the visibility
+        // buffer and geometry textures. Only custom attributes (colors, UVs, joints, weights) are in
+        // attribute_data.
+        //
+        // The ordering follows `impl Ord for MeshBufferVertexAttributeInfo`:
+        // - Positions (0) - visibility attribute, NOT in attribute_data
+        // - Normals (1) - visibility attribute, NOT in attribute_data
+        // - Tangents (2) - visibility attribute, NOT in attribute_data
+        // - Colors (3) - custom attribute, IN attribute_data
+        // - TexCoords (4) - custom attribute, IN attribute_data
+        // - Joints (5) - custom attribute, IN attribute_data
+        // - Weights (6) - custom attribute, IN attribute_data
+        //
+        // So uv_sets_index calculation starts at 0 and only adds offsets for custom attributes
+        // that come before TexCoords in the ordering.
+
         let mut uv_sets_index = 0;
-        if value.attributes.normals {
-            uv_sets_index += 3; // normals always consume 3 floats
-        }
-        if value.attributes.tangents {
-            uv_sets_index += 4; // tangents use 4 floats
-        }
+        // Colors come before TexCoords (3 < 4), so they affect the UV offset
         uv_sets_index += (value.attributes.color_sets.unwrap_or(0) * 4) as u32; // colors use 4 floats each
 
         let _self = Self {

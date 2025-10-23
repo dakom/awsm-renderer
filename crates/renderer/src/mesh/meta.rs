@@ -33,7 +33,10 @@ use crate::{
     transforms::{TransformKey, Transforms},
 };
 
-pub const MESH_META_INITIAL_CAPACITY: usize = 1024;
+// Reduced from 1024 to stay under 128MB default storage buffer limit.
+// Initial visibility buffer size = 512 * 3 * 1000 * 52 = ~76MB
+// This is conservative; buffer will grow dynamically as needed.
+pub const MESH_META_INITIAL_CAPACITY: usize = 512;
 
 pub struct MeshMeta {
     // meta data buffers
