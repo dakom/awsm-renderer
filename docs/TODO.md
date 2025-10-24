@@ -6,6 +6,7 @@
 
 # Bring back TAA
 - Very obvious on MorphStressTest
+- Also lines on EmissiveStrength
 
 # Transparent material pass
 - like opaque
