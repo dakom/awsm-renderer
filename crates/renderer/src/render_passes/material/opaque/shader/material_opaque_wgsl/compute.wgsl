@@ -80,18 +80,21 @@ struct CameraUniform {
 @group(0) @binding(12) var ibl_filtered_env_sampler: sampler;
 @group(0) @binding(13) var ibl_irradiance_tex: texture_cube<f32>;
 @group(0) @binding(14) var ibl_irradiance_sampler: sampler;
-@group(0) @binding(15) var<uniform> ibl_info: IblInfo;
-@group(0) @binding(16) var brdf_lut_tex: texture_2d<f32>;
-@group(0) @binding(17) var brdf_lut_sampler: sampler;
-@group(0) @binding(18) var depth_tex: texture_depth_2d;
-@group(0) @binding(19) var<storage, read> visibility_data: array<f32>;
-@group(0) @binding(20) var geometry_normal_tex: texture_2d<f32>;
-@group(0) @binding(21) var geometry_tangent_tex: texture_2d<f32>;
+@group(0) @binding(15) var brdf_lut_tex: texture_2d<f32>;
+@group(0) @binding(16) var brdf_lut_sampler: sampler;
+@group(0) @binding(17) var depth_tex: texture_depth_2d;
+@group(0) @binding(18) var<storage, read> visibility_data: array<f32>;
+@group(0) @binding(19) var geometry_normal_tex: texture_2d<f32>;
+@group(0) @binding(20) var geometry_tangent_tex: texture_2d<f32>;
+
+@group(1) @binding(0) var<uniform> lights_info: LightsInfoPacked;
+@group(1) @binding(1) var<storage, read> lights: array<LightPacked>;
+
 {% for i in 0..texture_atlas_len %}
-    @group(1) @binding({{ i }}u) var atlas_tex_{{ i }}: texture_2d_array<f32>;
+    @group(2) @binding({{ i }}u) var atlas_tex_{{ i }}: texture_2d_array<f32>;
 {% endfor %}
 {% for i in 0..sampler_atlas_len %}
-    @group(2) @binding({{ i }}u) var atlas_sampler_{{ i }}: sampler;
+    @group(3) @binding({{ i }}u) var atlas_sampler_{{ i }}: sampler;
 {% endfor %}
 
 
@@ -150,8 +153,9 @@ fn main(
     // Load world-space normal directly from geometry pass output (already transformed with morphs/skins)
     let world_normal = textureLoad(geometry_normal_tex, coords, 0).xyz;
 
-
     let os_vertices = get_object_space_vertices(visibility_data_offset, triangle_index);
+
+    let lights_info = get_lights_info();
 
     {% match mipmap %}
         {% when MipmapMode::None %}
@@ -209,43 +213,60 @@ fn main(
 
     var color = vec3<f32>(0.0);
 
-    {% if debug.ibl_only %}
-        // IBL only - skip direct lighting to isolate the issue
-        color = brdf_ibl(
-            material_color,
-            material_color.normal,
-            standard_coordinates.surface_to_camera,
-            ibl_filtered_env_tex,
-            ibl_filtered_env_sampler,
-            ibl_irradiance_tex,
-            ibl_irradiance_sampler,
-            brdf_lut_tex,
-            brdf_lut_sampler,
-            ibl_info
-        );
-    {% else %}
-        // Direct lighting: accumulate contributions from all lights
-        // Note: Hardcoded to 4 lights (see lights.wgsl for definitions)
-        let n_lights = 4u;
-        for(var i = 0u; i < n_lights; i = i + 1u) {
-            let light_brdf = light_to_brdf(get_light(i), material_color.normal, standard_coordinates.world_position);
-            color += brdf_direct(material_color, light_brdf, standard_coordinates.surface_to_camera);
-        }
+    {% match debug.lighting %}
+        {% when ShaderTemplateMaterialOpaqueDebugLighting::None | ShaderTemplateMaterialOpaqueDebugLighting::IblOnly %}
+            color = brdf_ibl(
+                material_color,
+                material_color.normal,
+                standard_coordinates.surface_to_camera,
+                ibl_filtered_env_tex,
+                ibl_filtered_env_sampler,
+                ibl_irradiance_tex,
+                ibl_irradiance_sampler,
+                brdf_lut_tex,
+                brdf_lut_sampler,
+                lights_info.ibl
+            );
+        {% when _ %}
+    {% endmatch %}
 
-        // Indirect lighting: IBL contribution (includes emissive)
-        color += brdf_ibl(
-            material_color,
-            material_color.normal,
-            standard_coordinates.surface_to_camera,
-            ibl_filtered_env_tex,
-            ibl_filtered_env_sampler,
-            ibl_irradiance_tex,
-            ibl_irradiance_sampler,
-            brdf_lut_tex,
-            brdf_lut_sampler,
-            ibl_info
-        );
-    {% endif %}
+    {% match debug.lighting %}
+        {% when ShaderTemplateMaterialOpaqueDebugLighting::None | ShaderTemplateMaterialOpaqueDebugLighting::PunctualOnly %}
+            // Punctual lighting: accumulate contributions from all lights
+            for(var i = 0u; i < lights_info.n_lights; i = i + 1u) {
+                let light_brdf = light_to_brdf(get_light(i), material_color.normal, standard_coordinates.world_position);
+                color += brdf_direct(material_color, light_brdf, standard_coordinates.surface_to_camera);
+            }
+        {% when _ %}
+    {% endmatch %}
+
+    {% match debug.lighting %}
+        {% when ShaderTemplateMaterialOpaqueDebugLighting::HardcodedPunctualOnly %}
+            for(var i = 0u; i < lights_info.n_lights; i = i + 1u) {
+                var light: Light;
+                switch(i) {
+                    case 0u: {
+                        light = Light(
+                            1u, // Directional
+                            vec3<f32>(1.0, 1.0, 1.0), // color
+                            1.0, // intensity
+                            vec3<f32>(0.0, 0.0, 0.0), // position
+                            0.0, // range
+                            vec3<f32>(-1.0, -0.5, -0.1), // direction
+                            0.0, // inner_cone
+                            0.0  // outer_cone
+                        );
+                    }
+                    default: {
+                        // no light
+                        light = Light(0u, vec3<f32>(0.0), 0.0, vec3<f32>(0.0), 0.0, vec3<f32>(0.0), 0.0, 0.0);
+                    }
+                }
+                let light_brdf = light_to_brdf(light, material_color.normal, standard_coordinates.world_position);
+                color += brdf_direct(material_color, light_brdf, standard_coordinates.surface_to_camera);
+            }
+        {% when _ %}
+    {% endmatch %}
 
     {% if debug.mips %}
         let i = i32(floor(texture_lods.base_color + 0.5)); // nearest mip

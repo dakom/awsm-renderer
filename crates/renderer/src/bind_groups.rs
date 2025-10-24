@@ -43,8 +43,9 @@ pub struct BindGroupRecreateContext<'a> {
 pub enum BindGroupCreate {
     CameraInitOnly,
     LightsResize,
-    IblCreate,
-    BrdfLutCreate,
+    LightsInfoCreate,
+    BrdfLutTextures,
+    IblTextures,
     EnvironmentSkyboxCreate,
     TransformsResize,
     TransformNormalsResize,
@@ -88,117 +89,153 @@ impl BindGroups {
             return Ok(());
         }
 
-        if self.create_list.contains(&BindGroupCreate::CameraInitOnly)
-            || self.create_list.contains(&BindGroupCreate::LightsResize)
-        {
-            render_passes
-                .geometry
-                .bind_groups
-                .camera_lights
-                .recreate(&ctx)?;
+        #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
+        enum FunctionToCall {
+            GeometryCamera,
+            GeometryTransformMaterials,
+            GeometryMeta,
+            GeometryAnimation,
+            OpaqueMain,
+            OpaqueLights,
+            OpaqueTextures,
+            OpaqueSamplers,
+            TransparentMain,
+            LightCulling,
+            Composite,
+            Display,
         }
 
-        if self
-            .create_list
-            .contains(&BindGroupCreate::TransformsResize)
-            || self
-                .create_list
-                .contains(&BindGroupCreate::PbrMaterialResize)
-        {
-            render_passes
-                .geometry
-                .bind_groups
-                .transform_materials
-                .recreate(&ctx)?;
+        let mut functions_to_call = HashSet::new();
+
+        for create in self.create_list.drain() {
+            match create {
+                BindGroupCreate::CameraInitOnly => {
+                    functions_to_call.insert(FunctionToCall::GeometryCamera);
+                }
+                BindGroupCreate::LightsInfoCreate => {
+                    functions_to_call.insert(FunctionToCall::OpaqueLights);
+                }
+                BindGroupCreate::LightsResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueLights);
+                }
+                BindGroupCreate::TransformsResize => {
+                    functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
+                }
+                BindGroupCreate::PbrMaterialResize => {
+                    functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
+                }
+                BindGroupCreate::GeometryMeshMetaResize => {
+                    functions_to_call.insert(FunctionToCall::GeometryMeta);
+                }
+                BindGroupCreate::GeometryMorphTargetWeightsResize
+                | BindGroupCreate::GeometryMorphTargetValuesResize
+                | BindGroupCreate::SkinJointMatricesResize
+                | BindGroupCreate::SkinJointIndexAndWeightsResize => {
+                    functions_to_call.insert(FunctionToCall::GeometryAnimation);
+                }
+                BindGroupCreate::TextureViewResize => {
+                    functions_to_call.insert(FunctionToCall::LightCulling);
+                    functions_to_call.insert(FunctionToCall::Composite);
+                    functions_to_call.insert(FunctionToCall::Display);
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                }
+                BindGroupCreate::MegaTexture => {
+                    functions_to_call.insert(FunctionToCall::OpaqueTextures);
+                    functions_to_call.insert(FunctionToCall::OpaqueSamplers);
+                }
+                BindGroupCreate::BrdfLutTextures => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                }
+                BindGroupCreate::IblTextures => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                }
+                BindGroupCreate::EnvironmentSkyboxCreate => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                }
+                BindGroupCreate::TransformNormalsResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                }
+                BindGroupCreate::MaterialMorphTargetWeightsResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                }
+                BindGroupCreate::MaterialMorphTargetValuesResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                }
+                BindGroupCreate::MaterialMeshMetaResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                }
+                BindGroupCreate::MeshAttributeDataResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                }
+                BindGroupCreate::MeshAttributeIndexResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                }
+            }
         }
 
-        if self
-            .create_list
-            .contains(&BindGroupCreate::GeometryMeshMetaResize)
-        {
-            render_passes.geometry.bind_groups.meta.recreate(&ctx)?;
+        for f in functions_to_call {
+            match f {
+                FunctionToCall::GeometryCamera => {
+                    render_passes.geometry.bind_groups.camera.recreate(&ctx)?;
+                }
+                FunctionToCall::GeometryTransformMaterials => {
+                    render_passes
+                        .geometry
+                        .bind_groups
+                        .transform_materials
+                        .recreate(&ctx)?;
+                }
+                FunctionToCall::GeometryMeta => {
+                    render_passes.geometry.bind_groups.meta.recreate(&ctx)?;
+                }
+                FunctionToCall::GeometryAnimation => {
+                    render_passes
+                        .geometry
+                        .bind_groups
+                        .animation
+                        .recreate(&ctx)?;
+                }
+                FunctionToCall::OpaqueMain => {
+                    render_passes
+                        .material_opaque
+                        .bind_groups
+                        .recreate_main(&ctx)?;
+                }
+                FunctionToCall::OpaqueLights => {
+                    render_passes
+                        .material_opaque
+                        .bind_groups
+                        .recreate_lights(&ctx)?;
+                }
+                FunctionToCall::OpaqueTextures => {
+                    render_passes
+                        .material_opaque
+                        .bind_groups
+                        .recreate_textures(&ctx)?;
+                }
+                FunctionToCall::OpaqueSamplers => {
+                    render_passes
+                        .material_opaque
+                        .bind_groups
+                        .recreate_samplers(&ctx)?;
+                }
+                FunctionToCall::TransparentMain => {
+                    render_passes
+                        .material_transparent
+                        .bind_groups
+                        .recreate(&ctx)?;
+                }
+                FunctionToCall::LightCulling => {
+                    render_passes.light_culling.bind_groups.recreate(&ctx)?;
+                }
+                FunctionToCall::Composite => {
+                    render_passes.composite.bind_groups.recreate(&ctx)?;
+                }
+                FunctionToCall::Display => {
+                    render_passes.display.bind_groups.recreate(&ctx)?;
+                }
+            }
         }
-
-        if self
-            .create_list
-            .contains(&BindGroupCreate::GeometryMorphTargetWeightsResize)
-            || self
-                .create_list
-                .contains(&BindGroupCreate::GeometryMorphTargetValuesResize)
-            || self
-                .create_list
-                .contains(&BindGroupCreate::SkinJointMatricesResize)
-            || self
-                .create_list
-                .contains(&BindGroupCreate::SkinJointIndexAndWeightsResize)
-        {
-            render_passes
-                .geometry
-                .bind_groups
-                .animation
-                .recreate(&ctx)?;
-        }
-
-        if self
-            .create_list
-            .contains(&BindGroupCreate::TextureViewResize)
-        {
-            // material passes are also recreated on render texture changes
-            render_passes.light_culling.bind_groups.recreate(&ctx)?;
-            render_passes.composite.bind_groups.recreate(&ctx)?;
-            render_passes.display.bind_groups.recreate(&ctx)?;
-        }
-
-        if self.create_list.contains(&BindGroupCreate::MegaTexture) {
-            render_passes
-                .material_opaque
-                .bind_groups
-                .recreate_textures(&ctx)?;
-            render_passes
-                .material_opaque
-                .bind_groups
-                .recreate_samplers(&ctx)?;
-        }
-
-        if self
-            .create_list
-            .contains(&BindGroupCreate::TextureViewResize)
-            || self
-                .create_list
-                .contains(&BindGroupCreate::EnvironmentSkyboxCreate)
-            || self.create_list.contains(&BindGroupCreate::IblCreate)
-            || self
-                .create_list
-                .contains(&BindGroupCreate::MaterialMeshMetaResize)
-            || self.create_list.contains(&BindGroupCreate::MegaTexture)
-            || self
-                .create_list
-                .contains(&BindGroupCreate::PbrMaterialResize)
-            || self
-                .create_list
-                .contains(&BindGroupCreate::MaterialMorphTargetWeightsResize)
-            || self
-                .create_list
-                .contains(&BindGroupCreate::MaterialMorphTargetValuesResize)
-            || self
-                .create_list
-                .contains(&BindGroupCreate::TransformsResize)
-            || self
-                .create_list
-                .contains(&BindGroupCreate::TransformNormalsResize)
-            || self.create_list.contains(&BindGroupCreate::BrdfLutCreate)
-        {
-            render_passes
-                .material_opaque
-                .bind_groups
-                .recreate_main(&ctx)?;
-            render_passes
-                .material_transparent
-                .bind_groups
-                .recreate(&ctx)?;
-        }
-
-        self.create_list.clear();
 
         Ok(())
     }

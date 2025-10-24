@@ -17,6 +17,10 @@
   - research best practices
   - should optimize for opaque pass (i.e. only light fragments that made it to the screen?)
 
+- optimize wgsl structs
+  - use FooPacked (or FooRaw) and members should be vec4
+  - e.g. MeshMeta, Lights, etc. (some may already be done)
+
 - get rid of 256 byte alignment for mesh meta?
   - maybe only necessary for uniforms?
 

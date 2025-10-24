@@ -31,10 +31,12 @@ impl AwsmRenderer {
     pub async fn finalize_gpu_textures(&mut self) -> std::result::Result<(), AwsmError> {
         let was_dirty = self
             .textures
-            .write_gpu_textures(&self.logging, &self.gpu)
+            .write_gpu_megatexture(&self.logging, &self.gpu)
             .await?;
 
         if was_dirty {
+            // If the mega texture was changed on the GPU, we need to recreate any render passes
+            // that depend on it, as well as any pipelines that depend on those render passes
             let mut render_pass_ctx = RenderPassInitContext {
                 gpu: &mut self.gpu,
                 pipelines: &mut self.pipelines,
@@ -49,9 +51,14 @@ impl AwsmRenderer {
 
             // Update all the things that depend on opaque materials changing due to textures
 
-            // First, that's the render pass itself
-            self.render_passes.material_opaque =
-                MaterialOpaqueRenderPass::new(&mut render_pass_ctx).await?;
+            // First, that's the render pass itself - necessary because the actual number of bindings
+            // may have changed due to new mega texture arrays being created and this affects the bind group layout
+            // and thus the pipeline layout as well, requiring a full recreation of the render pass
+            // however, internally, it will clone the bind groups and layouts that aren't affected
+            self.render_passes
+                .material_opaque
+                .mega_texture_changed(&mut render_pass_ctx)
+                .await?;
 
             self.textures
                 .mega_texture
@@ -60,8 +67,9 @@ impl AwsmRenderer {
                 .console_log();
         }
 
-        // Either way, all the meshes that use opaque materials and need their shader/pipelines (re)created
-        // It's okay if it's the same container as before, actual heavy creation uses cache
+        // Either way, gotta also deal with all the meshes that need their shader/pipelines (re)created
+        // because the mega texture change may have affected the dynamically generated number of bindings etc.
+        // This isn't so bad, it's okay if it's the same container as before, actual heavy creation uses cache
         let mut has_seen_buffer_info = SecondaryMap::new();
         let mut has_seen_material = SecondaryMap::new();
         for (key, mesh) in self.meshes.iter() {
@@ -103,7 +111,7 @@ pub struct Textures {
     // sampling inside the mega texture. This is especially important for clamp/mirror behaviour.
     sampler_address_modes: SecondaryMap<SamplerKey, (Option<AddressMode>, Option<AddressMode>)>,
     texture_samplers: SecondaryMap<TextureKey, SamplerKey>,
-    gpu_dirty: bool,
+    gpu_megatexture_dirty: bool,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -148,7 +156,7 @@ impl Textures {
             sampler_cache: HashMap::new(),
             sampler_address_modes: SecondaryMap::new(),
             texture_samplers: SecondaryMap::new(),
-            gpu_dirty: false,
+            gpu_megatexture_dirty: false,
         }
     }
 
@@ -168,7 +176,7 @@ impl Textures {
         self.texture_samplers.insert(key, sampler_key);
         self.mega_texture_sampler_set.insert(sampler_key);
 
-        self.gpu_dirty = true;
+        self.gpu_megatexture_dirty = true;
 
         Ok(key)
     }
@@ -183,13 +191,13 @@ impl Textures {
             .ok_or(AwsmTextureError::CubemapTextureNotFound(key))
     }
 
-    async fn write_gpu_textures(
+    async fn write_gpu_megatexture(
         &mut self,
         logging: &AwsmRendererLogging,
         gpu: &AwsmRendererWebGpu,
     ) -> Result<bool> {
-        let was_gpu_dirty = self.gpu_dirty;
-        if self.gpu_dirty {
+        let was_gpu_dirty = self.gpu_megatexture_dirty;
+        if self.gpu_megatexture_dirty {
             let _maybe_span_guard = if logging.render_timings {
                 Some(tracing::span!(tracing::Level::INFO, "Textures GPU write").entered())
             } else {
@@ -214,7 +222,7 @@ impl Textures {
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            self.gpu_dirty = false;
+            self.gpu_megatexture_dirty = false;
         }
 
         Ok(was_gpu_dirty)

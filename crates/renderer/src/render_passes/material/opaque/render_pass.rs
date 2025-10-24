@@ -31,17 +31,28 @@ impl MaterialOpaqueRenderPass {
         })
     }
 
+    pub async fn mega_texture_changed(
+        &mut self,
+        ctx: &mut RenderPassInitContext<'_>,
+    ) -> Result<()> {
+        self.bind_groups = self.bind_groups.clone_because_mega_texture_changed(ctx)?;
+        self.pipelines = MaterialOpaquePipelines::new(ctx, &self.bind_groups).await?;
+
+        Ok(())
+    }
+
     pub fn render(&self, ctx: &RenderContext, mut renderables: Vec<Renderable>) -> Result<()> {
         let compute_pass = ctx.command_encoder.begin_compute_pass(Some(
             &ComputePassDescriptor::new(Some("Material Opaque Pass")).into(),
         ));
 
-        let (main_bind_group, texture_bind_group, sampler_bind_group) =
+        let (main_bind_group, lights_bind_group, texture_bind_group, sampler_bind_group) =
             self.bind_groups.get_bind_groups()?;
 
         compute_pass.set_bind_group(0u32, &main_bind_group, None)?;
-        compute_pass.set_bind_group(1u32, &texture_bind_group, None)?;
-        compute_pass.set_bind_group(2u32, &sampler_bind_group, None)?;
+        compute_pass.set_bind_group(1u32, &lights_bind_group, None)?;
+        compute_pass.set_bind_group(2u32, &texture_bind_group, None)?;
+        compute_pass.set_bind_group(3u32, &sampler_bind_group, None)?;
 
         let workgroup_size = (
             ctx.render_texture_views.width.div_ceil(8),

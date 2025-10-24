@@ -91,7 +91,7 @@ impl GeometryRenderPass {
             .into(),
         )?;
 
-        render_pass.set_bind_group(0, self.bind_groups.camera_lights.get_bind_group()?, None)?;
+        render_pass.set_bind_group(0, self.bind_groups.camera.get_bind_group()?, None)?;
 
         render_pass.set_bind_group(
             1,

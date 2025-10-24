@@ -26,12 +26,14 @@ pub const MATERIAL_OPAQUE_CORE_TEXTURES_START_BINDING: u32 = 0;
 
 pub struct MaterialOpaqueBindGroups {
     pub main_bind_group_layout_key: BindGroupLayoutKey,
+    pub lights_bind_group_layout_key: BindGroupLayoutKey,
     pub texture_bind_group_layout_key: BindGroupLayoutKey,
     pub sampler_bind_group_layout_key: BindGroupLayoutKey,
     pub texture_atlas_len: u32,
     pub texture_sampler_keys: BTreeSet<SamplerKey>,
     // this is set via `recreate` mechanism
     _main_bind_group: Option<web_sys::GpuBindGroup>,
+    _lights_bind_group: Option<web_sys::GpuBindGroup>,
     _texture_bind_group: Option<web_sys::GpuBindGroup>,
     _sampler_bind_group: Option<web_sys::GpuBindGroup>,
 }
@@ -184,15 +186,6 @@ impl MaterialOpaqueBindGroups {
                 visibility_fragment: false,
                 visibility_compute: true,
             },
-            // IBL info buffer
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Buffer(
-                    BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
             // Brdf lut texture
             BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::Texture(
@@ -263,73 +256,83 @@ impl MaterialOpaqueBindGroups {
             },
         )?;
 
-        // textures
-        let device_limits = ctx.gpu.device.limits();
-        let texture_atlas_len = ctx.textures.mega_texture.bindings_len(&device_limits)?;
-
-        let mut texture_entries = Vec::new();
-
-        for i in 0..texture_atlas_len {
-            texture_entries.push(BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new()
-                        .with_view_dimension(TextureViewDimension::N2dArray)
-                        .with_sample_type(TextureSampleType::Float),
+        // lights
+        let light_entries = vec![
+            // info
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
                 ),
                 visibility_vertex: false,
                 visibility_fragment: false,
                 visibility_compute: true,
-            });
-        }
-
-        let texture_bind_group_layout_key = ctx.bind_group_layouts.get_key(
-            &ctx.gpu,
-            BindGroupLayoutCacheKey {
-                entries: texture_entries,
             },
-        )?;
-
-        // samplers
-        let texture_sampler_keys = ctx.textures.mega_texture_sampler_set.clone();
-
-        if texture_sampler_keys.len() > device_limits.max_samplers_per_shader_stage() as usize {
-            return Err(AwsmCoreError::MegaTextureTooManySamplers {
-                total_samplers: texture_sampler_keys.len() as u32,
-                max_samplers: device_limits.max_samplers_per_shader_stage(),
-            }
-            .into());
-        }
-
-        let mut sampler_entries = Vec::new();
-
-        for _ in 0..texture_sampler_keys.len() {
-            sampler_entries.push(BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Sampler(
-                    SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering),
+            // punctual lights
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
                 ),
                 visibility_vertex: false,
                 visibility_fragment: false,
                 visibility_compute: true,
-            });
-        }
+            },
+        ];
 
-        let sampler_bind_group_layout_key = ctx.bind_group_layouts.get_key(
+        let lights_bind_group_layout_key = ctx.bind_group_layouts.get_key(
             &ctx.gpu,
             BindGroupLayoutCacheKey {
-                entries: sampler_entries,
+                entries: light_entries,
             },
         )?;
+
+        // Mega texture
+        let MegaTextureDeps {
+            texture_bind_group_layout_key,
+            sampler_bind_group_layout_key,
+            texture_atlas_len,
+            texture_sampler_keys,
+        } = MegaTextureDeps::new(ctx)?;
 
         Ok(Self {
             main_bind_group_layout_key,
+            lights_bind_group_layout_key,
             texture_bind_group_layout_key,
             sampler_bind_group_layout_key,
             texture_atlas_len,
             texture_sampler_keys,
             _main_bind_group: None,
+            _lights_bind_group: None,
             _texture_bind_group: None,
             _sampler_bind_group: None,
         })
+    }
+
+    pub fn clone_because_mega_texture_changed(
+        &self,
+        ctx: &mut RenderPassInitContext<'_>,
+    ) -> Result<Self> {
+        let MegaTextureDeps {
+            texture_bind_group_layout_key,
+            sampler_bind_group_layout_key,
+            texture_atlas_len,
+            texture_sampler_keys,
+        } = MegaTextureDeps::new(ctx)?;
+
+        let mut _self = Self {
+            main_bind_group_layout_key: self.main_bind_group_layout_key,
+            lights_bind_group_layout_key: self.lights_bind_group_layout_key,
+            texture_bind_group_layout_key,
+            sampler_bind_group_layout_key,
+            texture_atlas_len,
+            texture_sampler_keys,
+            _main_bind_group: self._main_bind_group.clone(),
+            _lights_bind_group: self._lights_bind_group.clone(),
+            _texture_bind_group: None,
+            _sampler_bind_group: None,
+        };
+
+        Ok(_self)
     }
 
     pub fn get_bind_groups(
@@ -339,24 +342,37 @@ impl MaterialOpaqueBindGroups {
             &web_sys::GpuBindGroup,
             &web_sys::GpuBindGroup,
             &web_sys::GpuBindGroup,
+            &web_sys::GpuBindGroup,
         ),
         AwsmBindGroupError,
     > {
         match (
             &self._main_bind_group,
+            &self._lights_bind_group,
             &self._texture_bind_group,
             &self._sampler_bind_group,
         ) {
-            (Some(main_bind_group), Some(texture_bind_group), Some(sampler_bind_group)) => {
-                Ok((main_bind_group, texture_bind_group, sampler_bind_group))
-            }
-            (None, Some(_), _) => Err(AwsmBindGroupError::NotFound(
+            (
+                Some(main_bind_group),
+                Some(lights_bind_group),
+                Some(texture_bind_group),
+                Some(sampler_bind_group),
+            ) => Ok((
+                main_bind_group,
+                lights_bind_group,
+                texture_bind_group,
+                sampler_bind_group,
+            )),
+            (None, _, _, _) => Err(AwsmBindGroupError::NotFound(
                 "Material Opaque - Main".to_string(),
             )),
-            (Some(_), None, _) => Err(AwsmBindGroupError::NotFound(
+            (_, None, _, _) => Err(AwsmBindGroupError::NotFound(
+                "Material Opaque - Lights".to_string(),
+            )),
+            (_, _, None, _) => Err(AwsmBindGroupError::NotFound(
                 "Material Opaque - Texture".to_string(),
             )),
-            (Some(_), Some(_), None) => Err(AwsmBindGroupError::NotFound(
+            (_, _, _, None) => Err(AwsmBindGroupError::NotFound(
                 "Material Opaque - Sampler".to_string(),
             )),
             _ => Err(AwsmBindGroupError::NotFound("Material Opaque".to_string())),
@@ -442,12 +458,6 @@ impl MaterialOpaqueBindGroups {
             BindGroupResource::Sampler(&ctx.lights.ibl.irradiance.sampler),
         ));
 
-        // IBL info
-        entries.push(BindGroupEntry::new(
-            entries.len() as u32,
-            BindGroupResource::Buffer(BufferBinding::new(&ctx.lights.gpu_ibl_buffer)),
-        ));
-
         // BRDF lut
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
@@ -471,12 +481,16 @@ impl MaterialOpaqueBindGroups {
         // geometry normal texture
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
-            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.geometry_normal)),
+            BindGroupResource::TextureView(Cow::Borrowed(
+                &ctx.render_texture_views.geometry_normal,
+            )),
         ));
         // geometry tangent texture
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
-            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.geometry_tangent)),
+            BindGroupResource::TextureView(Cow::Borrowed(
+                &ctx.render_texture_views.geometry_tangent,
+            )),
         ));
 
         let descriptor = BindGroupDescriptor::new(
@@ -487,6 +501,32 @@ impl MaterialOpaqueBindGroups {
         );
 
         self._main_bind_group = Some(ctx.gpu.create_bind_group(&descriptor.into()));
+
+        Ok(())
+    }
+
+    pub fn recreate_lights(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
+        let mut entries = Vec::new();
+
+        // Lights info
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Buffer(BufferBinding::new(&ctx.lights.gpu_info_buffer)),
+        ));
+
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Buffer(BufferBinding::new(&ctx.lights.gpu_punctual_buffer)),
+        ));
+
+        let descriptor = BindGroupDescriptor::new(
+            ctx.bind_group_layouts
+                .get(self.lights_bind_group_layout_key)?,
+            Some("Material Opaque - Lights"),
+            entries,
+        );
+
+        self._lights_bind_group = Some(ctx.gpu.create_bind_group(&descriptor.into()));
 
         Ok(())
     }
@@ -537,5 +577,80 @@ impl MaterialOpaqueBindGroups {
         self._sampler_bind_group = Some(ctx.gpu.create_bind_group(&descriptor.into()));
 
         Ok(())
+    }
+}
+
+struct MegaTextureDeps {
+    pub texture_bind_group_layout_key: BindGroupLayoutKey,
+    pub sampler_bind_group_layout_key: BindGroupLayoutKey,
+    pub texture_atlas_len: u32,
+    pub texture_sampler_keys: BTreeSet<SamplerKey>,
+}
+
+impl MegaTextureDeps {
+    fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
+        // textures
+        let device_limits = ctx.gpu.device.limits();
+        let texture_atlas_len = ctx.textures.mega_texture.bindings_len(&device_limits)?;
+
+        let mut texture_entries = Vec::new();
+
+        for i in 0..texture_atlas_len {
+            texture_entries.push(BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Texture(
+                    TextureBindingLayout::new()
+                        .with_view_dimension(TextureViewDimension::N2dArray)
+                        .with_sample_type(TextureSampleType::Float),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            });
+        }
+
+        let texture_bind_group_layout_key = ctx.bind_group_layouts.get_key(
+            &ctx.gpu,
+            BindGroupLayoutCacheKey {
+                entries: texture_entries,
+            },
+        )?;
+
+        // samplers
+        let texture_sampler_keys = ctx.textures.mega_texture_sampler_set.clone();
+
+        if texture_sampler_keys.len() > device_limits.max_samplers_per_shader_stage() as usize {
+            return Err(AwsmCoreError::MegaTextureTooManySamplers {
+                total_samplers: texture_sampler_keys.len() as u32,
+                max_samplers: device_limits.max_samplers_per_shader_stage(),
+            }
+            .into());
+        }
+
+        let mut sampler_entries = Vec::new();
+
+        for _ in 0..texture_sampler_keys.len() {
+            sampler_entries.push(BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Sampler(
+                    SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            });
+        }
+
+        let sampler_bind_group_layout_key = ctx.bind_group_layouts.get_key(
+            &ctx.gpu,
+            BindGroupLayoutCacheKey {
+                entries: sampler_entries,
+            },
+        )?;
+
+        Ok(Self {
+            texture_atlas_len,
+            texture_bind_group_layout_key,
+            texture_sampler_keys,
+            sampler_bind_group_layout_key,
+        })
     }
 }

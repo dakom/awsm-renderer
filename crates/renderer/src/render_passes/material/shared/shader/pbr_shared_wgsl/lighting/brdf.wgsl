@@ -4,11 +4,6 @@
 // Safe for HDR workflows (no final saturate - tone mapping applied elsewhere)
 // -------------------------------------------------------------
 
-struct IblInfo {
-    prefiltered_env_mip_count: u32,
-    irradiance_mip_count: u32,
-}
-
 // -------------------------------------------------------------
 // Microfacet BRDF Components
 // -------------------------------------------------------------

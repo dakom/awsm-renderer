@@ -28,6 +28,7 @@ impl MaterialOpaquePipelines {
     ) -> Result<Self> {
         let pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
             bind_groups.main_bind_group_layout_key,
+            bind_groups.lights_bind_group_layout_key,
             bind_groups.texture_bind_group_layout_key,
             bind_groups.sampler_bind_group_layout_key,
         ]);

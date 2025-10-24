@@ -228,13 +228,20 @@ impl AwsmRenderer {
             )?
         };
 
-        // TEMPORARY WORKAROUND: Only load the first animation
+        // Load all animations from the GLTF file
         // TODO: Add proper API for selecting/controlling which animations to play
-        if let Some(gltf_animation) = ctx.data.doc.animations().next() {
+        // Heuristic: Only load the first morph animation per node
+        // This prevents multiple conflicting morph animations from playing simultaneously
+        let mut has_morph_animation = false;
+
+        for gltf_animation in ctx.data.doc.animations() {
             for channel in gltf_animation.channels() {
                 if channel.target().node().index() == gltf_node.index() {
                     match channel.target().property() {
                         gltf::animation::Property::MorphTargetWeights => {
+                            if has_morph_animation {
+                                continue;
+                            }
                             self.populate_gltf_animation_morph(
                                 ctx,
                                 gltf_animation
@@ -248,6 +255,7 @@ impl AwsmRenderer {
                                 geometry_morph_key,
                                 material_morph_key,
                             )?;
+                            has_morph_animation = true;
                         }
                         // transform animations were already populated in the node
                         gltf::animation::Property::Translation

@@ -85,7 +85,16 @@ struct ShaderTemplateMaterialOpaqueDebug {
     solid_color: bool,
     view_direction: bool,
     irradiance_sample: bool,
-    ibl_only: bool,
+    lighting: ShaderTemplateMaterialOpaqueDebugLighting,
+}
+
+#[derive(Debug, Default)]
+enum ShaderTemplateMaterialOpaqueDebugLighting {
+    #[default]
+    None,
+    IblOnly,
+    PunctualOnly,
+    HardcodedPunctualOnly,
 }
 
 impl ShaderTemplateMaterialOpaque {

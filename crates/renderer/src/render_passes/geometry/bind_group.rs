@@ -22,9 +22,8 @@ use crate::{
 use crate::{error::Result, materials::MaterialBufferKind};
 
 pub struct GeometryBindGroups {
-    // These could theoretically be somewhat static or re-used with other passes
-    pub camera_lights: GeometryBindGroupCameraLights,
-    // Likewise, theoretically these could be be used for multiple meshes
+    pub camera: GeometryBindGroupCamera,
+    // these could be be used for multiple meshes
     pub transform_materials: GeometryBindGroupTransformMaterials,
     // These are more specific to the mesh
     pub meta: GeometryBindGroupMeta,
@@ -33,13 +32,13 @@ pub struct GeometryBindGroups {
 
 impl GeometryBindGroups {
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
-        let camera_lights = GeometryBindGroupCameraLights::new(ctx).await?;
+        let camera = GeometryBindGroupCamera::new(ctx).await?;
         let transform_materials = GeometryBindGroupTransformMaterials::new(ctx).await?;
         let meta = GeometryBindGroupMeta::new(ctx).await?;
         let animation = GeometryBindGroupAnimation::new(ctx).await?;
 
         Ok(Self {
-            camera_lights,
+            camera,
             transform_materials,
             meta,
             animation,
@@ -47,34 +46,23 @@ impl GeometryBindGroups {
     }
 }
 
-pub struct GeometryBindGroupCameraLights {
+pub struct GeometryBindGroupCamera {
     pub bind_group_layout_key: BindGroupLayoutKey,
     // this is set via `recreate` mechanism
     _bind_group: Option<web_sys::GpuBindGroup>,
 }
 
-impl GeometryBindGroupCameraLights {
+impl GeometryBindGroupCamera {
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
-            entries: vec![
-                BindGroupLayoutCacheKeyEntry {
-                    resource: BindGroupLayoutResource::Buffer(
-                        BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
-                    ),
-                    visibility_vertex: true,
-                    visibility_fragment: true,
-                    visibility_compute: false,
-                },
-                BindGroupLayoutCacheKeyEntry {
-                    resource: BindGroupLayoutResource::Buffer(
-                        BufferBindingLayout::new()
-                            .with_binding_type(BufferBindingType::ReadOnlyStorage),
-                    ),
-                    visibility_vertex: true,
-                    visibility_fragment: true,
-                    visibility_compute: false,
-                },
-            ],
+            entries: vec![BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
+                ),
+                visibility_vertex: true,
+                visibility_fragment: true,
+                visibility_compute: false,
+            }],
         };
 
         let bind_group_layout_key = ctx
@@ -90,17 +78,11 @@ impl GeometryBindGroupCameraLights {
     pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts.get(self.bind_group_layout_key)?,
-            Some("Geometry Camera/Lights"),
-            vec![
-                BindGroupEntry::new(
-                    0,
-                    BindGroupResource::Buffer(BufferBinding::new(&ctx.camera.gpu_buffer)),
-                ),
-                BindGroupEntry::new(
-                    1,
-                    BindGroupResource::Buffer(BufferBinding::new(&ctx.lights.gpu_punctual_buffer)),
-                ),
-            ],
+            Some("Geometry Camera"),
+            vec![BindGroupEntry::new(
+                0,
+                BindGroupResource::Buffer(BufferBinding::new(&ctx.camera.gpu_buffer)),
+            )],
         );
 
         let bind_group = ctx.gpu.create_bind_group(&descriptor.into());
@@ -114,7 +96,7 @@ impl GeometryBindGroupCameraLights {
     ) -> std::result::Result<&web_sys::GpuBindGroup, AwsmBindGroupError> {
         self._bind_group
             .as_ref()
-            .ok_or_else(|| AwsmBindGroupError::NotFound("Geometry camera_lights".to_string()))
+            .ok_or_else(|| AwsmBindGroupError::NotFound("Geometry camera".to_string()))
     }
 }
 

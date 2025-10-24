@@ -29,7 +29,7 @@ impl GeometryPipelines {
         bind_groups: &GeometryBindGroups,
     ) -> Result<Self> {
         let pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
-            bind_groups.camera_lights.bind_group_layout_key,
+            bind_groups.camera.bind_group_layout_key,
             bind_groups.transform_materials.bind_group_layout_key,
             bind_groups.meta.bind_group_layout_key,
             bind_groups.animation.bind_group_layout_key,
@@ -79,7 +79,9 @@ impl GeometryPipelines {
 
         // Only add separate tangent target in full-fidelity mode
         if ctx.render_texture_formats.use_separate_normal_tangent {
-            color_targets.push(ColorTargetState::new(ctx.render_texture_formats.geometry_tangent));
+            color_targets.push(ColorTargetState::new(
+                ctx.render_texture_formats.geometry_tangent,
+            ));
         }
 
         let vertex_buffer_layout = VertexBufferLayout {
@@ -134,7 +136,7 @@ impl GeometryPipelines {
                 .push(VertexAttribute {
                     format: VertexFormat::Float32x4,
                     offset: i * 16,
-                    shader_location: 5 + i as u32,  // Locations 5-8 (after normal at 3 and tangent at 4)
+                    shader_location: 5 + i as u32, // Locations 5-8 (after normal at 3 and tangent at 4)
                 });
         }
 
@@ -149,7 +151,8 @@ impl GeometryPipelines {
                 .with_depth_stencil(depth_stencil.clone());
 
         for target in &color_targets {
-            pipeline_cache_key_cull_back = pipeline_cache_key_cull_back.with_push_fragment_targets(vec![target.clone()]);
+            pipeline_cache_key_cull_back =
+                pipeline_cache_key_cull_back.with_push_fragment_targets(vec![target.clone()]);
         }
 
         let mut pipeline_cache_key_cull_back_instancing =
@@ -160,7 +163,8 @@ impl GeometryPipelines {
                 .with_depth_stencil(depth_stencil.clone());
 
         for target in &color_targets {
-            pipeline_cache_key_cull_back_instancing = pipeline_cache_key_cull_back_instancing.with_push_fragment_targets(vec![target.clone()]);
+            pipeline_cache_key_cull_back_instancing = pipeline_cache_key_cull_back_instancing
+                .with_push_fragment_targets(vec![target.clone()]);
         }
 
         let mut pipeline_cache_key_cull_none =
@@ -170,7 +174,8 @@ impl GeometryPipelines {
                 .with_depth_stencil(depth_stencil.clone());
 
         for target in &color_targets {
-            pipeline_cache_key_cull_none = pipeline_cache_key_cull_none.with_push_fragment_targets(vec![target.clone()]);
+            pipeline_cache_key_cull_none =
+                pipeline_cache_key_cull_none.with_push_fragment_targets(vec![target.clone()]);
         }
 
         let mut pipeline_cache_key_cull_none_instancing =
@@ -181,7 +186,8 @@ impl GeometryPipelines {
                 .with_depth_stencil(depth_stencil);
 
         for target in &color_targets {
-            pipeline_cache_key_cull_none_instancing = pipeline_cache_key_cull_none_instancing.with_push_fragment_targets(vec![target.clone()]);
+            pipeline_cache_key_cull_none_instancing = pipeline_cache_key_cull_none_instancing
+                .with_push_fragment_targets(vec![target.clone()]);
         }
 
         let render_pipeline_key_cull_back = ctx

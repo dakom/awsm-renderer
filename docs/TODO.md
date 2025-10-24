@@ -1,9 +1,10 @@
+# Fix animations
+  - Play one only (morph stress test) vs. Play them all (Interpolation test)
+
 # Opaque material pass
-- take lighting as storage buffer
-  - actually pass it in
-  - point, spot, directional
 - occlusion test
 - emissive test
+- vertex colors
 
 # Bring back TAA
 - Very obvious on MorphStressTest

@@ -1,4 +1,28 @@
-// though it's set in the storage buffer as a float array with padding
+struct LightsInfoPacked {
+    data: vec4<u32>,
+}
+
+struct LightsInfo {
+    n_lights: u32,
+    ibl: IblInfo
+}
+
+struct IblInfo {
+    prefiltered_env_mip_count: u32,
+    irradiance_mip_count: u32,
+}
+
+struct LightPacked {
+  // pos.xyz + range
+  pos_range: vec4<f32>,
+  // dir.xyz + inner_cone
+  dir_inner: vec4<f32>,
+  // color.rgb + intensity
+  color_intensity: vec4<f32>,
+  // kind (as uint) + outer_cone + 2 pads (or extra params)
+  kind_outer_pad: vec4<f32>,
+};
+
 struct Light {
     kind: u32,
     color: vec3<f32>,
@@ -10,69 +34,30 @@ struct Light {
     outer_cone: f32,
 };
 
-fn get_light(index: u32) -> Light {
-    switch (index) {
-        case 0u: { // key from camera/front
-            return Light(
-                1u,
-                vec3<f32>(1.0, 0.97, 0.92),
-                1.4,
-                vec3<f32>(0.0, 0.0, 0.0),
-                0.0,
-                normalize(vec3<f32>(0.1, -0.35, -1.0)),
-                0.0,
-                0.0,
-            );
-        }
-        case 1u: { // camera fill
-            return Light(
-                1u,
-                vec3<f32>(0.9, 0.95, 1.0),
-                0.6,
-                vec3<f32>(0.0, 0.0, 0.0),
-                0.0,
-                normalize(vec3<f32>(0.0, -0.2, -1.0)),
-                0.0,
-                0.0,
-            );
-        }
-        case 2u: { // back fill
-            return Light(
-                1u,
-                vec3<f32>(0.8, 0.9, 1.0),
-                0.7,
-                vec3<f32>(0.0, 0.0, 0.0),
-                0.0,
-                normalize(vec3<f32>(-0.05, -0.25, 1.0)),
-                0.0,
-                0.0,
-            );
-        }
-        case 3u: { // rim
-            return Light(
-                1u,
-                vec3<f32>(1.0, 0.96, 0.9),
-                0.5,
-                vec3<f32>(0.0, 0.0, 0.0),
-                0.0,
-                normalize(vec3<f32>(-1.0, -0.2, 0.2)),
-                0.0,
-                0.0,
-            );
-        }
-        default: {
-            return Light(
-                0u,
-                vec3<f32>(0.0),
-                0.0,
-                vec3<f32>(0.0),
-                0.0,
-                vec3<f32>(0.0),
-                0.0,
-                0.0,
-            );
-        }
-    }
+fn get_lights_info() -> LightsInfo {
+    // expects `lights_info` is global LightsInfoPacked
+    return LightsInfo(
+        lights_info.data.x,
+        IblInfo(
+            lights_info.data.y,
+            lights_info.data.z
+        )
+    );
+}
+
+fn get_light(i: u32) -> Light {
+    // expects `lights` is global array<LightPacked>
+    let p = lights[i];
+    return Light(
+        u32(p.kind_outer_pad.x),
+        p.color_intensity.xyz,
+        p.color_intensity.w,
+        p.pos_range.xyz,
+        p.pos_range.w,
+        p.dir_inner.xyz,
+        p.dir_inner.w,
+        p.kind_outer_pad.y
+    );
 }
 
 struct LightBrdf {
@@ -101,7 +86,7 @@ fn light_to_brdf(light:Light, normal: vec3<f32>, world_position: vec3<f32>) -> L
             let dist = length(surface_to_light);
             light_dir = surface_to_light / dist; // light -> surface
             let attenuation = inverse_square(light.range, dist);
-            radiance = light.color * attenuation;
+            radiance = light.color * light.intensity * attenuation;
             n_dot_l = max(dot(normal, light_dir), 0.0);
         }
         case 3u: { // Spot
@@ -111,7 +96,7 @@ fn light_to_brdf(light:Light, normal: vec3<f32>, world_position: vec3<f32>) -> L
             let cos_l = dot(light_dir, -normalize(light.direction));
             let spot = spot_falloff(light.inner_cone, light.outer_cone, cos_l);
             let attenuation = inverse_square(light.range, dist) * spot;
-            radiance = light.color * attenuation;
+            radiance = light.color * light.intensity * attenuation;
             n_dot_l = max(dot(normal, light_dir), 0.0);
         }
         default: { // unexpected
