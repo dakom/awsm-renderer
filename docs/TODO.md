@@ -1,6 +1,3 @@
-# Fix animations
-  - Play one only (morph stress test) vs. Play them all (Interpolation test)
-
 # Opaque material pass
 - occlusion test
 - emissive test
