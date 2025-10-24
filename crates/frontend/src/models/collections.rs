@@ -8,6 +8,7 @@ pub enum GltfSetId {
     Todo,
     Standard,
     Animation,
+    Comparisons,
     Basics,
     Extensions,
 }
@@ -18,6 +19,7 @@ impl GltfSetId {
             GltfSetId::Todo,
             GltfSetId::Standard,
             GltfSetId::Animation,
+            GltfSetId::Comparisons,
             GltfSetId::Basics,
             GltfSetId::Extensions,
         ]
@@ -27,6 +29,7 @@ impl GltfSetId {
             Self::Todo => "Todo",
             Self::Standard => "Standard",
             Self::Animation => "Animation",
+            Self::Comparisons => "Comparisons",
             Self::Basics => "Basics",
             Self::Extensions => "Extensions",
         }
@@ -38,14 +41,35 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
     h.insert(
         GltfSetId::Todo,
         vec![
-            GltfId::MorphStressTest,
-            GltfId::RiggedSimple,
-            GltfId::SimpleSkin,
-            GltfId::RiggedFigure,
-            GltfId::NormalTangent,
-            GltfId::NormalTangentMirror,
-            GltfId::AlphaBlendMode,
             GltfId::VertexColor,
+            GltfId::CompareBaseColor,
+            GltfId::CompareAmbientOcclusion,
+            GltfId::CompareEmissiveStrength,
+            GltfId::EmissiveStrength,
+            GltfId::CompareAnisotropy,
+            GltfId::AlphaBlendMode,
+        ],
+    );
+
+    h.insert(
+        GltfSetId::Comparisons,
+        vec![
+            // GltfId::CompareBaseColor,
+            // GltfId::CompareAnisotropy,
+            GltfId::CompareAlphaCoverage,
+            //GltfId::CompareAmbientOcclusion,
+            GltfId::CompareClearcoat,
+            GltfId::CompareDispersion,
+            //GltfId::CompareEmissiveStrength,
+            GltfId::CompareIor,
+            GltfId::CompareIridescence,
+            GltfId::CompareMetallic,
+            GltfId::CompareNormal,
+            GltfId::CompareRoughness,
+            GltfId::CompareSheen,
+            GltfId::CompareSpecular,
+            GltfId::CompareTransmission,
+            GltfId::CompareVolume,
         ],
     );
 
@@ -60,15 +84,15 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
     h.insert(
         GltfSetId::Animation,
         vec![
-            //GltfId::SimpleSkin,
+            GltfId::SimpleSkin,
             GltfId::SimpleMorph,
             GltfId::AnimatedTriangle,
             GltfId::AnimatedMorphCube,
             GltfId::InterpolationTest,
-            //GltfId::RiggedSimple,
-            //GltfId::RiggedFigure,
+            GltfId::RiggedSimple,
+            GltfId::RiggedFigure,
             GltfId::RecursiveSkeletons,
-            //GltfId::MorphStressTest,
+            GltfId::MorphStressTest,
         ],
     );
 
@@ -89,8 +113,8 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
             GltfId::MultiUv,
             GltfId::NegativeScale,
             GltfId::Orientation,
-            // GltfId::NormalTangent,
-            // GltfId::NormalTangentMirror,
+            GltfId::NormalTangent,
+            GltfId::NormalTangentMirror,
             GltfId::Triangle,
             GltfId::BoxTextured,
             GltfId::MetalRoughSpheresTextureless,
@@ -101,6 +125,7 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
             GltfId::BoxWithSpaces,
             GltfId::BoxVertexColors,
             GltfId::Cube,
+            //GltfId::EmissiveStrength,
         ],
     );
 
@@ -165,11 +190,28 @@ pub enum GltfId {
     BoxWithSpaces,
     BoxVertexColors,
     Cube,
+    CompareAlphaCoverage,
+    CompareAmbientOcclusion,
+    CompareAnisotropy,
+    CompareBaseColor,
+    CompareClearcoat,
+    CompareDispersion,
+    CompareEmissiveStrength,
+    CompareIor,
+    CompareIridescence,
+    CompareMetallic,
+    CompareNormal,
+    CompareRoughness,
+    CompareSheen,
+    CompareSpecular,
+    CompareTransmission,
+    CompareVolume,
     RiggedFigure,
     RiggedSimple,
     DamagedHelmet,
     EnvironmentTest,
     EnvironmentIblTest,
+    EmissiveStrength,
     TextureTransformTest,
     TextureTransformMultiTest,
 }
@@ -252,11 +294,32 @@ impl GltfId {
             Self::BoxWithSpaces => "Box With Spaces/glTF/Box With Spaces.gltf",
             Self::BoxVertexColors => "BoxVertexColors/glTF/BoxVertexColors.gltf",
             Self::Cube => "Cube/glTF/Cube.gltf",
+            Self::CompareAlphaCoverage => "CompareAlphaCoverage/glTF/CompareAlphaCoverage.gltf",
+            Self::CompareAmbientOcclusion => {
+                "CompareAmbientOcclusion/glTF/CompareAmbientOcclusion.gltf"
+            }
+            Self::CompareAnisotropy => "CompareAnisotropy/glTF/CompareAnisotropy.gltf",
+            Self::CompareBaseColor => "CompareBaseColor/glTF/CompareBaseColor.gltf",
+            Self::CompareClearcoat => "CompareClearcoat/glTF/CompareClearcoat.gltf",
+            Self::CompareDispersion => "CompareDispersion/glTF/CompareDispersion.gltf",
+            Self::CompareEmissiveStrength => {
+                "CompareEmissiveStrength/glTF/CompareEmissiveStrength.gltf"
+            }
+            Self::CompareIor => "CompareIor/glTF/CompareIor.gltf",
+            Self::CompareIridescence => "CompareIridescence/glTF/CompareIridescence.gltf",
+            Self::CompareMetallic => "CompareMetallic/glTF/CompareMetallic.gltf",
+            Self::CompareNormal => "CompareNormal/glTF/CompareNormal.gltf",
+            Self::CompareRoughness => "CompareRoughness/glTF/CompareRoughness.gltf",
+            Self::CompareSheen => "CompareSheen/glTF/CompareSheen.gltf",
+            Self::CompareSpecular => "CompareSpecular/glTF/CompareSpecular.gltf",
+            Self::CompareTransmission => "CompareTransmission/glTF/CompareTransmission.gltf",
+            Self::CompareVolume => "CompareVolume/glTF/CompareVolume.gltf",
             Self::RiggedFigure => "RiggedFigure/glTF/RiggedFigure.gltf",
             Self::RiggedSimple => "RiggedSimple/glTF/RiggedSimple.gltf",
             Self::DamagedHelmet => "DamagedHelmet/glTF/DamagedHelmet.gltf",
             Self::EnvironmentTest => "EnvironmentTest/glTF/EnvironmentTest.gltf",
             Self::EnvironmentIblTest => "EnvironmentTest/glTF-IBL/EnvironmentTest.gltf",
+            Self::EmissiveStrength => "EmissiveStrengthTest/glTF/EmissiveStrengthTest.gltf",
         }
     }
 
@@ -299,11 +362,28 @@ impl GltfId {
             Self::BoxWithSpaces => "Box with spaces",
             Self::BoxVertexColors => "Box vertex colors",
             Self::Cube => "Cube",
+            Self::CompareAlphaCoverage => "Alpha coverage compare",
+            Self::CompareAmbientOcclusion => "Ambient occlusion compare",
+            Self::CompareAnisotropy => "Anisotropy compare",
+            Self::CompareBaseColor => "Base color compare",
+            Self::CompareClearcoat => "Clearcoat compare",
+            Self::CompareDispersion => "Dispersion compare",
+            Self::CompareEmissiveStrength => "Emissive strength compare",
+            Self::CompareIor => "IOR compare",
+            Self::CompareIridescence => "Iridescence compare",
+            Self::CompareMetallic => "Metallic compare",
+            Self::CompareNormal => "Normal compare",
+            Self::CompareRoughness => "Roughness compare",
+            Self::CompareSheen => "Sheen compare",
+            Self::CompareSpecular => "Specular compare",
+            Self::CompareTransmission => "Transmission compare",
+            Self::CompareVolume => "Volume compare",
             Self::RiggedFigure => "Rigged figure",
             Self::RiggedSimple => "Rigged simple",
             Self::DamagedHelmet => "Damaged helmet",
             Self::EnvironmentTest => "Environment test",
             Self::EnvironmentIblTest => "Environment ibl test",
+            Self::EmissiveStrength => "Emissive strength",
         }
     }
 }

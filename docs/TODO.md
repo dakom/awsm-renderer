@@ -1,7 +1,8 @@
 # Opaque material pass
+- base color compare
+- vertex colors
 - occlusion test
 - emissive test
-- vertex colors
 
 # Bring back TAA
 - Very obvious on MorphStressTest
