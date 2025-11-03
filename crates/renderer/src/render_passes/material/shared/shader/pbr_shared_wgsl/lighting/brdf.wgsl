@@ -112,8 +112,8 @@ fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera
     let k_d = (vec3<f32>(1.0) - F) * (1.0 - metallic);
     let diffuse = k_d * base_color * (1.0 / PI);
 
-    // Final radiance: (diffuse + specular) * incoming light * N·L
-    return (diffuse + specular) * light_brdf.radiance * n_dot_l;
+    // Final radiance: (diffuse + specular) * incoming light * N·L * occlusion
+    return (diffuse + specular) * light_brdf.radiance * n_dot_l * color.occlusion;
 }
 
 // -------------------------------------------------------------
@@ -152,7 +152,8 @@ fn brdf_ibl(
     let R = reflect(-v, n);
     let prefiltered = samplePrefilteredEnv(R, roughness, ibl_filtered_env_tex, ibl_filtered_env_sampler, ibl_info);
     let brdf_lut = sampleBRDFLUT(n_dot_v, roughness, brdf_lut_tex, brdf_lut_sampler);
-    let specular = prefiltered * (F0 * brdf_lut.x + brdf_lut.y);
+    // Apply occlusion to specular with reduced strength to avoid over-darkening reflections
+    let specular = prefiltered * (F0 * brdf_lut.x + brdf_lut.y) * mix(1.0, color.occlusion, 0.5);
 
     return diffuse + specular + color.emissive;
 }
