@@ -1,6 +1,3 @@
-# Opaque material pass
-- occlusion test
-
 # Bring back TAA
 - Very obvious on MorphStressTest
 - Also lines on EmissiveStrength
