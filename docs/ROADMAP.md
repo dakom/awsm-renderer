@@ -6,12 +6,20 @@
 - get demo working again
   - fix "dev-release" mode (just base path?)
 
-- Megatexture tool/load
-
-- at this point can probably use for demos :)
+- support KHR_texture_transform
+  - see base color comparison for example
 
 - load lights via KHR_lights_punctual
   - point, spot, directional
+
+- Megatexture tool/load
+
+- Support different kinds of Materials
+  - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
+  - unlit as example?
+
+- at this point can probably use for demos :)
+
 
 - Get started with light culling pass
   - research best practices

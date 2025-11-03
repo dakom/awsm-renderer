@@ -1,5 +1,7 @@
 const material_alignment = 256u; // must match `Materials::MAX_SIZE`
 
+// This must match PbrMaterial in Rust
+// and the size is PbrMaterial::BYTE_SIZE
 struct PbrMaterialRaw {
     // Basic properties, 14 * 4 = 56 bytes
     alpha_mode: u32,
@@ -16,6 +18,7 @@ struct PbrMaterialRaw {
     emissive_factor_r: f32,
     emissive_factor_g: f32,
     emissive_factor_b: f32,
+    emissive_strength: f32,
 
     // Textures, 5 * 36 = 180 bytes
     base_color_tex_info: TextureInfoRaw,
@@ -31,7 +34,7 @@ struct PbrMaterialRaw {
     bitmask: u32,
 
     // Padding to align to 256 bytes
-    padding: array<u32, 3>
+    padding: array<u32, 2>
 };
 
 struct PbrMaterial {
@@ -60,6 +63,7 @@ struct PbrMaterial {
     has_emissive_texture: bool,
     emissive_tex_info: TextureInfo,
     emissive_factor: vec3<f32>,
+    emissive_strength: f32,
 
     has_color_info: bool,
     color_info: ColorInfo,
@@ -105,6 +109,7 @@ fn pbr_get_material(offset: u32) -> PbrMaterial {
         (raw.bitmask & MATERIAL_BITMASK_EMISSIVE) != 0u,
         convert_texture_info(raw.emissive_tex_info),
         vec3<f32>(raw.emissive_factor_r, raw.emissive_factor_g, raw.emissive_factor_b),
+        raw.emissive_strength,
 
         // color
         (raw.bitmask & MATERIAL_BITMASK_COLOR) != 0u,

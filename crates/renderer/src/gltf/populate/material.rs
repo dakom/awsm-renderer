@@ -99,6 +99,7 @@ impl GltfMaterialInfo {
             material.occlusion_strength = occlusion_tex.strength();
         }
         material.emissive_factor = gltf_material.emissive_factor();
+        material.emissive_strength = gltf_material.emissive_strength().unwrap_or(1.0);
 
         let pbr = gltf_material.pbr_metallic_roughness();
         material.base_color_factor = pbr.base_color_factor();

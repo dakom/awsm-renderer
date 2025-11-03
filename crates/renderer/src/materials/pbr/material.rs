@@ -45,6 +45,7 @@ pub struct PbrMaterial {
     pub emissive_sampler: Option<SamplerKey>,
     pub emissive_uv_index: Option<u32>,
     pub emissive_factor: [f32; 3],
+    pub emissive_strength: f32,
     pub vertex_color_info: Option<VertexColorInfo>,
     // these come from initial settings which affects bind group, mesh pipeline etc.
     // so the only way to change them is to create a new material
@@ -61,7 +62,7 @@ impl PbrMaterial {
     pub const INITIAL_ELEMENTS: usize = 32; // 32 elements is a good starting point
                                             // NOTE: keep this in sync with `PbrMaterialRaw` in WGSL. Each texture packs 36 bytes
                                             // (including sampler + address mode metadata) so 5 textures + 60 byte header + padding = 240.
-    pub const BYTE_SIZE: usize = 244; // must be under Materials::MAX_SIZE
+    pub const BYTE_SIZE: usize = 248; // must be under Materials::MAX_SIZE
 
     pub const BITMASK_BASE_COLOR: u32 = 1;
     pub const BITMASK_METALIC_ROUGHNESS: u32 = 1 << 1;
@@ -95,6 +96,7 @@ impl PbrMaterial {
             emissive_sampler: None,
             emissive_uv_index: None,
             emissive_factor: [0.0, 0.0, 0.0],
+            emissive_strength: 1.0,
             vertex_color_info: None,
         }
     }
@@ -236,6 +238,8 @@ impl PbrMaterial {
         write(self.emissive_factor[0].into());
         write(self.emissive_factor[1].into());
         write(self.emissive_factor[2].into());
+
+        write(self.emissive_strength.into());
 
         // Encode the WebGPU address mode so the shader can reproduce clamp/repeat/mirror behaviour
         // after the sampling coordinates are adjusted to the mega texture tile.

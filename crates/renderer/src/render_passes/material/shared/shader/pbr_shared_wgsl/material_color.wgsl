@@ -260,6 +260,9 @@ fn _pbr_material_emissive_color(
         color *=
             texture_sample_atlas(material.emissive_tex_info, attribute_uv, mip_level).rgb;
     }
+
+    color *= material.emissive_strength;
+
     return color;
 }
 
