@@ -172,8 +172,6 @@ impl Lights {
                 )?;
             }
 
-            tracing::info!("data buffer size: {}", punctual_light_buffer.len());
-            tracing::info!("GPU buffer size: {}", self.punctual_gpu_size);
             // for (index, chunk) in punctual_light_buffer.chunks_exact(64).enumerate() {
             //     let values =
             //         unsafe { std::slice::from_raw_parts(chunk.as_ptr() as *const f32, 16) };

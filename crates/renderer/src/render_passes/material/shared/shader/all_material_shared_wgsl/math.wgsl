@@ -15,3 +15,12 @@ fn inverse_square(range: f32, dist: f32) -> f32 {
     let falloff = (1.0 - (dist * dist) / (range * range));
     return saturate(falloff * falloff) / denom;
 }
+
+fn safe_normalize(normal: vec3<f32>) -> vec3<f32> {
+    let len_sq = dot(normal, normal);
+    if (len_sq > 0.0) {
+        return normal * inverseSqrt(len_sq);
+    }
+    // fallback: up vector to avoid NaNs; scene lighting expects unit normal
+    return vec3<f32>(0.0, 0.0, 1.0);
+}

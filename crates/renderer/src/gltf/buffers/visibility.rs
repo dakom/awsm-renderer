@@ -76,7 +76,7 @@ pub(super) fn convert_to_visibility_buffer(
     )?;
 
     // Step 5: Pack vertex attributes
-    // These are the original attributes per-vertex, excluding positions
+    // These are the original attributes per-vertex, but only non-visibility ones
     // There is no need to repack or expand these, they are used as-is
     let attribute_vertex_offset = attribute_vertex_bytes.len();
     let vertex_attributes =
@@ -154,7 +154,9 @@ fn create_visibility_vertices(
     let positions = attribute_data
         .iter()
         .find_map(|(attr_info, data)| match attr_info {
-            MeshBufferVertexAttributeInfo::Visibility(MeshBufferVisibilityVertexAttributeInfo::Positions { .. }) => Some(&data[..]),
+            MeshBufferVertexAttributeInfo::Visibility(
+                MeshBufferVisibilityVertexAttributeInfo::Positions { .. },
+            ) => Some(&data[..]),
             _ => None,
         })
         .ok_or_else(|| AwsmGltfError::Positions("missing positions".to_string()))?;
@@ -163,7 +165,9 @@ fn create_visibility_vertices(
     let normals = attribute_data
         .iter()
         .find_map(|(attr_info, data)| match attr_info {
-            MeshBufferVertexAttributeInfo::Visibility(MeshBufferVisibilityVertexAttributeInfo::Normals { .. }) => Some(&data[..]),
+            MeshBufferVertexAttributeInfo::Visibility(
+                MeshBufferVisibilityVertexAttributeInfo::Normals { .. },
+            ) => Some(&data[..]),
             _ => None,
         })
         .ok_or_else(|| AwsmGltfError::AttributeData("missing normals".to_string()))?;
@@ -172,7 +176,9 @@ fn create_visibility_vertices(
     let tangents = attribute_data
         .iter()
         .find_map(|(attr_info, data)| match attr_info {
-            MeshBufferVertexAttributeInfo::Visibility(MeshBufferVisibilityVertexAttributeInfo::Tangents { .. }) => Some(&data[..]),
+            MeshBufferVertexAttributeInfo::Visibility(
+                MeshBufferVisibilityVertexAttributeInfo::Tangents { .. },
+            ) => Some(&data[..]),
             _ => None,
         });
 
@@ -321,7 +327,10 @@ fn get_vec3_from_buffer(buffer: &[u8], vertex_index: usize, name: &str) -> Resul
     if offset + 12 > buffer.len() {
         return Err(AwsmGltfError::AttributeData(format!(
             "{} data out of bounds for vertex {}. Offset {} + 12 > buffer size {}",
-            name, vertex_index, offset, buffer.len()
+            name,
+            vertex_index,
+            offset,
+            buffer.len()
         )));
     }
 
@@ -361,7 +370,10 @@ fn get_vec4_from_buffer(buffer: &[u8], vertex_index: usize, name: &str) -> Resul
     if offset + 16 > buffer.len() {
         return Err(AwsmGltfError::AttributeData(format!(
             "{} data out of bounds for vertex {}. Offset {} + 16 > buffer size {}",
-            name, vertex_index, offset, buffer.len()
+            name,
+            vertex_index,
+            offset,
+            buffer.len()
         )));
     }
 

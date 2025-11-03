@@ -25,7 +25,7 @@ fn pbr_get_material_color(
     os_vertices: ObjectSpaceVertices,
 ) -> PbrMaterialColor {
 
-    let base = _pbr_material_base_color(
+    var base = _pbr_material_base_color(
         material,
         texture_uv(
             attribute_data_offset,
@@ -36,6 +36,19 @@ fn pbr_get_material_color(
         ),
         mip_levels.base_color,
     );
+
+    {%- match color_sets %}
+        {% when Some with (color_sets) %}
+            base *= vertex_color(
+                attribute_data_offset,
+                triangle_indices,
+                barycentric,
+                material.color_info,
+                vertex_attribute_stride,
+            );
+        {% when _ %}
+    {% endmatch %}
+
 
     let metallic_roughness = _pbr_material_metallic_roughness_color (
         material,
@@ -102,13 +115,17 @@ fn pbr_get_material_color(
         emissive,
     );
 }
+
 // Base Color
 fn _pbr_material_base_color(material: PbrMaterial, attribute_uv: vec2<f32>, mip_level: f32) -> vec4<f32> {
     var color = material.base_color_factor;
+
+
     if material.has_base_color_texture {
         color *=
             texture_sample_atlas(material.base_color_tex_info, attribute_uv, mip_level);
     }
+
 
     // compute pass only deals with fully opaque
     // mask and blend are handled in the fragment shader

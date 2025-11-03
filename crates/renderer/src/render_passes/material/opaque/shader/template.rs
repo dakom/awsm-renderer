@@ -16,6 +16,9 @@ pub struct ShaderTemplateMaterialOpaque {
     pub uv_sets_index: u32,
     pub texture_atlas_len: u32,
     pub sampler_atlas_len: u32,
+    /// Offset (in floats) within the packed vertex attribute array
+    /// where the first vertex color component lives for each vertex.
+    pub color_sets_index: u32,
     pub normals: bool,
     pub tangents: bool,
     pub color_sets: Option<u32>,
@@ -37,7 +40,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
         // buffer and geometry textures. Only custom attributes (colors, UVs, joints, weights) are in
         // attribute_data.
         //
-        // The ordering follows `impl Ord for MeshBufferVertexAttributeInfo`:
+        // The ordering follows `impl Ord for MeshBufferCustomVertexAttributeInfo`:
         // - Positions (0) - visibility attribute, NOT in attribute_data
         // - Normals (1) - visibility attribute, NOT in attribute_data
         // - Tangents (2) - visibility attribute, NOT in attribute_data
@@ -46,16 +49,26 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
         // - Joints (5) - custom attribute, IN attribute_data
         // - Weights (6) - custom attribute, IN attribute_data
         //
-        // So uv_sets_index calculation starts at 0 and only adds offsets for custom attributes
-        // that come before TexCoords in the ordering.
+        // However we only care about the `MeshBufferCustomVertexAttributeInfo` ordering here, so that's:
+        //
+        // - Colors (3) - custom attribute, IN attribute_data
+        // - TexCoords (4) - custom attribute, IN attribute_data
+        // - Joints (5) - custom attribute, IN attribute_data
+        // - Weights (6) - custom attribute, IN attribute_data
+        //
 
+        // color sets always starts at 0;
+        let mut color_sets_index = 0;
+
+        // uv sets might start at 0 if there's no colors
+        // otherwise, it's pushed off by however many color sets there are
         let mut uv_sets_index = 0;
-        // Colors come before TexCoords (3 < 4), so they affect the UV offset
         uv_sets_index += (value.attributes.color_sets.unwrap_or(0) * 4) as u32; // colors use 4 floats each
 
         let _self = Self {
             texture_atlas_len: value.texture_atlas_len,
             sampler_atlas_len: value.sampler_atlas_len,
+            color_sets_index,
             uv_sets_index,
             normals: value.attributes.normals,
             tangents: value.attributes.tangents,

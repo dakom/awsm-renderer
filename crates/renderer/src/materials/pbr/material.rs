@@ -45,23 +45,30 @@ pub struct PbrMaterial {
     pub emissive_sampler: Option<SamplerKey>,
     pub emissive_uv_index: Option<u32>,
     pub emissive_factor: [f32; 3],
+    pub vertex_color_info: Option<VertexColorInfo>,
     // these come from initial settings which affects bind group, mesh pipeline etc.
     // so the only way to change them is to create a new material
     alpha_mode: MaterialAlphaMode,
     double_sided: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct VertexColorInfo {
+    pub set_index: u32,
+}
+
 impl PbrMaterial {
     pub const INITIAL_ELEMENTS: usize = 32; // 32 elements is a good starting point
                                             // NOTE: keep this in sync with `PbrMaterialRaw` in WGSL. Each texture packs 36 bytes
                                             // (including sampler + address mode metadata) so 5 textures + 60 byte header + padding = 240.
-    pub const BYTE_SIZE: usize = 240; // must be under Materials::MAX_SIZE
+    pub const BYTE_SIZE: usize = 244; // must be under Materials::MAX_SIZE
 
-    pub const TEXTURE_BITMASK_BASE_COLOR: u32 = 1;
-    pub const TEXTURE_BITMASK_METALIC_ROUGHNESS: u32 = 1 << 1;
-    pub const TEXTURE_BITMASK_NORMAL: u32 = 1 << 2;
-    pub const TEXTURE_BITMASK_OCCLUSION: u32 = 1 << 3;
-    pub const TEXTURE_BITMASK_EMISSIVE: u32 = 1 << 4;
+    pub const BITMASK_BASE_COLOR: u32 = 1;
+    pub const BITMASK_METALIC_ROUGHNESS: u32 = 1 << 1;
+    pub const BITMASK_NORMAL: u32 = 1 << 2;
+    pub const BITMASK_OCCLUSION: u32 = 1 << 3;
+    pub const BITMASK_EMISSIVE: u32 = 1 << 4;
+    pub const BITMASK_VERTEX_COLOR: u32 = 1 << 5;
 
     pub fn new(alpha_mode: MaterialAlphaMode, double_sided: bool) -> Self {
         Self {
@@ -88,6 +95,7 @@ impl PbrMaterial {
             emissive_sampler: None,
             emissive_uv_index: None,
             emissive_factor: [0.0, 0.0, 0.0],
+            vertex_color_info: None,
         }
     }
 
@@ -242,7 +250,7 @@ impl PbrMaterial {
             }
         };
 
-        let mut texture_bitmask = 0u32;
+        let mut bitmask = 0u32;
 
         let sampler_key_list: Vec<SamplerKey> =
             textures.mega_texture_sampler_set.iter().cloned().collect();
@@ -262,7 +270,7 @@ impl PbrMaterial {
             ))
         }) {
             write(tex.into());
-            texture_bitmask |= Self::TEXTURE_BITMASK_BASE_COLOR;
+            bitmask |= Self::BITMASK_BASE_COLOR;
         } else {
             write(Value::SkipTexture);
         }
@@ -283,7 +291,7 @@ impl PbrMaterial {
             ))
         }) {
             write(tex.into());
-            texture_bitmask |= Self::TEXTURE_BITMASK_METALIC_ROUGHNESS;
+            bitmask |= Self::BITMASK_METALIC_ROUGHNESS;
         } else {
             write(Value::SkipTexture);
         }
@@ -303,7 +311,7 @@ impl PbrMaterial {
             ))
         }) {
             write(tex.into());
-            texture_bitmask |= Self::TEXTURE_BITMASK_NORMAL;
+            bitmask |= Self::BITMASK_NORMAL;
         } else {
             write(Value::SkipTexture);
         }
@@ -323,7 +331,7 @@ impl PbrMaterial {
             ))
         }) {
             write(tex.into());
-            texture_bitmask |= Self::TEXTURE_BITMASK_OCCLUSION;
+            bitmask |= Self::BITMASK_OCCLUSION;
         } else {
             write(Value::SkipTexture);
         }
@@ -343,12 +351,19 @@ impl PbrMaterial {
             ))
         }) {
             write(tex.into());
-            texture_bitmask |= Self::TEXTURE_BITMASK_EMISSIVE;
+            bitmask |= Self::BITMASK_EMISSIVE;
         } else {
             write(Value::SkipTexture);
         }
 
-        write(texture_bitmask.into());
+        if let Some(color_info) = &self.vertex_color_info {
+            write(color_info.set_index.into());
+            bitmask |= Self::BITMASK_VERTEX_COLOR;
+        } else {
+            write(0u32.into());
+        }
+
+        write(bitmask.into());
 
         Ok(data)
     }

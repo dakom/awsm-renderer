@@ -5,8 +5,11 @@ use crate::{
         buffers::MeshBufferInfoWithOffset,
         error::{AwsmGltfError, Result},
     },
-    materials::{pbr::PbrMaterial, MaterialAlphaMode},
-    mesh::MeshBufferInfo,
+    materials::{
+        pbr::{PbrMaterial, VertexColorInfo},
+        MaterialAlphaMode,
+    },
+    mesh::{MeshBufferCustomVertexAttributeInfo, MeshBufferInfo, MeshBufferVertexAttributeInfo},
     render_passes::material::{
         cache_key::ShaderCacheKeyMaterial,
         transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent,
@@ -101,6 +104,23 @@ impl GltfMaterialInfo {
         material.base_color_factor = pbr.base_color_factor();
         material.metallic_factor = pbr.metallic_factor();
         material.roughness_factor = pbr.roughness_factor();
+
+        material.vertex_color_info = primitive_buffer_info
+            .triangles
+            .vertex_attributes
+            .iter()
+            .find_map(|attr| {
+                if let &MeshBufferVertexAttributeInfo::Custom(
+                    MeshBufferCustomVertexAttributeInfo::Colors { count, .. },
+                ) = attr
+                {
+                    tracing::info!("GOT COUNT: {}", count);
+                    // for right now just always use highest count
+                    Some(VertexColorInfo { set_index: count })
+                } else {
+                    None
+                }
+            });
 
         Ok(Self { material })
     }

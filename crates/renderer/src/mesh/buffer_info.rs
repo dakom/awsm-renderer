@@ -312,15 +312,29 @@ impl MeshBufferVertexAttributeInfo {
     pub fn force_data_size(&mut self, new_size: usize) {
         match self {
             MeshBufferVertexAttributeInfo::Visibility(vis) => match vis {
-                MeshBufferVisibilityVertexAttributeInfo::Positions { data_size, .. } => *data_size = new_size,
-                MeshBufferVisibilityVertexAttributeInfo::Normals { data_size, .. } => *data_size = new_size,
-                MeshBufferVisibilityVertexAttributeInfo::Tangents { data_size, .. } => *data_size = new_size,
+                MeshBufferVisibilityVertexAttributeInfo::Positions { data_size, .. } => {
+                    *data_size = new_size
+                }
+                MeshBufferVisibilityVertexAttributeInfo::Normals { data_size, .. } => {
+                    *data_size = new_size
+                }
+                MeshBufferVisibilityVertexAttributeInfo::Tangents { data_size, .. } => {
+                    *data_size = new_size
+                }
             },
             MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
-                MeshBufferCustomVertexAttributeInfo::Colors { data_size, .. } => *data_size = new_size,
-                MeshBufferCustomVertexAttributeInfo::TexCoords { data_size, .. } => *data_size = new_size,
-                MeshBufferCustomVertexAttributeInfo::Joints { data_size, .. } => *data_size = new_size,
-                MeshBufferCustomVertexAttributeInfo::Weights { data_size, .. } => *data_size = new_size,
+                MeshBufferCustomVertexAttributeInfo::Colors { data_size, .. } => {
+                    *data_size = new_size
+                }
+                MeshBufferCustomVertexAttributeInfo::TexCoords { data_size, .. } => {
+                    *data_size = new_size
+                }
+                MeshBufferCustomVertexAttributeInfo::Joints { data_size, .. } => {
+                    *data_size = new_size
+                }
+                MeshBufferCustomVertexAttributeInfo::Weights { data_size, .. } => {
+                    *data_size = new_size
+                }
             },
         }
     }
@@ -344,15 +358,25 @@ impl MeshBufferVertexAttributeInfo {
     pub fn component_len(&self) -> usize {
         match self {
             MeshBufferVertexAttributeInfo::Visibility(vis) => match vis {
-                MeshBufferVisibilityVertexAttributeInfo::Positions { component_len, .. } => *component_len,
-                MeshBufferVisibilityVertexAttributeInfo::Normals { component_len, .. } => *component_len,
-                MeshBufferVisibilityVertexAttributeInfo::Tangents { component_len, .. } => *component_len,
+                MeshBufferVisibilityVertexAttributeInfo::Positions { component_len, .. } => {
+                    *component_len
+                }
+                MeshBufferVisibilityVertexAttributeInfo::Normals { component_len, .. } => {
+                    *component_len
+                }
+                MeshBufferVisibilityVertexAttributeInfo::Tangents { component_len, .. } => {
+                    *component_len
+                }
             },
             MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
                 MeshBufferCustomVertexAttributeInfo::Colors { component_len, .. } => *component_len,
-                MeshBufferCustomVertexAttributeInfo::TexCoords { component_len, .. } => *component_len,
+                MeshBufferCustomVertexAttributeInfo::TexCoords { component_len, .. } => {
+                    *component_len
+                }
                 MeshBufferCustomVertexAttributeInfo::Joints { component_len, .. } => *component_len,
-                MeshBufferCustomVertexAttributeInfo::Weights { component_len, .. } => *component_len,
+                MeshBufferCustomVertexAttributeInfo::Weights { component_len, .. } => {
+                    *component_len
+                }
             },
         }
     }

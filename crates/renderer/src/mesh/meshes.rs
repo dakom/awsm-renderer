@@ -53,7 +53,8 @@ impl Meshes {
     const INDICES_INITIAL_SIZE: usize = MESH_META_INITIAL_CAPACITY * 3 * 1000;
 
     // Visibility buffer size uses MeshBufferVertexInfo::BYTE_SIZE (52 bytes per vertex)
-    const VISIBILITY_INITIAL_SIZE: usize = Self::INDICES_INITIAL_SIZE * MeshBufferVertexInfo::BYTE_SIZE;
+    const VISIBILITY_INITIAL_SIZE: usize =
+        Self::INDICES_INITIAL_SIZE * MeshBufferVertexInfo::BYTE_SIZE;
 
     // Attribute data is much smaller - only custom attributes (UVs, colors, joints, weights).
     // Estimate: 2 UV sets (8 bytes each) = 16 bytes per vertex as a reasonable starting point.

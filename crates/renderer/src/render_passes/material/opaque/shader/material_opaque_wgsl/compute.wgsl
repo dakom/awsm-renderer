@@ -10,15 +10,15 @@
 /*************** START mesh_meta.wgsl ******************/
 {% include "all_material_shared_wgsl/mesh_meta.wgsl" %}
 /*************** END mesh_meta.wgsl ******************/
-/*************** START normal.wgsl ******************/
-{% include "all_material_shared_wgsl/normal.wgsl" %}
-/*************** END normal.wgsl ******************/
 /*************** START projection.wgsl ******************/
 {% include "all_material_shared_wgsl/projection.wgsl" %}
 /*************** END projection.wgsl ******************/
 /*************** START textures.wgsl ******************/
 {% include "all_material_shared_wgsl/textures.wgsl" %}
 /*************** END textures.wgsl ******************/
+/*************** START vertex_color.wgsl ******************/
+{% include "all_material_shared_wgsl/vertex_color.wgsl" %}
+/*************** END vertex_color.wgsl ******************/
 /*************** START transforms.wgsl ******************/
 {% include "all_material_shared_wgsl/transforms.wgsl" %}
 /*************** END transforms.wgsl ******************/
@@ -313,10 +313,23 @@ fn main(
     textureStore(opaque_tex, coords, vec4<f32>(color, material_color.base.a));
 }
 
+fn pbr_should_run(material: PbrMaterial) -> bool {
+    return pbr_should_run_uvs(material) && pbr_should_run_colors(material);
+}
+
+fn pbr_should_run_colors(material: PbrMaterial) -> bool {
+    {%- match color_sets %}
+        {% when Some with (color_sets) %}
+            return material.has_color_info == true && material.color_info.set_index < {{ color_sets }};
+        {% when None %}
+            return material.has_color_info == false;
+    {% endmatch %}
+}
+
 // Decide whether we have enough UV inputs to evaluate every texture referenced by the material.
 // Each branch checks the number of TEXCOORD sets exposed by the mesh (see `attributes.rs`) against
 // what the material expects, and returns false when sampling would read garbage data.
-fn pbr_should_run(material: PbrMaterial) -> bool {
+fn pbr_should_run_uvs(material: PbrMaterial) -> bool {
     {%- match uv_sets %}
         {% when Some with (uv_sets) %}
             return pbr_material_uses_uv_count(material, {{ uv_sets }});
