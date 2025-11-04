@@ -1,5 +1,6 @@
 use awsm_renderer_core::{renderer::AwsmRendererWebGpu, texture::TextureFormat};
 
+use crate::anti_alias::AntiAliasing;
 use crate::error::Result;
 use crate::{
     bind_group_layout::BindGroupLayouts,

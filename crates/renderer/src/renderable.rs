@@ -23,7 +23,7 @@ pub struct Renderables<'a> {
 }
 
 impl AwsmRenderer {
-    pub fn collect_renderables(&self) -> Result<Renderables> {
+    pub fn collect_renderables(&self, ctx: &RenderContext) -> Result<Renderables> {
         let _maybe_span_guard = if self.logging.render_timings {
             Some(tracing::span!(tracing::Level::INFO, "Collect renderables").entered())
         } else {
@@ -63,8 +63,8 @@ impl AwsmRenderer {
 
         if let Some(camera_matrices) = self.camera.last_matrices.as_ref() {
             let view_proj = camera_matrices.view_projection();
-            opaque.sort_by(|a, b| geometry_sort_renderable(a, b, &view_proj, false));
-            transparent.sort_by(|a, b| geometry_sort_renderable(a, b, &view_proj, true));
+            opaque.sort_by(|a, b| geometry_sort_renderable(&ctx, a, b, &view_proj, false));
+            transparent.sort_by(|a, b| geometry_sort_renderable(&ctx, a, b, &view_proj, true));
         }
 
         Ok(Renderables {
@@ -75,6 +75,7 @@ impl AwsmRenderer {
 }
 
 fn geometry_sort_renderable(
+    ctx: &RenderContext,
     a: &Renderable,
     b: &Renderable,
     view_proj: &Mat4,
@@ -82,8 +83,8 @@ fn geometry_sort_renderable(
 ) -> std::cmp::Ordering {
     // Criteria 1: group by render_pipeline_key.
     let pipeline_ordering = a
-        .geometry_render_pipeline_key()
-        .cmp(&b.geometry_render_pipeline_key());
+        .geometry_render_pipeline_key(ctx)
+        .cmp(&b.geometry_render_pipeline_key(ctx));
     if pipeline_ordering != std::cmp::Ordering::Equal {
         return pipeline_ordering;
     }
@@ -136,9 +137,9 @@ pub enum Renderable<'a> {
 }
 
 impl Renderable<'_> {
-    pub fn geometry_render_pipeline_key(&self) -> RenderPipelineKey {
+    pub fn geometry_render_pipeline_key(&self, ctx: &RenderContext) -> RenderPipelineKey {
         match self {
-            Self::Mesh { mesh, .. } => mesh.geometry_render_pipeline_key,
+            Self::Mesh { mesh, .. } => mesh.geometry_render_pipeline_key(ctx),
         }
     }
 

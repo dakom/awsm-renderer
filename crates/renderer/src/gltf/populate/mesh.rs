@@ -153,18 +153,6 @@ impl AwsmRenderer {
             &self.textures,
         );
 
-        let geometry_render_pipeline_key = self
-            .render_passes
-            .geometry
-            .pipelines
-            .get_render_pipeline_key(
-                material_info.material.double_sided(),
-                ctx.transform_is_instanced
-                    .lock()
-                    .unwrap()
-                    .contains(&transform_key),
-            );
-
         let buffer_info_key = self
             .meshes
             .buffer_infos
@@ -172,9 +160,13 @@ impl AwsmRenderer {
 
         let mut mesh = Mesh::new(
             buffer_info_key,
-            geometry_render_pipeline_key,
             transform_key,
             material_key,
+            material_info.material.double_sided(),
+            ctx.transform_is_instanced
+                .lock()
+                .unwrap()
+                .contains(&transform_key),
         );
 
         if let Some(aabb) = try_position_aabb(&gltf_primitive) {

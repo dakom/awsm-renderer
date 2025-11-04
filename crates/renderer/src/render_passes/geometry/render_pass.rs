@@ -56,25 +56,22 @@ impl GeometryRenderPass {
             )
             .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
             ColorAttachment::new(
-                &ctx.render_texture_views.taa_clip_positions[ctx.render_texture_views.curr_index],
+                &ctx.render_texture_views.barycentric,
                 LoadOp::Clear,
                 StoreOp::Store,
-            ),
+            )
+            .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
             ColorAttachment::new(
                 &ctx.render_texture_views.geometry_normal,
                 LoadOp::Clear,
                 StoreOp::Store,
             ),
-        ];
-
-        // Only add separate tangent attachment in full-fidelity mode
-        if ctx.render_texture_views.use_separate_normal_tangent {
-            color_attachments.push(ColorAttachment::new(
+            ColorAttachment::new(
                 &ctx.render_texture_views.geometry_tangent,
                 LoadOp::Clear,
                 StoreOp::Store,
-            ));
-        }
+            ),
+        ];
 
         let render_pass = ctx.command_encoder.begin_render_pass(
             &RenderPassDescriptor {
@@ -103,7 +100,7 @@ impl GeometryRenderPass {
 
         let mut last_render_pipeline_key = None;
         for renderable in renderables {
-            let render_pipeline_key = renderable.geometry_render_pipeline_key();
+            let render_pipeline_key = renderable.geometry_render_pipeline_key(&ctx);
             if last_render_pipeline_key != Some(render_pipeline_key) {
                 render_pass.set_pipeline(ctx.pipelines.render.get(render_pipeline_key)?);
                 last_render_pipeline_key = Some(render_pipeline_key);

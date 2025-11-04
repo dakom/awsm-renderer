@@ -25,7 +25,8 @@ pub const MATERIAL_OPAQUE_CORE_TEXTURES_START_GROUP: u32 = 1;
 pub const MATERIAL_OPAQUE_CORE_TEXTURES_START_BINDING: u32 = 0;
 
 pub struct MaterialOpaqueBindGroups {
-    pub main_bind_group_layout_key: BindGroupLayoutKey,
+    pub multisampled_main_bind_group_layout_key: BindGroupLayoutKey,
+    pub singlesampled_main_bind_group_layout_key: BindGroupLayoutKey,
     pub lights_bind_group_layout_key: BindGroupLayoutKey,
     pub texture_bind_group_layout_key: BindGroupLayoutKey,
     pub sampler_bind_group_layout_key: BindGroupLayoutKey,
@@ -40,221 +41,10 @@ pub struct MaterialOpaqueBindGroups {
 
 impl MaterialOpaqueBindGroups {
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
-        let main_entries = vec![
-            // Mesh Meta (for this pass, different than geometry pass)
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Buffer(
-                    BufferBindingLayout::new()
-                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Visibility data texture
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new()
-                        .with_view_dimension(TextureViewDimension::N2d)
-                        .with_sample_type(TextureSampleType::UnfilterableFloat),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Opaque color render texture (storage texture for compute write)
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::StorageTexture(
-                    StorageTextureBindingLayout::new(ctx.render_texture_formats.opaque_color)
-                        .with_view_dimension(TextureViewDimension::N2d)
-                        .with_access(StorageTextureAccess::WriteOnly),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Material data buffer
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Buffer(
-                    BufferBindingLayout::new()
-                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Attribute index buffer
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Buffer(
-                    BufferBindingLayout::new()
-                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Attribute data buffer
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Buffer(
-                    BufferBindingLayout::new()
-                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Transform buffer
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Buffer(
-                    BufferBindingLayout::new()
-                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Normal matrices buffer
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Buffer(
-                    BufferBindingLayout::new()
-                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Camera uniform gives us inverse matrices + frustum rays for depth reprojection.
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Buffer(
-                    BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Skybox texture
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new().with_view_dimension(TextureViewDimension::Cube),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Skybox sampler
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Sampler(
-                    SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // IBL prefiltered env texture
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new().with_view_dimension(TextureViewDimension::Cube),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // IBL prefiltered env sampler
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Sampler(
-                    SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // IBL irradiance env texture
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new().with_view_dimension(TextureViewDimension::Cube),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // IBL irradiance env sampler
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Sampler(
-                    SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Brdf lut texture
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new().with_view_dimension(TextureViewDimension::N2d),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Brdf lut sampler
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Sampler(
-                    SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Depth texture from the visibility pass – sampled during the compute shading stage.
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new()
-                        .with_view_dimension(TextureViewDimension::N2d)
-                        .with_sample_type(TextureSampleType::Depth),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Visibility data buffer (positions, triangle-id, barycentric) for mipmap computation
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Buffer(
-                    BufferBindingLayout::new()
-                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Geometry normal texture (world-space normals from geometry pass)
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new()
-                        .with_view_dimension(TextureViewDimension::N2d)
-                        .with_sample_type(TextureSampleType::UnfilterableFloat),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            // Geometry tangent texture (world-space tangents from geometry pass)
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new()
-                        .with_view_dimension(TextureViewDimension::N2d)
-                        .with_sample_type(TextureSampleType::UnfilterableFloat),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-        ];
-
-        let main_bind_group_layout_key = ctx.bind_group_layouts.get_key(
-            &ctx.gpu,
-            BindGroupLayoutCacheKey {
-                entries: main_entries,
-            },
-        )?;
+        let multisampled_main_bind_group_layout_key =
+            create_main_bind_group_layout_key(ctx, true).await?;
+        let singlesampled_main_bind_group_layout_key =
+            create_main_bind_group_layout_key(ctx, false).await?;
 
         // lights
         let light_entries = vec![
@@ -295,7 +85,8 @@ impl MaterialOpaqueBindGroups {
         } = MegaTextureDeps::new(ctx)?;
 
         Ok(Self {
-            main_bind_group_layout_key,
+            singlesampled_main_bind_group_layout_key,
+            multisampled_main_bind_group_layout_key,
             lights_bind_group_layout_key,
             texture_bind_group_layout_key,
             sampler_bind_group_layout_key,
@@ -320,7 +111,8 @@ impl MaterialOpaqueBindGroups {
         } = MegaTextureDeps::new(ctx)?;
 
         let mut _self = Self {
-            main_bind_group_layout_key: self.main_bind_group_layout_key,
+            multisampled_main_bind_group_layout_key: self.multisampled_main_bind_group_layout_key,
+            singlesampled_main_bind_group_layout_key: self.singlesampled_main_bind_group_layout_key,
             lights_bind_group_layout_key: self.lights_bind_group_layout_key,
             texture_bind_group_layout_key,
             sampler_bind_group_layout_key,
@@ -382,30 +174,60 @@ impl MaterialOpaqueBindGroups {
     pub fn recreate_main(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let mut entries = Vec::new();
 
-        entries.push(BindGroupEntry::new(
-            entries.len() as u32,
-            BindGroupResource::Buffer(BufferBinding::new(&ctx.meshes.meta.material_gpu_buffer())),
-        ));
+        // Visibility data texture
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::TextureView(Cow::Borrowed(
                 &ctx.render_texture_views.visibility_data,
             )),
         ));
+        // Barycentric texture
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
-            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.opaque_color)),
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.barycentric)),
         ));
+        // Depth texture
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.depth)),
+        ));
+        // geometry normal texture
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(
+                &ctx.render_texture_views.geometry_normal,
+            )),
+        ));
+        // geometry tangent texture
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(
+                &ctx.render_texture_views.geometry_tangent,
+            )),
+        ));
+        // visibility data
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Buffer(BufferBinding::new(&ctx.meshes.visibility_data_gpu_buffer())),
+        ));
+        // Mesh Meta (for this pass, different than geometry pass)
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Buffer(BufferBinding::new(&ctx.meshes.meta.material_gpu_buffer())),
+        ));
+        // Material data buffer
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(BufferBinding::new(
                 &ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
             )),
         ));
+        // Attribute index buffer
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(BufferBinding::new(&ctx.meshes.attribute_index_gpu_buffer())),
         ));
+        // Attribute data buffer
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(BufferBinding::new(&ctx.meshes.attribute_data_gpu_buffer())),
@@ -467,35 +289,19 @@ impl MaterialOpaqueBindGroups {
             entries.len() as u32,
             BindGroupResource::Sampler(&ctx.lights.brdf_lut.sampler),
         ));
-
-        // depth
+        // Opaque color render texture (storage texture for compute write)
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
-            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.depth)),
-        ));
-        // visibility
-        entries.push(BindGroupEntry::new(
-            entries.len() as u32,
-            BindGroupResource::Buffer(BufferBinding::new(&ctx.meshes.visibility_data_gpu_buffer())),
-        ));
-        // geometry normal texture
-        entries.push(BindGroupEntry::new(
-            entries.len() as u32,
-            BindGroupResource::TextureView(Cow::Borrowed(
-                &ctx.render_texture_views.geometry_normal,
-            )),
-        ));
-        // geometry tangent texture
-        entries.push(BindGroupEntry::new(
-            entries.len() as u32,
-            BindGroupResource::TextureView(Cow::Borrowed(
-                &ctx.render_texture_views.geometry_tangent,
-            )),
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.opaque_color)),
         ));
 
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts
-                .get(self.main_bind_group_layout_key)?,
+                .get(if ctx.anti_aliasing.msaa_sample_count.is_some() {
+                    self.multisampled_main_bind_group_layout_key
+                } else {
+                    self.singlesampled_main_bind_group_layout_key
+                })?,
             Some("Material Opaque - Main"),
             entries,
         );
@@ -653,4 +459,234 @@ impl MegaTextureDeps {
             sampler_bind_group_layout_key,
         })
     }
+}
+
+async fn create_main_bind_group_layout_key(
+    ctx: &mut RenderPassInitContext<'_>,
+    multisampled_geometry: bool,
+) -> Result<BindGroupLayoutKey> {
+    let main_entries = vec![
+        // Visibility data texture
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Texture(
+                TextureBindingLayout::new()
+                    .with_view_dimension(TextureViewDimension::N2d)
+                    .with_sample_type(TextureSampleType::Uint)
+                    .with_multisampled(multisampled_geometry),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Barycentric texture
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Texture(
+                TextureBindingLayout::new()
+                    .with_view_dimension(TextureViewDimension::N2d)
+                    .with_sample_type(TextureSampleType::UnfilterableFloat)
+                    .with_multisampled(multisampled_geometry),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Depth texture
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Texture(
+                TextureBindingLayout::new()
+                    .with_view_dimension(TextureViewDimension::N2d)
+                    .with_sample_type(TextureSampleType::Depth)
+                    .with_multisampled(multisampled_geometry),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Geometry normal texture (world-space normals from geometry pass)
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Texture(
+                TextureBindingLayout::new()
+                    .with_view_dimension(TextureViewDimension::N2d)
+                    .with_sample_type(TextureSampleType::UnfilterableFloat)
+                    .with_multisampled(multisampled_geometry),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Geometry tangent texture (world-space tangents from geometry pass)
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Texture(
+                TextureBindingLayout::new()
+                    .with_view_dimension(TextureViewDimension::N2d)
+                    .with_sample_type(TextureSampleType::UnfilterableFloat)
+                    .with_multisampled(multisampled_geometry),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Visibility data buffer (positions, triangle-id, barycentric) for mipmap computation
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Buffer(
+                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Mesh Meta (for this pass, different than geometry pass)
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Buffer(
+                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Material data buffer
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Buffer(
+                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Attribute index buffer
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Buffer(
+                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Attribute data buffer
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Buffer(
+                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Transform buffer
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Buffer(
+                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Normal matrices buffer
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Buffer(
+                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Camera uniform gives us inverse matrices + frustum rays for depth reprojection.
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Buffer(
+                BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Skybox texture
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Texture(
+                TextureBindingLayout::new().with_view_dimension(TextureViewDimension::Cube),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Skybox sampler
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Sampler(
+                SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // IBL prefiltered env texture
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Texture(
+                TextureBindingLayout::new().with_view_dimension(TextureViewDimension::Cube),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // IBL prefiltered env sampler
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Sampler(
+                SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // IBL irradiance env texture
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Texture(
+                TextureBindingLayout::new().with_view_dimension(TextureViewDimension::Cube),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // IBL irradiance env sampler
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Sampler(
+                SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Brdf lut texture
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Texture(
+                TextureBindingLayout::new().with_view_dimension(TextureViewDimension::N2d),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Brdf lut sampler
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Sampler(
+                SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Opaque color render texture (storage texture for compute write)
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::StorageTexture(
+                StorageTextureBindingLayout::new(ctx.render_texture_formats.opaque_color)
+                    .with_view_dimension(TextureViewDimension::N2d)
+                    .with_access(StorageTextureAccess::WriteOnly),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+    ];
+
+    Ok(ctx.bind_group_layouts.get_key(
+        &ctx.gpu,
+        BindGroupLayoutCacheKey {
+            entries: main_entries,
+        },
+    )?)
 }

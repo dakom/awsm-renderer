@@ -90,6 +90,7 @@ impl AwsmRenderer {
                         &self.render_passes.material_opaque.bind_groups,
                         &self.pipeline_layouts,
                         &self.meshes.buffer_infos,
+                        &self.anti_aliasing,
                     )
                     .await?;
             }

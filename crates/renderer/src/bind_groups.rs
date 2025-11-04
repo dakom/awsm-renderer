@@ -11,9 +11,10 @@ use strum::{EnumIter, IntoEnumIterator};
 use thiserror::Error;
 
 use crate::{
-    bind_group_layout::BindGroupLayouts, camera::CameraBuffer, environment::Environment,
-    lights::Lights, materials::Materials, mesh::Meshes, render_passes::RenderPasses,
-    render_textures::RenderTextureViews, textures::Textures, transforms::Transforms,
+    anti_alias::AntiAliasing, bind_group_layout::BindGroupLayouts, camera::CameraBuffer,
+    environment::Environment, lights::Lights, materials::Materials, mesh::Meshes,
+    render_passes::RenderPasses, render_textures::RenderTextureViews, textures::Textures,
+    transforms::Transforms,
 };
 
 // There are no cache keys for bind groups, they are created on demand
@@ -37,6 +38,7 @@ pub struct BindGroupRecreateContext<'a> {
     pub environment: &'a Environment,
     pub lights: &'a Lights,
     pub transforms: &'a Transforms,
+    pub anti_aliasing: &'a AntiAliasing,
 }
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq, EnumIter)]
@@ -62,6 +64,7 @@ pub enum BindGroupCreate {
     PbrMaterialResize,
     TextureViewResize,
     MegaTexture,
+    AntiAliasingChange,
 }
 
 pub struct BindGroups {
@@ -168,6 +171,9 @@ impl BindGroups {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
                 }
                 BindGroupCreate::MeshAttributeIndexResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                }
+                BindGroupCreate::AntiAliasingChange => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
                 }
             }

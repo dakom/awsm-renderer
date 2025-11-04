@@ -1,7 +1,8 @@
 // Fragment input from vertex shader
 struct FragmentInput {
-    @builtin(position) frag_coord: vec4<f32>,
-    // same value as screen_position
+    @builtin(position) screen_position: vec4<f32>,
+    // same value as screen_position, but not interpolated
+    // useful for TAA, not using for now though
     @location(1) clip_position: vec4<f32>,
     @location(2) @interpolate(flat) triangle_index: u32,
     @location(3) barycentric: vec2<f32>,  // Full barycentric coordinates
@@ -10,41 +11,41 @@ struct FragmentInput {
 }
 
 struct FragmentOutput {
-    // Ideally RGBA32Float target, possibly RGBA16Float
-    @location(0) visibility_data: vec4<f32>,    // triangle_index, material_offset, bary.xy
-    // RG16Float - xy clip coords only (z in depth buffer, w not needed)
-    @location(1) taa_clip_position: vec2<f32>,      // Exact clip coords for TAA reprojection
+    // RGBA16uint
+    @location(0) visibility_data: vec4<u32>,    // triangle_index and material_offset (each as packed 32)
+    // RG16float
+    @location(1) barycentric: vec2<f32>,    // bary.xy
+    // RGB16float
     @location(2) geometry_normal: vec4<f32>,        // xyz = world normal, w unused
+    // RGB16float
     @location(3) geometry_tangent: vec4<f32>,       // xyzw = world tangent (w = handedness)
 }
 
 @fragment
 fn fs_main(input: FragmentInput) -> FragmentOutput {
-    // input.frag_coord already contains screen position + depth!
-    // frag_coord.xy = screen coordinates (will inherently exist in compute shader)
-    // frag_coord.z = depth (also written to depth buffer)
-
-    // So, compute shader can essentially do:
-    // let screen_pos = vec2<f32>(f32(pixel_coord.x), f32(pixel_coord.y));
-    // let depth = textureLoad(depth_texture, pixel_coord, 0).x;
-    // let world_pos = unproject_screen_to_world(screen_pos, depth, inv_view_proj_matrix);
-
     var out: FragmentOutput;
 
     // Pack visibility buffer data
-    out.visibility_data = vec4<f32>(
-        bitcast<f32>(input.triangle_index),
-        bitcast<f32>(mesh_meta.material_offset),
-        input.barycentric.x,
-        input.barycentric.y  // z = 1.0 - x - y
+    let t = split16(input.triangle_index);
+    let m = split16(mesh_meta.material_offset);
+    out.visibility_data = vec4<u32>(
+        t.x,t.y,
+        m.x,m.y
     );
 
-    // Store exact clip position for TAA (only xy needed, z in depth buffer)
-    out.taa_clip_position = input.clip_position.xy;
+    // z = 1.0 - x - y
+    out.barycentric = input.barycentric;
 
     // Store transformed world-space normal and tangent
     out.geometry_normal = vec4<f32>(normalize(input.world_normal), 0.0);
     out.geometry_tangent = vec4<f32>(normalize(input.world_tangent.xyz), input.world_tangent.w);
 
+
     return out;
+}
+
+fn split16(x: u32) -> vec2<u32> {
+  let lo = x & 0xFFFFu;
+  let hi = x >> 16u;
+  return vec2<u32>(lo, hi);
 }

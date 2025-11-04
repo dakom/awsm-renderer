@@ -1,6 +1,7 @@
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::SecondaryMap;
 
+use crate::anti_alias::AntiAliasing;
 use crate::bind_groups::BindGroups;
 use crate::error::Result;
 use crate::materials::MaterialKey;
@@ -16,7 +17,8 @@ use crate::render_passes::{
 use crate::shaders::Shaders;
 
 pub struct MaterialOpaquePipelines {
-    pipeline_layout_key: PipelineLayoutKey,
+    multisampled_pipeline_layout_key: PipelineLayoutKey,
+    singlesampled_pipeline_layout_key: PipelineLayoutKey,
     compute_pipeline_keys:
         SecondaryMap<MeshBufferInfoKey, SecondaryMap<MaterialKey, ComputePipelineKey>>,
 }
@@ -26,20 +28,33 @@ impl MaterialOpaquePipelines {
         ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &MaterialOpaqueBindGroups,
     ) -> Result<Self> {
-        let pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
-            bind_groups.main_bind_group_layout_key,
+        let multisampled_pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
+            bind_groups.multisampled_main_bind_group_layout_key,
             bind_groups.lights_bind_group_layout_key,
             bind_groups.texture_bind_group_layout_key,
             bind_groups.sampler_bind_group_layout_key,
         ]);
-        let pipeline_layout_key = ctx.pipeline_layouts.get_key(
+        let multisampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
             &ctx.gpu,
             &ctx.bind_group_layouts,
-            pipeline_layout_cache_key,
+            multisampled_pipeline_layout_cache_key,
+        )?;
+
+        let singlesampled_pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
+            bind_groups.singlesampled_main_bind_group_layout_key,
+            bind_groups.lights_bind_group_layout_key,
+            bind_groups.texture_bind_group_layout_key,
+            bind_groups.sampler_bind_group_layout_key,
+        ]);
+        let singlesampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
+            &ctx.gpu,
+            &ctx.bind_group_layouts,
+            singlesampled_pipeline_layout_cache_key,
         )?;
 
         Ok(Self {
-            pipeline_layout_key,
+            multisampled_pipeline_layout_key,
+            singlesampled_pipeline_layout_key,
             compute_pipeline_keys: SecondaryMap::new(),
         })
     }
@@ -65,13 +80,17 @@ impl MaterialOpaquePipelines {
         material_opaque_bind_groups: &MaterialOpaqueBindGroups,
         pipeline_layouts: &PipelineLayouts,
         mesh_buffer_infos: &MeshBufferInfos,
+        anti_aliasing: &AntiAliasing,
     ) -> Result<ComputePipelineKey> {
         let mesh_buffer_info = mesh_buffer_infos.get(mesh_buffer_info_key)?;
+
+        let msaa_sample_count = anti_aliasing.msaa_sample_count.unwrap_or(0);
 
         let shader_cache_key = ShaderCacheKeyMaterialOpaque {
             attributes: mesh_buffer_info.into(),
             texture_atlas_len: material_opaque_bind_groups.texture_atlas_len,
             sampler_atlas_len: material_opaque_bind_groups.texture_sampler_keys.len() as u32,
+            msaa_sample_count,
         };
 
         let shader_key = shaders
@@ -81,8 +100,14 @@ impl MaterialOpaquePipelines {
             )
             .await?;
 
-        let compute_pipeline_cache_key =
-            ComputePipelineCacheKey::new(shader_key, self.pipeline_layout_key);
+        let compute_pipeline_cache_key = ComputePipelineCacheKey::new(
+            shader_key,
+            if msaa_sample_count > 0 {
+                self.multisampled_pipeline_layout_key
+            } else {
+                self.singlesampled_pipeline_layout_key
+            },
+        );
 
         let compute_pipeline_key = pipelines
             .compute

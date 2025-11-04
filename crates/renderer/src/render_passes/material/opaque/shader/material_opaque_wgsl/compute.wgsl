@@ -49,6 +49,11 @@
 /*************** START skybox.wgsl ******************/
 {% include "material_opaque_wgsl/helpers/skybox.wgsl" %}
 /*************** END skybox.wgsl ******************/
+{% if multisampled_geometry %}
+/*************** START msaa.wgsl ******************/
+{% include "material_opaque_wgsl/helpers/msaa.wgsl" %}
+/*************** END msaa.wgsl ******************/
+{% endif %}
 
 // Mirrors the CPU-side `CameraBuffer` layout. The extra inverse matrices and frustum rays give
 // us everything needed to reconstruct world-space positions from a depth value inside this
@@ -64,28 +69,36 @@ struct CameraUniform {
     frame_count: u32,
     frustum_rays: array<vec4<f32>, 4>,
 };
-
-@group(0) @binding(0) var<storage, read> mesh_metas: array<MeshMeta>;
-@group(0) @binding(1) var visibility_data_tex: texture_2d<f32>;
-@group(0) @binding(2) var opaque_tex: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(3) var<storage, read> materials: array<PbrMaterialRaw>;
-@group(0) @binding(4) var<storage, read> attribute_indices: array<u32>;
-@group(0) @binding(5) var<storage, read> attribute_data: array<f32>;
-@group(0) @binding(6) var<storage, read> model_transforms: array<mat4x4<f32>>;
-@group(0) @binding(7) var<storage, read> normal_matrices: array<f32>;
-@group(0) @binding(8) var<uniform> camera: CameraUniform;
-@group(0) @binding(9) var skybox_tex: texture_cube<f32>;
-@group(0) @binding(10) var skybox_sampler: sampler;
-@group(0) @binding(11) var ibl_filtered_env_tex: texture_cube<f32>;
-@group(0) @binding(12) var ibl_filtered_env_sampler: sampler;
-@group(0) @binding(13) var ibl_irradiance_tex: texture_cube<f32>;
-@group(0) @binding(14) var ibl_irradiance_sampler: sampler;
-@group(0) @binding(15) var brdf_lut_tex: texture_2d<f32>;
-@group(0) @binding(16) var brdf_lut_sampler: sampler;
-@group(0) @binding(17) var depth_tex: texture_depth_2d;
-@group(0) @binding(18) var<storage, read> visibility_data: array<f32>;
-@group(0) @binding(19) var geometry_normal_tex: texture_2d<f32>;
-@group(0) @binding(20) var geometry_tangent_tex: texture_2d<f32>;
+{% if multisampled_geometry %}
+    @group(0) @binding(0) var visibility_data_tex: texture_multisampled_2d<u32>;
+    @group(0) @binding(1) var barycentric_tex: texture_multisampled_2d<f32>;
+    @group(0) @binding(2) var depth_tex: texture_depth_multisampled_2d;
+    @group(0) @binding(3) var geometry_normal_tex: texture_multisampled_2d<f32>;
+    @group(0) @binding(4) var geometry_tangent_tex: texture_multisampled_2d<f32>;
+{% else %}
+    @group(0) @binding(0) var visibility_data_tex: texture_2d<u32>;
+    @group(0) @binding(1) var barycentric_tex: texture_2d<f32>;
+    @group(0) @binding(2) var depth_tex: texture_depth_2d;
+    @group(0) @binding(3) var geometry_normal_tex: texture_2d<f32>;
+    @group(0) @binding(4) var geometry_tangent_tex: texture_2d<f32>;
+{% endif %}
+@group(0) @binding(5) var<storage, read> visibility_data: array<f32>;
+@group(0) @binding(6) var<storage, read> mesh_metas: array<MeshMeta>;
+@group(0) @binding(7) var<storage, read> materials: array<PbrMaterialRaw>;
+@group(0) @binding(8) var<storage, read> attribute_indices: array<u32>;
+@group(0) @binding(9) var<storage, read> attribute_data: array<f32>;
+@group(0) @binding(10) var<storage, read> model_transforms: array<mat4x4<f32>>;
+@group(0) @binding(11) var<storage, read> normal_matrices: array<f32>;
+@group(0) @binding(12) var<uniform> camera: CameraUniform;
+@group(0) @binding(13) var skybox_tex: texture_cube<f32>;
+@group(0) @binding(14) var skybox_sampler: sampler;
+@group(0) @binding(15) var ibl_filtered_env_tex: texture_cube<f32>;
+@group(0) @binding(16) var ibl_filtered_env_sampler: sampler;
+@group(0) @binding(17) var ibl_irradiance_tex: texture_cube<f32>;
+@group(0) @binding(18) var ibl_irradiance_sampler: sampler;
+@group(0) @binding(19) var brdf_lut_tex: texture_2d<f32>;
+@group(0) @binding(20) var brdf_lut_sampler: sampler;
+@group(0) @binding(21) var opaque_tex: texture_storage_2d<rgba16float, write>;
 
 @group(1) @binding(0) var<uniform> lights_info: LightsInfoPacked;
 @group(1) @binding(1) var<storage, read> lights: array<LightPacked>;
@@ -115,15 +128,140 @@ fn main(
 
     let visibility_data = textureLoad(visibility_data_tex, coords, 0);
 
-    let triangle_index = bitcast<u32>(visibility_data.x);
-    // early return if nothing was drawn at this pixel
-    if (triangle_index == F32_MAX) {
-        let color = sample_skybox(coords, screen_dims_f32, camera, skybox_tex, skybox_sampler);
-        textureStore(opaque_tex, coords, color);
-        return;
-    }
-    let material_meta_offset = bitcast<u32>(visibility_data.y);
-    let barycentric = vec3<f32>(visibility_data.z, visibility_data.w, 1.0 - visibility_data.z - visibility_data.w);
+    let triangle_index = join32(visibility_data.x, visibility_data.y);
+    let material_meta_offset = join32(visibility_data.z, visibility_data.w);
+
+    // early return if nothing was drawn at this pixel (only if no MSAA, otherwise check all samples)
+    {% if multisampled_geometry %}
+        // With MSAA, check if ANY sample hit geometry before early returning
+        // Using short-circuit OR for efficiency (stops checking once a hit is found)
+        {% for s in 0..msaa_sample_count %}let vis_check_{{s}} = textureLoad(visibility_data_tex, coords, {{s}});
+        {% endfor %}let any_sample_hit = {% for s in 0..msaa_sample_count %}join32(vis_check_{{s}}.x, vis_check_{{s}}.y) != U32_MAX{% if loop.last %}{% else %} || {% endif %}{% endfor %};
+
+        if (!any_sample_hit) {
+            // All samples are skybox - just render skybox
+            let color = sample_skybox(coords, screen_dims_f32, camera, skybox_tex, skybox_sampler);
+            textureStore(opaque_tex, coords, color);
+            return;
+        }
+    {% else %}
+        if (triangle_index == U32_MAX) {
+            let color = sample_skybox(coords, screen_dims_f32, camera, skybox_tex, skybox_sampler);
+            textureStore(opaque_tex, coords, color);
+            return;
+        }
+    {% endif %}
+    // Special case: Sample 0 is skybox but other samples might have geometry
+    // This handles silhouette edges where background is visible at sample 0
+    // We must handle this separately because the main path assumes sample 0 has valid geometry data
+    {% if multisampled_geometry %}
+        if (triangle_index == U32_MAX) {
+            // Process all samples with full per-sample shading and blend
+            // (This path was triggered by any_sample_hit check above, so we know at least one sample has geometry)
+            var color_sum = vec3<f32>(0.0);
+            var alpha_sum = 0.0;
+            var valid_samples = 0u;
+
+            let lights_info = get_lights_info();
+            let standard_coordinates = get_standard_coordinates(coords, screen_dims);
+            // Use LOD 0 for all samples (highest detail) - conservative for silhouette edges
+            let zero_lods = PbrMaterialMipLevels(0.0, 0.0, 0.0, 0.0, 0.0);
+
+            {% for s in 0..msaa_sample_count %}
+                let vis_{{s}} = textureLoad(visibility_data_tex, coords, {{s}});
+                let tri_{{s}} = join32(vis_{{s}}.x, vis_{{s}}.y);
+                let mat_meta_{{s}} = join32(vis_{{s}}.z, vis_{{s}}.w);
+
+                if (tri_{{s}} == U32_MAX) {
+                    valid_samples++;
+                    let skybox_col = sample_skybox(coords, screen_dims_f32, camera, skybox_tex, skybox_sampler);
+                    color_sum += skybox_col.rgb;
+                    alpha_sum += skybox_col.a;
+                } else {
+                    // Full per-sample geometry shading
+                    let mesh_meta_{{s}} = mesh_metas[mat_meta_{{s}} / META_SIZE_IN_BYTES];
+                    let material_offset_{{s}} = mesh_meta_{{s}}.material_offset;
+                    let pbr_material_{{s}} = pbr_get_material(material_offset_{{s}});
+
+                    if (pbr_should_run(pbr_material_{{s}})) {
+                        valid_samples++;
+
+                        let vertex_attribute_stride_{{s}} = mesh_meta_{{s}}.vertex_attribute_stride / 4;
+                        let attribute_indices_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
+                        let attribute_data_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
+                        let visibility_data_offset_{{s}} = mesh_meta_{{s}}.visibility_data_offset / 4;
+
+                        let base_tri_idx_{{s}} = attribute_indices_offset_{{s}} + (tri_{{s}} * 3u);
+                        let tri_indices_{{s}} = vec3<u32>(
+                            attribute_indices[base_tri_idx_{{s}}],
+                            attribute_indices[base_tri_idx_{{s}} + 1],
+                            attribute_indices[base_tri_idx_{{s}} + 2]
+                        );
+
+                        let bary_{{s}} = textureLoad(barycentric_tex, coords, {{s}});
+                        let barycentric_{{s}} = vec3<f32>(bary_{{s}}.x, bary_{{s}}.y, 1.0 - bary_{{s}}.x - bary_{{s}}.y);
+                        let normal_{{s}} = textureLoad(geometry_normal_tex, coords, {{s}}).xyz;
+                        let os_verts_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_{{s}});
+                        let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
+
+                        let mat_color_{{s}} = pbr_get_material_color(
+                            tri_indices_{{s}},
+                            attribute_data_offset_{{s}},
+                            tri_{{s}},
+                            pbr_material_{{s}},
+                            barycentric_{{s}},
+                            vertex_attribute_stride_{{s}},
+                            zero_lods,
+                            normal_{{s}},
+                            transforms_{{s}}.world_normal,
+                            os_verts_{{s}}
+                        );
+
+                        var sample_color = vec3<f32>(0.0);
+
+                        {% match debug.lighting %}
+                            {% when ShaderTemplateMaterialOpaqueDebugLighting::None | ShaderTemplateMaterialOpaqueDebugLighting::IblOnly %}
+                                sample_color = brdf_ibl(
+                                    mat_color_{{s}},
+                                    mat_color_{{s}}.normal,
+                                    standard_coordinates.surface_to_camera,
+                                    ibl_filtered_env_tex,
+                                    ibl_filtered_env_sampler,
+                                    ibl_irradiance_tex,
+                                    ibl_irradiance_sampler,
+                                    brdf_lut_tex,
+                                    brdf_lut_sampler,
+                                    lights_info.ibl
+                                );
+                            {% when _ %}
+                        {% endmatch %}
+
+                        {% match debug.lighting %}
+                            {% when ShaderTemplateMaterialOpaqueDebugLighting::None | ShaderTemplateMaterialOpaqueDebugLighting::PunctualOnly %}
+                                for(var i = 0u; i < lights_info.n_lights; i = i + 1u) {
+                                    let light_brdf = light_to_brdf(get_light(i), mat_color_{{s}}.normal, standard_coordinates.world_position);
+                                    sample_color += brdf_direct(mat_color_{{s}}, light_brdf, standard_coordinates.surface_to_camera);
+                                }
+                            {% when _ %}
+                        {% endmatch %}
+
+                        color_sum += sample_color;
+                        alpha_sum += mat_color_{{s}}.base.a;
+                    }
+                }
+            {% endfor %}
+
+            if (valid_samples > 0u) {
+                textureStore(opaque_tex, coords, vec4<f32>(color_sum / f32(valid_samples), alpha_sum / f32(valid_samples)));
+            } else {
+                textureStore(opaque_tex, coords, sample_skybox(coords, screen_dims_f32, camera, skybox_tex, skybox_sampler));
+            }
+            return;
+        }
+    {% endif %}
+
+    let barycentric_data = textureLoad(barycentric_tex, coords, 0);
+    let barycentric = vec3<f32>(barycentric_data.x, barycentric_data.y, 1.0 - barycentric_data.x - barycentric_data.y);
 
 
     let mesh_meta = mesh_metas[material_meta_offset / META_SIZE_IN_BYTES];
@@ -309,7 +447,133 @@ fn main(
         color = irradiance;
     {% endif %}
 
-    // Write to output texture
+    // MSAA Resolve: if this is an edge pixel, sample all MSAA samples and blend
+    {% if multisampled_geometry && !debug.msaa_detect_edges %}
+        let samples_to_process = msaa_sample_count_for_pixel(coords, pixel_center, screen_dims_f32, world_normal, triangle_index);
+
+        if (samples_to_process > 1u) {
+            // Edge pixel - resolve MSAA by averaging all samples
+            // NOTE: Each sample can be on a DIFFERENT triangle/mesh/material!
+            var color_sum = vec3<f32>(0.0);
+            var alpha_sum = 0.0;
+            var valid_samples = 0u;
+
+            // Process all MSAA samples (unrolled via template)
+            {% for s in 0..msaa_sample_count %}
+                let visibility_{{s}} = textureLoad(visibility_data_tex, coords, {{s}});
+                let tri_id_{{s}} = join32(visibility_{{s}}.x, visibility_{{s}}.y);
+                let material_meta_offset_{{s}} = join32(visibility_{{s}}.z, visibility_{{s}}.w);
+
+                if (tri_id_{{s}} == U32_MAX) {
+                    // Sample hit background - use skybox
+                    // Note: skybox is at infinity, so sub-pixel sample position doesn't matter much
+                    // All samples use pixel center, which is fine for distant skybox
+                    valid_samples++;
+                    let skybox_color = sample_skybox(coords, screen_dims_f32, camera, skybox_tex, skybox_sampler);
+                    color_sum += skybox_color.rgb;
+                    alpha_sum += skybox_color.a;
+                } else {
+                    // Each sample needs its own mesh/material data
+                    let mesh_meta_{{s}} = mesh_metas[material_meta_offset_{{s}} / META_SIZE_IN_BYTES];
+                    let material_offset_{{s}} = mesh_meta_{{s}}.material_offset;
+                    let pbr_material_{{s}} = pbr_get_material(material_offset_{{s}});
+
+                    // Only process if this sample's mesh provides required data
+                    if (pbr_should_run(pbr_material_{{s}})) {
+                        valid_samples++;
+
+                        // Per-sample mesh data
+                        let vertex_attribute_stride_{{s}} = mesh_meta_{{s}}.vertex_attribute_stride / 4;
+                        let attribute_indices_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
+                        let attribute_data_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
+                        let visibility_data_offset_{{s}} = mesh_meta_{{s}}.visibility_data_offset / 4;
+
+                        // Per-sample triangle indices
+                        let base_triangle_index_{{s}} = attribute_indices_offset_{{s}} + (tri_id_{{s}} * 3u);
+                        let triangle_indices_{{s}} = vec3<u32>(
+                            attribute_indices[base_triangle_index_{{s}}],
+                            attribute_indices[base_triangle_index_{{s}} + 1],
+                            attribute_indices[base_triangle_index_{{s}} + 2]
+                        );
+
+                        // Per-sample geometry
+                        let bary_{{s}} = textureLoad(barycentric_tex, coords, {{s}});
+                        let barycentric_{{s}} = vec3<f32>(bary_{{s}}.x, bary_{{s}}.y, 1.0 - bary_{{s}}.x - bary_{{s}}.y);
+                        let normal_{{s}} = textureLoad(geometry_normal_tex, coords, {{s}}).xyz;
+                        let os_vertices_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_id_{{s}});
+                        let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
+
+                        // Compute material color for this sample with its own data
+                        // OPTIMIZATION: Reuse texture_lods from sample 0 instead of computing per-sample
+                        // This is acceptable because MSAA samples are sub-pixel, so LOD difference is negligible
+                        // Computing per-sample LODs would require projecting vertices for each sample (expensive!)
+                        let material_color_{{s}} = pbr_get_material_color(
+                            triangle_indices_{{s}},
+                            attribute_data_offset_{{s}},
+                            tri_id_{{s}},
+                            pbr_material_{{s}},
+                            barycentric_{{s}},
+                            vertex_attribute_stride_{{s}},
+                            texture_lods,  // Reuse from sample 0
+                            normal_{{s}},
+                            transforms_{{s}}.world_normal,
+                            os_vertices_{{s}}
+                        );
+
+                        // Compute lighting for this sample
+                        var sample_color = vec3<f32>(0.0);
+
+                        {% match debug.lighting %}
+                            {% when ShaderTemplateMaterialOpaqueDebugLighting::None | ShaderTemplateMaterialOpaqueDebugLighting::IblOnly %}
+                                sample_color = brdf_ibl(
+                                    material_color_{{s}},
+                                    material_color_{{s}}.normal,
+                                    standard_coordinates.surface_to_camera,
+                                    ibl_filtered_env_tex,
+                                    ibl_filtered_env_sampler,
+                                    ibl_irradiance_tex,
+                                    ibl_irradiance_sampler,
+                                    brdf_lut_tex,
+                                    brdf_lut_sampler,
+                                    lights_info.ibl
+                                );
+                            {% when _ %}
+                        {% endmatch %}
+
+                        {% match debug.lighting %}
+                            {% when ShaderTemplateMaterialOpaqueDebugLighting::None | ShaderTemplateMaterialOpaqueDebugLighting::PunctualOnly %}
+                                for(var i = 0u; i < lights_info.n_lights; i = i + 1u) {
+                                    let light_brdf = light_to_brdf(get_light(i), material_color_{{s}}.normal, standard_coordinates.world_position);
+                                    sample_color += brdf_direct(material_color_{{s}}, light_brdf, standard_coordinates.surface_to_camera);
+                                }
+                            {% when _ %}
+                        {% endmatch %}
+
+                        color_sum += sample_color;
+                        alpha_sum += material_color_{{s}}.base.a;
+                    }
+                }
+            {% endfor %}
+
+            // Average the results
+            if (valid_samples > 0u) {
+                color = color_sum / f32(valid_samples);
+                let avg_alpha = alpha_sum / f32(valid_samples);
+                textureStore(opaque_tex, coords, vec4<f32>(color, avg_alpha));
+                return;
+            }
+        }
+    {% endif %}
+
+    {% if multisampled_geometry && debug.msaa_detect_edges %}
+        // Debug visualization: show detected edges in magenta
+        if (depth_edge_mask(coords, pixel_center, screen_dims_f32, world_normal, triangle_index)) {
+            textureStore(opaque_tex, coords, vec4<f32>(1.0, 0.0, 1.0, 1.0));
+            return;
+        }
+    {% endif %}
+
+    // Write to output texture (non-edge path or non-MSAA)
     textureStore(opaque_tex, coords, vec4<f32>(color, material_color.base.a));
 }
 

@@ -6,6 +6,8 @@ use awsm_renderer_core::{
 };
 use thiserror::Error;
 
+use crate::anti_alias::AntiAliasing;
+
 pub struct RenderTextures {
     pub formats: RenderTextureFormats,
     frame_count: u32,
@@ -16,12 +18,9 @@ pub struct RenderTextures {
 pub struct RenderTextureFormats {
     // Output from geometry pass
     pub visiblity_data: TextureFormat,
-    pub taa_clip_position: TextureFormat,
+    pub barycentric: TextureFormat,
     pub geometry_normal: TextureFormat, // Transformed normals with morphs/skins
     pub geometry_tangent: TextureFormat, // Transformed tangents with morphs/skins (or None if packed)
-
-    // Feature flags
-    pub use_separate_normal_tangent: bool, // true = full fidelity, false = octahedral packed
 
     // Output from opaque shading pass
     pub opaque_color: TextureFormat,
@@ -42,73 +41,11 @@ pub struct RenderTextureFormats {
 
 impl RenderTextureFormats {
     pub async fn new(device: &web_sys::GpuDevice) -> Self {
-        let actual_rgba32_format = {
-            let res = device.create_texture(
-                &TextureDescriptor::new(
-                    TextureFormat::Rgba32float,
-                    Extent3d::new(1, Some(1), Some(1)),
-                    TextureUsage::new().with_render_attachment(),
-                )
-                .into(),
-            );
-
-            match res {
-                Ok(tex) => {
-                    tex.destroy();
-                    TextureFormat::Rgba32float
-                }
-                Err(_) => TextureFormat::Rgba16float,
-            }
-        };
-
-        let actual_rgba32_format_size = match actual_rgba32_format {
-            TextureFormat::Rgba32float => 16,
-            TextureFormat::Rgba16float => 8,
-            _ => unreachable!(), // default fallback
-        };
-
-        // Detect color attachment byte limit
-        // Try to get limits from device (defaulting to 32 if unavailable)
-        let max_color_attachment_bytes_per_sample = {
-            let limits = device.limits();
-            // Try to use the web_sys API getter (requires unstable APIs enabled)
-            limits.max_color_attachment_bytes_per_sample()
-        };
-
-        // Calculate bytes for full-fidelity mode:
-        // taa_clip (RG16Float=4) + normal (RGBA16Float=8) + tangent (RGBA16Float=8) = 36 bytes
-        let full_fidelity_bytes = actual_rgba32_format_size + 4 + 8 + 8;
-
-        let use_separate_normal_tangent =
-            max_color_attachment_bytes_per_sample >= full_fidelity_bytes;
-
-        // Log which mode was selected (can be viewed in browser console)
-        // Full fidelity: 36 bytes (separate normal + tangent textures)
-        // Packed: 28 bytes (octahedral encoding)
-
-        let (geometry_normal, geometry_tangent) = if use_separate_normal_tangent {
-            // Full fidelity mode - separate textures
-            (
-                TextureFormat::Rgba16float, // xyz = normal, w unused
-                TextureFormat::Rgba16float, // xyzw = tangent (w = handedness)
-            )
-        } else {
-            // Packed mode - octahedral encoding
-            // visibility_data (16) + taa_clip (4) + normal_tangent_packed (8) = 28 bytes
-            // TODO: Implement octahedral encoding/decoding shaders
-            // For now, this will fail at runtime if triggered
-            (
-                TextureFormat::Rgba16float, // xy = octahedral normal, z = tangent handedness, w unused
-                TextureFormat::Rgba16float, // Unused, but kept for API consistency
-            )
-        };
-
         Self {
-            visiblity_data: actual_rgba32_format,
-            taa_clip_position: TextureFormat::Rg16float, // xy clip coords only (z in depth buffer)
-            geometry_normal,
-            geometry_tangent,
-            use_separate_normal_tangent,
+            visiblity_data: TextureFormat::Rgba16uint,
+            barycentric: TextureFormat::Rg16float,
+            geometry_normal: TextureFormat::Rgba16float,
+            geometry_tangent: TextureFormat::Rgba16float,
             opaque_color: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
             oit_rgb: TextureFormat::Rgba16float,      // HDR format for bloom/tonemapping
             oit_alpha: TextureFormat::R32float,       // Alpha channel for OIT
@@ -139,7 +76,11 @@ impl RenderTextures {
         self.frame_count() % 2 == 0
     }
 
-    pub fn views(&mut self, gpu: &AwsmRendererWebGpu) -> Result<RenderTextureViews> {
+    pub fn views(
+        &mut self,
+        gpu: &AwsmRendererWebGpu,
+        anti_aliasing: AntiAliasing,
+    ) -> Result<RenderTextureViews> {
         let current_size = gpu
             .current_context_texture_size()
             .map_err(AwsmRenderTextureError::CurrentScreenSize)?;
@@ -147,6 +88,11 @@ impl RenderTextures {
         let size_changed = match self.inner.as_ref() {
             Some(inner) => (inner.width, inner.height) != current_size,
             None => true,
+        };
+
+        let anti_aliasing_changed = match self.inner.as_ref() {
+            Some(inner) => inner.anti_aliasing != anti_aliasing,
+            None => false,
         };
 
         if size_changed {
@@ -159,6 +105,7 @@ impl RenderTextures {
                 self.formats.clone(),
                 current_size.0,
                 current_size.1,
+                anti_aliasing,
             )?;
             self.inner = Some(inner);
         }
@@ -169,7 +116,6 @@ impl RenderTextures {
             current_size.0,
             current_size.1,
             size_changed,
-            self.formats.use_separate_normal_tangent,
         ))
     }
 
@@ -188,12 +134,9 @@ impl RenderTextures {
 pub struct RenderTextureViews {
     // Output from geometry pass
     pub visibility_data: web_sys::GpuTextureView,
-    pub taa_clip_positions: [web_sys::GpuTextureView; 2],
+    pub barycentric: web_sys::GpuTextureView,
     pub geometry_normal: web_sys::GpuTextureView,
     pub geometry_tangent: web_sys::GpuTextureView,
-
-    // Feature flags
-    pub use_separate_normal_tangent: bool,
 
     // Output from opaque shading pass
     pub opaque_color: web_sys::GpuTextureView,
@@ -220,16 +163,14 @@ impl RenderTextureViews {
         width: u32,
         height: u32,
         size_changed: bool,
-        use_separate_normal_tangent: bool,
     ) -> Self {
         let curr_index = if ping_pong { 0 } else { 1 };
         let prev_index = if ping_pong { 1 } else { 0 };
         Self {
             visibility_data: inner.visibility_data_view.clone(),
-            taa_clip_positions: inner.taa_clip_position_views.clone(),
+            barycentric: inner.barycentric_view.clone(),
             geometry_normal: inner.geometry_normal_view.clone(),
             geometry_tangent: inner.geometry_tangent_view.clone(),
-            use_separate_normal_tangent,
             opaque_color: inner.opaque_color_view.clone(),
             oit_rgb: inner.oit_rgb_view.clone(),
             oit_alpha: inner.oit_alpha_view.clone(),
@@ -249,9 +190,11 @@ pub struct RenderTexturesInner {
     pub visibility_data: web_sys::GpuTexture,
     pub visibility_data_view: web_sys::GpuTextureView,
 
-    pub taa_clip_positions: [web_sys::GpuTexture; 2],
-    pub taa_clip_position_views: [web_sys::GpuTextureView; 2],
+    pub barycentric: web_sys::GpuTexture,
+    pub barycentric_view: web_sys::GpuTextureView,
 
+    // pub taa_clip_positions: [web_sys::GpuTexture; 2],
+    // pub taa_clip_position_views: [web_sys::GpuTextureView; 2],
     pub geometry_normal: web_sys::GpuTexture,
     pub geometry_normal_view: web_sys::GpuTextureView,
 
@@ -276,6 +219,8 @@ pub struct RenderTexturesInner {
 
     pub width: u32,
     pub height: u32,
+
+    pub anti_aliasing: AntiAliasing,
 }
 
 impl RenderTexturesInner {
@@ -284,74 +229,68 @@ impl RenderTexturesInner {
         render_texture_formats: RenderTextureFormats,
         width: u32,
         height: u32,
+        anti_aliasing: AntiAliasing,
     ) -> Result<Self> {
+        let geometry_texture =
+            |format: TextureFormat, label: &'static str| -> TextureDescriptor<'static> {
+                let mut descriptor = TextureDescriptor::new(
+                    format,
+                    Extent3d::new(width, Some(height), Some(1)),
+                    TextureUsage::new()
+                        .with_render_attachment()
+                        .with_texture_binding(),
+                )
+                .with_label(label);
+
+                if let Some(sample_count) = anti_aliasing.msaa_sample_count {
+                    descriptor = descriptor.with_sample_count(sample_count);
+                }
+
+                descriptor
+            };
+
         // 1. Create all textures
         let visibility_data = gpu
             .create_texture(
-                &TextureDescriptor::new(
-                    render_texture_formats.visiblity_data,
-                    Extent3d::new(width, Some(height), Some(1)),
-                    TextureUsage::new()
-                        .with_render_attachment()
-                        .with_texture_binding(),
-                )
-                .with_label("Material Offset")
-                .into(),
+                &geometry_texture(render_texture_formats.visiblity_data, "Visibility Data").into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let taa_clip_positions = [
-            gpu.create_texture(
-                &TextureDescriptor::new(
-                    render_texture_formats.taa_clip_position,
-                    Extent3d::new(width, Some(height), Some(1)),
-                    TextureUsage::new()
-                        .with_render_attachment()
-                        .with_texture_binding(),
-                )
-                .with_label("Screen Position (0)")
-                .into(),
+        let barycentric = gpu
+            .create_texture(
+                &geometry_texture(render_texture_formats.barycentric, "Barycentric").into(),
             )
-            .map_err(AwsmRenderTextureError::CreateTexture)?,
-            gpu.create_texture(
-                &TextureDescriptor::new(
-                    render_texture_formats.taa_clip_position,
-                    Extent3d::new(width, Some(height), Some(1)),
-                    TextureUsage::new()
-                        .with_render_attachment()
-                        .with_texture_binding(),
-                )
-                .with_label("Screen Position (1)")
-                .into(),
-            )
-            .map_err(AwsmRenderTextureError::CreateTexture)?,
-        ];
+            .map_err(AwsmRenderTextureError::CreateTexture)?;
+
+        // let taa_clip_positions = [
+        //     gpu.create_texture(
+        //         &geometry_texture(
+        //             render_texture_formats.taa_clip_position,
+        //             "TAA Clip Position (0)",
+        //         )
+        //         .into(),
+        //     )
+        //     .map_err(AwsmRenderTextureError::CreateTexture)?,
+        //     gpu.create_texture(
+        //         &geometry_texture(
+        //             render_texture_formats.taa_clip_position,
+        //             "TAA Clip Position (1)",
+        //         )
+        //         .into(),
+        //     )
+        //     .map_err(AwsmRenderTextureError::CreateTexture)?,
+        // ];
 
         let geometry_normal = gpu
             .create_texture(
-                &TextureDescriptor::new(
-                    render_texture_formats.geometry_normal,
-                    Extent3d::new(width, Some(height), Some(1)),
-                    TextureUsage::new()
-                        .with_render_attachment()
-                        .with_texture_binding(),
-                )
-                .with_label("Geometry Normal")
-                .into(),
+                &geometry_texture(render_texture_formats.geometry_normal, "Geometry Normal").into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
         let geometry_tangent = gpu
             .create_texture(
-                &TextureDescriptor::new(
-                    render_texture_formats.geometry_tangent,
-                    Extent3d::new(width, Some(height), Some(1)),
-                    TextureUsage::new()
-                        .with_render_attachment()
-                        .with_texture_binding(),
-                )
-                .with_label("Geometry Tangent")
-                .into(),
+                &geometry_texture(render_texture_formats.geometry_tangent, "Geometry Tangent")
+                    .into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
@@ -399,17 +338,7 @@ impl RenderTexturesInner {
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
         let depth = gpu
-            .create_texture(
-                &TextureDescriptor::new(
-                    render_texture_formats.depth,
-                    Extent3d::new(width, Some(height), Some(1)),
-                    TextureUsage::new()
-                        .with_render_attachment()
-                        .with_texture_binding(),
-                )
-                .with_label("Depth")
-                .into(),
-            )
+            .create_texture(&geometry_texture(render_texture_formats.depth, "Depth").into())
             // Keeping the depth buffer bindable allows later passes (e.g. compute shading) to
             // sample it directly for world-position reconstruction.
             .map_err(AwsmRenderTextureError::CreateTexture)?;
@@ -434,14 +363,18 @@ impl RenderTexturesInner {
             AwsmRenderTextureError::CreateTextureView(format!("visibility_data: {e:?}"))
         })?;
 
-        let taa_clip_position_views = [
-            taa_clip_positions[0].create_view().map_err(|e| {
-                AwsmRenderTextureError::CreateTextureView(format!("taa_clip_positions[0]: {e:?}"))
-            })?,
-            taa_clip_positions[1].create_view().map_err(|e| {
-                AwsmRenderTextureError::CreateTextureView(format!("taa_clip_positions[1]: {e:?}"))
-            })?,
-        ];
+        let barycentric_view = barycentric.create_view().map_err(|e| {
+            AwsmRenderTextureError::CreateTextureView(format!("barycentric: {e:?}"))
+        })?;
+
+        // let taa_clip_position_views = [
+        //     taa_clip_positions[0].create_view().map_err(|e| {
+        //         AwsmRenderTextureError::CreateTextureView(format!("taa_clip_positions[0]: {e:?}"))
+        //     })?,
+        //     taa_clip_positions[1].create_view().map_err(|e| {
+        //         AwsmRenderTextureError::CreateTextureView(format!("taa_clip_positions[1]: {e:?}"))
+        //     })?,
+        // ];
 
         let geometry_normal_view = geometry_normal.create_view().map_err(|e| {
             AwsmRenderTextureError::CreateTextureView(format!("geometry_normal: {e:?}"))
@@ -475,8 +408,8 @@ impl RenderTexturesInner {
             visibility_data,
             visibility_data_view,
 
-            taa_clip_positions,
-            taa_clip_position_views,
+            barycentric,
+            barycentric_view,
 
             geometry_normal,
             geometry_normal_view,
@@ -508,14 +441,17 @@ impl RenderTexturesInner {
 
             width,
             height,
+
+            anti_aliasing,
         })
     }
 
     pub fn destroy(self) {
         self.visibility_data.destroy();
-        for texture in self.taa_clip_positions {
-            texture.destroy();
-        }
+        self.barycentric.destroy();
+        // for texture in self.taa_clip_positions {
+        //     texture.destroy();
+        // }
         self.geometry_normal.destroy();
         self.geometry_tangent.destroy();
         self.opaque_color.destroy();

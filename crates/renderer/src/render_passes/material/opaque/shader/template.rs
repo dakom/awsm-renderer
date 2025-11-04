@@ -28,6 +28,8 @@ pub struct ShaderTemplateMaterialOpaque {
     pub uv_sets: Option<u32>,
     pub debug: ShaderTemplateMaterialOpaqueDebug,
     pub mipmap: MipmapMode,
+    pub multisampled_geometry: bool,
+    pub msaa_sample_count: u32, // 0 if no MSAA
 }
 
 impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
@@ -75,7 +77,10 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             color_sets: value.attributes.color_sets,
             uv_sets: value.attributes.uv_sets,
             mipmap: MipmapMode::Lod,
+            multisampled_geometry: value.msaa_sample_count > 0,
+            msaa_sample_count: value.msaa_sample_count,
             debug: ShaderTemplateMaterialOpaqueDebug {
+                msaa_detect_edges: false, // Disabled - using real MSAA resolve
                 ..Default::default()
             },
         };
@@ -98,6 +103,7 @@ struct ShaderTemplateMaterialOpaqueDebug {
     solid_color: bool,
     view_direction: bool,
     irradiance_sample: bool,
+    msaa_detect_edges: bool,
     lighting: ShaderTemplateMaterialOpaqueDebugLighting,
 }
 

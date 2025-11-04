@@ -6,6 +6,7 @@ use awsm_renderer_core::command::{CommandEncoder, LoadOp, StoreOp};
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use awsm_renderer_core::texture::TextureFormat;
 
+use crate::anti_alias::AntiAliasing;
 use crate::bind_groups::{BindGroupCreate, BindGroupRecreateContext, BindGroups};
 use crate::error::Result;
 use crate::instances::Instances;
@@ -53,7 +54,9 @@ impl AwsmRenderer {
         self.camera
             .write_gpu(&self.logging, &self.gpu, &self.bind_groups)?;
 
-        let render_texture_views = self.render_textures.views(&self.gpu)?;
+        let render_texture_views = self
+            .render_textures
+            .views(&self.gpu, self.anti_aliasing.clone())?;
 
         if render_texture_views.size_changed {
             self.bind_groups
@@ -72,6 +75,7 @@ impl AwsmRenderer {
                 environment: &self.environment,
                 lights: &self.lights,
                 transforms: &self.transforms,
+                anti_aliasing: &self.anti_aliasing,
             },
             &mut self.render_passes,
         )?;
@@ -87,9 +91,10 @@ impl AwsmRenderer {
             instances: &self.instances,
             bind_groups: &self.bind_groups,
             render_passes: &self.render_passes,
+            anti_aliasing: &self.anti_aliasing,
         };
 
-        let renderables = self.collect_renderables()?;
+        let renderables = self.collect_renderables(&ctx)?;
 
         {
             let _maybe_span_guard = if self.logging.render_timings {
@@ -187,4 +192,5 @@ pub struct RenderContext<'a> {
     pub instances: &'a Instances,
     pub bind_groups: &'a BindGroups,
     pub render_passes: &'a RenderPasses,
+    pub anti_aliasing: &'a AntiAliasing,
 }

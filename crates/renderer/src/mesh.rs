@@ -30,7 +30,6 @@ use super::error::Result;
 // because for non-gltf naming, "mesh" makes more sense
 #[derive(Debug, Clone)]
 pub struct Mesh {
-    pub geometry_render_pipeline_key: RenderPipelineKey,
     pub buffer_info_key: MeshBufferInfoKey,
     pub aabb: Option<Aabb>,
     pub world_aabb: Option<Aabb>, // this is the transformed AABB, used for frustum culling and depth sorting
@@ -39,20 +38,24 @@ pub struct Mesh {
     pub geometry_morph_key: Option<GeometryMorphKey>,
     pub material_morph_key: Option<MaterialMorphKey>,
     pub skin_key: Option<SkinKey>,
+    pub double_sided: bool,
+    pub instanced: bool,
 }
 
 impl Mesh {
     pub fn new(
         buffer_info_key: MeshBufferInfoKey,
-        geometry_render_pipeline_key: RenderPipelineKey,
         transform_key: TransformKey,
         material_key: MaterialKey,
+        double_sided: bool,
+        instanced: bool,
     ) -> Self {
         Self {
             buffer_info_key,
-            geometry_render_pipeline_key,
             transform_key,
             material_key,
+            double_sided,
+            instanced,
             aabb: None,
             world_aabb: None,
             geometry_morph_key: None,
@@ -80,6 +83,13 @@ impl Mesh {
     pub fn with_skin_key(mut self, skin_key: SkinKey) -> Self {
         self.skin_key = Some(skin_key);
         self
+    }
+
+    pub fn geometry_render_pipeline_key(&self, ctx: &RenderContext) -> RenderPipelineKey {
+        ctx.render_passes
+            .geometry
+            .pipelines
+            .get_render_pipeline_key(self.double_sided, self.instanced, ctx.anti_aliasing)
     }
 
     pub fn push_geometry_pass_commands(

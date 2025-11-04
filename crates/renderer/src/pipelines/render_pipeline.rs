@@ -7,6 +7,7 @@ use awsm_renderer_core::{
         depth_stencil::DepthStencilState,
         fragment::{ColorTargetState, FragmentState},
         layout::PipelineLayoutKind,
+        multisample::MultisampleState,
         primitive::PrimitiveState,
         vertex::{VertexBufferLayout, VertexState},
         RenderPipelineDescriptor,
@@ -69,6 +70,10 @@ impl RenderPipelines {
             descriptor = descriptor.with_depth_stencil(depth_stencil);
         }
 
+        if let Some(multisample) = cache_key.multisample {
+            descriptor = descriptor.with_multisample(multisample);
+        }
+
         let pipeline = gpu.create_render_pipeline(&descriptor.into()).await?;
 
         let key = self.lookup.insert(pipeline);
@@ -99,6 +104,7 @@ pub struct RenderPipelineCacheKey {
     pub fragment_targets: Vec<ColorTargetState>,
     pub vertex_buffer_layouts: Vec<VertexBufferLayout>,
     pub vertex_constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
+    pub multisample: Option<MultisampleState>,
 }
 
 impl RenderPipelineCacheKey {
@@ -111,7 +117,13 @@ impl RenderPipelineCacheKey {
             fragment_targets: Vec::new(),
             vertex_buffer_layouts: Vec::new(),
             vertex_constants: BTreeMap::new(),
+            multisample: None,
         }
+    }
+
+    pub fn with_multisample(mut self, multisample: MultisampleState) -> Self {
+        self.multisample = Some(multisample);
+        self
     }
 
     pub fn with_push_vertex_buffer_layout(
