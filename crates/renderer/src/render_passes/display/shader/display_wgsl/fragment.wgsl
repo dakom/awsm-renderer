@@ -1,3 +1,9 @@
+{% if smaa_anti_alias %}
+/*************** START msaa.wgsl ******************/
+{% include "display_wgsl/smaa.wgsl" %}
+/*************** END msaa.wgsl ******************/
+{% endif %}
+
 @group(0) @binding(0) var composite_texture: texture_2d<f32>;
 
 struct FragmentInput {
@@ -8,7 +14,11 @@ struct FragmentInput {
 fn frag_main(in: FragmentInput) -> @location(0) vec4<f32> {
     let coords = vec2<i32>(in.full_screen_quad_position.xy);
 
-    let color: vec4<f32> = textureLoad(composite_texture, coords, 0);
+    var color: vec4<f32> = textureLoad(composite_texture, coords, 0);
+
+    {% if smaa_anti_alias %}
+        color = apply_smaa(color);
+    {% endif %}
 
     let rgb = linear_to_srgb(color.rgb);
 

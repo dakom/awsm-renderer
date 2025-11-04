@@ -1,6 +1,5 @@
-use std::collections::HashSet;
-
 use askama::Template;
+use std::collections::HashSet;
 
 use crate::{
     render_passes::{
@@ -21,21 +20,29 @@ pub struct ShaderTemplateDisplay {
 
 #[derive(Template, Debug)]
 #[template(path = "display_wgsl/vertex.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateDisplayVertex {}
+pub struct ShaderTemplateDisplayVertex {
+    pub smaa_anti_alias: bool,
+}
 
 impl ShaderTemplateDisplayVertex {
     pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
-        Self {}
+        Self {
+            smaa_anti_alias: cache_key.smaa_anti_alias,
+        }
     }
 }
 
 #[derive(Template, Debug)]
 #[template(path = "display_wgsl/fragment.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateDisplayFragment {}
+pub struct ShaderTemplateDisplayFragment {
+    pub smaa_anti_alias: bool,
+}
 
 impl ShaderTemplateDisplayFragment {
     pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
-        Self {}
+        Self {
+            smaa_anti_alias: cache_key.smaa_anti_alias,
+        }
     }
 }
 
