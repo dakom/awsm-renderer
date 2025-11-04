@@ -1,5 +1,6 @@
 #![allow(warnings)]
 
+pub mod anti_alias;
 pub mod bind_group_layout;
 pub mod bind_groups;
 pub mod bounds;
@@ -50,6 +51,7 @@ use textures::Textures;
 use transforms::Transforms;
 
 use crate::{
+    anti_alias::AntiAliasing,
     bind_group_layout::BindGroupLayouts,
     debug::AwsmRendererLogging,
     environment::{Environment, Skybox},
@@ -79,6 +81,7 @@ pub struct AwsmRenderer {
     pub render_textures: RenderTextures,
     pub render_passes: RenderPasses,
     pub environment: Environment,
+    pub anti_aliasing: AntiAliasing,
     // we pick between these on the fly
     _clear_color_perceptual_to_linear: Color,
     _clear_color: Color,
@@ -116,6 +119,7 @@ pub struct AwsmRendererBuilder {
     skybox_colors: CubemapBitmapColors,
     ibl_filtered_env_colors: CubemapBitmapColors,
     ibl_irradiance_colors: CubemapBitmapColors,
+    anti_aliasing: AntiAliasing,
 }
 
 pub enum AwsmRendererGpuBuilderKind {
@@ -167,13 +171,14 @@ impl AwsmRendererBuilder {
                 y_positive: Color::BLACK,
                 y_negative: Color::BLACK,
             }, // skybox_colors: CubemapBitmapColors {
-               //     z_positive: Color::BLACK,
-               //     z_negative: Color::BLACK,
-               //     x_positive: Color::BLACK,
-               //     x_negative: Color::BLACK,
-               //     y_positive: Color::BLACK,
-               //     y_negative: Color::BLACK,
-               // },
+            //     z_positive: Color::BLACK,
+            //     z_negative: Color::BLACK,
+            //     x_positive: Color::BLACK,
+            //     x_negative: Color::BLACK,
+            //     y_positive: Color::BLACK,
+            //     y_negative: Color::BLACK,
+            // },
+            anti_aliasing: AntiAliasing::default(),
         }
     }
 
@@ -184,6 +189,11 @@ impl AwsmRendererBuilder {
 
     pub fn with_ibl_filtered_env_colors(mut self, colors: CubemapBitmapColors) -> Self {
         self.ibl_filtered_env_colors = colors;
+        self
+    }
+
+    pub fn with_anti_aliasing(mut self, anti_aliasing: AntiAliasing) -> Self {
+        self.anti_aliasing = anti_aliasing;
         self
     }
 
@@ -222,6 +232,7 @@ impl AwsmRendererBuilder {
             skybox_colors,
             ibl_filtered_env_colors,
             ibl_irradiance_colors,
+            anti_aliasing,
         } = self;
 
         let mut gpu = match gpu {
@@ -303,6 +314,7 @@ impl AwsmRendererBuilder {
             _clear_color_perceptual_to_linear: clear_color.perceptual_to_linear(),
             logging,
             render_textures,
+            anti_aliasing,
             #[cfg(feature = "gltf")]
             gltf,
             #[cfg(feature = "animation")]

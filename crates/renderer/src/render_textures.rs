@@ -17,7 +17,7 @@ pub struct RenderTextureFormats {
     // Output from geometry pass
     pub visiblity_data: TextureFormat,
     pub taa_clip_position: TextureFormat,
-    pub geometry_normal: TextureFormat,  // Transformed normals with morphs/skins
+    pub geometry_normal: TextureFormat, // Transformed normals with morphs/skins
     pub geometry_tangent: TextureFormat, // Transformed tangents with morphs/skins (or None if packed)
 
     // Feature flags
@@ -61,6 +61,12 @@ impl RenderTextureFormats {
             }
         };
 
+        let actual_rgba32_format_size = match actual_rgba32_format {
+            TextureFormat::Rgba32float => 16,
+            TextureFormat::Rgba16float => 8,
+            _ => unreachable!(), // default fallback
+        };
+
         // Detect color attachment byte limit
         // Try to get limits from device (defaulting to 32 if unavailable)
         let max_color_attachment_bytes_per_sample = {
@@ -70,10 +76,11 @@ impl RenderTextureFormats {
         };
 
         // Calculate bytes for full-fidelity mode:
-        // visibility_data (RGBA32Float=16) + taa_clip (RG16Float=4) + normal (RGBA16Float=8) + tangent (RGBA16Float=8) = 36 bytes
-        let full_fidelity_bytes = 16 + 4 + 8 + 8; // actual_rgba32_format size + 4 + 8 + 8
+        // taa_clip (RG16Float=4) + normal (RGBA16Float=8) + tangent (RGBA16Float=8) = 36 bytes
+        let full_fidelity_bytes = actual_rgba32_format_size + 4 + 8 + 8;
 
-        let use_separate_normal_tangent = max_color_attachment_bytes_per_sample >= full_fidelity_bytes;
+        let use_separate_normal_tangent =
+            max_color_attachment_bytes_per_sample >= full_fidelity_bytes;
 
         // Log which mode was selected (can be viewed in browser console)
         // Full fidelity: 36 bytes (separate normal + tangent textures)
@@ -82,8 +89,8 @@ impl RenderTextureFormats {
         let (geometry_normal, geometry_tangent) = if use_separate_normal_tangent {
             // Full fidelity mode - separate textures
             (
-                TextureFormat::Rgba16float,  // xyz = normal, w unused
-                TextureFormat::Rgba16float,  // xyzw = tangent (w = handedness)
+                TextureFormat::Rgba16float, // xyz = normal, w unused
+                TextureFormat::Rgba16float, // xyzw = tangent (w = handedness)
             )
         } else {
             // Packed mode - octahedral encoding
@@ -91,22 +98,22 @@ impl RenderTextureFormats {
             // TODO: Implement octahedral encoding/decoding shaders
             // For now, this will fail at runtime if triggered
             (
-                TextureFormat::Rgba16float,  // xy = octahedral normal, z = tangent handedness, w unused
-                TextureFormat::Rgba16float,  // Unused, but kept for API consistency
+                TextureFormat::Rgba16float, // xy = octahedral normal, z = tangent handedness, w unused
+                TextureFormat::Rgba16float, // Unused, but kept for API consistency
             )
         };
 
         Self {
             visiblity_data: actual_rgba32_format,
-            taa_clip_position: TextureFormat::Rg16float,  // xy clip coords only (z in depth buffer)
+            taa_clip_position: TextureFormat::Rg16float, // xy clip coords only (z in depth buffer)
             geometry_normal,
             geometry_tangent,
             use_separate_normal_tangent,
-            opaque_color: TextureFormat::Rgba16float,     // HDR format for bloom/tonemapping
-            oit_rgb: TextureFormat::Rgba16float,          // HDR format for bloom/tonemapping
-            oit_alpha: TextureFormat::R32float,           // Alpha channel for OIT
-            composite: TextureFormat::Rgba8unorm,         // Final composite output format
-            depth: TextureFormat::Depth24plus,            // Depth format for depth testing
+            opaque_color: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
+            oit_rgb: TextureFormat::Rgba16float,      // HDR format for bloom/tonemapping
+            oit_alpha: TextureFormat::R32float,       // Alpha channel for OIT
+            composite: TextureFormat::Rgba8unorm,     // Final composite output format
+            depth: TextureFormat::Depth24plus,        // Depth format for depth testing
         }
     }
 }

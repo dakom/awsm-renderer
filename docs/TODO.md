@@ -7,6 +7,8 @@
 - cutoff
 - complete getting alpha blend mode working again
 
+# Test octahedral encoding ?
+
 
 ------
 
