@@ -234,7 +234,7 @@ impl GltfTextureInfo {
             min_filter: Some(FilterMode::Linear),
             mag_filter: Some(FilterMode::Linear),
             mipmap_filter: Some(MipmapFilterMode::Linear),
-            // CRITICAL: Enable anisotropic filtering for thin lines at oblique angles
+            // Enable anisotropic filtering for thin lines at oblique angles
             // Without this, textures become severely aliased when viewed at angles
             max_anisotropy: Some(16),
             ..Default::default()

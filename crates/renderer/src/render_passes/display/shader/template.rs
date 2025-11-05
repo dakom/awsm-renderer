@@ -22,12 +22,14 @@ pub struct ShaderTemplateDisplay {
 #[template(path = "display_wgsl/vertex.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateDisplayVertex {
     pub smaa_anti_alias: bool,
+    pub debug: ShaderTemplateDisplayDebug,
 }
 
 impl ShaderTemplateDisplayVertex {
     pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
         Self {
             smaa_anti_alias: cache_key.smaa_anti_alias,
+            debug: ShaderTemplateDisplayDebug::new(),
         }
     }
 }
@@ -36,12 +38,14 @@ impl ShaderTemplateDisplayVertex {
 #[template(path = "display_wgsl/fragment.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateDisplayFragment {
     pub smaa_anti_alias: bool,
+    pub debug: ShaderTemplateDisplayDebug,
 }
 
 impl ShaderTemplateDisplayFragment {
     pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
         Self {
             smaa_anti_alias: cache_key.smaa_anti_alias,
+            debug: ShaderTemplateDisplayDebug::new(),
         }
     }
 }
@@ -67,5 +71,19 @@ impl ShaderTemplateDisplay {
     #[cfg(debug_assertions)]
     pub fn debug_label(&self) -> Option<&str> {
         Some("Display")
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct ShaderTemplateDisplayDebug {
+    pub smaa_edges: bool,
+}
+
+impl ShaderTemplateDisplayDebug {
+    pub fn new() -> Self {
+        Self {
+            smaa_edges: false,
+            ..Default::default()
+        }
     }
 }

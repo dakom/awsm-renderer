@@ -16,8 +16,8 @@
 // Performance: ~15-25 ALU ops per pixel (very affordable for post-process)
 // ============================================================================
 
-const SMAA_THRESHOLD: f32 = 0.05;          // Edge detection threshold (lower = more sensitive) - aggressive for thin lines
-const SMAA_LOCAL_CONTRAST_THRESHOLD: f32 = 0.03;  // Even more sensitive for local contrast
+const SMAA_THRESHOLD: f32 = 0.03;          // Edge detection threshold (lower = more sensitive) - aggressive for thin lines
+const SMAA_LOCAL_CONTRAST_THRESHOLD: f32 = 0.02;  // Even more sensitive for local contrast
 const SMAA_MAX_SEARCH_STEPS: i32 = 8;     // How far to search for edge patterns
 const SMAA_CORNER_ROUNDING: f32 = 0.25;   // Corner smoothing amount
 
@@ -29,6 +29,7 @@ fn apply_smaa(color: vec4<f32>, coords: vec2<i32>) -> vec4<f32> {
     // Convert to perceptual space for edge detection (humans perceive edges in gamma space, not linear)
     let center_perceptual = linear_to_srgb(color.rgb);
     let center_luma = rgb_to_luma(center_perceptual);
+
 
     // Sample neighbors and convert to perceptual space
     let left_luma   = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(-1, 0), 0).rgb));
@@ -62,11 +63,12 @@ fn apply_smaa(color: vec4<f32>, coords: vec2<i32>) -> vec4<f32> {
 
     // Early exit if no significant edge
     if (max_delta < SMAA_THRESHOLD) {
+        {% if debug.smaa_edges %}
+            // No edge - show black
+            return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+        {% endif %}
         return color;
     }
-
-    // Debug: visualize edge detection (green = edges detected)
-    // return vec4<f32>(0.0, 1.0, 0.0, 1.0);
 
     // Determine edge orientation (including diagonal detection)
     let is_horizontal_edge = max_horizontal > max_vertical;
@@ -114,6 +116,15 @@ fn apply_smaa(color: vec4<f32>, coords: vec2<i32>) -> vec4<f32> {
         blended = neighborhood_blending(coords, weights, false);
     }
 
+    {% if debug.smaa_edges %}
+        // Debug visualization:
+        // Red channel: edge strength (0-1)
+        // Green channel: blending amount (how much the color changed)
+        let edge_strength = saturate(max_delta / SMAA_THRESHOLD);
+        let blend_amount = length(blended.rgb - color.rgb) * 10.0; // Scale up to make visible
+        return vec4<f32>(edge_strength, blend_amount, 0.0, 1.0);
+    {% endif %}
+
     return blended;
 }
 
@@ -136,26 +147,22 @@ fn calculate_blending_weights_horizontal(
     var weight_top = 0.0;
     var weight_bottom = 0.0;
 
-    // Calculate how much to blend with top neighbor
+    // Calculate blend weights based on how close neighbors are to center
+    // Closer neighbors get more weight (helps average the edge smoothly)
     let top_contrast = abs(center - top);
-    if (top_contrast > SMAA_LOCAL_CONTRAST_THRESHOLD) {
-        weight_top = saturate(1.0 - top_contrast / SMAA_THRESHOLD);
-    }
-
-    // Calculate how much to blend with bottom neighbor
     let bottom_contrast = abs(center - bottom);
-    if (bottom_contrast > SMAA_LOCAL_CONTRAST_THRESHOLD) {
-        weight_bottom = saturate(1.0 - bottom_contrast / SMAA_THRESHOLD);
-    }
 
-    // Normalize weights
+    // Inverse weighting: closer neighbors (lower contrast) get higher weight
+    // Add small epsilon to avoid division by zero
+    weight_top = 1.0 / (top_contrast + 0.001);
+    weight_bottom = 1.0 / (bottom_contrast + 0.001);
+
+    // Normalize weights so they sum to 1
     let total = weight_top + weight_bottom;
-    if (total > 0.0) {
-        weight_top /= total;
-        weight_bottom /= total;
-    }
+    weight_top /= total;
+    weight_bottom /= total;
 
-    return vec2<f32>(weight_top, weight_bottom) * 0.75; // More aggressive blending for thin lines
+    return vec2<f32>(weight_top, weight_bottom) * 0.75; // 0.75 = blend 75% with neighbors
 }
 
 fn calculate_blending_weights_vertical(
@@ -176,26 +183,20 @@ fn calculate_blending_weights_vertical(
     var weight_left = 0.0;
     var weight_right = 0.0;
 
-    // Calculate how much to blend with left neighbor
+    // Calculate blend weights based on how close neighbors are to center
     let left_contrast = abs(center - left);
-    if (left_contrast > SMAA_LOCAL_CONTRAST_THRESHOLD) {
-        weight_left = saturate(1.0 - left_contrast / SMAA_THRESHOLD);
-    }
-
-    // Calculate how much to blend with right neighbor
     let right_contrast = abs(center - right);
-    if (right_contrast > SMAA_LOCAL_CONTRAST_THRESHOLD) {
-        weight_right = saturate(1.0 - right_contrast / SMAA_THRESHOLD);
-    }
 
-    // Normalize weights
+    // Inverse weighting: closer neighbors (lower contrast) get higher weight
+    weight_left = 1.0 / (left_contrast + 0.001);
+    weight_right = 1.0 / (right_contrast + 0.001);
+
+    // Normalize weights so they sum to 1
     let total = weight_left + weight_right;
-    if (total > 0.0) {
-        weight_left /= total;
-        weight_right /= total;
-    }
+    weight_left /= total;
+    weight_right /= total;
 
-    return vec2<f32>(weight_left, weight_right) * 0.75; // More aggressive blending for thin lines
+    return vec2<f32>(weight_left, weight_right) * 0.75; // 0.75 = blend 75% with neighbors
 }
 
 fn diagonal_blending(
@@ -212,36 +213,20 @@ fn diagonal_blending(
 ) -> vec4<f32> {
     let center = textureLoad(composite_texture, coords, 0);
 
-    // Calculate adaptive weights for each diagonal based on contrast
-    var weight_tl = 0.0;
-    var weight_tr = 0.0;
-    var weight_bl = 0.0;
-    var weight_br = 0.0;
-
-    if (delta_top_left > SMAA_LOCAL_CONTRAST_THRESHOLD) {
-        weight_tl = saturate(1.0 - delta_top_left / SMAA_THRESHOLD);
-    }
-    if (delta_top_right > SMAA_LOCAL_CONTRAST_THRESHOLD) {
-        weight_tr = saturate(1.0 - delta_top_right / SMAA_THRESHOLD);
-    }
-    if (delta_bottom_left > SMAA_LOCAL_CONTRAST_THRESHOLD) {
-        weight_bl = saturate(1.0 - delta_bottom_left / SMAA_THRESHOLD);
-    }
-    if (delta_bottom_right > SMAA_LOCAL_CONTRAST_THRESHOLD) {
-        weight_br = saturate(1.0 - delta_bottom_right / SMAA_THRESHOLD);
-    }
+    // Calculate adaptive weights for each diagonal based on inverse contrast
+    // Closer neighbors (lower contrast) get higher weight
+    let weight_tl = 1.0 / (delta_top_left + 0.001);
+    let weight_tr = 1.0 / (delta_top_right + 0.001);
+    let weight_bl = 1.0 / (delta_bottom_left + 0.001);
+    let weight_br = 1.0 / (delta_bottom_right + 0.001);
 
     let total_weight = weight_tl + weight_tr + weight_bl + weight_br;
 
-    if (total_weight <= 0.0) {
-        return center;
-    }
-
-    // Normalize weights
-    weight_tl /= total_weight;
-    weight_tr /= total_weight;
-    weight_bl /= total_weight;
-    weight_br /= total_weight;
+    // Normalize weights so they sum to 1
+    let norm_weight_tl = weight_tl / total_weight;
+    let norm_weight_tr = weight_tr / total_weight;
+    let norm_weight_bl = weight_bl / total_weight;
+    let norm_weight_br = weight_br / total_weight;
 
     // Sample diagonal neighbors
     let top_left = textureLoad(composite_texture, coords + vec2<i32>(-1, -1), 0);
@@ -249,13 +234,13 @@ fn diagonal_blending(
     let bottom_left = textureLoad(composite_texture, coords + vec2<i32>(-1, 1), 0);
     let bottom_right = textureLoad(composite_texture, coords + vec2<i32>(1, 1), 0);
 
-    // Blend diagonally with moderate strength for thin lines
+    // Blend diagonally with moderate strength
     let blend_strength = 0.6;
     var result = center;
-    result = mix(result, top_left, weight_tl * blend_strength);
-    result = mix(result, top_right, weight_tr * blend_strength);
-    result = mix(result, bottom_left, weight_bl * blend_strength);
-    result = mix(result, bottom_right, weight_br * blend_strength);
+    result = mix(result, top_left, norm_weight_tl * blend_strength);
+    result = mix(result, top_right, norm_weight_tr * blend_strength);
+    result = mix(result, bottom_left, norm_weight_bl * blend_strength);
+    result = mix(result, bottom_right, norm_weight_br * blend_strength);
 
     return result;
 }
