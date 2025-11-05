@@ -9,7 +9,7 @@
 // - Shader aliasing
 //
 // Strategy:
-// 1. Edge detection using luma contrast
+// 1. Edge detection using luma contrast (in perceptual/gamma space)
 // 2. Pattern-based neighborhood blending
 // 3. Sub-pixel edge handling
 //
@@ -26,20 +26,21 @@ fn apply_smaa(color: vec4<f32>, coords: vec2<i32>) -> vec4<f32> {
     let tex_size = vec2<f32>(f32(dimensions.x), f32(dimensions.y));
     let inv_tex_size = vec2<f32>(1.0 / tex_size.x, 1.0 / tex_size.y);
 
-    // Sample center and neighbors for edge detection
-    let center_luma = rgb_to_luma(color.rgb);
+    // Convert to perceptual space for edge detection (humans perceive edges in gamma space, not linear)
+    let center_perceptual = linear_to_srgb(color.rgb);
+    let center_luma = rgb_to_luma(center_perceptual);
 
-    // Sample 4-neighborhood for edge detection
-    let left_luma   = rgb_to_luma(textureLoad(composite_texture, coords + vec2<i32>(-1, 0), 0).rgb);
-    let right_luma  = rgb_to_luma(textureLoad(composite_texture, coords + vec2<i32>(1, 0), 0).rgb);
-    let top_luma    = rgb_to_luma(textureLoad(composite_texture, coords + vec2<i32>(0, -1), 0).rgb);
-    let bottom_luma = rgb_to_luma(textureLoad(composite_texture, coords + vec2<i32>(0, 1), 0).rgb);
+    // Sample neighbors and convert to perceptual space
+    let left_luma   = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(-1, 0), 0).rgb));
+    let right_luma  = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(1, 0), 0).rgb));
+    let top_luma    = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(0, -1), 0).rgb));
+    let bottom_luma = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(0, 1), 0).rgb));
 
     // Sample diagonals for better thin line detection
-    let top_left_luma     = rgb_to_luma(textureLoad(composite_texture, coords + vec2<i32>(-1, -1), 0).rgb);
-    let top_right_luma    = rgb_to_luma(textureLoad(composite_texture, coords + vec2<i32>(1, -1), 0).rgb);
-    let bottom_left_luma  = rgb_to_luma(textureLoad(composite_texture, coords + vec2<i32>(-1, 1), 0).rgb);
-    let bottom_right_luma = rgb_to_luma(textureLoad(composite_texture, coords + vec2<i32>(1, 1), 0).rgb);
+    let top_left_luma     = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(-1, -1), 0).rgb));
+    let top_right_luma    = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(1, -1), 0).rgb));
+    let bottom_left_luma  = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(-1, 1), 0).rgb));
+    let bottom_right_luma = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(1, 1), 0).rgb));
 
     // Calculate luma deltas (edge strength)
     let delta_left   = abs(center_luma - left_luma);
@@ -63,6 +64,9 @@ fn apply_smaa(color: vec4<f32>, coords: vec2<i32>) -> vec4<f32> {
     if (max_delta < SMAA_THRESHOLD) {
         return color;
     }
+
+    // Debug: visualize edge detection (green = edges detected)
+    // return vec4<f32>(0.0, 1.0, 0.0, 1.0);
 
     // Determine edge orientation (including diagonal detection)
     let is_horizontal_edge = max_horizontal > max_vertical;

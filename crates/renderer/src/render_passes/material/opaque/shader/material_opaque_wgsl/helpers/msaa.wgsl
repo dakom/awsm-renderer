@@ -109,6 +109,7 @@ fn edge_mask_neighbors(
 
 // Detect edges within a pixel by checking MSAA sample depth variation
 // This catches sub-pixel edges that neighbor checks would miss
+// IMPORTANT: Only returns true for cross-triangle edges to preserve texture detail
 fn edge_mask_depth_msaa(
   coords: vec2<i32>,
   pixel_center: vec2<f32>,
@@ -118,10 +119,11 @@ fn edge_mask_depth_msaa(
   var dmin =  1e9;
   var dmax = -1e9;
 
-  // Check all MSAA samples for depth variation (loop unrolled via template)
+  // Check all MSAA samples for depth variation and triangle IDs (loop unrolled via template)
   // View-space depth needed here since samples at same screen position but different depths
   {% for s in 0..msaa_sample_count %}
     if (sampleCovered(coords, {{ s }})) {
+
       sample_count++;
       let depth = textureLoad(depth_tex, coords, {{ s }});
       let view_depth = viewSpaceDepth(depth, pixel_center, screen_dims_f32);

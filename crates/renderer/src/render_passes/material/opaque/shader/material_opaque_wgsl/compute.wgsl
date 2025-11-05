@@ -135,8 +135,18 @@ fn main(
     {% if multisampled_geometry %}
         // With MSAA, check if ANY sample hit geometry before early returning
         // Using short-circuit OR for efficiency (stops checking once a hit is found)
-        {% for s in 0..msaa_sample_count %}let vis_check_{{s}} = textureLoad(visibility_data_tex, coords, {{s}});
-        {% endfor %}let any_sample_hit = {% for s in 0..msaa_sample_count %}join32(vis_check_{{s}}.x, vis_check_{{s}}.y) != U32_MAX{% if loop.last %}{% else %} || {% endif %}{% endfor %};
+        {% for s in 0..msaa_sample_count %}
+            let vis_check_{{s}} = textureLoad(visibility_data_tex, coords, {{s}});
+        {% endfor %}
+
+        let any_sample_hit =
+        {% for s in 0..msaa_sample_count %}
+            join32(vis_check_{{s}}.x, vis_check_{{s}}.y) != U32_MAX
+            {% if loop.last %}
+            {% else %}
+                ||
+            {% endif %}
+        {% endfor %};
 
         if (!any_sample_hit) {
             // All samples are skybox - just render skybox
@@ -164,8 +174,6 @@ fn main(
 
             let lights_info = get_lights_info();
             let standard_coordinates = get_standard_coordinates(coords, screen_dims);
-            // Use zero LODs for all samples (forces mip 0 = highest detail) - conservative for silhouette edges
-            let zero_lods = PbrMaterialMipLevels(0.0, 0.0, 0.0, 0.0, 0.0);
 
             {% for s in 0..msaa_sample_count %}
                 let vis_{{s}} = textureLoad(visibility_data_tex, coords, {{s}});
@@ -204,14 +212,29 @@ fn main(
                         let os_verts_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_{{s}});
                         let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
 
-                        let mat_color_{{s}} = pbr_get_material_color(
+                        // Calculate proper gradients for this MSAA sample to enable mipmapping
+                        let gradients_{{s}} = pbr_get_gradients(
+                            coords,
+                            pixel_center,
+                            screen_dims_f32,
+                            pbr_material_{{s}},
+                            tri_indices_{{s}},
+                            attribute_data_offset_{{s}},
+                            vertex_attribute_stride_{{s}},
+                            camera.inv_view_proj,
+                            os_verts_{{s}},
+                            transforms_{{s}}.world_model
+                        );
+
+                        // Compute material color with proper mipmapping
+                        let mat_color_{{s}} = pbr_get_material_color_grad(
                             tri_indices_{{s}},
                             attribute_data_offset_{{s}},
                             tri_{{s}},
                             pbr_material_{{s}},
                             barycentric_{{s}},
                             vertex_attribute_stride_{{s}},
-                            zero_lods,
+                            gradients_{{s}},
                             normal_{{s}},
                             transforms_{{s}}.world_normal,
                             os_verts_{{s}}
@@ -493,16 +516,29 @@ fn main(
                         let os_vertices_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_id_{{s}});
                         let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
 
-                        // Compute material color for this sample with its own data
-                        // Use mip 0 (highest detail) for all MSAA samples - conservative for edge pixels
-                        let material_color_{{s}} = pbr_get_material_color(
+                        // Calculate proper gradients for this MSAA sample to enable mipmapping
+                        let gradients_{{s}} = pbr_get_gradients(
+                            coords,
+                            pixel_center,
+                            screen_dims_f32,
+                            pbr_material_{{s}},
+                            triangle_indices_{{s}},
+                            attribute_data_offset_{{s}},
+                            vertex_attribute_stride_{{s}},
+                            camera.inv_view_proj,
+                            os_vertices_{{s}},
+                            transforms_{{s}}.world_model
+                        );
+
+                        // Compute material color with proper mipmapping
+                        let material_color_{{s}} = pbr_get_material_color_grad(
                             triangle_indices_{{s}},
                             attribute_data_offset_{{s}},
                             tri_id_{{s}},
                             pbr_material_{{s}},
                             barycentric_{{s}},
                             vertex_attribute_stride_{{s}},
-                            PbrMaterialMipLevels(0.0, 0.0, 0.0, 0.0, 0.0),
+                            gradients_{{s}},
                             normal_{{s}},
                             transforms_{{s}}.world_normal,
                             os_vertices_{{s}}
