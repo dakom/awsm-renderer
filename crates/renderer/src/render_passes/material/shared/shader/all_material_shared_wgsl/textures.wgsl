@@ -1,4 +1,4 @@
-// 10 * 4 = 40 bytes
+// 14 * 4 = 56 bytes (added precomputed UV transform for optimization)
 struct TextureInfoRaw {
     pixel_offset_x: u32,
     pixel_offset_y: u32,
@@ -10,6 +10,10 @@ struct TextureInfoRaw {
     address_mode_u: u32,
     address_mode_v: u32,
     padding: u32,  // Atlas padding in pixels
+    uv_offset_x: f32,  // Precomputed UV offset = (texel_offset + 0.5) / atlas_dimensions
+    uv_offset_y: f32,
+    uv_scale_x: f32,   // Precomputed UV scale = span / atlas_dimensions
+    uv_scale_y: f32,
 }
 
 struct TextureInfo {
@@ -23,6 +27,8 @@ struct TextureInfo {
     address_mode_u: u32,
     address_mode_v: u32,
     padding: u32,
+    uv_offset: vec2<f32>,  // Precomputed for direct use
+    uv_scale: vec2<f32>,   // Precomputed for direct use
 }
 
 fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
@@ -37,6 +43,8 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
         raw.address_mode_u,
         raw.address_mode_v,
         raw.padding,
+        vec2<f32>(raw.uv_offset_x, raw.uv_offset_y),
+        vec2<f32>(raw.uv_scale_x, raw.uv_scale_y),
     );
 }
 
@@ -106,13 +114,8 @@ fn _texture_sample_atlas(
         apply_address_mode(attribute_uv.y, info.address_mode_v),
     );
 
-    let atlas_dimensions = vec2<f32>(textureDimensions(atlas_tex, 0u));
-    let texel_offset = vec2<f32>(info.pixel_offset);
-    let texel_size = vec2<f32>(info.size);
-
-    let span = max(texel_size - vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 0.0));
-    let texel_coords = texel_offset + wrapped_uv * span + vec2<f32>(0.5, 0.5);
-    let uv = texel_coords / atlas_dimensions;
+    // Use precomputed UV transform (eliminates textureDimensions() call and conversions)
+    let uv = info.uv_offset + wrapped_uv * info.uv_scale;
 
     switch info.sampler_index {
         {% for i in 0..sampler_atlas_len %}
@@ -145,18 +148,12 @@ fn _texture_sample_atlas_grad(
         apply_address_mode(attribute_uv.y, info.address_mode_v),
     );
 
-    let atlas_dimensions = vec2<f32>(textureDimensions(atlas_tex, 0u));
-    let texel_offset = vec2<f32>(info.pixel_offset);
-    let texel_size = vec2<f32>(info.size);
+    // Use precomputed UV transform (eliminates textureDimensions() call and conversions)
+    let uv = info.uv_offset + wrapped_uv * info.uv_scale;
 
-    let span = max(texel_size - vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 0.0));
-    let texel_coords = texel_offset + wrapped_uv * span + vec2<f32>(0.5, 0.5);
-    let uv = texel_coords / atlas_dimensions;
-
-    // Convert gradients from local UV space [0,1] to atlas UV space
-    let atlas_scale = span / atlas_dimensions;
-    let ddx_atlas = ddx_local * atlas_scale;
-    let ddy_atlas = ddy_local * atlas_scale;
+    // Convert gradients from local UV space [0,1] to atlas UV space using precomputed scale
+    let ddx_atlas = ddx_local * info.uv_scale;
+    let ddy_atlas = ddy_local * info.uv_scale;
 
     switch info.sampler_index {
         {% for i in 0..sampler_atlas_len %}
