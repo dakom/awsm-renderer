@@ -7,6 +7,7 @@ pub struct MegaTextureReport<ID> {
     pub entries: Vec<Vec<Vec<MegaTextureReportEntry<ID>>>>,
     pub count: MegaTextureReportCount,
     pub size: MegaTextureReportSizes,
+    pub mip_levels: Option<u32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -111,6 +112,7 @@ where
             max_depth,
             max_bindings_per_group,
             max_bind_groups,
+            mip_levels,
         } = self;
 
         let entries: Vec<Vec<Vec<MegaTextureReportEntry<ID>>>> = entries
@@ -200,6 +202,7 @@ where
             entries,
             count,
             size,
+            mip_levels,
         }
     }
 }

@@ -1,4 +1,4 @@
-// 36 bytes
+// 10 * 4 = 40 bytes
 struct TextureInfoRaw {
     pixel_offset_x: u32,
     pixel_offset_y: u32,
@@ -9,6 +9,7 @@ struct TextureInfoRaw {
     sampler_index: u32,
     address_mode_u: u32,
     address_mode_v: u32,
+    padding: u32,  // Atlas padding in pixels
 }
 
 struct TextureInfo {
@@ -21,6 +22,7 @@ struct TextureInfo {
     sampler_index: u32,
     address_mode_u: u32,
     address_mode_v: u32,
+    padding: u32,
 }
 
 fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
@@ -34,6 +36,7 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
         raw.sampler_index,
         raw.address_mode_u,
         raw.address_mode_v,
+        raw.padding,
     );
 }
 
@@ -98,9 +101,6 @@ fn _texture_sample_atlas(
     attribute_uv: vec2<f32>,
     mip_level: f32,
 ) -> vec4<f32> {
-    // Each slice inside the mega texture re-uses a single sampler. When individual GLTF textures
-    // request clamp/mirror behaviour we need to reproduce it manually before fetching from the
-    // atlas region.
     let wrapped_uv = vec2<f32>(
         apply_address_mode(attribute_uv.x, info.address_mode_u),
         apply_address_mode(attribute_uv.y, info.address_mode_v),
@@ -109,10 +109,9 @@ fn _texture_sample_atlas(
     let atlas_dimensions = vec2<f32>(textureDimensions(atlas_tex, 0u));
     let texel_offset = vec2<f32>(info.pixel_offset);
     let texel_size = vec2<f32>(info.size);
-    // Map attribute_uv in [0, 1] to texel centers within the sub-rectangle.
-    let texel_coords = texel_offset
-        + wrapped_uv * max(texel_size - vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 0.0))
-        + vec2<f32>(0.5, 0.5);
+
+    let span = max(texel_size - vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 0.0));
+    let texel_coords = texel_offset + wrapped_uv * span + vec2<f32>(0.5, 0.5);
     let uv = texel_coords / atlas_dimensions;
 
     switch info.sampler_index {
@@ -149,13 +148,12 @@ fn _texture_sample_atlas_grad(
     let atlas_dimensions = vec2<f32>(textureDimensions(atlas_tex, 0u));
     let texel_offset = vec2<f32>(info.pixel_offset);
     let texel_size = vec2<f32>(info.size);
-    let span = max(texel_size - vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 0.0));
 
+    let span = max(texel_size - vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 0.0));
     let texel_coords = texel_offset + wrapped_uv * span + vec2<f32>(0.5, 0.5);
     let uv = texel_coords / atlas_dimensions;
 
     // Convert gradients from local UV space [0,1] to atlas UV space
-    // The gradients need to be scaled by the texture span in atlas space
     let atlas_scale = span / atlas_dimensions;
     let ddx_atlas = ddx_local * atlas_scale;
     let ddy_atlas = ddy_local * atlas_scale;

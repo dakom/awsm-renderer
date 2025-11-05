@@ -49,7 +49,7 @@ impl MaterialBuffers {
 }
 
 impl Materials {
-    pub const MAX_SIZE: usize = 256; // minUniformBufferOffsetAlignment (also, largest possible material size)
+    pub const MAX_SIZE: usize = 512; // minUniformBufferOffsetAlignment (also, largest possible material size)
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Materials {
             lookup: SlotMap::with_key(),

@@ -143,13 +143,20 @@ impl AwsmRendererWebGpu {
     pub async fn export_texture_as_png(
         &self,
         texture: &web_sys::GpuTexture,
-        width: u32,
-        height: u32,
+        mut width: u32,
+        mut height: u32,
         array_index: u32,
         format: TextureFormat,
+        mipmap_level: Option<u32>,
         use_16bit_png: bool,
         force_srgb: Option<bool>, // typically Some(true) since that's what PNG expects
     ) -> Result<Vec<u8>> {
+        // adjust for mipmap
+        if let Some(mipmap_level) = mipmap_level {
+            width = (width >> mipmap_level).max(1);
+            height = (height >> mipmap_level).max(1);
+        }
+
         // 1. Get format information to determine buffer size and processing steps.
         let format_info = get_format_info(format, force_srgb)?;
 
@@ -166,9 +173,13 @@ impl AwsmRendererWebGpu {
         // 3. Create a command encoder and issue the copy command.
         let command_encoder = self.create_command_encoder(Some("Texture Exporter"));
 
-        let image_copy_texture = TexelCopyTextureInfo::new(texture).with_origin(
+        let mut image_copy_texture = TexelCopyTextureInfo::new(texture).with_origin(
             Origin3d::new().with_z(array_index), // Specify the array index for texture array
         );
+
+        if let Some(mipmap_level) = mipmap_level {
+            image_copy_texture = image_copy_texture.with_mip_level(mipmap_level);
+        }
 
         let image_copy_buffer = TexelCopyBufferInfo::new(&destination_buffer)
             .with_bytes_per_row(width * format_info.bytes_per_pixel)

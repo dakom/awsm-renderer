@@ -185,8 +185,8 @@ impl ImageData {
         gpu.copy_external_image_to_texture(&source.into(), &dest.into(), &self.extent_3d().into())?;
 
         if let Some(mipmap_levels) = mipmap_levels {
-            let (width, height) = self.size();
-            generate_mipmaps(gpu, &texture, width, height, 1, false, mipmap_levels).await?;
+            // Single images occupy the entire texture, so pass empty tiles vec (no tile-aware processing needed)
+            generate_mipmaps(gpu, &texture, vec![], 0, 1, false, mipmap_levels).await?;
         }
 
         Ok(texture)

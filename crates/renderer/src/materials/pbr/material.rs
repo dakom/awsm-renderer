@@ -60,9 +60,9 @@ pub struct VertexColorInfo {
 
 impl PbrMaterial {
     pub const INITIAL_ELEMENTS: usize = 32; // 32 elements is a good starting point
-                                            // NOTE: keep this in sync with `PbrMaterialRaw` in WGSL. Each texture packs 36 bytes
-                                            // (including sampler + address mode metadata) so 5 textures + 60 byte header + padding = 240.
-    pub const BYTE_SIZE: usize = 248; // must be under Materials::MAX_SIZE
+                                            // NOTE: keep this in sync with `PbrMaterialRaw` in WGSL. Each texture packs 40 bytes
+                                            // (including sampler + address mode + padding) so 5 textures + 60 byte header + padding = 260.
+    pub const BYTE_SIZE: usize = 268; // must be under Materials::MAX_SIZE
 
     pub const BITMASK_BASE_COLOR: u32 = 1;
     pub const BITMASK_METALIC_ROUGHNESS: u32 = 1 << 1;
@@ -144,6 +144,7 @@ impl PbrMaterial {
                 sampler_index: u32,
                 address_mode_u: u32,
                 address_mode_v: u32,
+                padding: u32,
             },
             SkipTexture,
         }
@@ -159,14 +160,33 @@ impl PbrMaterial {
             }
         }
 
-        impl<'a> From<(&'a MegaTextureEntryInfo<TextureKey>, u32, u32, u32, u32)> for Value<'a> {
-            fn from(value: (&'a MegaTextureEntryInfo<TextureKey>, u32, u32, u32, u32)) -> Self {
+        impl<'a>
+            From<(
+                &'a MegaTextureEntryInfo<TextureKey>,
+                u32,
+                u32,
+                u32,
+                u32,
+                u32,
+            )> for Value<'a>
+        {
+            fn from(
+                value: (
+                    &'a MegaTextureEntryInfo<TextureKey>,
+                    u32,
+                    u32,
+                    u32,
+                    u32,
+                    u32,
+                ),
+            ) -> Self {
                 Value::Texture {
                     entry_info: value.0,
                     uv_index: value.1,
                     sampler_index: value.2,
                     address_mode_u: value.3,
                     address_mode_v: value.4,
+                    padding: value.5,
                 }
             }
         }
@@ -190,6 +210,7 @@ impl PbrMaterial {
                         sampler_index,
                         address_mode_u,
                         address_mode_v,
+                        padding,
                     } => {
                         offset = write_inner(data, entry_info.pixel_offset[0].into(), offset);
                         offset = write_inner(data, entry_info.pixel_offset[1].into(), offset);
@@ -205,9 +226,11 @@ impl PbrMaterial {
                         offset = write_inner(data, sampler_index.into(), offset);
                         offset = write_inner(data, address_mode_u.into(), offset);
                         offset = write_inner(data, address_mode_v.into(), offset);
+                        // Write padding (same for all textures in the atlas)
+                        offset = write_inner(data, padding.into(), offset);
                     }
                     Value::SkipTexture => {
-                        offset += 36;
+                        offset += 40; // Changed from 36 to 40
                     }
                 }
 
@@ -259,6 +282,8 @@ impl PbrMaterial {
         let sampler_key_list: Vec<SamplerKey> =
             textures.mega_texture_sampler_set.iter().cloned().collect();
 
+        let texture_padding = textures.mega_texture.padding;
+
         if let Some(tex) = self.base_color_tex.and_then(|texture_key| {
             let entry_info = textures.get_entry(texture_key).ok()?;
             let sampler_key = self.base_color_sampler?;
@@ -271,6 +296,7 @@ impl PbrMaterial {
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
+                texture_padding,
             ))
         }) {
             write(tex.into());
@@ -292,6 +318,7 @@ impl PbrMaterial {
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
+                texture_padding,
             ))
         }) {
             write(tex.into());
@@ -312,6 +339,7 @@ impl PbrMaterial {
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
+                texture_padding,
             ))
         }) {
             write(tex.into());
@@ -332,6 +360,7 @@ impl PbrMaterial {
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
+                texture_padding,
             ))
         }) {
             write(tex.into());
@@ -352,6 +381,7 @@ impl PbrMaterial {
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
+                texture_padding,
             ))
         }) {
             write(tex.into());

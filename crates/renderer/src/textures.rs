@@ -149,7 +149,7 @@ impl Textures {
         Self {
             gpu_texture_arrays: Vec::new(),
             gpu_texture_array_views: Vec::new(),
-            mega_texture: MegaTexture::new(&gpu.device.limits(), 8),
+            mega_texture: MegaTexture::new(&gpu.device.limits(), 8), // 8 pixels recommended for 16× AF safety
             mega_texture_sampler_set: BTreeSet::new(),
             textures: SlotMap::with_key(),
             samplers: SlotMap::with_key(),
@@ -169,7 +169,7 @@ impl Textures {
     ) -> Result<TextureKey> {
         let key = self.textures.try_insert_with_key(|key| {
             self.mega_texture
-                .add_entries(vec![(image_data, key, is_srgb_encoded)])
+                .add_entries(vec![(image_data, key, is_srgb_encoded, Default::default())])
                 .map_err(AwsmTextureError::from)
                 .and_then(|mut entries| entries.pop().ok_or(AwsmTextureError::MegaTexture))
         })?;

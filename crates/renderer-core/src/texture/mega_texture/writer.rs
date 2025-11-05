@@ -13,7 +13,7 @@ use crate::{
         mega_texture::{
             pipeline::get_atlas_pipeline, MegaTexture, MegaTextureAtlas, MegaTextureLayer,
         },
-        mipmap::{calculate_mipmap_levels, generate_mipmaps},
+        mipmap::{calculate_mipmap_levels, generate_mipmaps, TileInfo},
         Extent3d, TextureDescriptor, TextureFormat, TextureUsage, TextureViewDescriptor,
         TextureViewDimension,
     },
@@ -112,11 +112,38 @@ impl<ID> MegaTextureAtlas<ID> {
         }
 
         if mipmap {
+            // Collect tile information from all layers for tile-aware mipmap generation
+            let tiles: Vec<TileInfo> = self
+                .layers
+                .iter()
+                .enumerate()
+                .flat_map(|(layer_index, layer)| {
+                    layer.entries.iter().map(move |entry| {
+                        // Convert TextureType enum to u32
+                        let texture_type_u32 = match entry.texture_type {
+                            crate::texture::mega_texture::TextureType::Albedo => 0,
+                            crate::texture::mega_texture::TextureType::Normal => 1,
+                            crate::texture::mega_texture::TextureType::MetallicRoughness => 2,
+                            crate::texture::mega_texture::TextureType::Occlusion => 3,
+                            crate::texture::mega_texture::TextureType::Emissive => 4,
+                        };
+
+                        let (width, height) = entry.image_data.size();
+                        TileInfo {
+                            pixel_offset: entry.pixel_offset,
+                            size: [width, height],
+                            texture_type: texture_type_u32,
+                            layer_index: layer_index as u32,
+                        }
+                    })
+                })
+                .collect();
+
             generate_mipmaps(
                 gpu,
                 &dest_tex_array,
-                self.texture_size,
-                self.texture_size,
+                tiles,
+                self.padding,
                 self.layers.len() as u32, // array_layers
                 true,
                 mipmap_levels,

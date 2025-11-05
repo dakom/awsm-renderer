@@ -268,8 +268,8 @@ pub async fn create_texture(
 
     // Generate mipmaps for the cubemap if requested
     if generate_mipmap {
-        // Generate mipmaps for all 6 faces
-        generate_mipmaps(gpu, &texture, width, height, 6, true, mipmap_levels).await?;
+        // Cubemaps occupy the entire texture, so pass empty tiles vec (no tile-aware processing needed)
+        generate_mipmaps(gpu, &texture, vec![], 0, 6, true, mipmap_levels).await?;
     }
 
     Ok((texture, mipmap_levels))

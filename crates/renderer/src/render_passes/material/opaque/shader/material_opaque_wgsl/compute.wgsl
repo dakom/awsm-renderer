@@ -313,7 +313,8 @@ fn main(
                 os_vertices
             );
         {% when MipmapMode::Lod %}
-            let texture_lods = pbr_get_mipmap_levels(
+            // Gradient-based sampling for anisotropic filtering
+            let gradients = pbr_get_gradients(
                 coords,
                 pixel_center,
                 screen_dims_f32,
@@ -326,14 +327,14 @@ fn main(
                 transforms.world_model
             );
 
-            let material_color = pbr_get_material_color(
+            let material_color = pbr_get_material_color_grad(
                 triangle_indices,
                 attribute_data_offset,
                 triangle_index,
                 pbr_material,
                 barycentric,
                 vertex_attribute_stride,
-                texture_lods,
+                gradients,
                 world_normal,
                 transforms.world_normal,
                 os_vertices

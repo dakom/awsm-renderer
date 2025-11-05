@@ -11,7 +11,7 @@ impl Default for AntiAliasing {
     fn default() -> Self {
         Self {
             msaa_sample_count: Some(4),
-            smaa: false,
+            smaa: true,
         }
     }
 }

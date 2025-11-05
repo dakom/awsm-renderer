@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use awsm_renderer::{
     core::texture::{mega_texture::report::MegaTextureReport, TextureFormat},
     textures::TextureKey,
@@ -18,6 +20,7 @@ pub struct SidebarTextures {
     phase: Mutable<Phase>,
     report: Mutex<Option<MegaTextureReport<TextureKey>>>,
     to_export: Mutex<Option<(usize, usize)>>,
+    mipmap_level: Cell<Option<u32>>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,6 +37,7 @@ impl SidebarTextures {
             phase: Mutable::new(Phase::Initializing),
             report: Mutex::new(None),
             to_export: Mutex::new(None),
+            mipmap_level: Cell::new(None),
         })
     }
 
@@ -88,6 +92,7 @@ impl SidebarTextures {
         let finished = Mutable::new(false);
 
         let (atlas_index, layer_index) = state.to_export.lock().unwrap().unwrap().clone();
+        let mipmap_level = state.mipmap_level.get();
 
         html!("div", {
             .future(clone!(state, finished => async move {
@@ -111,14 +116,19 @@ impl SidebarTextures {
                     layer_size.height,
                     layer_index as u32,
                     TextureFormat::Rgba16float,
+                    mipmap_level,
                     true,
                     Some(true)
                 ).await;
 
                 match png_data {
                     Ok(png_data) => {
+                        let filename = match mipmap_level {
+                            Some(level) => format!("mega_texture_atlas_{}_layer_{}_mip_{}.png", atlas_index + 1, layer_index + 1, level),
+                            None => format!("mega_texture_atlas_{}_layer_{}.png", atlas_index + 1, layer_index + 1),
+                        };
                         tracing::info!("Exported PNG data for Atlas {} - Layer {}: {:?}", atlas_index + 1, layer_index + 1, png_data.len());
-                        match save_file(&png_data, &format!("atlas_{}_layer_{}.png", atlas_index + 1, layer_index + 1), Some("image/png")) {
+                        match save_file(&png_data, &filename, Some("image/png")) {
                             Ok(_) => {
                             }
                             Err(err) => {
@@ -177,11 +187,22 @@ impl SidebarTextures {
                 .style("align-items", "center")
             }
         });
+
+        let has_mips = state
+            .report
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .mip_levels
+            .is_some();
+
         html!("div", {
             .class(&*CONTAINER)
             .child(html!("div", {
                 .class(&*INNER_CONTAINER)
                 .child(state.render_export_selector())
+                .apply_if(has_mips, |dom| dom.child(state.render_mipmap_selector()))
                 .child(state.render_export_button())
             }))
             .child(state.render_report_button())
@@ -223,6 +244,39 @@ impl SidebarTextures {
         )
     }
 
+    fn render_mipmap_selector(self: &Arc<Self>) -> Dom {
+        let state = self;
+
+        // safe, this is only called if mip_levels is Some, but might as well be safer :p
+        let mipmap_levels = state
+            .report
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .mip_levels
+            .unwrap_or_default();
+
+        let options: Vec<(String, u32)> = (0..mipmap_levels)
+            .map(|level| {
+                let label = format!("Level - {level}");
+                (label, level)
+            })
+            .collect();
+
+        render_dropdown_label(
+            "Mipmap Level",
+            Dropdown::new()
+                .with_intial_selected(None)
+                .with_bg_color(ColorBackground::Dropdown)
+                .with_on_change(clone!(state => move |level| {
+                    state.mipmap_level.set(Some(*level));
+                }))
+                .with_options(options)
+                .render(),
+        )
+    }
+
     fn render_export_button(self: &Arc<Self>) -> Dom {
         let state = self;
 
@@ -230,7 +284,9 @@ impl SidebarTextures {
             .with_style(ButtonStyle::Outline)
             .with_text("Export")
             .with_on_click(clone!(state => move || {
-                state.phase.set(Phase::Exporting);
+                if state.to_export.lock().unwrap().is_some() {
+                    state.phase.set(Phase::Exporting);
+                }
             }))
             .render()
     }

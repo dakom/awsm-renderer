@@ -41,6 +41,27 @@ use binpack2d::{
 
 use crate::image::ImageData;
 
+/// Texture type for mipmap generation filtering
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TextureType {
+    /// Standard color/albedo textures (sRGB or linear)
+    Albedo,
+    /// Normal maps - require renormalization after filtering
+    Normal,
+    /// Metallic/roughness - roughness needs perceptual averaging (r²)
+    MetallicRoughness,
+    /// Occlusion maps - standard averaging
+    Occlusion,
+    /// Emissive textures - standard averaging
+    Emissive,
+}
+
+impl Default for TextureType {
+    fn default() -> Self {
+        Self::Albedo
+    }
+}
+
 pub struct MegaTexture<ID> {
     // width and height of each layer in each atlas
     pub texture_size: u32,
@@ -90,6 +111,7 @@ pub struct MegaTextureEntry<ID> {
     pub image_data: ImageData,
     pub id: ID,
     pub is_srgb_encoded: bool,
+    pub texture_type: TextureType,
 }
 
 impl<ID> MegaTextureEntry<ID>
@@ -126,6 +148,7 @@ where
     max_depth: u32,
     max_bindings_per_group: u32,
     max_bind_groups: u32,
+    mip_levels: Option<u32>,
 }
 
 impl<ID> MegaTexture<ID>
@@ -175,10 +198,20 @@ where
             })
             .collect();
 
+        let mip_levels = if self.mipmap {
+            Some(calculate_mipmap_levels(
+                self.texture_size,
+                self.texture_size,
+            ))
+        } else {
+            None
+        };
+
         MegaTextureInfo {
             texture_size: self.texture_size,
             max_depth: self.atlas_depth,
             entries,
+            mip_levels,
             max_bindings_per_group: limits.max_sampled_textures_per_shader_stage(),
             max_bind_groups: limits.max_bind_groups(),
         }
@@ -221,7 +254,7 @@ where
 
     pub fn add_entries(
         &mut self,
-        mut images: Vec<(ImageData, ID, IsSrgbEncoded)>,
+        mut images: Vec<(ImageData, ID, IsSrgbEncoded, TextureType)>,
     ) -> Result<Vec<MegaTextureEntryInfo<ID>>> {
         if self.atlases.is_empty() {
             self.atlases.push(MegaTextureAtlas::new(
@@ -298,15 +331,15 @@ where
         &mut self,
         lookup: &mut HashMap<ID, MegaTextureIndex>,
         atlas_index: usize,
-        images: Vec<(ImageData, ID, IsSrgbEncoded)>,
+        images: Vec<(ImageData, ID, IsSrgbEncoded, TextureType)>,
         new_entries: &mut Vec<MegaTextureEntryInfo<ID>>,
-    ) -> Result<Vec<(ImageData, ID, IsSrgbEncoded)>> {
+    ) -> Result<Vec<(ImageData, ID, IsSrgbEncoded, TextureType)>> {
         if images.is_empty() {
             return Ok(images);
         }
 
         // allows us to have a stable index and mutable vec that we can take from
-        let mut images: Vec<Option<(ImageData, ID, IsSrgbEncoded)>> =
+        let mut images: Vec<Option<(ImageData, ID, IsSrgbEncoded, TextureType)>> =
             images.into_iter().map(Some).collect();
 
         let padding = self.padding as i32;
@@ -363,7 +396,8 @@ where
             }
 
             for rect in inserted.into_iter() {
-                let (image_data, id, is_srgb_encoded) = images[rect.id() as usize].take().unwrap();
+                let (image_data, id, is_srgb_encoded, texture_type) =
+                    images[rect.id() as usize].take().unwrap();
 
                 let index = MegaTextureIndex {
                     atlas: atlas_index
@@ -392,6 +426,7 @@ where
                     id,
                     image_data,
                     is_srgb_encoded,
+                    texture_type,
                 };
 
                 new_entries.push(entry.into_info(index));
@@ -405,7 +440,7 @@ where
             }
 
             if layer_index as u32 >= self.max_depth {
-                let rejected_images: Vec<(ImageData, ID, IsSrgbEncoded)> = rejected
+                let rejected_images: Vec<(ImageData, ID, IsSrgbEncoded, TextureType)> = rejected
                     .into_iter()
                     .filter_map(|dim| images[dim.id() as usize].take())
                     .collect();

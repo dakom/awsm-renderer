@@ -29,6 +29,7 @@ struct UvDerivs {
     dvdy : f32,
 }
 
+// Legacy struct - kept for compatibility with zero-LOD paths
 struct PbrMaterialMipLevels {
     base_color         : f32,
     metallic_roughness : f32,
@@ -70,8 +71,39 @@ fn reconstruct_world_position(
     return world_pos.xyz / world_pos.w;
 }
 
-// Compute per-pixel UV derivatives using depth buffer reconstruction
-// This is the "correct" solution for deferred rendering - matches fragment shader quality
+// Helper: 2x2 matrix determinant
+fn det2(a: vec2<f32>, b: vec2<f32>) -> f32 {
+    return a.x * b.y - a.y * b.x;
+}
+
+// Helper: 2x2 matrix inverse
+fn inv2(a: vec2<f32>, b: vec2<f32>) -> mat2x2<f32> {
+    let d = det2(a, b);
+    if (abs(d) < 1e-8) {
+        return mat2x2<f32>(vec2<f32>(0.0), vec2<f32>(0.0));
+    }
+    let invd = 1.0 / d;
+    return mat2x2<f32>(
+        vec2<f32>(b.y, -a.y) * invd,
+        vec2<f32>(-b.x, a.x) * invd
+    );
+}
+
+// Helper: Transform clip-space to pixel coordinates
+fn clip_to_pixel(clip: vec4<f32>, screen_size: vec2<f32>) -> vec2<f32> {
+    let ndc = clip.xy / clip.w;
+    // Convert NDC [-1,1] to [0,1], with Y-flip to match framebuffer coordinates
+    // In WebGPU/WGSL: NDC Y=-1 is bottom, Y=+1 is top
+    // In framebuffer: pixel Y=0 is top, Y=height is bottom
+    let xy01 = vec2<f32>(
+        ndc.x * 0.5 + 0.5,
+        1.0 - (ndc.y * 0.5 + 0.5)  // Flip Y
+    );
+    return xy01 * screen_size;
+}
+
+// Compute UV derivatives using screen-space Jacobian
+// This is simpler and more robust than world-space reconstruction
 fn compute_uv_derivatives_from_depth(
     coords: vec2<i32>,
     pixel_center: vec2<f32>,
@@ -84,93 +116,182 @@ fn compute_uv_derivatives_from_depth(
     os_vertices: ObjectSpaceVertices,
     world_model: mat4x4<f32>
 ) -> UvDerivs {
-    // Read depth values for 3-pixel stencil (center + right + down)
-    let depth_center = textureLoad(depth_tex, coords, 0);
-    let depth_x = textureLoad(depth_tex, coords + vec2<i32>(1, 0), 0);
-    let depth_y = textureLoad(depth_tex, coords + vec2<i32>(0, 1), 0);
-
-    // Reconstruct world positions
-    let world_center = reconstruct_world_position(pixel_center, depth_center, inv_view_proj, screen_size);
-    let world_x = reconstruct_world_position(pixel_center + vec2<f32>(1.0, 0.0), depth_x, inv_view_proj, screen_size);
-    let world_y = reconstruct_world_position(pixel_center + vec2<f32>(0.0, 1.0), depth_y, inv_view_proj, screen_size);
-
-    // World-space derivatives (per screen pixel)
-    let dWorld_dx = world_x - world_center;
-    let dWorld_dy = world_y - world_center;
-
-    // Get triangle vertices in world space by transforming object-space positions
-    let v0_world = (world_model * vec4<f32>(os_vertices.p0, 1.0)).xyz;
-    let v1_world = (world_model * vec4<f32>(os_vertices.p1, 1.0)).xyz;
-    let v2_world = (world_model * vec4<f32>(os_vertices.p2, 1.0)).xyz;
-
+    // Get triangle UVs
     let uv0 = _texture_uv_per_vertex(attribute_data_offset, uv_set_index, tri.x, vertex_stride);
     let uv1 = _texture_uv_per_vertex(attribute_data_offset, uv_set_index, tri.y, vertex_stride);
     let uv2 = _texture_uv_per_vertex(attribute_data_offset, uv_set_index, tri.z, vertex_stride);
 
-    // Solve for UV derivatives using barycentric interpolation
-    // UV(world) = w0*uv0 + w1*uv1 + w2*uv2, where w are barycentric coords
-    // We need: dUV/dScreen = dUV/dWorld * dWorld/dScreen
+    // Transform triangle vertices to clip space
+    let mvp = camera.view_proj * world_model;
+    let clip0 = mvp * vec4<f32>(os_vertices.p0, 1.0);
+    let clip1 = mvp * vec4<f32>(os_vertices.p1, 1.0);
+    let clip2 = mvp * vec4<f32>(os_vertices.p2, 1.0);
 
-    // Build edge vectors for triangle in world space
-    let e01_world = v1_world - v0_world;
-    let e02_world = v2_world - v0_world;
+    // Convert to screen-space pixel coordinates
+    let p0 = clip_to_pixel(clip0, screen_size);
+    let p1 = clip_to_pixel(clip1, screen_size);
+    let p2 = clip_to_pixel(clip2, screen_size);
 
-    // Build edge vectors for UVs
+    // Screen-space triangle edges
+    let e01_screen = p1 - p0;
+    let e02_screen = p2 - p0;
+
+    // Check for degenerate triangle in screen space
+    let screen_area = abs(det2(e01_screen, e02_screen));
+    if (screen_area < 0.01) {
+        // Triangle is too small in screen space (< 0.01 pixels² area)
+        // Use LARGE derivatives to force highest mip level (maximum blur)
+        // Large derivatives = many texels per pixel = need blur
+        return UvDerivs(10.0, 10.0, 10.0, 10.0);
+    }
+
+    // Compute inverse of screen-space triangle matrix
+    // Minv maps from screen-space displacement to barycentric coords
+    let Minv = inv2(e01_screen, e02_screen);
+
+    // Check if inversion failed (det was too small)
+    if (Minv[0].x == 0.0 && Minv[0].y == 0.0 &&
+        Minv[1].x == 0.0 && Minv[1].y == 0.0) {
+        return UvDerivs(10.0, 10.0, 10.0, 10.0);
+    }
+
+    // UV space triangle edges
     let e01_uv = uv1 - uv0;
     let e02_uv = uv2 - uv0;
 
-    // Compute dWorld/dBarycentric (2x3 matrix)
-    // Then chain with dBarycentric/dScreen to get dWorld/dScreen
-    // Finally invert to get dUV/dScreen
+    // Compute UV Jacobian: J = [e01_uv, e02_uv] * Minv
+    // This gives us d(uv)/d(screen) - the derivatives we need!
+    // J[0] = d(uv)/dx (first column)
+    // J[1] = d(uv)/dy (second column)
+    let T = mat2x2<f32>(e01_uv, e02_uv);
+    let J = T * Minv;
 
-    // Build 3x3 system to solve for barycentric derivatives
-    // [e01_world.x  e02_world.x  dWorld_dx.x]   [dw1/dx]   [0]
-    // [e01_world.y  e02_world.y  dWorld_dx.y] * [dw2/dx] = [0]
-    // [e01_world.z  e02_world.z  dWorld_dx.z]   [dw0/dx]   [0]
-    //
-    // With constraint: dw0/dx + dw1/dx + dw2/dx = 0
-    //
-    // This simplifies to solving a 2D system for dw1/dx, dw2/dx
-    // Then dw0/dx = -(dw1/dx + dw2/dx)
+    let dudx = J[0].x;
+    let dvdx = J[0].y;
+    let dudy = J[1].x;
+    let dvdy = J[1].y;
 
-    // Project onto triangle plane using cross product
-    let tri_normal = normalize(cross(e01_world, e02_world));
-
-    // Project world derivatives onto triangle plane
-    let dWorld_dx_proj = dWorld_dx - dot(dWorld_dx, tri_normal) * tri_normal;
-    let dWorld_dy_proj = dWorld_dy - dot(dWorld_dy, tri_normal) * tri_normal;
-
-    // Solve 2x2 system: [e01 e02] * [dw1; dw2] = dWorld_proj
-    // Using Cramer's rule
-    let det = e01_world.x * e02_world.y - e01_world.y * e02_world.x;
-
-    if (abs(det) < 1e-8) {
-        // Degenerate triangle - return zero derivatives
-        return UvDerivs(0.0, 0.0, 0.0, 0.0);
+    // Safety checks for extreme or invalid derivatives
+    if (dudx != dudx || dudy != dudy || dvdx != dvdx || dvdy != dvdy) {
+        // NaN - use large derivatives to force blur
+        return UvDerivs(10.0, 10.0, 10.0, 10.0);
     }
 
-    let inv_det = 1.0 / det;
+    // For extreme derivatives, clamp them to reasonable range
+    // Don't reject them entirely - just limit the max LOD
+    const MAX_DERIVATIVE = 100.0;
+    let clamped_dudx = clamp(dudx, -MAX_DERIVATIVE, MAX_DERIVATIVE);
+    let clamped_dudy = clamp(dudy, -MAX_DERIVATIVE, MAX_DERIVATIVE);
+    let clamped_dvdx = clamp(dvdx, -MAX_DERIVATIVE, MAX_DERIVATIVE);
+    let clamped_dvdy = clamp(dvdy, -MAX_DERIVATIVE, MAX_DERIVATIVE);
 
-    // Solve for barycentric derivatives in 2D (XY plane dominant)
-    let dw1_dx = (dWorld_dx_proj.x * e02_world.y - dWorld_dx_proj.y * e02_world.x) * inv_det;
-    let dw2_dx = (e01_world.x * dWorld_dx_proj.y - e01_world.y * dWorld_dx_proj.x) * inv_det;
-
-    let dw1_dy = (dWorld_dy_proj.x * e02_world.y - dWorld_dy_proj.y * e02_world.x) * inv_det;
-    let dw2_dy = (e01_world.x * dWorld_dy_proj.y - e01_world.y * dWorld_dy_proj.x) * inv_det;
-
-    // UV derivatives: dUV/dScreen = dw1/dScreen * e01_uv + dw2/dScreen * e02_uv
-    let dudx = dw1_dx * e01_uv.x + dw2_dx * e02_uv.x;
-    let dudy = dw1_dy * e01_uv.x + dw2_dy * e02_uv.x;
-    let dvdx = dw1_dx * e01_uv.y + dw2_dx * e02_uv.y;
-    let dvdy = dw1_dy * e01_uv.y + dw2_dy * e02_uv.y;
-
-    return UvDerivs(dudx, dudy, dvdx, dvdy);
+    return UvDerivs(clamped_dudx, clamped_dudy, clamped_dvdx, clamped_dvdy);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
 // ─────────────────────────────────────────────────────────────────────────────
 
+// NEW: Gradient-based API for anisotropic filtering
+// Computes UV derivatives for each texture type, which are used with textureSampleGrad
+// This approach:
+// - Leverages hardware gradient computation (faster)
+// - Enables anisotropic filtering automatically
+// - More robust than manual LOD calculation
+fn pbr_get_gradients(
+    coords: vec2<i32>,
+    pixel_center: vec2<f32>,
+    screen_dims: vec2<f32>,
+    material: PbrMaterial,
+    triangle_indices: vec3<u32>,
+    attribute_data_offset: u32,
+    vertex_attribute_stride: u32,
+    inv_view_proj: mat4x4<f32>,
+    os_vertices: ObjectSpaceVertices,
+    world_model: mat4x4<f32>
+) -> PbrMaterialGradients {
+
+    var out : PbrMaterialGradients;
+
+    if (material.has_base_color_texture) {
+        let d = compute_uv_derivatives_from_depth(
+            coords, pixel_center, screen_dims,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            material.base_color_tex_info.attribute_uv_set_index,
+            inv_view_proj, os_vertices, world_model
+        );
+        out.base_color_ddx = vec2<f32>(d.dudx, d.dvdx);
+        out.base_color_ddy = vec2<f32>(d.dudy, d.dvdy);
+    } else {
+        out.base_color_ddx = vec2<f32>(0.0, 0.0);
+        out.base_color_ddy = vec2<f32>(0.0, 0.0);
+    }
+
+    if (material.has_metallic_roughness_texture) {
+        let d = compute_uv_derivatives_from_depth(
+            coords, pixel_center, screen_dims,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            material.metallic_roughness_tex_info.attribute_uv_set_index,
+            inv_view_proj, os_vertices, world_model
+        );
+        out.metallic_roughness_ddx = vec2<f32>(d.dudx, d.dvdx);
+        out.metallic_roughness_ddy = vec2<f32>(d.dudy, d.dvdy);
+    } else {
+        out.metallic_roughness_ddx = vec2<f32>(0.0, 0.0);
+        out.metallic_roughness_ddy = vec2<f32>(0.0, 0.0);
+    }
+
+    if (material.has_normal_texture) {
+        let d = compute_uv_derivatives_from_depth(
+            coords, pixel_center, screen_dims,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            material.normal_tex_info.attribute_uv_set_index,
+            inv_view_proj, os_vertices, world_model
+        );
+        out.normal_ddx = vec2<f32>(d.dudx, d.dvdx);
+        out.normal_ddy = vec2<f32>(d.dudy, d.dvdy);
+    } else {
+        out.normal_ddx = vec2<f32>(0.0, 0.0);
+        out.normal_ddy = vec2<f32>(0.0, 0.0);
+    }
+
+    if (material.has_occlusion_texture) {
+        let d = compute_uv_derivatives_from_depth(
+            coords, pixel_center, screen_dims,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            material.occlusion_tex_info.attribute_uv_set_index,
+            inv_view_proj, os_vertices, world_model
+        );
+        out.occlusion_ddx = vec2<f32>(d.dudx, d.dvdx);
+        out.occlusion_ddy = vec2<f32>(d.dudy, d.dvdy);
+    } else {
+        out.occlusion_ddx = vec2<f32>(0.0, 0.0);
+        out.occlusion_ddy = vec2<f32>(0.0, 0.0);
+    }
+
+    if (material.has_emissive_texture) {
+        let d = compute_uv_derivatives_from_depth(
+            coords, pixel_center, screen_dims,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            material.emissive_tex_info.attribute_uv_set_index,
+            inv_view_proj, os_vertices, world_model
+        );
+        out.emissive_ddx = vec2<f32>(d.dudx, d.dvdx);
+        out.emissive_ddy = vec2<f32>(d.dudy, d.dvdy);
+    } else {
+        out.emissive_ddx = vec2<f32>(0.0, 0.0);
+        out.emissive_ddy = vec2<f32>(0.0, 0.0);
+    }
+
+    return out;
+}
+
+// LEGACY: LOD-based API (kept for compatibility)
 fn pbr_get_mipmap_levels(
     coords: vec2<i32>,
     pixel_center: vec2<f32>,
