@@ -1,8 +1,9 @@
 // Fragment input from vertex shader
 struct FragmentInput {
     @builtin(position) screen_position: vec4<f32>,
-    // same value as screen_position, but not interpolated
-    // useful for TAA, not using for now though
+    // same coordinate space as screen_position, but this is the interpolated
+    // vertex shader output, not the hardware-computed fragment position on the screen
+    // useful for TAA motion vectors, not using for now though
     @location(1) clip_position: vec4<f32>,
     @location(2) @interpolate(flat) triangle_index: u32,
     @location(3) barycentric: vec2<f32>,  // Full barycentric coordinates
@@ -36,10 +37,17 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
     // z = 1.0 - x - y
     out.barycentric = input.barycentric;
 
-    // Store transformed world-space normal and tangent
+    // Store transformed world-space normal
     out.geometry_normal = vec4<f32>(normalize(input.world_normal), 0.0);
-    out.geometry_tangent = vec4<f32>(normalize(input.world_tangent.xyz), input.world_tangent.w);
 
+    // DEBUG: Compute hardware UV gradients
+    // Input: world_tangent.xy contains interpolated UV from vertex shader
+    let uv = input.world_tangent.xy;
+    let ddx_uv = dpdx(uv);
+    let ddy_uv = dpdy(uv);
+
+    // Output: vec4(ddx_uv.x, ddx_uv.y, ddy_uv.x, ddy_uv.y)
+    out.geometry_tangent = vec4<f32>(ddx_uv, ddy_uv);
 
     return out;
 }

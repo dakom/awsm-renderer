@@ -417,10 +417,121 @@ fn main(
         {% when _ %}
     {% endmatch %}
 
-    {% if debug.mips %}
-        // Debug mips visualization disabled when using gradient-based sampling
-        // (gradients don't expose explicit mip level)
-        color = vec3<f32>(0.5, 0.5, 0.5);
+    // DEBUG: Compare hardware UV gradients vs geometric calculation
+    {% if debug.mips %}  // Enable this for gradient debugging
+        {% match mipmap %}
+            {% when MipmapMode::Gradient %}
+                if (pbr_material.has_base_color_texture) {
+                    let tex_info = pbr_material.base_color_tex_info;
+
+                    // Read hardware UV gradients from fragment shader
+                    let hw_uv_grads = textureLoad(geometry_tangent_tex, coords, 0);
+                    let hw_ddx_uv = hw_uv_grads.xy;
+                    let hw_ddy_uv = hw_uv_grads.zw;
+
+                    // Get actual UVs from attribute data (TEXCOORD_0 / uv_set_index 0)
+                    let uv0 = _texture_uv_per_vertex(attribute_data_offset, 0u, triangle_indices.x, vertex_attribute_stride);
+                    let uv1 = _texture_uv_per_vertex(attribute_data_offset, 0u, triangle_indices.y, vertex_attribute_stride);
+                    let uv2 = _texture_uv_per_vertex(attribute_data_offset, 0u, triangle_indices.z, vertex_attribute_stride);
+
+                    // Transform triangle to screen space
+                    let mvp = camera.view_proj * transforms.world_model;
+                    let clip0 = mvp * vec4<f32>(os_vertices.p0, 1.0);
+                    let clip1 = mvp * vec4<f32>(os_vertices.p1, 1.0);
+                    let clip2 = mvp * vec4<f32>(os_vertices.p2, 1.0);
+
+                    let p0 = clip_to_pixel(clip0, screen_dims_f32);
+                    let p1 = clip_to_pixel(clip1, screen_dims_f32);
+                    let p2 = clip_to_pixel(clip2, screen_dims_f32);
+
+                    // Compute barycentric gradients
+                    let bary_grads = compute_barycentric_derivatives(p0, p1, p2);
+
+                    // Apply chain rule to get UV gradients
+                    let duv_db1 = uv1 - uv0;
+                    let duv_db2 = uv2 - uv0;
+                    let geo_ddx_uv = duv_db1 * bary_grads.x + duv_db2 * bary_grads.z;
+                    let geo_ddy_uv = duv_db1 * bary_grads.y + duv_db2 * bary_grads.w;
+
+                    // Compare magnitudes
+                    let hw_mag = max(length(hw_ddx_uv), length(hw_ddy_uv));
+                    let geo_mag = max(length(geo_ddx_uv), length(geo_ddy_uv));
+
+                    // Compute ratio (geometric / hardware)
+                    let ratio = geo_mag / max(hw_mag, 1e-8);
+
+                    // Visualize ratio
+                    // Green = ratio ~1 (perfect match!)
+                    // Red = ratio > 1 (geometric larger)
+                    // Blue = ratio < 1 (geometric smaller)
+                    if (ratio > 0.9 && ratio < 1.1) {
+                        color = vec3<f32>(0.0, 1.0, 0.0);  // Green = match!
+                    } else if (ratio > 1.1) {
+                        color = vec3<f32>(min(ratio / 4.0, 1.0), 0.0, 0.0);  // Red = too large
+                    } else {
+                        color = vec3<f32>(0.0, 0.0, min(1.0 / ratio / 4.0, 1.0));  // Blue = too small
+                    }
+                } else {
+                    color = vec3<f32>(0.5, 0.5, 0.5);  // No texture - gray
+                }
+            {% when _ %}
+                color = vec3<f32>(0.5, 0.5, 0.5);  // No mipmap mode - gray
+        {% endmatch %}
+    {% endif %}
+
+    {% if false %}  // TEMP: Disabled to see texel:pixel ratio debug
+        // Visualize mip level selection using base color texture (if present)
+        {% match mipmap %}
+            {% when MipmapMode::Gradient %}
+                if (pbr_material.has_base_color_texture) {
+                    // Calculate ACTUAL atlas mip level (what hardware selects)
+                    let atlas_mip = debug_calculate_atlas_mip_level(
+                        gradients.base_color_ddx,
+                        gradients.base_color_ddy,
+                        pbr_material.base_color_tex_info.uv_scale,
+                        pbr_material.base_color_tex_info.atlas_index
+                    );
+
+                    // Calculate "tile mip" (what level the tile itself is at)
+                    // For a 1024x1024 tile in 4096x4096 atlas: tile is at atlas mip 2
+                    let tile_base_mip = log2(4096.0 / 1024.0); // Example: = 2.0
+
+                    // Show gradient magnitude as overlay (helps debug scale issues)
+                    let grad_mag = max(length(gradients.base_color_ddx), length(gradients.base_color_ddy));
+
+                    // Color code by ATLAS mip level:
+                    // Shows what the hardware actually selects
+                    if (atlas_mip < 0.5) {
+                        color = vec3<f32>(0.0, 0.0, 1.0); // Blue = atlas mip 0
+                    } else if (atlas_mip < 1.5) {
+                        color = vec3<f32>(0.0, 1.0, 0.0); // Green = atlas mip 1
+                    } else if (atlas_mip < 2.5) {
+                        color = vec3<f32>(0.5, 1.0, 0.0); // Yellow-green = atlas mip 2
+                    } else if (atlas_mip < 3.5) {
+                        color = vec3<f32>(1.0, 1.0, 0.0); // Yellow = atlas mip 3
+                    } else if (atlas_mip < 4.5) {
+                        color = vec3<f32>(1.0, 0.5, 0.0); // Orange = atlas mip 4
+                    } else {
+                        color = vec3<f32>(1.0, 0.0, 0.0); // Red = atlas mip 5+
+                    }
+
+                    // Show raw gradient magnitude for debugging (uncomment to use)
+                    //color = vec3<f32>(grad_mag * 10.0);
+
+                    // Debug: show raw gradient values
+                    // For 1:1 texel:pixel on 1024 tile, expect ~0.001 (1/1024)
+                    //let grad_scale = 1000.0; // Makes 0.001 appear as white
+                    //color = vec3<f32>(
+                    //    length(gradients.base_color_ddx) * grad_scale,
+                    //    length(gradients.base_color_ddy) * grad_scale,
+                    //    0.0
+                    //);
+                } else {
+                    color = vec3<f32>(0.5, 0.5, 0.5); // Gray = no texture
+                }
+            {% when _ %}
+                color = vec3<f32>(0.5, 0.5, 0.5); // Gray = no mipmap mode
+        {% endmatch %}
     {% endif %}
 
     {% if debug.n_dot_v %}

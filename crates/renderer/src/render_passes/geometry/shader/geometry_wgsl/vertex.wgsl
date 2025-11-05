@@ -92,7 +92,6 @@ fn vert_main(vertex_orig: VertexInput) -> VertexOutput {
     );
     out.world_normal = normalize(normal_matrix * normal);
 
-    // Transform tangent to world space (preserve handedness in w)
     out.world_tangent = vec4<f32>(normalize(normal_matrix * tangent.xyz), tangent.w);
 
     return out;

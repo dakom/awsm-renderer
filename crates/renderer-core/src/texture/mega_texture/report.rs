@@ -33,6 +33,8 @@ pub struct MegaTextureReportEntry<ID> {
     pub pixel_offset: MegaTextureReportCoords,
     pub size: MegaTextureReportSize,
     pub id: ID,
+    pub uv_scale: MegaTextureReportCoordsF32,
+    pub uv_offset: MegaTextureReportCoordsF32,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -47,6 +49,17 @@ impl From<(u32, u32)> for MegaTextureReportCoords {
     }
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct MegaTextureReportCoordsF32 {
+    pub x: f32,
+    pub y: f32,
+}
+impl From<(f32, f32)> for MegaTextureReportCoordsF32 {
+    fn from(coords: (f32, f32)) -> Self {
+        let (x, y) = coords;
+        Self { x, y }
+    }
+}
 #[derive(Clone, Debug, Copy, Serialize, Deserialize)]
 pub struct MegaTextureReportSize {
     pub width: u32,
@@ -130,6 +143,14 @@ where
                                 )),
                                 size: MegaTextureReportSize::from((entry.size[0], entry.size[1])),
                                 id: entry.id.clone(),
+                                uv_scale: MegaTextureReportCoordsF32::from((
+                                    entry.uv_scale[0],
+                                    entry.uv_scale[1],
+                                )),
+                                uv_offset: MegaTextureReportCoordsF32::from((
+                                    entry.uv_offset[0],
+                                    entry.uv_offset[1],
+                                )),
                             })
                             .collect()
                     })

@@ -307,6 +307,11 @@ impl GltfTextureInfo {
             }
         }
 
+        if !sampler_cache_key.allowed_ansiotropy() {
+            tracing::warn!("Disabling max ansiotropy!");
+            sampler_cache_key.max_anisotropy = None;
+        }
+
         Ok(renderer
             .textures
             .get_sampler_key(&renderer.gpu, sampler_cache_key)?)

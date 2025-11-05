@@ -16,6 +16,11 @@
 // - Matches fragment shader quality
 // ============================================================================
 
+// No gradient scale factor needed!
+// We now use a chain-rule approach that computes barycentric derivatives analytically
+// (matching hardware dFdx/dFdy behavior) and then applies the chain rule to get UV derivatives.
+// This produces correct gradients without needing manual calibration.
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared structs
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,8 +62,59 @@ fn clip_to_pixel(clip: vec4<f32>, screen_size: vec2<f32>) -> vec2<f32> {
     return xy01 * screen_size;
 }
 
-// Compute UV derivatives using screen-space Jacobian
-// This is simpler and more robust than world-space reconstruction
+// Helper: Compute barycentric coordinates for a point in screen space
+fn compute_barycentric(p: vec2<f32>, p0: vec2<f32>, e01: vec2<f32>, e02: vec2<f32>, inv_area: f32) -> vec3<f32> {
+    let v0 = p - p0;
+    let d10 = det2(v0, e02);
+    let d20 = det2(e01, v0);
+    let b1 = d10 * inv_area;
+    let b2 = d20 * inv_area;
+    let b0 = 1.0 - b1 - b2;
+    return vec3<f32>(b0, b1, b2);
+}
+
+// Helper: Linearly interpolate UVs using barycentric coordinates
+fn interpolate_uv_linear(bary: vec3<f32>, uv0: vec2<f32>, uv1: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+    return uv0 * bary.x + uv1 * bary.y + uv2 * bary.z;
+}
+
+// Compute barycentric coordinate derivatives geometrically
+// Returns d(bary.xy)/d(screen) as vec4(db1/dx, db1/dy, db2/dx, db2/dy)
+// bary = (b0, b1, b2) where b0 = 1 - b1 - b2
+fn compute_barycentric_derivatives(
+    p0: vec2<f32>,
+    p1: vec2<f32>,
+    p2: vec2<f32>
+) -> vec4<f32> {
+    let e01 = p1 - p0;
+    let e02 = p2 - p0;
+    let area = det2(e01, e02);
+
+    if (abs(area) < 1e-8) {
+        return vec4<f32>(0.0);
+    }
+
+    let inv_area = 1.0 / area;
+
+    // Barycentric formulas:
+    // b1 = det(p - p0, e02) / area
+    // b2 = det(e01, p - p0) / area
+    //
+    // Taking derivatives with respect to screen position:
+    // d(b1)/dx = det((1,0), e02) / area = e02.y / area
+    // d(b1)/dy = det((0,1), e02) / area = -e02.x / area
+    // d(b2)/dx = det(e01, (1,0)) / area = -e01.y / area
+    // d(b2)/dy = det(e01, (0,1)) / area = e01.x / area
+
+    let db1_dx = e02.y * inv_area;
+    let db1_dy = -e02.x * inv_area;
+    let db2_dx = -e01.y * inv_area;
+    let db2_dy = e01.x * inv_area;
+
+    return vec4<f32>(db1_dx, db1_dy, db2_dx, db2_dy);
+}
+
+// Compute UV derivatives using verified barycentric gradient chain rule
 fn compute_uv_derivatives_from_depth(
     coords: vec2<i32>,
     pixel_center: vec2<f32>,
@@ -87,44 +143,32 @@ fn compute_uv_derivatives_from_depth(
     let p1 = clip_to_pixel(clip1, screen_size);
     let p2 = clip_to_pixel(clip2, screen_size);
 
-    // Screen-space triangle edges
-    let e01_screen = p1 - p0;
-    let e02_screen = p2 - p0;
+    // Compute barycentric derivatives: d(bary)/d(screen)
+    // This uses the verified formula that matches hardware dFdx/dFdy
+    let bary_derivs = compute_barycentric_derivatives(p0, p1, p2);
 
-    // Check for degenerate triangle in screen space
-    let screen_area = abs(det2(e01_screen, e02_screen));
-    if (screen_area < 0.01) {
-        // Triangle is too small in screen space (< 0.01 pixels² area)
-        // Use LARGE derivatives to force highest mip level (maximum blur)
-        // Large derivatives = many texels per pixel = need blur
+    // Check for degenerate triangle
+    if (bary_derivs.x == 0.0 && bary_derivs.y == 0.0 &&
+        bary_derivs.z == 0.0 && bary_derivs.w == 0.0) {
         return UvDerivs(10.0, 10.0, 10.0, 10.0);
     }
 
-    // Compute inverse of screen-space triangle matrix
-    // Minv maps from screen-space displacement to barycentric coords
-    let Minv = inv2(e01_screen, e02_screen);
+    // Apply chain rule: d(UV)/d(screen) = d(UV)/d(bary) × d(bary)/d(screen)
+    // d(UV)/d(b1) = uv1 - uv0
+    // d(UV)/d(b2) = uv2 - uv0
+    let duv_db1 = uv1 - uv0;
+    let duv_db2 = uv2 - uv0;
 
-    // Check if inversion failed (det was too small)
-    if (Minv[0].x == 0.0 && Minv[0].y == 0.0 &&
-        Minv[1].x == 0.0 && Minv[1].y == 0.0) {
-        return UvDerivs(10.0, 10.0, 10.0, 10.0);
-    }
+    // Chain rule application:
+    // d(UV)/dx = d(UV)/d(b1) × d(b1)/dx + d(UV)/d(b2) × d(b2)/dx
+    // d(UV)/dy = d(UV)/d(b1) × d(b1)/dy + d(UV)/d(b2) × d(b2)/dy
+    let ddx_uv = duv_db1 * bary_derivs.x + duv_db2 * bary_derivs.z;  // db1/dx, db2/dx
+    let ddy_uv = duv_db1 * bary_derivs.y + duv_db2 * bary_derivs.w;  // db1/dy, db2/dy
 
-    // UV space triangle edges
-    let e01_uv = uv1 - uv0;
-    let e02_uv = uv2 - uv0;
-
-    // Compute UV Jacobian: J = [e01_uv, e02_uv] * Minv
-    // This gives us d(uv)/d(screen) - the derivatives we need!
-    // J[0] = d(uv)/dx (first column)
-    // J[1] = d(uv)/dy (second column)
-    let T = mat2x2<f32>(e01_uv, e02_uv);
-    let J = T * Minv;
-
-    let dudx = J[0].x;
-    let dvdx = J[0].y;
-    let dudy = J[1].x;
-    let dvdy = J[1].y;
+    let dudx = ddx_uv.x;
+    let dvdx = ddx_uv.y;
+    let dudy = ddy_uv.x;
+    let dvdy = ddy_uv.y;
 
     // Safety checks for extreme or invalid derivatives
     if (dudx != dudx || dudy != dudy || dvdx != dvdx || dvdy != dvdy) {
@@ -133,14 +177,18 @@ fn compute_uv_derivatives_from_depth(
     }
 
     // For extreme derivatives, clamp them to reasonable range
-    // Don't reject them entirely - just limit the max LOD
     const MAX_DERIVATIVE = 100.0;
     let clamped_dudx = clamp(dudx, -MAX_DERIVATIVE, MAX_DERIVATIVE);
     let clamped_dudy = clamp(dudy, -MAX_DERIVATIVE, MAX_DERIVATIVE);
     let clamped_dvdx = clamp(dvdx, -MAX_DERIVATIVE, MAX_DERIVATIVE);
     let clamped_dvdy = clamp(dvdy, -MAX_DERIVATIVE, MAX_DERIVATIVE);
 
-    return UvDerivs(clamped_dudx, clamped_dudy, clamped_dvdx, clamped_dvdy);
+    return UvDerivs(
+        clamped_dudx,
+        clamped_dudy,
+        clamped_dvdx,
+        clamped_dvdy
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -240,4 +288,58 @@ fn pbr_get_gradients(
     }
 
     return out;
+}
+
+// Debug helper: Calculate what mip level would be selected for a given texture
+// This mimics the hardware mip selection algorithm
+fn debug_calculate_mip_level(
+    ddx: vec2<f32>,
+    ddy: vec2<f32>,
+    texture_size: vec2<u32>
+) -> f32 {
+    // Convert gradients from UV space [0,1] to texel space
+    let ddx_texels = ddx * vec2<f32>(f32(texture_size.x), f32(texture_size.y));
+    let ddy_texels = ddy * vec2<f32>(f32(texture_size.x), f32(texture_size.y));
+
+    // Compute gradient magnitudes (texels per pixel)
+    let rho_x = length(ddx_texels);
+    let rho_y = length(ddy_texels);
+    let rho = max(rho_x, rho_y);
+
+    // Hardware mip selection: LOD = log2(rho)
+    return log2(max(rho, 1e-6));
+}
+
+// Debug helper: Calculate actual atlas mip level (what hardware selects)
+// Takes atlas dimensions to compute the real mip level
+fn debug_calculate_atlas_mip_level(
+    ddx_local: vec2<f32>,
+    ddy_local: vec2<f32>,
+    uv_scale: vec2<f32>,
+    atlas_index: u32
+) -> f32 {
+    // Get atlas dimensions
+    var atlas_dims = vec2<f32>(0.0);
+    switch (atlas_index) {
+        {% for i in 0..texture_atlas_len %}
+        case {{ i }}u: {
+            atlas_dims = vec2<f32>(textureDimensions(atlas_tex_{{ i }}, 0u));
+        }
+        {% endfor %}
+        default: {}
+    }
+
+    // Convert from local UV space to atlas UV space
+    let ddx_atlas = ddx_local * uv_scale;
+    let ddy_atlas = ddy_local * uv_scale;
+
+    // Convert to texel space using ATLAS dimensions (what hardware actually sees)
+    let ddx_texels = ddx_atlas * atlas_dims;
+    let ddy_texels = ddy_atlas * atlas_dims;
+
+    let rho_x = length(ddx_texels);
+    let rho_y = length(ddy_texels);
+    let rho = max(rho_x, rho_y);
+
+    return log2(max(rho, 1e-6));
 }

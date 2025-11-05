@@ -150,7 +150,8 @@ fn _texture_sample_atlas_grad(
     // Use precomputed UV transform (eliminates textureDimensions() call and conversions)
     let uv = info.uv_offset + wrapped_uv * info.uv_scale;
 
-    // Convert gradients from local UV space [0,1] to atlas UV space using precomputed scale
+    // Convert gradients from local UV space [0,1] to atlas UV space
+    // textureSampleGrad requires gradients in the same coordinate space as the UVs
     let ddx_atlas = ddx_local * info.uv_scale;
     let ddy_atlas = ddy_local * info.uv_scale;
 

@@ -118,13 +118,30 @@ impl<ID> MegaTextureEntry<ID>
 where
     ID: Clone,
 {
-    pub fn into_info(&self, index: MegaTextureIndex) -> MegaTextureEntryInfo<ID> {
+    pub fn into_info(&self, index: MegaTextureIndex, atlas_size: u32) -> MegaTextureEntryInfo<ID> {
         let (width, height) = self.image_data.size();
+
+        let x = self.pixel_offset[0] as f32;
+        let y = self.pixel_offset[1] as f32;
+
+        let span_x = (width as f32 - 1.0).max(0.0);
+        let span_y = (height as f32 - 1.0).max(0.0);
+
+        let atlas_dimensions = atlas_size as f32;
+
+        let uv_offset_x = (x + 0.5) / atlas_dimensions;
+        let uv_offset_y = (y + 0.5) / atlas_dimensions;
+
+        let uv_scale_x = span_x / atlas_dimensions;
+        let uv_scale_y = span_y / atlas_dimensions;
+
         MegaTextureEntryInfo {
             pixel_offset: self.pixel_offset,
             size: [width, height],
-            id: self.id.clone(),
             index,
+            id: self.id.clone(),
+            uv_scale: [uv_scale_x, uv_scale_y],
+            uv_offset: [uv_offset_x, uv_offset_y],
         }
     }
 }
@@ -136,6 +153,8 @@ pub struct MegaTextureEntryInfo<ID> {
     pub size: [u32; 2],
     pub index: MegaTextureIndex,
     pub id: ID,
+    pub uv_scale: [f32; 2],
+    pub uv_offset: [f32; 2],
 }
 
 #[derive(Clone, Debug)]
@@ -190,7 +209,7 @@ where
                             .map(|(entry_index, entry)| {
                                 let index =
                                     MegaTextureIndex::new(atlas_index, layer_index, entry_index);
-                                entry.into_info(index)
+                                entry.into_info(index, self.texture_size)
                             })
                             .collect()
                     })
@@ -235,7 +254,7 @@ where
     pub fn get_entry_info(&self, custom_id: &ID) -> Option<MegaTextureEntryInfo<ID>> {
         let index = self.get_index(custom_id)?;
         self.get_entry(custom_id)
-            .map(|entry| entry.into_info(index))
+            .map(|entry| entry.into_info(index, self.texture_size))
     }
 
     pub fn bindings_len(&self, limits: &web_sys::GpuSupportedLimits) -> Result<u32> {
@@ -429,7 +448,7 @@ where
                     texture_type,
                 };
 
-                new_entries.push(entry.into_info(index));
+                new_entries.push(entry.into_info(index, self.texture_size));
 
                 current_layer.entries.push(entry);
             }

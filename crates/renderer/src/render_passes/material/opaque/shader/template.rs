@@ -80,6 +80,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             multisampled_geometry: value.msaa_sample_count > 0,
             msaa_sample_count: value.msaa_sample_count,
             debug: ShaderTemplateMaterialOpaqueDebug {
+                mips: false,
                 msaa_detect_edges: false, // Disabled - using real MSAA resolve
                 ..Default::default()
             },

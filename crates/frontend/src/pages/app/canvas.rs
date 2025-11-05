@@ -74,6 +74,7 @@ impl AppCanvas {
                                 .with_tone_mapping(CanvasToneMappingMode::Standard)
                             )
                             .with_device_request_limits(DeviceRequestLimits::max_storage_buffer_binding_size());
+                            //.with_device_request_limits(DeviceRequestLimits::max_all());
 
                         let renderer = AwsmRendererBuilder::new(gpu_builder)
                             .with_logging(AwsmRendererLogging { render_timings: true })

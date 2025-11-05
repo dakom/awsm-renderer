@@ -15,7 +15,7 @@ use awsm_renderer_core::{
 use ordered_float::OrderedFloat;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use thiserror::Error;
-use web_sys::GpuSupportedLimits;
+use web_sys::{GpuMipmapFilterMode, GpuSupportedLimits};
 
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
@@ -127,6 +127,17 @@ pub struct SamplerCacheKey {
     pub mag_filter: Option<FilterMode>,
     pub min_filter: Option<FilterMode>,
     pub mipmap_filter: Option<MipmapFilterMode>,
+}
+
+impl SamplerCacheKey {
+    pub fn allowed_ansiotropy(&self) -> bool {
+        match (self.min_filter, self.mag_filter, self.mipmap_filter) {
+            (Some(FilterMode::Nearest), _, _)
+            | (_, Some(FilterMode::Nearest), _)
+            | (_, _, Some(MipmapFilterMode::Nearest)) => false,
+            _ => true,
+        }
+    }
 }
 
 impl std::hash::Hash for SamplerCacheKey {
