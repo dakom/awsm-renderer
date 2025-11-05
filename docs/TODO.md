@@ -5,6 +5,10 @@
 
 # Fix perspective projection skybox
 
+# Barycentric derivatives via dFdx/dFdy
+
+# discard and single-sample the non-depth targets in the geometry pass
+
 # Do DEBUG_MIPMAPS.md
 
 
