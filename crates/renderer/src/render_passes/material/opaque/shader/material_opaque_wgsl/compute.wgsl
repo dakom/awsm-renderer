@@ -418,7 +418,9 @@ fn main(
     {% endmatch %}
 
     // DEBUG: Compare hardware UV gradients vs geometric calculation
-    {% if debug.mips %}  // Enable this for gradient debugging
+    // NOTE: This debug code requires proper UV data from fragment shader
+    // Re-enable once alpha materials forward pass is implemented (see DEBUG_MIPMAPS.md)
+    {% if false %}  // Disabled - enable for gradient debugging
         {% match mipmap %}
             {% when MipmapMode::Gradient %}
                 if (pbr_material.has_base_color_texture) {
@@ -479,7 +481,7 @@ fn main(
         {% endmatch %}
     {% endif %}
 
-    {% if false %}  // TEMP: Disabled to see texel:pixel ratio debug
+    {% if debug.mips %}
         // Visualize mip level selection using base color texture (if present)
         {% match mipmap %}
             {% when MipmapMode::Gradient %}

@@ -40,14 +40,8 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
     // Store transformed world-space normal
     out.geometry_normal = vec4<f32>(normalize(input.world_normal), 0.0);
 
-    // DEBUG: Compute hardware UV gradients
-    // Input: world_tangent.xy contains interpolated UV from vertex shader
-    let uv = input.world_tangent.xy;
-    let ddx_uv = dpdx(uv);
-    let ddy_uv = dpdy(uv);
-
-    // Output: vec4(ddx_uv.x, ddx_uv.y, ddy_uv.x, ddy_uv.y)
-    out.geometry_tangent = vec4<f32>(ddx_uv, ddy_uv);
+    // Store transformed world-space tangent
+    out.geometry_tangent = vec4<f32>(normalize(input.world_tangent.xyz), input.world_tangent.w);
 
     return out;
 }

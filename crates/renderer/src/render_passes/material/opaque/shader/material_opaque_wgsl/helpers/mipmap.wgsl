@@ -4,22 +4,22 @@
 //
 // This implementation computes UV derivatives (gradients) for anisotropic filtering:
 // 1. Transform triangle vertices to screen space
-// 2. Compute screen-space Jacobian (dScreen/dBarycentric)
-// 3. Invert to get dBarycentric/dScreen
-// 4. Chain with dUV/dBarycentric to get dUV/dScreen (the gradients we need)
+// 2. Compute barycentric derivatives analytically: d(bary)/d(screen)
+//    - This has been verified to match hardware dFdx/dFdy
+// 3. Apply chain rule: d(UV)/d(screen) = d(UV)/d(bary) × d(bary)/d(screen)
+// 4. Scale by atlas uv_scale transform
 // 5. Pass gradients to textureSampleGrad for hardware mip selection
 //
 // Benefits:
 // - Hardware handles mip selection (anisotropic filtering, etc.)
 // - No manual LOD calculation needed
 // - No triangle seams
-// - Matches fragment shader quality
+// - Mathematically correct gradient computation
+//
+// Note: There appears to be a systematic 4x gradient magnitude discrepancy between
+// this geometric calculation and what produces optimal mip selection. The root cause
+// is under investigation - see DEBUG_MIPMAPS.md for current status and next steps.
 // ============================================================================
-
-// No gradient scale factor needed!
-// We now use a chain-rule approach that computes barycentric derivatives analytically
-// (matching hardware dFdx/dFdy behavior) and then applies the chain rule to get UV derivatives.
-// This produces correct gradients without needing manual calibration.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared structs
