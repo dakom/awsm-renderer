@@ -195,14 +195,14 @@ impl MaterialOpaqueBindGroups {
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::TextureView(Cow::Borrowed(
-                &ctx.render_texture_views.geometry_normal,
+                &ctx.render_texture_views.normal_tangent,
             )),
         ));
-        // geometry tangent texture
+        // placeholder derivatives texture
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::TextureView(Cow::Borrowed(
-                &ctx.render_texture_views.geometry_tangent,
+                &ctx.render_texture_views.placeholder_derivatives,
             )),
         ));
         // visibility data

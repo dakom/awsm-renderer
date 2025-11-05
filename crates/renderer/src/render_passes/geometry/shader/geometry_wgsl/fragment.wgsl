@@ -1,3 +1,5 @@
+{% include "all_material_shared_wgsl/math.wgsl" %}
+
 // Fragment input from vertex shader
 struct FragmentInput {
     @builtin(position) screen_position: vec4<f32>,
@@ -17,9 +19,9 @@ struct FragmentOutput {
     // RG16float
     @location(1) barycentric: vec2<f32>,    // bary.xy
     // RGB16float
-    @location(2) geometry_normal: vec4<f32>,        // xyz = world normal, w unused
+    @location(2) normal_tangent: vec4<f32>,
     // RGB16float
-    @location(3) geometry_tangent: vec4<f32>,       // xyzw = world tangent (w = handedness)
+    @location(3) placeholder_for_derivatives: vec4<f32>,
 }
 
 @fragment
@@ -37,17 +39,15 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
     // z = 1.0 - x - y
     out.barycentric = input.barycentric;
 
-    // Store transformed world-space normal
-    out.geometry_normal = vec4<f32>(normalize(input.world_normal), 0.0);
+    // Pack normal and tangent into a single vec4 (RGBA16Float)
+    // octahedral normal (2 channels) + tangent angle (1 channel) + handedness sign (1 channel)
+    let N = normalize(input.world_normal);
+    let T = normalize(input.world_tangent.xyz);
+    let s = input.world_tangent.w; // handedness: +1 or -1
+    out.normal_tangent = pack_normal_tangent(N, T, s);
 
-    // Store transformed world-space tangent
-    out.geometry_tangent = vec4<f32>(normalize(input.world_tangent.xyz), input.world_tangent.w);
+    // Placeholder for future barycentric derivatives
+    out.placeholder_for_derivatives = vec4<f32>(0.0, 0.0, 0.0, 0.0);
 
     return out;
-}
-
-fn split16(x: u32) -> vec2<u32> {
-  let lo = x & 0xFFFFu;
-  let hi = x >> 16u;
-  return vec2<u32>(lo, hi);
 }

@@ -146,8 +146,8 @@ async fn init_pipeline_keys(
     let mut color_targets = vec![
         ColorTargetState::new(render_texture_formats.visiblity_data),
         ColorTargetState::new(render_texture_formats.barycentric),
-        ColorTargetState::new(render_texture_formats.geometry_normal),
-        ColorTargetState::new(render_texture_formats.geometry_tangent),
+        ColorTargetState::new(render_texture_formats.normal_tangent),
+        ColorTargetState::new(render_texture_formats.placeholder_derivatives),
     ];
 
     let vertex_buffer_layout = VertexBufferLayout {

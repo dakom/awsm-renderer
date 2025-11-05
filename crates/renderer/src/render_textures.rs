@@ -19,8 +19,8 @@ pub struct RenderTextureFormats {
     // Output from geometry pass
     pub visiblity_data: TextureFormat,
     pub barycentric: TextureFormat,
-    pub geometry_normal: TextureFormat, // Transformed normals with morphs/skins
-    pub geometry_tangent: TextureFormat, // Transformed tangents with morphs/skins (or None if packed)
+    pub normal_tangent: TextureFormat, // Packed: octahedral normal + tangent angle + handedness
+    pub placeholder_derivatives: TextureFormat, // Placeholder for future barycentric derivatives
 
     // Output from opaque shading pass
     pub opaque_color: TextureFormat,
@@ -44,8 +44,8 @@ impl RenderTextureFormats {
         Self {
             visiblity_data: TextureFormat::Rgba16uint,
             barycentric: TextureFormat::Rg16float,
-            geometry_normal: TextureFormat::Rgba16float,
-            geometry_tangent: TextureFormat::Rgba16float,
+            normal_tangent: TextureFormat::Rgba16float,
+            placeholder_derivatives: TextureFormat::Rgba16float,
             opaque_color: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
             oit_rgb: TextureFormat::Rgba16float,      // HDR format for bloom/tonemapping
             oit_alpha: TextureFormat::R32float,       // Alpha channel for OIT
@@ -135,8 +135,8 @@ pub struct RenderTextureViews {
     // Output from geometry pass
     pub visibility_data: web_sys::GpuTextureView,
     pub barycentric: web_sys::GpuTextureView,
-    pub geometry_normal: web_sys::GpuTextureView,
-    pub geometry_tangent: web_sys::GpuTextureView,
+    pub normal_tangent: web_sys::GpuTextureView,
+    pub placeholder_derivatives: web_sys::GpuTextureView,
 
     // Output from opaque shading pass
     pub opaque_color: web_sys::GpuTextureView,
@@ -169,8 +169,8 @@ impl RenderTextureViews {
         Self {
             visibility_data: inner.visibility_data_view.clone(),
             barycentric: inner.barycentric_view.clone(),
-            geometry_normal: inner.geometry_normal_view.clone(),
-            geometry_tangent: inner.geometry_tangent_view.clone(),
+            normal_tangent: inner.normal_tangent_view.clone(),
+            placeholder_derivatives: inner.placeholder_derivatives_view.clone(),
             opaque_color: inner.opaque_color_view.clone(),
             oit_rgb: inner.oit_rgb_view.clone(),
             oit_alpha: inner.oit_alpha_view.clone(),
@@ -195,11 +195,11 @@ pub struct RenderTexturesInner {
 
     // pub taa_clip_positions: [web_sys::GpuTexture; 2],
     // pub taa_clip_position_views: [web_sys::GpuTextureView; 2],
-    pub geometry_normal: web_sys::GpuTexture,
-    pub geometry_normal_view: web_sys::GpuTextureView,
+    pub normal_tangent: web_sys::GpuTexture,
+    pub normal_tangent_view: web_sys::GpuTextureView,
 
-    pub geometry_tangent: web_sys::GpuTexture,
-    pub geometry_tangent_view: web_sys::GpuTextureView,
+    pub placeholder_derivatives: web_sys::GpuTexture,
+    pub placeholder_derivatives_view: web_sys::GpuTextureView,
 
     pub opaque_color: web_sys::GpuTexture,
     pub opaque_color_clearer: TextureClearer,
@@ -281,15 +281,15 @@ impl RenderTexturesInner {
         //     .map_err(AwsmRenderTextureError::CreateTexture)?,
         // ];
 
-        let geometry_normal = gpu
+        let normal_tangent = gpu
             .create_texture(
-                &geometry_texture(render_texture_formats.geometry_normal, "Geometry Normal").into(),
+                &geometry_texture(render_texture_formats.normal_tangent, "Normal Tangent").into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let geometry_tangent = gpu
+        let placeholder_derivatives = gpu
             .create_texture(
-                &geometry_texture(render_texture_formats.geometry_tangent, "Geometry Tangent")
+                &geometry_texture(render_texture_formats.placeholder_derivatives, "Placeholder Derivatives")
                     .into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
@@ -376,12 +376,12 @@ impl RenderTexturesInner {
         //     })?,
         // ];
 
-        let geometry_normal_view = geometry_normal.create_view().map_err(|e| {
-            AwsmRenderTextureError::CreateTextureView(format!("geometry_normal: {e:?}"))
+        let normal_tangent_view = normal_tangent.create_view().map_err(|e| {
+            AwsmRenderTextureError::CreateTextureView(format!("normal_tangent: {e:?}"))
         })?;
 
-        let geometry_tangent_view = geometry_tangent.create_view().map_err(|e| {
-            AwsmRenderTextureError::CreateTextureView(format!("geometry_tangent: {e:?}"))
+        let placeholder_derivatives_view = placeholder_derivatives.create_view().map_err(|e| {
+            AwsmRenderTextureError::CreateTextureView(format!("placeholder_derivatives: {e:?}"))
         })?;
 
         let opaque_color_view = opaque_color.create_view().map_err(|e| {
@@ -411,11 +411,11 @@ impl RenderTexturesInner {
             barycentric,
             barycentric_view,
 
-            geometry_normal,
-            geometry_normal_view,
+            normal_tangent,
+            normal_tangent_view,
 
-            geometry_tangent,
-            geometry_tangent_view,
+            placeholder_derivatives,
+            placeholder_derivatives_view,
 
             opaque_color,
             opaque_color_clearer: TextureClearer::new(
@@ -452,8 +452,8 @@ impl RenderTexturesInner {
         // for texture in self.taa_clip_positions {
         //     texture.destroy();
         // }
-        self.geometry_normal.destroy();
-        self.geometry_tangent.destroy();
+        self.normal_tangent.destroy();
+        self.placeholder_derivatives.destroy();
         self.opaque_color.destroy();
         self.oit_rgb.destroy();
         self.oit_alpha.destroy();

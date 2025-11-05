@@ -75,7 +75,9 @@ fn edge_mask_neighbors(
     let neighbor_id = sampleTriangleId(neighbor_coords, 0);
 
     if (neighbor_id != U32_MAX) {
-      let neighbor_normal = textureLoad(geometry_normal_tex, neighbor_coords, 0).xyz;
+      let packed_nt_neighbor = textureLoad(normal_tangent_tex, neighbor_coords, 0);
+      let tbn_neighbor = unpack_normal_tangent(packed_nt_neighbor);
+      let neighbor_normal = tbn_neighbor.N;
 
       // Check normal discontinuity first (cheapest - just a dot product)
       if (dot(center_normal, neighbor_normal) < EDGE_NORMAL_THRESHOLD) {

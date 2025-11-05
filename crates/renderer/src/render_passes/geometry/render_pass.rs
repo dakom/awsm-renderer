@@ -61,12 +61,12 @@ impl GeometryRenderPass {
                 StoreOp::Store,
             ),
             ColorAttachment::new(
-                &ctx.render_texture_views.geometry_normal,
+                &ctx.render_texture_views.normal_tangent,
                 LoadOp::Clear,
                 StoreOp::Store,
             ),
             ColorAttachment::new(
-                &ctx.render_texture_views.geometry_tangent,
+                &ctx.render_texture_views.placeholder_derivatives,
                 LoadOp::Clear,
                 StoreOp::Store,
             ),

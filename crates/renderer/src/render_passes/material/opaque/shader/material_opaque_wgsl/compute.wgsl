@@ -73,14 +73,14 @@ struct CameraUniform {
     @group(0) @binding(0) var visibility_data_tex: texture_multisampled_2d<u32>;
     @group(0) @binding(1) var barycentric_tex: texture_multisampled_2d<f32>;
     @group(0) @binding(2) var depth_tex: texture_depth_multisampled_2d;
-    @group(0) @binding(3) var geometry_normal_tex: texture_multisampled_2d<f32>;
-    @group(0) @binding(4) var geometry_tangent_tex: texture_multisampled_2d<f32>;
+    @group(0) @binding(3) var normal_tangent_tex: texture_multisampled_2d<f32>;
+    @group(0) @binding(4) var placeholder_derivatives_tex: texture_multisampled_2d<f32>;
 {% else %}
     @group(0) @binding(0) var visibility_data_tex: texture_2d<u32>;
     @group(0) @binding(1) var barycentric_tex: texture_2d<f32>;
     @group(0) @binding(2) var depth_tex: texture_depth_2d;
-    @group(0) @binding(3) var geometry_normal_tex: texture_2d<f32>;
-    @group(0) @binding(4) var geometry_tangent_tex: texture_2d<f32>;
+    @group(0) @binding(3) var normal_tangent_tex: texture_2d<f32>;
+    @group(0) @binding(4) var placeholder_derivatives_tex: texture_2d<f32>;
 {% endif %}
 @group(0) @binding(5) var<storage, read> visibility_data: array<f32>;
 @group(0) @binding(6) var<storage, read> mesh_metas: array<MeshMeta>;
@@ -208,7 +208,9 @@ fn main(
 
                         let bary_{{s}} = textureLoad(barycentric_tex, coords, {{s}});
                         let barycentric_{{s}} = vec3<f32>(bary_{{s}}.x, bary_{{s}}.y, 1.0 - bary_{{s}}.x - bary_{{s}}.y);
-                        let normal_{{s}} = textureLoad(geometry_normal_tex, coords, {{s}}).xyz;
+                        let packed_nt_{{s}} = textureLoad(normal_tangent_tex, coords, {{s}});
+                        let tbn_{{s}} = unpack_normal_tangent(packed_nt_{{s}});
+                        let normal_{{s}} = tbn_{{s}}.N;
                         let os_verts_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_{{s}});
                         let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
 
@@ -312,7 +314,9 @@ fn main(
     let triangle_indices = vec3<u32>(attribute_indices[base_triangle_index], attribute_indices[base_triangle_index + 1], attribute_indices[base_triangle_index + 2]);
 
     // Load world-space normal directly from geometry pass output (already transformed with morphs/skins)
-    let world_normal = textureLoad(geometry_normal_tex, coords, 0).xyz;
+    let packed_nt = textureLoad(normal_tangent_tex, coords, 0);
+    let tbn = unpack_normal_tangent(packed_nt);
+    let world_normal = tbn.N;
 
     let os_vertices = get_object_space_vertices(visibility_data_offset, triangle_index);
 
@@ -427,7 +431,7 @@ fn main(
                     let tex_info = pbr_material.base_color_tex_info;
 
                     // Read hardware UV gradients from fragment shader
-                    let hw_uv_grads = textureLoad(geometry_tangent_tex, coords, 0);
+                    let hw_uv_grads = textureLoad(placeholder_derivatives_tex, coords, 0);
                     let hw_ddx_uv = hw_uv_grads.xy;
                     let hw_ddy_uv = hw_uv_grads.zw;
 
@@ -621,7 +625,9 @@ fn main(
                         // Per-sample geometry
                         let bary_{{s}} = textureLoad(barycentric_tex, coords, {{s}});
                         let barycentric_{{s}} = vec3<f32>(bary_{{s}}.x, bary_{{s}}.y, 1.0 - bary_{{s}}.x - bary_{{s}}.y);
-                        let normal_{{s}} = textureLoad(geometry_normal_tex, coords, {{s}}).xyz;
+                        let packed_nt_{{s}} = textureLoad(normal_tangent_tex, coords, {{s}});
+                        let tbn_{{s}} = unpack_normal_tangent(packed_nt_{{s}});
+                        let normal_{{s}} = tbn_{{s}}.N;
                         let os_vertices_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_id_{{s}});
                         let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
 
