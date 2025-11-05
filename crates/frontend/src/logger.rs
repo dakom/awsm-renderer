@@ -1,4 +1,5 @@
 use tracing::Level;
+use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::format::Pretty;
 use tracing_subscriber::prelude::*;
 use tracing_web::{performance_layer, MakeWebConsoleWriter};
@@ -21,13 +22,12 @@ pub fn init_logger() {
 
         let perf_layer = performance_layer().with_details_from_fields(Pretty::default());
 
-        let mut tracing_env =
-            tracing_subscriber::EnvFilter::new("").add_directive("debug".parse().unwrap());
+        let level_filter = LevelFilter::DEBUG;
 
         tracing_subscriber::registry()
             .with(fmt_layer)
             .with(perf_layer)
-            .with(tracing_env)
+            .with(level_filter)
             .init();
 
         tracing::warn!("(warn) Logger initialized");
