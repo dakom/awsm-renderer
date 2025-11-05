@@ -78,6 +78,20 @@ fn texture_sample_atlas(info: TextureInfo, attribute_uv: vec2<f32>, mip_level: f
     }
 }
 
+// NEW: Sampling with explicit gradients for anisotropic filtering support in compute shaders
+fn texture_sample_atlas_grad(info: TextureInfo, attribute_uv: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> {
+    switch info.atlas_index {
+        {% for i in 0..texture_atlas_len %}
+            case {{ i }}u: {
+                return _texture_sample_atlas_grad(info, atlas_tex_{{ i }}, attribute_uv, ddx, ddy);
+            }
+        {% endfor %}
+        default: {
+            return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+        }
+    }
+}
+
 fn _texture_sample_atlas(
     info: TextureInfo,
     atlas_tex: texture_2d_array<f32>,
@@ -110,6 +124,52 @@ fn _texture_sample_atlas(
                     uv,
                     i32(info.layer_index),
                     mip_level,
+                );
+            }
+        {% endfor %}
+        default: {
+            return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+        }
+    }
+}
+
+// NEW: Sample with explicit gradients - enables anisotropic filtering in compute shaders!
+fn _texture_sample_atlas_grad(
+    info: TextureInfo,
+    atlas_tex: texture_2d_array<f32>,
+    attribute_uv: vec2<f32>,
+    ddx_local: vec2<f32>,
+    ddy_local: vec2<f32>,
+) -> vec4<f32> {
+    let wrapped_uv = vec2<f32>(
+        apply_address_mode(attribute_uv.x, info.address_mode_u),
+        apply_address_mode(attribute_uv.y, info.address_mode_v),
+    );
+
+    let atlas_dimensions = vec2<f32>(textureDimensions(atlas_tex, 0u));
+    let texel_offset = vec2<f32>(info.pixel_offset);
+    let texel_size = vec2<f32>(info.size);
+    let span = max(texel_size - vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 0.0));
+
+    let texel_coords = texel_offset + wrapped_uv * span + vec2<f32>(0.5, 0.5);
+    let uv = texel_coords / atlas_dimensions;
+
+    // Convert gradients from local UV space [0,1] to atlas UV space
+    // The gradients need to be scaled by the texture span in atlas space
+    let atlas_scale = span / atlas_dimensions;
+    let ddx_atlas = ddx_local * atlas_scale;
+    let ddy_atlas = ddy_local * atlas_scale;
+
+    switch info.sampler_index {
+        {% for i in 0..sampler_atlas_len %}
+            case {{ i }}u: {
+                return textureSampleGrad(
+                    atlas_tex,
+                    atlas_sampler_{{ i }},
+                    uv,
+                    i32(info.layer_index),
+                    ddx_atlas,
+                    ddy_atlas,
                 );
             }
         {% endfor %}

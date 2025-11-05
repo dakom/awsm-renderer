@@ -65,7 +65,7 @@ fn _project_vertex(
     let world = model_transform * vec4<f32>(position_os, 1.0);
     let clip  = camera.view_proj * world;
 
-    if (abs(clip.w) < MIPMAP_MIN_DET) {
+    if (abs(clip.w) < 1e-6) {
         return VertexProjection(vec2<f32>(0.0, 0.0), 0.0, false);
     }
 

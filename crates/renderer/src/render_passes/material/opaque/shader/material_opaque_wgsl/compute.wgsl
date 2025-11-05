@@ -164,7 +164,7 @@ fn main(
 
             let lights_info = get_lights_info();
             let standard_coordinates = get_standard_coordinates(coords, screen_dims);
-            // Use LOD 0 for all samples (highest detail) - conservative for silhouette edges
+            // Use zero LODs for all samples (forces mip 0 = highest detail) - conservative for silhouette edges
             let zero_lods = PbrMaterialMipLevels(0.0, 0.0, 0.0, 0.0, 0.0);
 
             {% for s in 0..msaa_sample_count %}
@@ -297,13 +297,8 @@ fn main(
 
     {% match mipmap %}
         {% when MipmapMode::None %}
-            let texture_lods = PbrMaterialMipLevels(
-                0.0, // base_color
-                0.0, // metallic_roughness
-                0.0, // normal
-                0.0, // occlusion
-                0.0  // emissive
-            );
+            // Use zero LODs (forces mip 0 = highest detail)
+            let texture_lods = PbrMaterialMipLevels(0.0, 0.0, 0.0, 0.0, 0.0);
 
             let material_color = pbr_get_material_color(
                 triangle_indices,
@@ -318,21 +313,17 @@ fn main(
                 os_vertices
             );
         {% when MipmapMode::Lod %}
-            let projected_vertices = project_vertices(os_vertices, transforms.world_model, screen_dims_f32);
-
-            let mip_cache = build_mip_cache_with_barycentric(
-                projected_vertices,
-                pixel_center
-            );
-
             let texture_lods = pbr_get_mipmap_levels(
-                mip_cache,
+                coords,
+                pixel_center,
                 screen_dims_f32,
                 pbr_material,
                 triangle_indices,
-                barycentric,
                 attribute_data_offset,
                 vertex_attribute_stride,
+                camera.inv_view_proj,
+                os_vertices,
+                transforms.world_model
             );
 
             let material_color = pbr_get_material_color(
@@ -407,11 +398,9 @@ fn main(
     {% endmatch %}
 
     {% if debug.mips %}
-        let i = i32(floor(texture_lods.base_color + 0.5)); // nearest mip
-        let atlas_info = get_atlas_info(pbr_material.base_color_tex_info.atlas_index);
-        let max_mip_level = select(15.0, atlas_info.levels_f - 1.0, atlas_info.valid && atlas_info.levels_f > 1.0);
-        let level = f32(i) / max_mip_level;
-        color = vec3<f32>(level, level, level);
+        // Debug mips visualization disabled when using gradient-based sampling
+        // (gradients don't expose explicit mip level)
+        color = vec3<f32>(0.5, 0.5, 0.5);
     {% endif %}
 
     {% if debug.n_dot_v %}
@@ -504,9 +493,7 @@ fn main(
                         let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
 
                         // Compute material color for this sample with its own data
-                        // OPTIMIZATION: Reuse texture_lods from sample 0 instead of computing per-sample
-                        // This is acceptable because MSAA samples are sub-pixel, so LOD difference is negligible
-                        // Computing per-sample LODs would require projecting vertices for each sample (expensive!)
+                        // Use mip 0 (highest detail) for all MSAA samples - conservative for edge pixels
                         let material_color_{{s}} = pbr_get_material_color(
                             triangle_indices_{{s}},
                             attribute_data_offset_{{s}},
@@ -514,7 +501,7 @@ fn main(
                             pbr_material_{{s}},
                             barycentric_{{s}},
                             vertex_attribute_stride_{{s}},
-                            texture_lods,  // Reuse from sample 0
+                            PbrMaterialMipLevels(0.0, 0.0, 0.0, 0.0, 0.0),
                             normal_{{s}},
                             transforms_{{s}}.world_normal,
                             os_vertices_{{s}}
