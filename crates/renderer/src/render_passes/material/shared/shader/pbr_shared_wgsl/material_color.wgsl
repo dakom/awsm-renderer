@@ -12,20 +12,19 @@ struct PbrMaterialColor {
 // Samples all PBR material textures and computes the final material properties including
 // normal mapping. The returned normal is the perturbed normal (with normal map applied) and
 // should be used for all lighting calculations.
-fn pbr_get_material_color(
+fn pbr_get_material_color_no_mips(
     triangle_indices: vec3<u32>,
     attribute_data_offset: u32,
     triangle_index: u32,
     material: PbrMaterial,
     barycentric: vec3<f32>,
     vertex_attribute_stride: u32,
-    mip_levels: PbrMaterialMipLevels,
     world_normal: vec3<f32>,
     normal_matrix: mat3x3<f32>,
     os_vertices: ObjectSpaceVertices,
 ) -> PbrMaterialColor {
 
-    var base = _pbr_material_base_color(
+    var base = _pbr_material_base_color_no_mips(
         material,
         texture_uv(
             attribute_data_offset,
@@ -34,7 +33,6 @@ fn pbr_get_material_color(
             material.base_color_tex_info,
             vertex_attribute_stride,
         ),
-        mip_levels.base_color,
     );
 
     {%- match color_sets %}
@@ -50,7 +48,7 @@ fn pbr_get_material_color(
     {% endmatch %}
 
 
-    let metallic_roughness = _pbr_material_metallic_roughness_color (
+    let metallic_roughness = _pbr_material_metallic_roughness_color_no_mips (
         material,
         texture_uv(
             attribute_data_offset,
@@ -59,12 +57,11 @@ fn pbr_get_material_color(
             material.metallic_roughness_tex_info,
             vertex_attribute_stride,
         ),
-        mip_levels.metallic_roughness,
     );
 
     // Compute the normal-mapped normal by applying the normal texture to the geometry normal
     // using either stored tangents or computed tangent space from UVs
-    let normal = _pbr_normal_color(
+    let normal = _pbr_normal_color_no_mips(
         material,
         texture_uv(
             attribute_data_offset,
@@ -73,7 +70,6 @@ fn pbr_get_material_color(
             material.normal_tex_info,
             vertex_attribute_stride,
         ),
-        mip_levels.normal,
         world_normal,
         barycentric,
         triangle_indices,
@@ -83,7 +79,7 @@ fn pbr_get_material_color(
         os_vertices,
     );
 
-    let occlusion = _pbr_occlusion_color(
+    let occlusion = _pbr_occlusion_color_no_mips(
         material,
         texture_uv(
             attribute_data_offset,
@@ -92,10 +88,9 @@ fn pbr_get_material_color(
             material.occlusion_tex_info,
             vertex_attribute_stride,
         ),
-        mip_levels.occlusion,
     );
 
-    let emissive = _pbr_material_emissive_color(
+    let emissive = _pbr_material_emissive_color_no_mips(
         material,
         texture_uv(
             attribute_data_offset,
@@ -104,7 +99,6 @@ fn pbr_get_material_color(
             material.emissive_tex_info,
             vertex_attribute_stride,
         ),
-        mip_levels.emissive,
     );
 
     return PbrMaterialColor(
@@ -117,13 +111,13 @@ fn pbr_get_material_color(
 }
 
 // Base Color
-fn _pbr_material_base_color(material: PbrMaterial, attribute_uv: vec2<f32>, mip_level: f32) -> vec4<f32> {
+fn _pbr_material_base_color_no_mips(material: PbrMaterial, attribute_uv: vec2<f32>) -> vec4<f32> {
     var color = material.base_color_factor;
 
 
     if material.has_base_color_texture {
         color *=
-            texture_sample_atlas(material.base_color_tex_info, attribute_uv, mip_level);
+            texture_sample_atlas_no_mips(material.base_color_tex_info, attribute_uv);
     }
 
 
@@ -134,14 +128,13 @@ fn _pbr_material_base_color(material: PbrMaterial, attribute_uv: vec2<f32>, mip_
     return color;
 }
 
-fn _pbr_material_metallic_roughness_color(
+fn _pbr_material_metallic_roughness_color_no_mips(
     material: PbrMaterial,
     attribute_uv: vec2<f32>,
-    mip_level: f32,
 ) -> vec2<f32> {
     var color = vec2<f32>(material.metallic_factor, material.roughness_factor);
     if material.has_metallic_roughness_texture {
-        let tex = texture_sample_atlas(material.metallic_roughness_tex_info, attribute_uv, mip_level);
+        let tex = texture_sample_atlas_no_mips(material.metallic_roughness_tex_info, attribute_uv);
         // glTF uses B channel for metallic, G channel for roughness
         color *= vec2<f32>(tex.b, tex.g);
     }
@@ -151,10 +144,9 @@ fn _pbr_material_metallic_roughness_color(
 // Applies normal mapping by constructing a TBN (tangent-bitangent-normal) matrix and
 // transforming the normal texture sample from tangent space to world space.
 // Falls back through three methods: stored tangents -> computed from UVs -> generated basis
-fn _pbr_normal_color(
+fn _pbr_normal_color_no_mips(
     material: PbrMaterial,
     attribute_uv: vec2<f32>,
-    mip_level: f32,
     world_normal: vec3<f32>,
     barycentric: vec3<f32>,
     triangle_indices: vec3<u32>,
@@ -169,7 +161,7 @@ fn _pbr_normal_color(
 
     // Sample normal map and unpack from [0,1] to [-1,1] range
     // Use mip_level parameter (not forced to 0) to get proper filtering
-    let tex = texture_sample_atlas(material.normal_tex_info, attribute_uv, mip_level);
+    let tex = texture_sample_atlas_no_mips(material.normal_tex_info, attribute_uv);
     var tangent_normal = vec3<f32>(
         (tex.r * 2.0 - 1.0) * material.normal_scale,
         (tex.g * 2.0 - 1.0) * material.normal_scale,
@@ -237,28 +229,26 @@ fn _pbr_normal_color(
     return normalize(tbn * tangent_normal);
 }
 
-fn _pbr_occlusion_color(
+fn _pbr_occlusion_color_no_mips(
     material: PbrMaterial,
     attribute_uv: vec2<f32>,
-    mip_level: f32,
 ) -> f32 {
     var occlusion = 1.0;
     if material.has_occlusion_texture {
-        let tex = texture_sample_atlas(material.occlusion_tex_info, attribute_uv, mip_level);
+        let tex = texture_sample_atlas_no_mips(material.occlusion_tex_info, attribute_uv);
         occlusion = mix(1.0, tex.r, material.occlusion_strength);
     }
     return occlusion;
 }
 
-fn _pbr_material_emissive_color(
+fn _pbr_material_emissive_color_no_mips(
     material: PbrMaterial,
     attribute_uv: vec2<f32>,
-    mip_level: f32,
 ) -> vec3<f32> {
     var color = material.emissive_factor;
     if material.has_emissive_texture {
         color *=
-            texture_sample_atlas(material.emissive_tex_info, attribute_uv, mip_level).rgb;
+            texture_sample_atlas_no_mips(material.emissive_tex_info, attribute_uv).rgb;
     }
 
     color *= material.emissive_strength;

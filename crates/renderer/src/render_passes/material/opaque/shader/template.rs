@@ -76,7 +76,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             tangents: value.attributes.tangents,
             color_sets: value.attributes.color_sets,
             uv_sets: value.attributes.uv_sets,
-            mipmap: MipmapMode::Lod,
+            mipmap: MipmapMode::Gradient,
             multisampled_geometry: value.msaa_sample_count > 0,
             msaa_sample_count: value.msaa_sample_count,
             debug: ShaderTemplateMaterialOpaqueDebug {
@@ -92,7 +92,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
 #[derive(Debug)]
 enum MipmapMode {
     None,
-    Lod,
+    Gradient,
 }
 
 #[derive(Debug, Default)]

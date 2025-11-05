@@ -320,22 +320,18 @@ fn main(
 
     {% match mipmap %}
         {% when MipmapMode::None %}
-            // Use zero LODs (forces mip 0 = highest detail)
-            let texture_lods = PbrMaterialMipLevels(0.0, 0.0, 0.0, 0.0, 0.0);
-
-            let material_color = pbr_get_material_color(
+            let material_color = pbr_get_material_color_no_mips(
                 triangle_indices,
                 attribute_data_offset,
                 triangle_index,
                 pbr_material,
                 barycentric,
                 vertex_attribute_stride,
-                texture_lods,
                 world_normal,
                 transforms.world_normal,
                 os_vertices
             );
-        {% when MipmapMode::Lod %}
+        {% when MipmapMode::Gradient %}
             // Gradient-based sampling for anisotropic filtering
             let gradients = pbr_get_gradients(
                 coords,

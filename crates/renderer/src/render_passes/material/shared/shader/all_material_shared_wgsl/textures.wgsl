@@ -74,11 +74,11 @@ fn _texture_uv_per_vertex(attribute_data_offset: u32, set_index: u32, vertex_ind
 
 // Sampling helpers for the mega-texture atlas. Every fetch receives an explicit LOD so the compute
 // pass can emulate hardware derivative selection.
-fn texture_sample_atlas(info: TextureInfo, attribute_uv: vec2<f32>, mip_level: f32) -> vec4<f32> {
+fn texture_sample_atlas_no_mips(info: TextureInfo, attribute_uv: vec2<f32>) -> vec4<f32> {
     switch info.atlas_index {
         {% for i in 0..texture_atlas_len %}
             case {{ i }}u: {
-                return _texture_sample_atlas(info, atlas_tex_{{ i }}, attribute_uv, mip_level);
+                return _texture_sample_atlas_no_mips(info, atlas_tex_{{ i }}, attribute_uv);
             }
         {% endfor %}
         default: {
@@ -103,11 +103,10 @@ fn texture_sample_atlas_grad(info: TextureInfo, attribute_uv: vec2<f32>, ddx: ve
     }
 }
 
-fn _texture_sample_atlas(
+fn _texture_sample_atlas_no_mips(
     info: TextureInfo,
     atlas_tex: texture_2d_array<f32>,
     attribute_uv: vec2<f32>,
-    mip_level: f32,
 ) -> vec4<f32> {
     let wrapped_uv = vec2<f32>(
         apply_address_mode(attribute_uv.x, info.address_mode_u),
@@ -125,7 +124,7 @@ fn _texture_sample_atlas(
                     atlas_sampler_{{ i }},
                     uv,
                     i32(info.layer_index),
-                    mip_level,
+                    0
                 );
             }
         {% endfor %}
@@ -135,7 +134,7 @@ fn _texture_sample_atlas(
     }
 }
 
-// NEW: Sample with explicit gradients - enables anisotropic filtering in compute shaders!
+// Sample with explicit gradients - enables anisotropic filtering in compute shaders!
 fn _texture_sample_atlas_grad(
     info: TextureInfo,
     atlas_tex: texture_2d_array<f32>,
