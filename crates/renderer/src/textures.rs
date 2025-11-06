@@ -91,6 +91,7 @@ impl AwsmRenderer {
                         &self.pipeline_layouts,
                         &self.meshes.buffer_infos,
                         &self.anti_aliasing,
+                        &self.textures,
                     )
                     .await?;
             }
@@ -104,6 +105,7 @@ pub struct Textures {
     pub gpu_texture_array_views: Vec<web_sys::GpuTextureView>,
     pub mega_texture: MegaTexture<TextureKey>,
     pub mega_texture_sampler_set: BTreeSet<SamplerKey>,
+    pub clamp_sampler_key: SamplerKey,
     textures: SlotMap<TextureKey, MegaTextureEntryInfo<TextureKey>>,
     cubemaps: SlotMap<CubemapTextureKey, web_sys::GpuTexture>,
     samplers: SlotMap<SamplerKey, web_sys::GpuSampler>,
@@ -156,20 +158,49 @@ impl std::hash::Hash for SamplerCacheKey {
 }
 
 impl Textures {
-    pub fn new(gpu: &AwsmRendererWebGpu) -> Self {
-        Self {
+    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
+        let clamp_sampler_cache_key = SamplerCacheKey {
+            // This looks better with our mipmap generation...
+            // if it's overridden by the glTF sampler, fine.
+            // but otherwise, let's just do what looks best.
+            min_filter: Some(FilterMode::Linear),
+            mag_filter: Some(FilterMode::Linear),
+            mipmap_filter: Some(MipmapFilterMode::Linear),
+            // Enable anisotropic filtering for thin lines at oblique angles
+            // Without this, textures become severely aliased when viewed at angles
+            max_anisotropy: Some(16),
+            address_mode_u: Some(AddressMode::ClampToEdge),
+            address_mode_v: Some(AddressMode::ClampToEdge),
+            address_mode_w: Some(AddressMode::ClampToEdge),
+            ..Default::default()
+        };
+
+        let mut samplers = SlotMap::with_key();
+        let mut sampler_cache = HashMap::new();
+        let mut sampler_address_modes = SecondaryMap::new();
+
+        let clamp_sampler_key = create_sampler_key(
+            &gpu,
+            clamp_sampler_cache_key,
+            &mut samplers,
+            &mut sampler_cache,
+            &mut sampler_address_modes,
+        )?;
+
+        Ok(Self {
             gpu_texture_arrays: Vec::new(),
             gpu_texture_array_views: Vec::new(),
             mega_texture: MegaTexture::new(&gpu.device.limits(), 8), // 8 pixels recommended for 16× AF safety
             mega_texture_sampler_set: BTreeSet::new(),
             textures: SlotMap::with_key(),
-            samplers: SlotMap::with_key(),
             cubemaps: SlotMap::with_key(),
-            sampler_cache: HashMap::new(),
-            sampler_address_modes: SecondaryMap::new(),
             texture_samplers: SecondaryMap::new(),
             gpu_megatexture_dirty: false,
-        }
+            samplers,
+            sampler_cache,
+            sampler_address_modes,
+            clamp_sampler_key,
+        })
     }
 
     pub fn add_image(
@@ -262,32 +293,13 @@ impl Textures {
             return Ok(*sampler_key);
         }
 
-        let descriptor = SamplerDescriptor {
-            label: None,
-            address_mode_u: cache_key.address_mode_u,
-            address_mode_v: cache_key.address_mode_v,
-            address_mode_w: cache_key.address_mode_w,
-            compare: cache_key.compare,
-            lod_min_clamp: cache_key.lod_min_clamp.map(|x| x.into_inner()),
-            lod_max_clamp: cache_key.lod_max_clamp.map(|x| x.into_inner()),
-            max_anisotropy: cache_key.max_anisotropy,
-            mag_filter: cache_key.mag_filter,
-            min_filter: cache_key.min_filter,
-            mipmap_filter: cache_key.mipmap_filter,
-        };
-
-        let sampler = gpu.create_sampler(Some(&descriptor.into()));
-
-        let key = self.samplers.insert(sampler);
-        let address_mode_u = cache_key.address_mode_u;
-        let address_mode_v = cache_key.address_mode_v;
-        self.sampler_cache.insert(cache_key, key);
-        // Persist the original (U,V) wrap modes so that shader-side helpers can reproduce the
-        // desired behaviour after UVs are remapped into the mega texture atlas.
-        self.sampler_address_modes
-            .insert(key, (address_mode_u, address_mode_v));
-
-        Ok(key)
+        create_sampler_key(
+            gpu,
+            cache_key,
+            &mut self.samplers,
+            &mut self.sampler_cache,
+            &mut self.sampler_address_modes,
+        )
     }
 
     pub fn get_sampler(&self, key: SamplerKey) -> Result<&web_sys::GpuSampler> {
@@ -305,6 +317,56 @@ impl Textures {
             .copied()
             .unwrap_or((None, None))
     }
+}
+
+fn create_sampler_key(
+    gpu: &AwsmRendererWebGpu,
+    cache_key: SamplerCacheKey,
+    samplers: &mut SlotMap<SamplerKey, web_sys::GpuSampler>,
+    sampler_cache: &mut HashMap<SamplerCacheKey, SamplerKey>,
+    sampler_address_modes: &mut SecondaryMap<
+        SamplerKey,
+        (Option<AddressMode>, Option<AddressMode>),
+    >,
+) -> Result<SamplerKey> {
+    let descriptor = SamplerDescriptor {
+        label: None,
+        address_mode_u: cache_key.address_mode_u,
+        address_mode_v: cache_key.address_mode_v,
+        address_mode_w: cache_key.address_mode_w,
+        compare: cache_key.compare,
+        lod_min_clamp: cache_key.lod_min_clamp.map(|x| x.into_inner()),
+        lod_max_clamp: cache_key.lod_max_clamp.map(|x| x.into_inner()),
+        max_anisotropy: cache_key.max_anisotropy,
+        mag_filter: cache_key.mag_filter,
+        min_filter: cache_key.min_filter,
+        mipmap_filter: cache_key.mipmap_filter,
+    };
+
+    // tracing::info!("address_mode_u: {address_mode_u:?}, address_mode_v: {address_mode_v:?}, address_mode_w: {address_mode_w:?}, compare: {compare:?}, lod_min_clamp: {lod_min_clamp:?}, lod_max_clamp: {lod_max_clamp:?}, max_anisotropy: {max_anisotropy:?}, mag_filter: {mag_filter:?}, min_filter: {min_filter:?}, mipmap_filter: {mipmap_filter:?}",
+    //     address_mode_u = cache_key.address_mode_u,
+    //     address_mode_v = cache_key.address_mode_v,
+    //     address_mode_w = cache_key.address_mode_w,
+    //     compare = cache_key.compare,
+    //     lod_min_clamp = cache_key.lod_min_clamp,
+    //     lod_max_clamp = cache_key.lod_max_clamp,
+    //     max_anisotropy = cache_key.max_anisotropy,
+    //     mag_filter = cache_key.mag_filter,
+    //     min_filter = cache_key.min_filter,
+    //     mipmap_filter = cache_key.mipmap_filter,
+    // );
+
+    let sampler = gpu.create_sampler(Some(&descriptor.into()));
+
+    let key = samplers.insert(sampler);
+    let address_mode_u = cache_key.address_mode_u;
+    let address_mode_v = cache_key.address_mode_v;
+    sampler_cache.insert(cache_key, key);
+    // Persist the original (U,V) wrap modes so that shader-side helpers can reproduce the
+    // desired behaviour after UVs are remapped into the mega texture atlas.
+    sampler_address_modes.insert(key, (address_mode_u, address_mode_v));
+
+    Ok(key)
 }
 
 new_key_type! {
@@ -340,4 +402,7 @@ pub enum AwsmTextureError {
 
     #[error("[texture] subemap texture not found: {0:?}")]
     CubemapTextureNotFound(CubemapTextureKey),
+
+    #[error("[texture] no clamp sampler found in mega-texture")]
+    NoClampSamplerInMegaTexture,
 }

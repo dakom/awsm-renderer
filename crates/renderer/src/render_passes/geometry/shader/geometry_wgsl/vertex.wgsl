@@ -79,10 +79,7 @@ fn vert_main(vertex_orig: VertexInput) -> VertexOutput {
     out.triangle_index = vertex.triangle_index;
 
     // Reconstruct full barycentric coordinates
-    out.barycentric = vec2<f32>(
-        vertex.barycentric.x,
-        vertex.barycentric.y,
-    );
+    out.barycentric = vertex.barycentric;
 
     // Transform normal to world space (use mat3 to ignore translation)
     let normal_matrix = mat3x3<f32>(
@@ -93,6 +90,7 @@ fn vert_main(vertex_orig: VertexInput) -> VertexOutput {
     out.world_normal = normalize(normal_matrix * normal);
 
     out.world_tangent = vec4<f32>(normalize(normal_matrix * tangent.xyz), tangent.w);
+
 
     return out;
 }

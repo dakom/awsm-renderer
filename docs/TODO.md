@@ -1,13 +1,11 @@
+# Barycentric derivatives via dFdx/dFdy
+# Fix perspective projection skybox
+# discard and single-sample the non-depth targets in the geometry pass
+
 # Transparent material pass
 - like opaque
 - cutoff
 - complete getting alpha blend mode working again
-
-# Fix perspective projection skybox
-
-# Barycentric derivatives via dFdx/dFdy
-
-# discard and single-sample the non-depth targets in the geometry pass
 
 # Do DEBUG_MIPMAPS.md
 

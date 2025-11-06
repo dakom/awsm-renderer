@@ -20,7 +20,7 @@ pub struct RenderTextureFormats {
     pub visiblity_data: TextureFormat,
     pub barycentric: TextureFormat,
     pub normal_tangent: TextureFormat, // Packed: octahedral normal + tangent angle + handedness
-    pub placeholder_derivatives: TextureFormat, // Placeholder for future barycentric derivatives
+    pub barycentric_derivatives: TextureFormat,
 
     // Output from opaque shading pass
     pub opaque_color: TextureFormat,
@@ -45,7 +45,7 @@ impl RenderTextureFormats {
             visiblity_data: TextureFormat::Rgba16uint,
             barycentric: TextureFormat::Rg16float,
             normal_tangent: TextureFormat::Rgba16float,
-            placeholder_derivatives: TextureFormat::Rgba16float,
+            barycentric_derivatives: TextureFormat::Rgba16float,
             opaque_color: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
             oit_rgb: TextureFormat::Rgba16float,      // HDR format for bloom/tonemapping
             oit_alpha: TextureFormat::R32float,       // Alpha channel for OIT
@@ -136,7 +136,7 @@ pub struct RenderTextureViews {
     pub visibility_data: web_sys::GpuTextureView,
     pub barycentric: web_sys::GpuTextureView,
     pub normal_tangent: web_sys::GpuTextureView,
-    pub placeholder_derivatives: web_sys::GpuTextureView,
+    pub barycentric_derivatives: web_sys::GpuTextureView,
 
     // Output from opaque shading pass
     pub opaque_color: web_sys::GpuTextureView,
@@ -170,7 +170,7 @@ impl RenderTextureViews {
             visibility_data: inner.visibility_data_view.clone(),
             barycentric: inner.barycentric_view.clone(),
             normal_tangent: inner.normal_tangent_view.clone(),
-            placeholder_derivatives: inner.placeholder_derivatives_view.clone(),
+            barycentric_derivatives: inner.barycentric_derivatives_view.clone(),
             opaque_color: inner.opaque_color_view.clone(),
             oit_rgb: inner.oit_rgb_view.clone(),
             oit_alpha: inner.oit_alpha_view.clone(),
@@ -198,8 +198,8 @@ pub struct RenderTexturesInner {
     pub normal_tangent: web_sys::GpuTexture,
     pub normal_tangent_view: web_sys::GpuTextureView,
 
-    pub placeholder_derivatives: web_sys::GpuTexture,
-    pub placeholder_derivatives_view: web_sys::GpuTextureView,
+    pub barycentric_derivatives: web_sys::GpuTexture,
+    pub barycentric_derivatives_view: web_sys::GpuTextureView,
 
     pub opaque_color: web_sys::GpuTexture,
     pub opaque_color_clearer: TextureClearer,
@@ -287,10 +287,13 @@ impl RenderTexturesInner {
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let placeholder_derivatives = gpu
+        let barycentric_derivatives = gpu
             .create_texture(
-                &geometry_texture(render_texture_formats.placeholder_derivatives, "Placeholder Derivatives")
-                    .into(),
+                &geometry_texture(
+                    render_texture_formats.barycentric_derivatives,
+                    "Barycentric Derivatives",
+                )
+                .into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
@@ -380,8 +383,8 @@ impl RenderTexturesInner {
             AwsmRenderTextureError::CreateTextureView(format!("normal_tangent: {e:?}"))
         })?;
 
-        let placeholder_derivatives_view = placeholder_derivatives.create_view().map_err(|e| {
-            AwsmRenderTextureError::CreateTextureView(format!("placeholder_derivatives: {e:?}"))
+        let barycentric_derivatives_view = barycentric_derivatives.create_view().map_err(|e| {
+            AwsmRenderTextureError::CreateTextureView(format!("barycentric: {e:?}"))
         })?;
 
         let opaque_color_view = opaque_color.create_view().map_err(|e| {
@@ -414,8 +417,8 @@ impl RenderTexturesInner {
             normal_tangent,
             normal_tangent_view,
 
-            placeholder_derivatives,
-            placeholder_derivatives_view,
+            barycentric_derivatives,
+            barycentric_derivatives_view,
 
             opaque_color,
             opaque_color_clearer: TextureClearer::new(
@@ -453,7 +456,7 @@ impl RenderTexturesInner {
         //     texture.destroy();
         // }
         self.normal_tangent.destroy();
-        self.placeholder_derivatives.destroy();
+        self.barycentric_derivatives.destroy();
         self.opaque_color.destroy();
         self.oit_rgb.destroy();
         self.oit_alpha.destroy();

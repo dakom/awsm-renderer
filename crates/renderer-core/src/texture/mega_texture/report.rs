@@ -35,6 +35,7 @@ pub struct MegaTextureReportEntry<ID> {
     pub id: ID,
     pub uv_scale: MegaTextureReportCoordsF32,
     pub uv_offset: MegaTextureReportCoordsF32,
+    pub grad_scale: MegaTextureReportCoordsF32,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -150,6 +151,10 @@ where
                                 uv_offset: MegaTextureReportCoordsF32::from((
                                     entry.uv_offset[0],
                                     entry.uv_offset[1],
+                                )),
+                                grad_scale: MegaTextureReportCoordsF32::from((
+                                    entry.grad_scale[0],
+                                    entry.grad_scale[1],
                                 )),
                             })
                             .collect()

@@ -32,6 +32,7 @@ pub struct MaterialOpaqueBindGroups {
     pub sampler_bind_group_layout_key: BindGroupLayoutKey,
     pub texture_atlas_len: u32,
     pub texture_sampler_keys: BTreeSet<SamplerKey>,
+    pub clamp_sampler_index: u32,
     // this is set via `recreate` mechanism
     _main_bind_group: Option<web_sys::GpuBindGroup>,
     _lights_bind_group: Option<web_sys::GpuBindGroup>,
@@ -82,6 +83,7 @@ impl MaterialOpaqueBindGroups {
             sampler_bind_group_layout_key,
             texture_atlas_len,
             texture_sampler_keys,
+            clamp_sampler_index,
         } = MegaTextureDeps::new(ctx)?;
 
         Ok(Self {
@@ -90,6 +92,7 @@ impl MaterialOpaqueBindGroups {
             lights_bind_group_layout_key,
             texture_bind_group_layout_key,
             sampler_bind_group_layout_key,
+            clamp_sampler_index,
             texture_atlas_len,
             texture_sampler_keys,
             _main_bind_group: None,
@@ -108,6 +111,7 @@ impl MaterialOpaqueBindGroups {
             sampler_bind_group_layout_key,
             texture_atlas_len,
             texture_sampler_keys,
+            clamp_sampler_index,
         } = MegaTextureDeps::new(ctx)?;
 
         let mut _self = Self {
@@ -118,6 +122,7 @@ impl MaterialOpaqueBindGroups {
             sampler_bind_group_layout_key,
             texture_atlas_len,
             texture_sampler_keys,
+            clamp_sampler_index,
             _main_bind_group: self._main_bind_group.clone(),
             _lights_bind_group: self._lights_bind_group.clone(),
             _texture_bind_group: None,
@@ -194,15 +199,13 @@ impl MaterialOpaqueBindGroups {
         // geometry normal texture
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
-            BindGroupResource::TextureView(Cow::Borrowed(
-                &ctx.render_texture_views.normal_tangent,
-            )),
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.normal_tangent)),
         ));
         // placeholder derivatives texture
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::TextureView(Cow::Borrowed(
-                &ctx.render_texture_views.placeholder_derivatives,
+                &ctx.render_texture_views.barycentric_derivatives,
             )),
         ));
         // visibility data
@@ -391,6 +394,7 @@ struct MegaTextureDeps {
     pub sampler_bind_group_layout_key: BindGroupLayoutKey,
     pub texture_atlas_len: u32,
     pub texture_sampler_keys: BTreeSet<SamplerKey>,
+    pub clamp_sampler_index: u32,
 }
 
 impl MegaTextureDeps {
@@ -422,7 +426,25 @@ impl MegaTextureDeps {
         )?;
 
         // samplers
-        let texture_sampler_keys = ctx.textures.mega_texture_sampler_set.clone();
+        let mut texture_sampler_keys = ctx.textures.mega_texture_sampler_set.clone();
+
+        // gotta make sure we have a clamp sampler in there
+        let clamp_sampler_index = texture_sampler_keys
+            .iter()
+            .position(|key| *key == ctx.textures.clamp_sampler_key);
+
+        let clamp_sampler_index = match clamp_sampler_index {
+            Some(index) => index as u32,
+            None => {
+                // add it
+                texture_sampler_keys.insert(ctx.textures.clamp_sampler_key);
+                // indexing is by hash set, not necessarily last
+                texture_sampler_keys
+                    .iter()
+                    .position(|key| *key == ctx.textures.clamp_sampler_key)
+                    .unwrap() as u32
+            }
+        };
 
         if texture_sampler_keys.len() > device_limits.max_samplers_per_shader_stage() as usize {
             return Err(AwsmCoreError::MegaTextureTooManySamplers {
@@ -457,6 +479,7 @@ impl MegaTextureDeps {
             texture_bind_group_layout_key,
             texture_sampler_keys,
             sampler_bind_group_layout_key,
+            clamp_sampler_index,
         })
     }
 }
@@ -514,7 +537,7 @@ async fn create_main_bind_group_layout_key(
             visibility_fragment: false,
             visibility_compute: true,
         },
-        // Geometry tangent texture (world-space tangents from geometry pass)
+        // Barycentric derivatives texture
         BindGroupLayoutCacheKeyEntry {
             resource: BindGroupLayoutResource::Texture(
                 TextureBindingLayout::new()

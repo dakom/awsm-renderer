@@ -18,10 +18,10 @@ struct FragmentOutput {
     @location(0) visibility_data: vec4<u32>,    // triangle_index and material_offset (each as packed 32)
     // RG16float
     @location(1) barycentric: vec2<f32>,    // bary.xy
-    // RGB16float
+    // RGBA16float
     @location(2) normal_tangent: vec4<f32>,
-    // RGB16float
-    @location(3) placeholder_for_derivatives: vec4<f32>,
+    // RGBA16float
+    @location(3) barycentric_derivatives: vec4<f32>,
 }
 
 @fragment
@@ -46,8 +46,11 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
     let s = input.world_tangent.w; // handedness: +1 or -1
     out.normal_tangent = pack_normal_tangent(N, T, s);
 
-    // Placeholder for future barycentric derivatives
-    out.placeholder_for_derivatives = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    // perspective-correct barycentrics by default:
+    let ddx = dpdx(input.barycentric);          // (db1/dx, db2/dx)
+    let ddy = dpdy(input.barycentric);          // (db1/dy, db2/dy)
+
+    out.barycentric_derivatives = vec4<f32>(ddx.x, ddy.x, ddx.y, ddy.y);
 
     return out;
 }

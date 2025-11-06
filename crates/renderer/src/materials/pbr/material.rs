@@ -62,7 +62,7 @@ impl PbrMaterial {
     pub const INITIAL_ELEMENTS: usize = 32; // 32 elements is a good starting point
                                             // NOTE: keep this in sync with `PbrMaterialRaw` in WGSL. Each texture packs 56 bytes
                                             // (including sampler + address mode + padding + UV transforms) so 5 textures + 60 byte header + padding = 348.
-    pub const BYTE_SIZE: usize = 348; // must be under Materials::MAX_SIZE
+    pub const BYTE_SIZE: usize = 388; // must be under Materials::MAX_SIZE
 
     pub const BITMASK_BASE_COLOR: u32 = 1;
     pub const BITMASK_METALIC_ROUGHNESS: u32 = 1 << 1;
@@ -145,7 +145,6 @@ impl PbrMaterial {
                 address_mode_u: u32,
                 address_mode_v: u32,
                 padding: u32,
-                atlas_size: u32,
             },
             SkipTexture,
         }
@@ -169,13 +168,11 @@ impl PbrMaterial {
                 u32,
                 u32,
                 u32,
-                u32,
             )> for Value<'a>
         {
             fn from(
                 value: (
                     &'a MegaTextureEntryInfo<TextureKey>,
-                    u32,
                     u32,
                     u32,
                     u32,
@@ -190,7 +187,6 @@ impl PbrMaterial {
                     address_mode_u: value.3,
                     address_mode_v: value.4,
                     padding: value.5,
-                    atlas_size: value.6,
                 }
             }
         }
@@ -215,7 +211,6 @@ impl PbrMaterial {
                         address_mode_u,
                         address_mode_v,
                         padding,
-                        atlas_size,
                     } => {
                         offset = write_inner(data, entry_info.pixel_offset[0].into(), offset);
                         offset = write_inner(data, entry_info.pixel_offset[1].into(), offset);
@@ -233,31 +228,15 @@ impl PbrMaterial {
                         offset = write_inner(data, address_mode_v.into(), offset);
                         offset = write_inner(data, padding.into(), offset);
 
-                        // Compute UV transform for optimized GPU sampling
-                        let atlas_dimensions = atlas_size as f32;
-                        let texel_offset_x = entry_info.pixel_offset[0] as f32;
-                        let texel_offset_y = entry_info.pixel_offset[1] as f32;
-                        let texel_size_x = entry_info.size[0] as f32;
-                        let texel_size_y = entry_info.size[1] as f32;
-
-                        let span_x = (texel_size_x - 1.0).max(0.0);
-                        let span_y = (texel_size_y - 1.0).max(0.0);
-
-                        // uv_offset = (texel_offset + 0.5) / atlas_dimensions
-                        let uv_offset_x = (texel_offset_x + 0.5) / atlas_dimensions;
-                        let uv_offset_y = (texel_offset_y + 0.5) / atlas_dimensions;
-
-                        // uv_scale = span / atlas_dimensions
-                        let uv_scale_x = span_x / atlas_dimensions;
-                        let uv_scale_y = span_y / atlas_dimensions;
-
-                        offset = write_inner(data, uv_offset_x.into(), offset);
-                        offset = write_inner(data, uv_offset_y.into(), offset);
-                        offset = write_inner(data, uv_scale_x.into(), offset);
-                        offset = write_inner(data, uv_scale_y.into(), offset);
+                        offset = write_inner(data, entry_info.uv_offset[0].into(), offset);
+                        offset = write_inner(data, entry_info.uv_offset[1].into(), offset);
+                        offset = write_inner(data, entry_info.uv_scale[0].into(), offset);
+                        offset = write_inner(data, entry_info.uv_scale[1].into(), offset);
+                        offset = write_inner(data, entry_info.grad_scale[0].into(), offset);
+                        offset = write_inner(data, entry_info.grad_scale[1].into(), offset);
                     }
                     Value::SkipTexture => {
-                        offset += 56; // 14 * 4 bytes
+                        offset += 64; // 16 * 4 bytes
                     }
                 }
 
@@ -325,7 +304,6 @@ impl PbrMaterial {
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
                 texture_padding,
-                atlas_size,
             ))
         }) {
             write(tex.into());
@@ -348,7 +326,6 @@ impl PbrMaterial {
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
                 texture_padding,
-                atlas_size,
             ))
         }) {
             write(tex.into());
@@ -370,7 +347,6 @@ impl PbrMaterial {
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
                 texture_padding,
-                atlas_size,
             ))
         }) {
             write(tex.into());
@@ -392,7 +368,6 @@ impl PbrMaterial {
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
                 texture_padding,
-                atlas_size,
             ))
         }) {
             write(tex.into());
@@ -414,7 +389,6 @@ impl PbrMaterial {
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
                 texture_padding,
-                atlas_size,
             ))
         }) {
             write(tex.into());

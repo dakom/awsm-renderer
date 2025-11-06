@@ -54,6 +54,11 @@
 {% include "material_opaque_wgsl/helpers/msaa.wgsl" %}
 /*************** END msaa.wgsl ******************/
 {% endif %}
+{% if debug.any() %}
+/*************** START debug.wgsl ******************/
+{% include "material_opaque_wgsl/helpers/debug.wgsl" %}
+/*************** END debug.wgsl ******************/
+{% endif %}
 
 // Mirrors the CPU-side `CameraBuffer` layout. The extra inverse matrices and frustum rays give
 // us everything needed to reconstruct world-space positions from a depth value inside this
@@ -74,13 +79,13 @@ struct CameraUniform {
     @group(0) @binding(1) var barycentric_tex: texture_multisampled_2d<f32>;
     @group(0) @binding(2) var depth_tex: texture_depth_multisampled_2d;
     @group(0) @binding(3) var normal_tangent_tex: texture_multisampled_2d<f32>;
-    @group(0) @binding(4) var placeholder_derivatives_tex: texture_multisampled_2d<f32>;
+    @group(0) @binding(4) var barycentric_derivatives_tex: texture_multisampled_2d<f32>;
 {% else %}
     @group(0) @binding(0) var visibility_data_tex: texture_2d<u32>;
     @group(0) @binding(1) var barycentric_tex: texture_2d<f32>;
     @group(0) @binding(2) var depth_tex: texture_depth_2d;
     @group(0) @binding(3) var normal_tangent_tex: texture_2d<f32>;
-    @group(0) @binding(4) var placeholder_derivatives_tex: texture_2d<f32>;
+    @group(0) @binding(4) var barycentric_derivatives_tex: texture_2d<f32>;
 {% endif %}
 @group(0) @binding(5) var<storage, read> visibility_data: array<f32>;
 @group(0) @binding(6) var<storage, read> mesh_metas: array<MeshMeta>;
@@ -207,6 +212,7 @@ fn main(
                         );
 
                         let bary_{{s}} = textureLoad(barycentric_tex, coords, {{s}});
+                        let bary_derivs_{{s}} = textureLoad(barycentric_derivatives_tex, coords, {{s}});
                         let barycentric_{{s}} = vec3<f32>(bary_{{s}}.x, bary_{{s}}.y, 1.0 - bary_{{s}}.x - bary_{{s}}.y);
                         let packed_nt_{{s}} = textureLoad(normal_tangent_tex, coords, {{s}});
                         let tbn_{{s}} = unpack_normal_tangent(packed_nt_{{s}});
@@ -216,16 +222,12 @@ fn main(
 
                         // Calculate proper gradients for this MSAA sample to enable mipmapping
                         let gradients_{{s}} = pbr_get_gradients(
-                            coords,
-                            pixel_center,
-                            screen_dims_f32,
+                            barycentric_{{s}},
+                            bary_derivs_{{s}},
                             pbr_material_{{s}},
                             tri_indices_{{s}},
                             attribute_data_offset_{{s}},
                             vertex_attribute_stride_{{s}},
-                            camera.inv_view_proj,
-                            os_verts_{{s}},
-                            transforms_{{s}}.world_model
                         );
 
                         // Compute material color with proper mipmapping
@@ -244,31 +246,27 @@ fn main(
 
                         var sample_color = vec3<f32>(0.0);
 
-                        {% match debug.lighting %}
-                            {% when ShaderTemplateMaterialOpaqueDebugLighting::None | ShaderTemplateMaterialOpaqueDebugLighting::IblOnly %}
-                                sample_color = brdf_ibl(
-                                    mat_color_{{s}},
-                                    mat_color_{{s}}.normal,
-                                    standard_coordinates.surface_to_camera,
-                                    ibl_filtered_env_tex,
-                                    ibl_filtered_env_sampler,
-                                    ibl_irradiance_tex,
-                                    ibl_irradiance_sampler,
-                                    brdf_lut_tex,
-                                    brdf_lut_sampler,
-                                    lights_info.ibl
-                                );
-                            {% when _ %}
-                        {% endmatch %}
+                        {% if has_lighting_ibl() %}
+                            sample_color = brdf_ibl(
+                                mat_color_{{s}},
+                                mat_color_{{s}}.normal,
+                                standard_coordinates.surface_to_camera,
+                                ibl_filtered_env_tex,
+                                ibl_filtered_env_sampler,
+                                ibl_irradiance_tex,
+                                ibl_irradiance_sampler,
+                                brdf_lut_tex,
+                                brdf_lut_sampler,
+                                lights_info.ibl
+                            );
+                        {% endif %}
 
-                        {% match debug.lighting %}
-                            {% when ShaderTemplateMaterialOpaqueDebugLighting::None | ShaderTemplateMaterialOpaqueDebugLighting::PunctualOnly %}
-                                for(var i = 0u; i < lights_info.n_lights; i = i + 1u) {
-                                    let light_brdf = light_to_brdf(get_light(i), mat_color_{{s}}.normal, standard_coordinates.world_position);
-                                    sample_color += brdf_direct(mat_color_{{s}}, light_brdf, standard_coordinates.surface_to_camera);
-                                }
-                            {% when _ %}
-                        {% endmatch %}
+                        {% if has_lighting_punctual() %}
+                            for(var i = 0u; i < lights_info.n_lights; i = i + 1u) {
+                                let light_brdf = light_to_brdf(get_light(i), mat_color_{{s}}.normal, standard_coordinates.world_position);
+                                sample_color += brdf_direct(mat_color_{{s}}, light_brdf, standard_coordinates.surface_to_camera);
+                            }
+                        {% endif %}
 
                         color_sum += sample_color;
                         alpha_sum += mat_color_{{s}}.base.a;
@@ -336,18 +334,16 @@ fn main(
                 os_vertices
             );
         {% when MipmapMode::Gradient %}
+
+            let bary_derivs = textureLoad(barycentric_derivatives_tex, coords, 0);
             // Gradient-based sampling for anisotropic filtering
             let gradients = pbr_get_gradients(
-                coords,
-                pixel_center,
-                screen_dims_f32,
+                barycentric,
+                bary_derivs,
                 pbr_material,
                 triangle_indices,
                 attribute_data_offset,
                 vertex_attribute_stride,
-                camera.inv_view_proj,
-                os_vertices,
-                transforms.world_model
             );
 
             let material_color = pbr_get_material_color_grad(
@@ -366,123 +362,27 @@ fn main(
 
     var color = vec3<f32>(0.0);
 
-    {% match debug.lighting %}
-        {% when ShaderTemplateMaterialOpaqueDebugLighting::None | ShaderTemplateMaterialOpaqueDebugLighting::IblOnly %}
-            color = brdf_ibl(
-                material_color,
-                material_color.normal,
-                standard_coordinates.surface_to_camera,
-                ibl_filtered_env_tex,
-                ibl_filtered_env_sampler,
-                ibl_irradiance_tex,
-                ibl_irradiance_sampler,
-                brdf_lut_tex,
-                brdf_lut_sampler,
-                lights_info.ibl
-            );
-        {% when _ %}
-    {% endmatch %}
+    {% if has_lighting_ibl() %}
+        color = brdf_ibl(
+            material_color,
+            material_color.normal,
+            standard_coordinates.surface_to_camera,
+            ibl_filtered_env_tex,
+            ibl_filtered_env_sampler,
+            ibl_irradiance_tex,
+            ibl_irradiance_sampler,
+            brdf_lut_tex,
+            brdf_lut_sampler,
+            lights_info.ibl
+        );
+    {% endif %}
 
-    {% match debug.lighting %}
-        {% when ShaderTemplateMaterialOpaqueDebugLighting::None | ShaderTemplateMaterialOpaqueDebugLighting::PunctualOnly %}
-            // Punctual lighting: accumulate contributions from all lights
-            for(var i = 0u; i < lights_info.n_lights; i = i + 1u) {
-                let light_brdf = light_to_brdf(get_light(i), material_color.normal, standard_coordinates.world_position);
-                color += brdf_direct(material_color, light_brdf, standard_coordinates.surface_to_camera);
-            }
-        {% when _ %}
-    {% endmatch %}
-
-    {% match debug.lighting %}
-        {% when ShaderTemplateMaterialOpaqueDebugLighting::HardcodedPunctualOnly %}
-            for(var i = 0u; i < lights_info.n_lights; i = i + 1u) {
-                var light: Light;
-                switch(i) {
-                    case 0u: {
-                        light = Light(
-                            1u, // Directional
-                            vec3<f32>(1.0, 1.0, 1.0), // color
-                            1.0, // intensity
-                            vec3<f32>(0.0, 0.0, 0.0), // position
-                            0.0, // range
-                            vec3<f32>(-1.0, -0.5, -0.1), // direction
-                            0.0, // inner_cone
-                            0.0  // outer_cone
-                        );
-                    }
-                    default: {
-                        // no light
-                        light = Light(0u, vec3<f32>(0.0), 0.0, vec3<f32>(0.0), 0.0, vec3<f32>(0.0), 0.0, 0.0);
-                    }
-                }
-                let light_brdf = light_to_brdf(light, material_color.normal, standard_coordinates.world_position);
-                color += brdf_direct(material_color, light_brdf, standard_coordinates.surface_to_camera);
-            }
-        {% when _ %}
-    {% endmatch %}
-
-    // DEBUG: Compare hardware UV gradients vs geometric calculation
-    // NOTE: This debug code requires proper UV data from fragment shader
-    // Re-enable once alpha materials forward pass is implemented (see DEBUG_MIPMAPS.md)
-    {% if false %}  // Disabled - enable for gradient debugging
-        {% match mipmap %}
-            {% when MipmapMode::Gradient %}
-                if (pbr_material.has_base_color_texture) {
-                    let tex_info = pbr_material.base_color_tex_info;
-
-                    // Read hardware UV gradients from fragment shader
-                    let hw_uv_grads = textureLoad(placeholder_derivatives_tex, coords, 0);
-                    let hw_ddx_uv = hw_uv_grads.xy;
-                    let hw_ddy_uv = hw_uv_grads.zw;
-
-                    // Get actual UVs from attribute data (TEXCOORD_0 / uv_set_index 0)
-                    let uv0 = _texture_uv_per_vertex(attribute_data_offset, 0u, triangle_indices.x, vertex_attribute_stride);
-                    let uv1 = _texture_uv_per_vertex(attribute_data_offset, 0u, triangle_indices.y, vertex_attribute_stride);
-                    let uv2 = _texture_uv_per_vertex(attribute_data_offset, 0u, triangle_indices.z, vertex_attribute_stride);
-
-                    // Transform triangle to screen space
-                    let mvp = camera.view_proj * transforms.world_model;
-                    let clip0 = mvp * vec4<f32>(os_vertices.p0, 1.0);
-                    let clip1 = mvp * vec4<f32>(os_vertices.p1, 1.0);
-                    let clip2 = mvp * vec4<f32>(os_vertices.p2, 1.0);
-
-                    let p0 = clip_to_pixel(clip0, screen_dims_f32);
-                    let p1 = clip_to_pixel(clip1, screen_dims_f32);
-                    let p2 = clip_to_pixel(clip2, screen_dims_f32);
-
-                    // Compute barycentric gradients
-                    let bary_grads = compute_barycentric_derivatives(p0, p1, p2);
-
-                    // Apply chain rule to get UV gradients
-                    let duv_db1 = uv1 - uv0;
-                    let duv_db2 = uv2 - uv0;
-                    let geo_ddx_uv = duv_db1 * bary_grads.x + duv_db2 * bary_grads.z;
-                    let geo_ddy_uv = duv_db1 * bary_grads.y + duv_db2 * bary_grads.w;
-
-                    // Compare magnitudes
-                    let hw_mag = max(length(hw_ddx_uv), length(hw_ddy_uv));
-                    let geo_mag = max(length(geo_ddx_uv), length(geo_ddy_uv));
-
-                    // Compute ratio (geometric / hardware)
-                    let ratio = geo_mag / max(hw_mag, 1e-8);
-
-                    // Visualize ratio
-                    // Green = ratio ~1 (perfect match!)
-                    // Red = ratio > 1 (geometric larger)
-                    // Blue = ratio < 1 (geometric smaller)
-                    if (ratio > 0.9 && ratio < 1.1) {
-                        color = vec3<f32>(0.0, 1.0, 0.0);  // Green = match!
-                    } else if (ratio > 1.1) {
-                        color = vec3<f32>(min(ratio / 4.0, 1.0), 0.0, 0.0);  // Red = too large
-                    } else {
-                        color = vec3<f32>(0.0, 0.0, min(1.0 / ratio / 4.0, 1.0));  // Blue = too small
-                    }
-                } else {
-                    color = vec3<f32>(0.5, 0.5, 0.5);  // No texture - gray
-                }
-            {% when _ %}
-                color = vec3<f32>(0.5, 0.5, 0.5);  // No mipmap mode - gray
-        {% endmatch %}
+    {% if has_lighting_punctual() %}
+        // Punctual lighting: accumulate contributions from all lights
+        for(var i = 0u; i < lights_info.n_lights; i = i + 1u) {
+            let light_brdf = light_to_brdf(get_light(i), material_color.normal, standard_coordinates.world_position);
+            color += brdf_direct(material_color, light_brdf, standard_coordinates.surface_to_camera);
+        }
     {% endif %}
 
     {% if debug.mips %}
@@ -490,23 +390,24 @@ fn main(
         {% match mipmap %}
             {% when MipmapMode::Gradient %}
                 if (pbr_material.has_base_color_texture) {
+                    // Get the actual gradients being used
+                    let ddx_uv = gradients.base_color.ddx;
+                    let ddy_uv = gradients.base_color.ddy;
+
                     // Calculate ACTUAL atlas mip level (what hardware selects)
                     let atlas_mip = debug_calculate_atlas_mip_level(
-                        gradients.base_color_ddx,
-                        gradients.base_color_ddy,
-                        pbr_material.base_color_tex_info.uv_scale,
+                        ddx_uv,
+                        ddy_uv,
+                        pbr_material.base_color_tex_info.grad_scale,
                         pbr_material.base_color_tex_info.atlas_index
                     );
 
-                    // Calculate "tile mip" (what level the tile itself is at)
-                    // For a 1024x1024 tile in 4096x4096 atlas: tile is at atlas mip 2
-                    let tile_base_mip = log2(4096.0 / 1024.0); // Example: = 2.0
+                    // Show gradient magnitude
+                    let grad_mag = max(length(ddx_uv), length(ddy_uv));
 
-                    // Show gradient magnitude as overlay (helps debug scale issues)
-                    let grad_mag = max(length(gradients.base_color_ddx), length(gradients.base_color_ddy));
-
-                    // Color code by ATLAS mip level:
-                    // Shows what the hardware actually selects
+                    // COLOR MODE 1: Show mip level as color
+                    // Uncomment this block to see mip levels
+                    /*
                     if (atlas_mip < 0.5) {
                         color = vec3<f32>(0.0, 0.0, 1.0); // Blue = atlas mip 0
                     } else if (atlas_mip < 1.5) {
@@ -520,18 +421,45 @@ fn main(
                     } else {
                         color = vec3<f32>(1.0, 0.0, 0.0); // Red = atlas mip 5+
                     }
+                    */
 
-                    // Show raw gradient magnitude for debugging (uncomment to use)
-                    //color = vec3<f32>(grad_mag * 10.0);
+                    // COLOR MODE 2: Show raw gradient magnitudes
+                    // Scale gradients to visible range - adjust multiplier as needed
+                    // For a 1024x1024 texture at 1:1 pixel ratio, expect ddx/ddy ~ 1/1024 = 0.001
+                    // Multiply by 100 to make 0.001 appear as 0.1 brightness
+                    let scale = 100.0;
+                    color = vec3<f32>(
+                        length(ddx_uv) * scale,  // Red channel = ddx magnitude
+                        length(ddy_uv) * scale,  // Green channel = ddy magnitude
+                        atlas_mip / 5.0          // Blue channel = mip level (normalized to 0-5 range)
+                    );
 
-                    // Debug: show raw gradient values
-                    // For 1:1 texel:pixel on 1024 tile, expect ~0.001 (1/1024)
-                    //let grad_scale = 1000.0; // Makes 0.001 appear as white
-                    //color = vec3<f32>(
-                    //    length(gradients.base_color_ddx) * grad_scale,
-                    //    length(gradients.base_color_ddy) * grad_scale,
-                    //    0.0
-                    //);
+                    // COLOR MODE 3: Show both gradients and mip level side-by-side
+                    // Uncomment to use this mode instead
+                    /*
+                    // Left half of screen: gradient magnitude as brightness
+                    // Right half: mip level as color
+                    if (f32(coords.x) < screen_dims_f32.x * 0.5) {
+                        // Gradient magnitude mode
+                        let brightness = grad_mag * 100.0;
+                        color = vec3<f32>(brightness);
+                    } else {
+                        // Mip level color mode
+                        if (atlas_mip < 0.5) {
+                            color = vec3<f32>(0.0, 0.0, 1.0);
+                        } else if (atlas_mip < 1.5) {
+                            color = vec3<f32>(0.0, 1.0, 0.0);
+                        } else if (atlas_mip < 2.5) {
+                            color = vec3<f32>(0.5, 1.0, 0.0);
+                        } else if (atlas_mip < 3.5) {
+                            color = vec3<f32>(1.0, 1.0, 0.0);
+                        } else if (atlas_mip < 4.5) {
+                            color = vec3<f32>(1.0, 0.5, 0.0);
+                        } else {
+                            color = vec3<f32>(1.0, 0.0, 0.0);
+                        }
+                    }
+                    */
                 } else {
                     color = vec3<f32>(0.5, 0.5, 0.5); // Gray = no texture
                 }
@@ -624,6 +552,7 @@ fn main(
 
                         // Per-sample geometry
                         let bary_{{s}} = textureLoad(barycentric_tex, coords, {{s}});
+                        let bary_derivs_{{s}} = textureLoad(barycentric_derivatives_tex, coords, {{s}});
                         let barycentric_{{s}} = vec3<f32>(bary_{{s}}.x, bary_{{s}}.y, 1.0 - bary_{{s}}.x - bary_{{s}}.y);
                         let packed_nt_{{s}} = textureLoad(normal_tangent_tex, coords, {{s}});
                         let tbn_{{s}} = unpack_normal_tangent(packed_nt_{{s}});
@@ -633,16 +562,12 @@ fn main(
 
                         // Calculate proper gradients for this MSAA sample to enable mipmapping
                         let gradients_{{s}} = pbr_get_gradients(
-                            coords,
-                            pixel_center,
-                            screen_dims_f32,
+                            barycentric_{{s}},
+                            bary_derivs_{{s}},
                             pbr_material_{{s}},
                             triangle_indices_{{s}},
                             attribute_data_offset_{{s}},
                             vertex_attribute_stride_{{s}},
-                            camera.inv_view_proj,
-                            os_vertices_{{s}},
-                            transforms_{{s}}.world_model
                         );
 
                         // Compute material color with proper mipmapping

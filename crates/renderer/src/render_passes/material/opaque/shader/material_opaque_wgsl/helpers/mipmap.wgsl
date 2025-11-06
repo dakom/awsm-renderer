@@ -25,170 +25,164 @@
 // Shared structs
 // ─────────────────────────────────────────────────────────────────────────────
 struct UvDerivs {
-    dudx : f32,
-    dudy : f32,
-    dvdx : f32,
-    dvdy : f32,
+    ddx: vec2<f32>,  // (dudx, dvdx)
+    ddy: vec2<f32>,  // (dudy, dvdy)
 }
 
-// Helper: 2x2 matrix determinant
-fn det2(a: vec2<f32>, b: vec2<f32>) -> f32 {
-    return a.x * b.y - a.y * b.x;
-}
+struct UV3 { u0: vec2<f32>, u1: vec2<f32>, u2: vec2<f32> }
 
-// Helper: 2x2 matrix inverse
-fn inv2(a: vec2<f32>, b: vec2<f32>) -> mat2x2<f32> {
-    let d = det2(a, b);
-    if (abs(d) < 1e-8) {
-        return mat2x2<f32>(vec2<f32>(0.0), vec2<f32>(0.0));
+struct MirrorLocal { uv: vec2<f32>, slope: vec2<f32> } // slope per axis is ±1
+
+// Unwrap aX relative to a0 for repeat textures
+// This makes vertices continuous when they cross the 0→1 boundary,
+// but preserves large spans (e.g., texture repeating multiple times)
+fn unwrap_repeat_axis(a0: f32, aX: f32) -> f32 {
+    let d = aX - a0;
+
+    // Compute what the distance would be with ±1 shifts
+    // Choose whichever gives the smallest absolute distance
+    let d_minus = d - 1.0;
+    let d_plus = d + 1.0;
+
+    // But only apply a shift if it makes a "significant" improvement (> 0.5 reduction)
+    // This prevents collapsing large spans while still unwrapping boundaries
+    if (abs(d_plus) < abs(d) - 0.5) {
+        return aX + 1.0;
+    } else if (abs(d_minus) < abs(d) - 0.5) {
+        return aX - 1.0;
+    } else {
+        return aX;
     }
-    let invd = 1.0 / d;
-    return mat2x2<f32>(
-        vec2<f32>(b.y, -a.y) * invd,
-        vec2<f32>(-b.x, a.x) * invd
+}
+
+
+fn unwrap_repeat(u0: vec2<f32>, u1: vec2<f32>, u2: vec2<f32>) -> UV3 {
+    return UV3(
+        u0,
+        vec2<f32>(unwrap_repeat_axis(u0.x, u1.x), unwrap_repeat_axis(u0.y, u1.y)),
+        vec2<f32>(unwrap_repeat_axis(u0.x, u2.x), unwrap_repeat_axis(u0.y, u2.y))
+    );
+}
+fn mirror_linearize_axis(a: f32) -> vec2<f32> {
+    // Returns (u_lin, slope)
+    let k = floor(a);
+    let frac = a - k; // [0,1)
+    let is_odd = (i32(k) & 1) != 0;
+    // Map to a monotonic coordinate (continuous in "mirror space"):
+    let u_lin = select(frac, 1.0 - frac, is_odd) + k;
+    let s = select(1.0, -1.0, is_odd);
+    return vec2<f32>(u_lin, s);
+}
+
+fn mirror_linearize(uv: vec2<f32>) -> MirrorLocal {
+    let x = mirror_linearize_axis(uv.x);
+    let y = mirror_linearize_axis(uv.y);
+    return MirrorLocal(
+        vec2<f32>(x.x, y.x),
+        vec2<f32>(x.y, y.y)
     );
 }
 
-// Helper: Transform clip-space to pixel coordinates
-fn clip_to_pixel(clip: vec4<f32>, screen_size: vec2<f32>) -> vec2<f32> {
-    let ndc = clip.xy / clip.w;
-    // Convert NDC [-1,1] to [0,1], with Y-flip to match framebuffer coordinates
-    // In WebGPU/WGSL: NDC Y=-1 is bottom, Y=+1 is top
-    // In framebuffer: pixel Y=0 is top, Y=height is bottom
-    let xy01 = vec2<f32>(
-        ndc.x * 0.5 + 0.5,
-        1.0 - (ndc.y * 0.5 + 0.5)  // Flip Y
-    );
-    return xy01 * screen_size;
-}
-
-// Helper: Compute barycentric coordinates for a point in screen space
-fn compute_barycentric(p: vec2<f32>, p0: vec2<f32>, e01: vec2<f32>, e02: vec2<f32>, inv_area: f32) -> vec3<f32> {
-    let v0 = p - p0;
-    let d10 = det2(v0, e02);
-    let d20 = det2(e01, v0);
-    let b1 = d10 * inv_area;
-    let b2 = d20 * inv_area;
-    let b0 = 1.0 - b1 - b2;
-    return vec3<f32>(b0, b1, b2);
-}
-
-// Helper: Linearly interpolate UVs using barycentric coordinates
-fn interpolate_uv_linear(bary: vec3<f32>, uv0: vec2<f32>, uv1: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
-    return uv0 * bary.x + uv1 * bary.y + uv2 * bary.z;
-}
-
-// Compute barycentric coordinate derivatives geometrically
-// Returns d(bary.xy)/d(screen) as vec4(db1/dx, db1/dy, db2/dx, db2/dy)
-// bary = (b0, b1, b2) where b0 = 1 - b1 - b2
-fn compute_barycentric_derivatives(
-    p0: vec2<f32>,
-    p1: vec2<f32>,
-    p2: vec2<f32>
-) -> vec4<f32> {
-    let e01 = p1 - p0;
-    let e02 = p2 - p0;
-    let area = det2(e01, e02);
-
-    if (abs(area) < 1e-8) {
-        return vec4<f32>(0.0);
-    }
-
-    let inv_area = 1.0 / area;
-
-    // Barycentric formulas:
-    // b1 = det(p - p0, e02) / area
-    // b2 = det(e01, p - p0) / area
-    //
-    // Taking derivatives with respect to screen position:
-    // d(b1)/dx = det((1,0), e02) / area = e02.y / area
-    // d(b1)/dy = det((0,1), e02) / area = -e02.x / area
-    // d(b2)/dx = det(e01, (1,0)) / area = -e01.y / area
-    // d(b2)/dy = det(e01, (0,1)) / area = e01.x / area
-
-    let db1_dx = e02.y * inv_area;
-    let db1_dy = -e02.x * inv_area;
-    let db2_dx = -e01.y * inv_area;
-    let db2_dy = e01.x * inv_area;
-
-    return vec4<f32>(db1_dx, db1_dy, db2_dx, db2_dy);
-}
-
-// Compute UV derivatives using verified barycentric gradient chain rule
-fn compute_uv_derivatives_from_depth(
-    coords: vec2<i32>,
-    pixel_center: vec2<f32>,
-    screen_size: vec2<f32>,
+fn get_uv_derivatives(
+    barycentric: vec3<f32>,         // (db1dx, db1dy, db2dx, db2dy)
+    bary_derivs: vec4<f32>,         // (db1dx, db1dy, db2dx, db2dy)
     tri: vec3<u32>,
     attribute_data_offset: u32,
     vertex_stride: u32,
-    uv_set_index: u32,
-    inv_view_proj: mat4x4<f32>,
-    os_vertices: ObjectSpaceVertices,
-    world_model: mat4x4<f32>
+    tex_info: TextureInfo
 ) -> UvDerivs {
-    // Get triangle UVs
-    let uv0 = _texture_uv_per_vertex(attribute_data_offset, uv_set_index, tri.x, vertex_stride);
-    let uv1 = _texture_uv_per_vertex(attribute_data_offset, uv_set_index, tri.y, vertex_stride);
-    let uv2 = _texture_uv_per_vertex(attribute_data_offset, uv_set_index, tri.z, vertex_stride);
+    let uv_set_index = tex_info.attribute_uv_set_index;
 
-    // Transform triangle vertices to clip space
-    let mvp = camera.view_proj * world_model;
-    let clip0 = mvp * vec4<f32>(os_vertices.p0, 1.0);
-    let clip1 = mvp * vec4<f32>(os_vertices.p1, 1.0);
-    let clip2 = mvp * vec4<f32>(os_vertices.p2, 1.0);
+    // Fetch per-vertex UVs (raw, as authored)
+        let uv0 = _texture_uv_per_vertex(attribute_data_offset, tex_info.attribute_uv_set_index, tri.x, vertex_stride);
+        let uv1 = _texture_uv_per_vertex(attribute_data_offset, tex_info.attribute_uv_set_index, tri.y, vertex_stride);
+        let uv2 = _texture_uv_per_vertex(attribute_data_offset, tex_info.attribute_uv_set_index, tri.z, vertex_stride);
 
-    // Convert to screen-space pixel coordinates
-    let p0 = clip_to_pixel(clip0, screen_size);
-    let p1 = clip_to_pixel(clip1, screen_size);
-    let p2 = clip_to_pixel(clip2, screen_size);
+        let db1dx = bary_derivs.x;
+        let db1dy = bary_derivs.y;
+        let db2dx = bary_derivs.z;
+        let db2dy = bary_derivs.w;
 
-    // Compute barycentric derivatives: d(bary)/d(screen)
-    // This uses the verified formula that matches hardware dFdx/dFdy
-    let bary_derivs = compute_barycentric_derivatives(p0, p1, p2);
+        // If nearly zero derivatives, short-circuit (selects base mip).
+        let m = abs(db1dx) + abs(db1dy) + abs(db2dx) + abs(db2dy);
+        if (m < 1e-20) {
+            return UvDerivs(vec2<f32>(0.0), vec2<f32>(0.0));
+        }
 
-    // Check for degenerate triangle
-    if (bary_derivs.x == 0.0 && bary_derivs.y == 0.0 &&
-        bary_derivs.z == 0.0 && bary_derivs.w == 0.0) {
-        return UvDerivs(10.0, 10.0, 10.0, 10.0);
-    }
+        // Perspective barycentrics: b0 = 1 - b1 - b2
+        let db0dx = -db1dx - db2dx;
+        let db0dy = -db1dy - db2dy;
 
-    // Apply chain rule: d(UV)/d(screen) = d(UV)/d(bary) × d(bary)/d(screen)
-    // d(UV)/d(b1) = uv1 - uv0
-    // d(UV)/d(b2) = uv2 - uv0
-    let duv_db1 = uv1 - uv0;
-    let duv_db2 = uv2 - uv0;
+        // Make the THREE vertex UVs locally continuous per axis based on the address mode.
+        var U0 = uv0;
+        var U1 = uv1;
+        var U2 = uv2;
 
-    // Chain rule application:
-    // d(UV)/dx = d(UV)/d(b1) × d(b1)/dx + d(UV)/d(b2) × d(b2)/dx
-    // d(UV)/dy = d(UV)/d(b1) × d(b1)/dy + d(UV)/d(b2) × d(b2)/dy
-    let ddx_uv = duv_db1 * bary_derivs.x + duv_db2 * bary_derivs.z;  // db1/dx, db2/dx
-    let ddy_uv = duv_db1 * bary_derivs.y + duv_db2 * bary_derivs.w;  // db1/dy, db2/dy
+        // TEMPORARY FIX: Skip unwrapping for REPEAT mode entirely
+        // The unwrapping logic was collapsing large UV spans, causing incorrect mip selection
+        // For MIRROR_REPEAT, we still need linearization + unwrapping
+        // Handle U axis:
+        switch (tex_info.address_mode_u) {
+            case ADDRESS_MODE_REPEAT: {
+                // Don't unwrap - use raw UVs
+                // This preserves large spans but may have seams at boundaries
+            }
+            case ADDRESS_MODE_MIRROR_REPEAT: {
+                let L0 = mirror_linearize(vec2<f32>(U0.x, 0.0));
+                let L1 = mirror_linearize(vec2<f32>(U1.x, 0.0));
+                let L2 = mirror_linearize(vec2<f32>(U2.x, 0.0));
+                let R  = unwrap_repeat(vec2<f32>(L0.uv.x, 0.0), vec2<f32>(L1.uv.x, 0.0), vec2<f32>(L2.uv.x, 0.0));
+                U0.x = R.u0.x; U1.x = R.u1.x; U2.x = R.u2.x;
+            }
+            default: { /* CLAMP: nothing */ }
+        }
 
-    let dudx = ddx_uv.x;
-    let dvdx = ddx_uv.y;
-    let dudy = ddy_uv.x;
-    let dvdy = ddy_uv.y;
+        // Handle V axis:
+        switch (tex_info.address_mode_v) {
+            case ADDRESS_MODE_REPEAT: {
+                // Don't unwrap - use raw UVs
+            }
+            case ADDRESS_MODE_MIRROR_REPEAT: {
+                let L0 = mirror_linearize(vec2<f32>(0.0, U0.y));
+                let L1 = mirror_linearize(vec2<f32>(0.0, U1.y));
+                let L2 = mirror_linearize(vec2<f32>(0.0, U2.y));
+                let R  = unwrap_repeat(vec2<f32>(0.0, L0.uv.y), vec2<f32>(0.0, L1.uv.y), vec2<f32>(0.0, L2.uv.y));
+                U0.y = R.u0.y; U1.y = R.u1.y; U2.y = R.u2.y;
+            }
+            default: { /* CLAMP: nothing */ }
+        }
 
-    // Safety checks for extreme or invalid derivatives
-    if (dudx != dudx || dudy != dudy || dvdx != dvdx || dvdy != dvdy) {
-        // NaN - use large derivatives to force blur
-        return UvDerivs(10.0, 10.0, 10.0, 10.0);
-    }
+        // Chain rule with the unwrapped / linearized UVs
+        var dudx = U0.x * db0dx + U1.x * db1dx + U2.x * db2dx;
+        var dvdx = U0.y * db0dx + U1.y * db1dx + U2.y * db2dx;
 
-    // For extreme derivatives, clamp them to reasonable range
-    const MAX_DERIVATIVE = 100.0;
-    let clamped_dudx = clamp(dudx, -MAX_DERIVATIVE, MAX_DERIVATIVE);
-    let clamped_dudy = clamp(dudy, -MAX_DERIVATIVE, MAX_DERIVATIVE);
-    let clamped_dvdx = clamp(dvdx, -MAX_DERIVATIVE, MAX_DERIVATIVE);
-    let clamped_dvdy = clamp(dvdy, -MAX_DERIVATIVE, MAX_DERIVATIVE);
+        var dudy = U0.x * db0dy + U1.x * db1dy + U2.x * db2dy;
+        var dvdy = U0.y * db0dy + U1.y * db1dy + U2.y * db2dy;
 
-    return UvDerivs(
-        clamped_dudx,
-        clamped_dudy,
-        clamped_dvdx,
-        clamped_dvdy
-    );
+        // For MIRROR_REPEAT, apply local slope sign (+1/-1) at THIS PIXEL so grads reflect flips.
+        if (tex_info.address_mode_u == ADDRESS_MODE_MIRROR_REPEAT ||
+            tex_info.address_mode_v == ADDRESS_MODE_MIRROR_REPEAT) {
+
+            // Interpolated raw UV at this pixel (no wrapping) just to decide parity:
+            let uv_pix = barycentric.x * uv0 + barycentric.y * uv1 + barycentric.z * uv2;
+
+            if (tex_info.address_mode_u == ADDRESS_MODE_MIRROR_REPEAT) {
+                let sx = mirror_linearize_axis(uv_pix.x).y; // +1 or -1
+                dudx *= sx; dudy *= sx;
+            }
+            if (tex_info.address_mode_v == ADDRESS_MODE_MIRROR_REPEAT) {
+                let sy = mirror_linearize_axis(uv_pix.y).y; // +1 or -1
+                dvdx *= sy; dvdy *= sy;
+            }
+        }
+
+        // NaN/Inf guard (don’t clamp magnitudes)
+        let ok = (dudx == dudx) && (dudy == dudy) && (dvdx == dvdx) && (dvdy == dvdy);
+        if (!ok) {
+            return UvDerivs(vec2<f32>(0.0), vec2<f32>(0.0));
+        }
+
+        return UvDerivs(vec2<f32>(dudx, dvdx), vec2<f32>(dudy, dvdy));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -198,93 +192,64 @@ fn compute_uv_derivatives_from_depth(
 // Computes UV derivatives for each texture type, which are used with textureSampleGrad
 // This enables hardware anisotropic filtering in compute shaders
 fn pbr_get_gradients(
-    coords: vec2<i32>,
-    pixel_center: vec2<f32>,
-    screen_dims: vec2<f32>,
+    barycentric: vec3<f32>,         // (b0, b1, b2)
+    bary_derivs: vec4<f32>,         // (db1dx, db1dy, db2dx, db2dy)
     material: PbrMaterial,
     triangle_indices: vec3<u32>,
     attribute_data_offset: u32,
     vertex_attribute_stride: u32,
-    inv_view_proj: mat4x4<f32>,
-    os_vertices: ObjectSpaceVertices,
-    world_model: mat4x4<f32>
 ) -> PbrMaterialGradients {
 
     var out : PbrMaterialGradients;
 
     if (material.has_base_color_texture) {
-        let d = compute_uv_derivatives_from_depth(
-            coords, pixel_center, screen_dims,
+        out.base_color = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
-            material.base_color_tex_info.attribute_uv_set_index,
-            inv_view_proj, os_vertices, world_model
+            material.base_color_tex_info,
         );
-        out.base_color_ddx = vec2<f32>(d.dudx, d.dvdx);
-        out.base_color_ddy = vec2<f32>(d.dudy, d.dvdy);
-    } else {
-        out.base_color_ddx = vec2<f32>(0.0, 0.0);
-        out.base_color_ddy = vec2<f32>(0.0, 0.0);
     }
 
     if (material.has_metallic_roughness_texture) {
-        let d = compute_uv_derivatives_from_depth(
-            coords, pixel_center, screen_dims,
+        out.metallic_roughness = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
-            material.metallic_roughness_tex_info.attribute_uv_set_index,
-            inv_view_proj, os_vertices, world_model
+            material.metallic_roughness_tex_info,
         );
-        out.metallic_roughness_ddx = vec2<f32>(d.dudx, d.dvdx);
-        out.metallic_roughness_ddy = vec2<f32>(d.dudy, d.dvdy);
-    } else {
-        out.metallic_roughness_ddx = vec2<f32>(0.0, 0.0);
-        out.metallic_roughness_ddy = vec2<f32>(0.0, 0.0);
     }
 
     if (material.has_normal_texture) {
-        let d = compute_uv_derivatives_from_depth(
-            coords, pixel_center, screen_dims,
+        out.normal = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
-            material.normal_tex_info.attribute_uv_set_index,
-            inv_view_proj, os_vertices, world_model
+            material.normal_tex_info,
         );
-        out.normal_ddx = vec2<f32>(d.dudx, d.dvdx);
-        out.normal_ddy = vec2<f32>(d.dudy, d.dvdy);
-    } else {
-        out.normal_ddx = vec2<f32>(0.0, 0.0);
-        out.normal_ddy = vec2<f32>(0.0, 0.0);
     }
 
     if (material.has_occlusion_texture) {
-        let d = compute_uv_derivatives_from_depth(
-            coords, pixel_center, screen_dims,
+        out.occlusion = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
-            material.occlusion_tex_info.attribute_uv_set_index,
-            inv_view_proj, os_vertices, world_model
+            material.occlusion_tex_info,
         );
-        out.occlusion_ddx = vec2<f32>(d.dudx, d.dvdx);
-        out.occlusion_ddy = vec2<f32>(d.dudy, d.dvdy);
-    } else {
-        out.occlusion_ddx = vec2<f32>(0.0, 0.0);
-        out.occlusion_ddy = vec2<f32>(0.0, 0.0);
     }
 
     if (material.has_emissive_texture) {
-        let d = compute_uv_derivatives_from_depth(
-            coords, pixel_center, screen_dims,
+        out.emissive = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
-            material.emissive_tex_info.attribute_uv_set_index,
-            inv_view_proj, os_vertices, world_model
+            material.emissive_tex_info,
         );
-        out.emissive_ddx = vec2<f32>(d.dudx, d.dvdx);
-        out.emissive_ddy = vec2<f32>(d.dudy, d.dvdy);
-    } else {
-        out.emissive_ddx = vec2<f32>(0.0, 0.0);
-        out.emissive_ddy = vec2<f32>(0.0, 0.0);
     }
 
     return out;
@@ -315,7 +280,7 @@ fn debug_calculate_mip_level(
 fn debug_calculate_atlas_mip_level(
     ddx_local: vec2<f32>,
     ddy_local: vec2<f32>,
-    uv_scale: vec2<f32>,
+    grad_scale: vec2<f32>,
     atlas_index: u32
 ) -> f32 {
     // Get atlas dimensions
@@ -330,8 +295,8 @@ fn debug_calculate_atlas_mip_level(
     }
 
     // Convert from local UV space to atlas UV space
-    let ddx_atlas = ddx_local * uv_scale;
-    let ddy_atlas = ddy_local * uv_scale;
+    let ddx_atlas = ddx_local * grad_scale;
+    let ddy_atlas = ddy_local * grad_scale;
 
     // Convert to texel space using ATLAS dimensions (what hardware actually sees)
     let ddx_texels = ddx_atlas * atlas_dims;

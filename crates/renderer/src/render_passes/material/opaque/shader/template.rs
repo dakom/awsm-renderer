@@ -29,7 +29,26 @@ pub struct ShaderTemplateMaterialOpaque {
     pub debug: ShaderTemplateMaterialOpaqueDebug,
     pub mipmap: MipmapMode,
     pub multisampled_geometry: bool,
+    pub clamp_sampler_index: u32,
     pub msaa_sample_count: u32, // 0 if no MSAA
+}
+
+impl ShaderTemplateMaterialOpaque {
+    pub fn has_lighting_ibl(&self) -> bool {
+        match self.debug.lighting {
+            ShaderTemplateMaterialOpaqueDebugLighting::None => true,
+            ShaderTemplateMaterialOpaqueDebugLighting::IblOnly => true,
+            ShaderTemplateMaterialOpaqueDebugLighting::PunctualOnly => false,
+        }
+    }
+
+    pub fn has_lighting_punctual(&self) -> bool {
+        match self.debug.lighting {
+            ShaderTemplateMaterialOpaqueDebugLighting::None => true,
+            ShaderTemplateMaterialOpaqueDebugLighting::IblOnly => false,
+            ShaderTemplateMaterialOpaqueDebugLighting::PunctualOnly => true,
+        }
+    }
 }
 
 impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
@@ -70,6 +89,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
         let _self = Self {
             texture_atlas_len: value.texture_atlas_len,
             sampler_atlas_len: value.sampler_atlas_len,
+            clamp_sampler_index: value.clamp_sampler_index,
             color_sets_index,
             uv_sets_index,
             normals: value.attributes.normals,
@@ -108,20 +128,37 @@ struct ShaderTemplateMaterialOpaqueDebug {
     lighting: ShaderTemplateMaterialOpaqueDebugLighting,
 }
 
+impl ShaderTemplateMaterialOpaqueDebug {
+    pub fn any(&self) -> bool {
+        self.mips
+            || self.n_dot_v
+            || self.normals
+            || self.solid_color
+            || self.view_direction
+            || self.irradiance_sample
+            || self.msaa_detect_edges
+            || !matches!(
+                self.lighting,
+                ShaderTemplateMaterialOpaqueDebugLighting::None
+            )
+    }
+}
+
 #[derive(Debug, Default)]
 enum ShaderTemplateMaterialOpaqueDebugLighting {
     #[default]
     None,
     IblOnly,
     PunctualOnly,
-    HardcodedPunctualOnly,
 }
 
 impl ShaderTemplateMaterialOpaque {
     pub fn into_source(self) -> Result<String> {
         let source = self.render()?;
 
-        //debug_unique_string(1, &source, || print_shader_source(&source, true));
+        //print_shader_source(&source, false);
+
+        //debug_unique_string(1, &source, || print_shader_source(&source, false));
 
         Ok(source)
     }

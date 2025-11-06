@@ -66,7 +66,7 @@ impl GeometryRenderPass {
                 StoreOp::Store,
             ),
             ColorAttachment::new(
-                &ctx.render_texture_views.placeholder_derivatives,
+                &ctx.render_texture_views.barycentric_derivatives,
                 LoadOp::Clear,
                 StoreOp::Store,
             ),

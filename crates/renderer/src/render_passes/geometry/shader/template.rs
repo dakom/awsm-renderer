@@ -64,7 +64,7 @@ impl ShaderTemplateGeometry {
         let source = format!("{}\n{}", vertex_source, fragment_source);
 
         // print_shader_source(&vertex_source, false);
-        // print_shader_source(&source, false);
+        //print_shader_source(&source, false);
 
         Ok(source)
     }

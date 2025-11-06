@@ -15,6 +15,7 @@ use crate::render_passes::{
     material::opaque::bind_group::MaterialOpaqueBindGroups, RenderPassInitContext,
 };
 use crate::shaders::Shaders;
+use crate::textures::{AwsmTextureError, Textures};
 
 pub struct MaterialOpaquePipelines {
     multisampled_pipeline_layout_key: PipelineLayoutKey,
@@ -81,6 +82,7 @@ impl MaterialOpaquePipelines {
         pipeline_layouts: &PipelineLayouts,
         mesh_buffer_infos: &MeshBufferInfos,
         anti_aliasing: &AntiAliasing,
+        textures: &Textures,
     ) -> Result<ComputePipelineKey> {
         let mesh_buffer_info = mesh_buffer_infos.get(mesh_buffer_info_key)?;
 
@@ -90,6 +92,7 @@ impl MaterialOpaquePipelines {
             attributes: mesh_buffer_info.into(),
             texture_atlas_len: material_opaque_bind_groups.texture_atlas_len,
             sampler_atlas_len: material_opaque_bind_groups.texture_sampler_keys.len() as u32,
+            clamp_sampler_index: material_opaque_bind_groups.clamp_sampler_index,
             msaa_sample_count,
         };
 

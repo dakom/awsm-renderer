@@ -297,16 +297,11 @@ fn _get_vertex_tangent(
 // ============================================================================
 
 struct PbrMaterialGradients {
-    base_color_ddx: vec2<f32>,          // dudx, dvdx
-    base_color_ddy: vec2<f32>,          // dudy, dvdy
-    metallic_roughness_ddx: vec2<f32>,
-    metallic_roughness_ddy: vec2<f32>,
-    normal_ddx: vec2<f32>,
-    normal_ddy: vec2<f32>,
-    occlusion_ddx: vec2<f32>,
-    occlusion_ddy: vec2<f32>,
-    emissive_ddx: vec2<f32>,
-    emissive_ddy: vec2<f32>,
+    base_color: UvDerivs,
+    metallic_roughness: UvDerivs,
+    normal: UvDerivs,
+    occlusion: UvDerivs,
+    emissive: UvDerivs,
 }
 
 // Gradient-based version - enables anisotropic filtering in compute shaders
@@ -332,8 +327,7 @@ fn pbr_get_material_color_grad(
             material.base_color_tex_info,
             vertex_attribute_stride,
         ),
-        gradients.base_color_ddx,
-        gradients.base_color_ddy,
+        gradients.base_color,
     );
 
     {%- match color_sets %}
@@ -357,8 +351,7 @@ fn pbr_get_material_color_grad(
             material.metallic_roughness_tex_info,
             vertex_attribute_stride,
         ),
-        gradients.metallic_roughness_ddx,
-        gradients.metallic_roughness_ddy,
+        gradients.metallic_roughness,
     );
 
     let normal = _pbr_normal_color_grad(
@@ -370,8 +363,7 @@ fn pbr_get_material_color_grad(
             material.normal_tex_info,
             vertex_attribute_stride,
         ),
-        gradients.normal_ddx,
-        gradients.normal_ddy,
+        gradients.normal,
         world_normal,
         barycentric,
         triangle_indices,
@@ -390,8 +382,7 @@ fn pbr_get_material_color_grad(
             material.occlusion_tex_info,
             vertex_attribute_stride,
         ),
-        gradients.occlusion_ddx,
-        gradients.occlusion_ddy,
+        gradients.occlusion,
     );
 
     let emissive = _pbr_material_emissive_color_grad(
@@ -403,8 +394,7 @@ fn pbr_get_material_color_grad(
             material.emissive_tex_info,
             vertex_attribute_stride,
         ),
-        gradients.emissive_ddx,
-        gradients.emissive_ddy,
+        gradients.emissive,
     );
 
     return PbrMaterialColor(
@@ -416,24 +406,19 @@ fn pbr_get_material_color_grad(
     );
 }
 
-fn _pbr_material_base_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> {
+fn _pbr_material_base_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> vec4<f32> {
     var color = material.base_color_factor;
     if material.has_base_color_texture {
-        color *= texture_sample_atlas_grad(material.base_color_tex_info, attribute_uv, ddx, ddy);
+        color *= texture_sample_atlas_grad(material.base_color_tex_info, attribute_uv, uv_derivs);
     }
     color.a = 1.0;
     return color;
 }
 
-fn _pbr_material_metallic_roughness_color_grad(
-    material: PbrMaterial,
-    attribute_uv: vec2<f32>,
-    ddx: vec2<f32>,
-    ddy: vec2<f32>,
-) -> vec2<f32> {
+fn _pbr_material_metallic_roughness_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs ) -> vec2<f32> {
     var color = vec2<f32>(material.metallic_factor, material.roughness_factor);
     if material.has_metallic_roughness_texture {
-        let tex = texture_sample_atlas_grad(material.metallic_roughness_tex_info, attribute_uv, ddx, ddy);
+        let tex = texture_sample_atlas_grad(material.metallic_roughness_tex_info, attribute_uv, uv_derivs);
         color *= vec2<f32>(tex.b, tex.g);
     }
     return color;
@@ -442,8 +427,7 @@ fn _pbr_material_metallic_roughness_color_grad(
 fn _pbr_normal_color_grad(
     material: PbrMaterial,
     attribute_uv: vec2<f32>,
-    ddx: vec2<f32>,
-    ddy: vec2<f32>,
+    uv_derivs: UvDerivs,
     world_normal: vec3<f32>,
     barycentric: vec3<f32>,
     triangle_indices: vec3<u32>,
@@ -456,7 +440,7 @@ fn _pbr_normal_color_grad(
         return world_normal;
     }
 
-    let tex = texture_sample_atlas_grad(material.normal_tex_info, attribute_uv, ddx, ddy);
+    let tex = texture_sample_atlas_grad(material.normal_tex_info, attribute_uv, uv_derivs);
     var tangent_normal = vec3<f32>(
         (tex.r * 2.0 - 1.0) * material.normal_scale,
         (tex.g * 2.0 - 1.0) * material.normal_scale,
@@ -516,29 +500,19 @@ fn _pbr_normal_color_grad(
     return normalize(tbn * tangent_normal);
 }
 
-fn _pbr_occlusion_color_grad(
-    material: PbrMaterial,
-    attribute_uv: vec2<f32>,
-    ddx: vec2<f32>,
-    ddy: vec2<f32>,
-) -> f32 {
+fn _pbr_occlusion_color_grad( material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs ) -> f32 {
     var occlusion = 1.0;
     if material.has_occlusion_texture {
-        let tex = texture_sample_atlas_grad(material.occlusion_tex_info, attribute_uv, ddx, ddy);
+        let tex = texture_sample_atlas_grad(material.occlusion_tex_info, attribute_uv, uv_derivs);
         occlusion = mix(1.0, tex.r, material.occlusion_strength);
     }
     return occlusion;
 }
 
-fn _pbr_material_emissive_color_grad(
-    material: PbrMaterial,
-    attribute_uv: vec2<f32>,
-    ddx: vec2<f32>,
-    ddy: vec2<f32>,
-) -> vec3<f32> {
+fn _pbr_material_emissive_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs ) -> vec3<f32> {
     var color = material.emissive_factor;
     if material.has_emissive_texture {
-        color *= texture_sample_atlas_grad(material.emissive_tex_info, attribute_uv, ddx, ddy).rgb;
+        color *= texture_sample_atlas_grad(material.emissive_tex_info, attribute_uv, uv_derivs).rgb;
     }
     color *= material.emissive_strength;
     return color;

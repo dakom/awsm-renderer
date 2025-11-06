@@ -256,7 +256,7 @@ impl AwsmRendererBuilder {
         let mut pipelines = Pipelines::new();
         let mut shaders = Shaders::new();
 
-        let mut textures = Textures::new(&gpu);
+        let mut textures = Textures::new(&gpu)?;
         let mut camera = camera::CameraBuffer::new(&gpu)?;
         let mut lights = Lights::new(
             &gpu,

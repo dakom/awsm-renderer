@@ -16,6 +16,7 @@ pub struct ShaderCacheKeyMaterialOpaque {
     pub texture_atlas_len: u32,
     pub sampler_atlas_len: u32,
     pub msaa_sample_count: u32, // 0 if no MSAA
+    pub clamp_sampler_index: u32,
 }
 
 impl From<ShaderCacheKeyMaterialOpaque> for ShaderCacheKey {

@@ -151,5 +151,7 @@ impl CommandEncoder {
     }
 }
 
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuLoadOp.html
 pub type LoadOp = web_sys::GpuLoadOp;
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuStoreOp.html
 pub type StoreOp = web_sys::GpuStoreOp;

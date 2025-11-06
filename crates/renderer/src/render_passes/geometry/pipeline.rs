@@ -147,7 +147,7 @@ async fn init_pipeline_keys(
         ColorTargetState::new(render_texture_formats.visiblity_data),
         ColorTargetState::new(render_texture_formats.barycentric),
         ColorTargetState::new(render_texture_formats.normal_tangent),
-        ColorTargetState::new(render_texture_formats.placeholder_derivatives),
+        ColorTargetState::new(render_texture_formats.barycentric_derivatives),
     ];
 
     let vertex_buffer_layout = VertexBufferLayout {

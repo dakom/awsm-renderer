@@ -119,29 +119,32 @@ where
     ID: Clone,
 {
     pub fn into_info(&self, index: MegaTextureIndex, atlas_size: u32) -> MegaTextureEntryInfo<ID> {
-        let (width, height) = self.image_data.size();
+        let (width_u32, height_u32) = self.image_data.size();
 
+        let height = height_u32 as f32;
+        let width = width_u32 as f32;
         let x = self.pixel_offset[0] as f32;
         let y = self.pixel_offset[1] as f32;
-
-        let span_x = (width as f32 - 1.0).max(0.0);
-        let span_y = (height as f32 - 1.0).max(0.0);
 
         let atlas_dimensions = atlas_size as f32;
 
         let uv_offset_x = (x + 0.5) / atlas_dimensions;
         let uv_offset_y = (y + 0.5) / atlas_dimensions;
 
-        let uv_scale_x = span_x / atlas_dimensions;
-        let uv_scale_y = span_y / atlas_dimensions;
+        let uv_scale_x = (width - 1.0) / atlas_dimensions;
+        let uv_scale_y = (height - 1.0) / atlas_dimensions;
+
+        let grad_scale_x = width / atlas_dimensions;
+        let grad_scale_y = height / atlas_dimensions;
 
         MegaTextureEntryInfo {
             pixel_offset: self.pixel_offset,
-            size: [width, height],
+            size: [width_u32, height_u32],
             index,
             id: self.id.clone(),
             uv_scale: [uv_scale_x, uv_scale_y],
             uv_offset: [uv_offset_x, uv_offset_y],
+            grad_scale: [grad_scale_x, grad_scale_y],
         }
     }
 }
@@ -155,6 +158,7 @@ pub struct MegaTextureEntryInfo<ID> {
     pub id: ID,
     pub uv_scale: [f32; 2],
     pub uv_offset: [f32; 2],
+    pub grad_scale: [f32; 2],
 }
 
 #[derive(Clone, Debug)]
