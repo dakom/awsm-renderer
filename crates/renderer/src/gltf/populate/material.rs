@@ -237,7 +237,7 @@ impl GltfTextureInfo {
 
                 let texture_key = renderer.textures.add_image(
                     image_data.clone(),
-                    TextureFormat::Rgba16float,
+                    image_data.format(),
                     sampler_key,
                     color_info,
                 )?;

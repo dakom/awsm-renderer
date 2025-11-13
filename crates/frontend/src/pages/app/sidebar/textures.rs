@@ -101,12 +101,13 @@ impl SidebarTextures {
                     (report.arrays[array_index].width, report.arrays[array_index].height)
                 };
 
-                let (gpu, texture_array) = {
+                let (gpu, texture_array, format) = {
                     let renderer = state.ctx.scene.lock_ref();
                     let renderer = renderer.as_ref().unwrap().renderer.lock().await;
                     let gpu = renderer.gpu.clone();
                     let texture_array = renderer.textures.pool.textures().nth(array_index).unwrap().clone();
-                    (gpu, texture_array)
+                    let format = renderer.textures.pool.array_by_index(array_index).unwrap().format;
+                    (gpu, texture_array, format)
                 };
 
                 let png_data = gpu.export_texture_as_png(
@@ -114,7 +115,7 @@ impl SidebarTextures {
                     width,
                     height,
                     layer_index as u32,
-                    TextureFormat::Rgba16float,
+                    format,
                     mipmap_level,
                     true,
                     Some(true)
