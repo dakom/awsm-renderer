@@ -1,62 +1,95 @@
-// 14 * 4 = 64 bytes (added precomputed UV transform for optimization)
+// 16-byte packed texture descriptor suitable for uniform/storage buffers.
+//
+// Layout:
+// - size:               width/height in texels (16 bits each)
+// - array_and_layer:    array texture index (12 bits), layer index (20 bits)
+// - uv_and_sampler:     uv set index (8 bits), sampler index (24 bits)
+// - extra:              flags (8 bits), address_mode_u (8 bits),
+//                       address_mode_v (8 bits), padding (8 bits)
+//
+// Notes:
+// - 16 bits for width/height covers all practical WebGPU limits.
+// - 12 bits for array_index => up to 4096 texture arrays.
+// - 20 bits for layer_index => up to 1,048,576 layers (way above spec limits).
+// - 8 bits for uv_set_index => up to 256 UV sets (you'll use < 8).
+// - 24 bits for sampler_index => up to ~16M samplers (effectively unlimited).
+// - flags byte: bit 0 = has mipmaps, bit 1 = sRGB; rest reserved.
 struct TextureInfoRaw {
-    pixel_offset_x: u32,
-    pixel_offset_y: u32,
-    width: u32,
-    height: u32,
-    atlas_layer_index: u32,
-    entry_attribute_uv_set_index: u32,
-    sampler_index: u32,
-    address_mode_u: u32,
-    address_mode_v: u32,
-    padding: u32,  // Atlas padding in pixels
-    uv_offset_x: f32,  // Precomputed UV offset = (texel_offset + 0.5) / atlas_dimensions
-    uv_offset_y: f32,
-    uv_scale_x: f32,   // Precomputed UV scale = span / atlas_dimensions
-    uv_scale_y: f32,
-    grad_scale_x: f32,   // Precomputed UV scale = width / atlas_dimensions
-    grad_scale_y: f32,
-}
+    // packed: width (low 16 bits), height (high 16 bits)
+    size: u32,
+
+    // packed:
+    //   bits  0..11 : array_index
+    //   bits 12..31 : layer_index
+    array_and_layer: u32,
+
+    // packed:
+    //   bits  0..7  : uv_set_index
+    //   bits  8..31 : sampler_index
+    uv_and_sampler: u32,
+
+    // packed:
+    //   bits  0..7  : flags
+    //                  bit 0 -> has mipmaps
+    //                  bit 1 -> is sRGB
+    //                  bits 2..7 reserved
+    //   bits  8..15 : address_mode_u
+    //   bits 16..23 : address_mode_v
+    //   bits 24..31 : padding / reserved
+    extra: u32,
+};
 
 struct TextureInfo {
-    pixel_offset: vec2<u32>,
-    size: vec2<u32>,
-    atlas_index: u32,
+    size: vec2<u32>,   // (width, height)
+    array_index: u32,
     layer_index: u32,
-    entry_index: u32,
-    attribute_uv_set_index: u32,
+    uv_set_index: u32,
     sampler_index: u32,
+    mipmapped: bool,
+    srgb: bool,
     address_mode_u: u32,
     address_mode_v: u32,
-    padding: u32,
-    uv_offset: vec2<f32>,  // Precomputed for direct use
-    uv_scale: vec2<f32>,   // Precomputed for direct use
-    grad_scale: vec2<f32>,   // Precomputed for direct use
-}
+};
 
 fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
+    // size
+    let width:  u32 = raw.size & 0xFFFFu;
+    let height: u32 = raw.size >> 16u;
+
+    // array index (12 bits) and layer index (20 bits)
+    let array_index: u32 =  raw.array_and_layer & 0xFFFu;      // bits 0..11
+    let layer_index: u32 =  raw.array_and_layer >> 12u;        // bits 12..31
+
+    // uv set (8 bits) and sampler index (24 bits)
+    let uv_set_index:  u32 =  raw.uv_and_sampler & 0xFFu;      // bits 0..7
+    let sampler_index: u32 =  raw.uv_and_sampler >> 8u;        // bits 8..31
+
+    // flags + address modes
+    let flags: u32          = raw.extra & 0xFFu;                // bits 0..7
+    let mipmapped: bool     = (flags & 0x1u) != 0u;
+    let srgb: bool          = (flags & 0x2u) != 0u;
+
+    let address_mode_u: u32 = (raw.extra >> 8u)  & 0xFFu;       // bits 8..15
+    let address_mode_v: u32 = (raw.extra >> 16u) & 0xFFu;       // bits 16..23
+
     return TextureInfo(
-        vec2<u32>(raw.pixel_offset_x, raw.pixel_offset_y),
-        vec2<u32>(raw.width, raw.height),
-        raw.atlas_layer_index & 0xFFFFu,           // atlas_index (16 bits)
-        (raw.atlas_layer_index >> 16u) & 0xFFFFu, // layer_index (16 bits)
-        raw.entry_attribute_uv_set_index & 0xFFFFu,    // entry_index (16 bits)
-        (raw.entry_attribute_uv_set_index >> 16u) & 0xFFFFu, // attribute_uv_index (16 bits)
-        raw.sampler_index,
-        raw.address_mode_u,
-        raw.address_mode_v,
-        raw.padding,
-        vec2<f32>(raw.uv_offset_x, raw.uv_offset_y),
-        vec2<f32>(raw.uv_scale_x, raw.uv_scale_y),
-        vec2<f32>(raw.grad_scale_x, raw.grad_scale_y),
+        vec2<u32>(width, height),
+        array_index,
+        layer_index,
+        uv_set_index,
+        sampler_index,
+        mipmapped,
+        srgb,
+        address_mode_u,
+        address_mode_v,
     );
 }
 
 
 fn texture_uv(attribute_data_offset: u32, triangle_indices: vec3<u32>, barycentric: vec3<f32>, tex_info: TextureInfo, vertex_attribute_stride: u32) -> vec2<f32> {
-    let uv0 = _texture_uv_per_vertex(attribute_data_offset, tex_info.attribute_uv_set_index, triangle_indices.x, vertex_attribute_stride);
-    let uv1 = _texture_uv_per_vertex(attribute_data_offset, tex_info.attribute_uv_set_index, triangle_indices.y, vertex_attribute_stride);
-    let uv2 = _texture_uv_per_vertex(attribute_data_offset, tex_info.attribute_uv_set_index, triangle_indices.z, vertex_attribute_stride);
+    let uv0 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, triangle_indices.x, vertex_attribute_stride);
+    let uv1 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, triangle_indices.y, vertex_attribute_stride);
+    let uv2 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, triangle_indices.z, vertex_attribute_stride);
 
     let interpolated_uv = barycentric.x * uv0 + barycentric.y * uv1 + barycentric.z * uv2;
 
@@ -78,11 +111,11 @@ fn _texture_uv_per_vertex(attribute_data_offset: u32, set_index: u32, vertex_ind
 
 
 // NEW: Sampling with explicit gradients for anisotropic filtering support in compute shaders
-fn texture_sample_atlas_grad(info: TextureInfo, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> vec4<f32> {
-    switch info.atlas_index {
-        {% for i in 0..texture_atlas_len %}
+fn texture_pool_sample_grad(info: TextureInfo, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> vec4<f32> {
+    switch info.array_index {
+        {% for i in 0..texture_pool_arrays_len %}
             case {{ i }}u: {
-                return _texture_sample_atlas_grad(info, atlas_tex_{{ i }}, attribute_uv, uv_derivs);
+                return _texture_pool_sample_grad(info, pool_tex_{{ i }}, attribute_uv, uv_derivs);
             }
         {% endfor %}
         default: {
@@ -92,175 +125,41 @@ fn texture_sample_atlas_grad(info: TextureInfo, attribute_uv: vec2<f32>, uv_deri
 }
 
 
-fn _texture_sample_atlas_grad(
+fn _texture_pool_sample_grad(
     info: TextureInfo,
-    atlas_tex: texture_2d_array<f32>,
+    tex: texture_2d_array<f32>,
     attribute_uv: vec2<f32>,
     uv_derivs: UvDerivs
 ) -> vec4<f32> {
-    return _texture_sample_atlas_grad_basics(info, atlas_tex, attribute_uv, uv_derivs);
-}
-
-fn _texture_sample_atlas_grad_basics(
-    info: TextureInfo,
-    atlas_tex: texture_2d_array<f32>,
-    attribute_uv: vec2<f32>,
-    uv_derivs: UvDerivs
-) -> vec4<f32> {
-    let uv_local  = attribute_uv;           // tile space (continuous)
-    let ddx_local = uv_derivs.ddx;          // keep grads continuous
-    let ddy_local = uv_derivs.ddy;
-
-    // Manual wrap on COORDS ONLY in tile space
-    var uv_wrapped = vec2<f32>(
-        apply_address_mode(uv_local.x, info.address_mode_u),
-        apply_address_mode(uv_local.y, info.address_mode_v)
-    );
-
-
-    let uv_atlas  = info.uv_offset + uv_wrapped * info.uv_scale;
-    let ddx_atlas = ddx_local * info.grad_scale;
-    let ddy_atlas = ddy_local * info.grad_scale;
-
-    // TEMP debug: force base LOD
-    // return textureSampleLevel(atlas_tex, atlas_sampler_{{ clamp_sampler_index }}, uv_atlas, i32(info.layer_index), 0.0);
-
-    return textureSampleGrad(
-        atlas_tex,
-        atlas_sampler_{{ clamp_sampler_index }},
-        uv_atlas,
-        i32(info.layer_index),
-        ddx_atlas,
-        ddy_atlas
-    );
-}
-fn _texture_sample_atlas_grad_advanced_once_basics_are_fixed(
-    info: TextureInfo,
-    atlas_tex: texture_2d_array<f32>,
-    attribute_uv: vec2<f32>,
-    uv_derivs: UvDerivs
-) -> vec4<f32> {
-    const ATLAS_HAS_GUTTERS : bool = false;
-
-    // Non-atlas: let the sampler do addressing. DO NOT manual wrap.
-    if (!uses_atlas(info)) {
-        let uv  = info.uv_offset + attribute_uv * info.uv_scale;
-        let ddx = uv_derivs.ddx * info.grad_scale;
-        let ddy = uv_derivs.ddy * info.grad_scale;
-
-        // TEMP debug: force base LOD if needed
-        // return textureSampleLevel(atlas_tex, atlas_sampler_0, uv, i32(info.layer_index), 0.0);
-        switch info.sampler_index {
-            {% for i in 0..sampler_atlas_len %}
-                case {{ i }}u: {
-                    return textureSampleGrad(
-                        atlas_tex,
-                        atlas_sampler_{{ i }},
-                        uv,
-                        i32(info.layer_index),
-                        ddx,
-                        ddy,
-                    );
-                }
-            {% endfor %}
-            default: {
-                return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    // TEMP debug: force base LOD if needed
+    // return textureSampleLevel(atlas_tex, atlas_sampler_0, uv, i32(info.layer_index), 0.0);
+    switch info.sampler_index {
+        {% for i in 0..texture_pool_samplers_len %}
+            case {{ i }}u: {
+                return textureSampleGrad(
+                    tex,
+                    pool_sampler_{{ i }},
+                    attribute_uv,
+                    i32(info.layer_index),
+                    uv_derivs.ddx,
+                    uv_derivs.ddy,
+                );
             }
+        {% endfor %}
+        default: {
+            return vec4<f32>(0.0, 0.0, 0.0, 0.0);
         }
-    }
-
-    // Atlas path
-    let uv_local  = attribute_uv;           // tile space (continuous)
-    let ddx_local = uv_derivs.ddx;          // keep grads continuous
-    let ddy_local = uv_derivs.ddy;
-
-    // Manual wrap on COORDS ONLY in tile space
-    var uv_wrapped = vec2<f32>(
-        apply_address_mode(uv_local.x, info.address_mode_u),
-        apply_address_mode(uv_local.y, info.address_mode_v)
-    );
-
-    // Map into atlas. Two modes:
-    if (ATLAS_HAS_GUTTERS) {
-        // ----- GUTTER MODE (enable after your builder adds per-mip padding) -----
-        let atlas_dims = vec2<f32>(textureDimensions(atlas_tex, 0u));
-        let pad_uv = vec2<f32>(f32(info.padding)) / atlas_dims;
-
-        // Variant A: uv_offset/uv_scale ALREADY include padding (most common)
-        let linear = max(info.uv_scale - 2.0 * pad_uv, vec2<f32>(0.0));
-        let uv_atlas  = info.uv_offset + (uv_wrapped * linear + pad_uv);
-        let ddx_atlas = ddx_local * linear;
-        let ddy_atlas = ddy_local * linear;
-
-        // TEMP debug: force base LOD
-        // return textureSampleLevel(atlas_tex, atlas_sampler_{{ clamp_sampler_index }}, uv_atlas, i32(info.layer_index), 0.0);
-
-        return textureSampleGrad(
-            atlas_tex,
-            atlas_sampler_{{ clamp_sampler_index }},
-            uv_atlas,
-            i32(info.layer_index),
-            ddx_atlas,
-            ddy_atlas
-        );
-
-    } else {
-        // ----- NO-GUTTER FALLBACK (matches your original visual behavior) -----
-        // WARNING: with clamp sampler this can show seams at tile edges.
-        // If you must avoid seams without rebuilding the atlas, there is no perfect solution.
-        let uv_atlas  = info.uv_offset + uv_wrapped * info.uv_scale;
-        let ddx_atlas = ddx_local * info.grad_scale;
-        let ddy_atlas = ddy_local * info.grad_scale;
-
-        // TEMP debug: force base LOD
-        // return textureSampleLevel(atlas_tex, atlas_sampler_{{ clamp_sampler_index }}, uv_atlas, i32(info.layer_index), 0.0);
-
-        return textureSampleGrad(
-            atlas_tex,
-            atlas_sampler_{{ clamp_sampler_index }},
-            uv_atlas,
-            i32(info.layer_index),
-            ddx_atlas,
-            ddy_atlas
-        );
-    }
-}
-
-
-const ADDRESS_MODE_CLAMP_TO_EDGE : u32 = 0u;
-const ADDRESS_MODE_REPEAT        : u32 = 1u;
-const ADDRESS_MODE_MIRROR_REPEAT : u32 = 2u;
-
-fn uses_atlas(info: TextureInfo) -> bool {
-    return any(info.uv_scale  != vec2<f32>(1.0)) ||
-           any(info.uv_offset != vec2<f32>(0.0));
-}
-
-fn wrap_mirror(coord: f32) -> f32 {
-    let floored = floor(coord);
-    let frac    = coord - floored;
-    let is_odd  = (i32(floored) & 1) != 0;
-    return select(frac, 1.0 - frac, is_odd);
-}
-
-// Manual per-axis address mode for coords only
-fn apply_address_mode(coord: f32, mode: u32) -> f32 {
-    switch (mode) {
-        case ADDRESS_MODE_CLAMP_TO_EDGE: { return clamp(coord, 0.0, 1.0); }
-        case ADDRESS_MODE_MIRROR_REPEAT: { return wrap_mirror(coord); }
-        case ADDRESS_MODE_REPEAT:        { return fract(coord); }
-        default: { return 0.0; }
     }
 }
 
 
 // Sampling helpers for the mega-texture atlas. Every fetch receives an explicit LOD so the compute
 // pass can emulate hardware derivative selection.
-fn texture_sample_atlas_no_mips(info: TextureInfo, attribute_uv: vec2<f32>) -> vec4<f32> {
-    switch info.atlas_index {
-        {% for i in 0..texture_atlas_len %}
+fn texture_pool_sample_no_mips(info: TextureInfo, attribute_uv: vec2<f32>) -> vec4<f32> {
+    switch info.array_index {
+        {% for i in 0..texture_pool_arrays_len %}
             case {{ i }}u: {
-                return _texture_sample_atlas_no_mips(info, atlas_tex_{{ i }}, attribute_uv);
+                return _texture_pool_sample_no_mips(info, pool_tex_{{ i }}, attribute_uv);
             }
         {% endfor %}
         default: {
@@ -271,25 +170,17 @@ fn texture_sample_atlas_no_mips(info: TextureInfo, attribute_uv: vec2<f32>) -> v
     }
 }
 
-fn _texture_sample_atlas_no_mips(
+fn _texture_pool_sample_no_mips(
     info: TextureInfo,
-    atlas_tex: texture_2d_array<f32>,
-    attribute_uv: vec2<f32>,
+    tex: texture_2d_array<f32>,
+    uv: vec2<f32>,
 ) -> vec4<f32> {
-    let wrapped_uv = vec2<f32>(
-        apply_address_mode(attribute_uv.x, info.address_mode_u),
-        apply_address_mode(attribute_uv.y, info.address_mode_v),
-    );
-
-    // Use precomputed UV transform (eliminates textureDimensions() call and conversions)
-    let uv = info.uv_offset + wrapped_uv * info.uv_scale;
-
     switch info.sampler_index {
-        {% for i in 0..sampler_atlas_len %}
+        {% for i in 0..texture_pool_samplers_len %}
             case {{ i }}u: {
                 return textureSampleLevel(
-                    atlas_tex,
-                    atlas_sampler_{{ i }},
+                    tex,
+                    pool_sampler_{{ i }},
                     uv,
                     i32(info.layer_index),
                     0

@@ -32,8 +32,8 @@ impl MaterialOpaquePipelines {
         let multisampled_pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
             bind_groups.multisampled_main_bind_group_layout_key,
             bind_groups.lights_bind_group_layout_key,
-            bind_groups.texture_bind_group_layout_key,
-            bind_groups.sampler_bind_group_layout_key,
+            bind_groups.texture_pool_textures_bind_group_layout_key,
+            bind_groups.texture_pool_samplers_bind_group_layout_key,
         ]);
         let multisampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
             &ctx.gpu,
@@ -44,8 +44,8 @@ impl MaterialOpaquePipelines {
         let singlesampled_pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
             bind_groups.singlesampled_main_bind_group_layout_key,
             bind_groups.lights_bind_group_layout_key,
-            bind_groups.texture_bind_group_layout_key,
-            bind_groups.sampler_bind_group_layout_key,
+            bind_groups.texture_pool_textures_bind_group_layout_key,
+            bind_groups.texture_pool_samplers_bind_group_layout_key,
         ]);
         let singlesampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
             &ctx.gpu,
@@ -90,9 +90,9 @@ impl MaterialOpaquePipelines {
 
         let shader_cache_key = ShaderCacheKeyMaterialOpaque {
             attributes: mesh_buffer_info.into(),
-            texture_atlas_len: material_opaque_bind_groups.texture_atlas_len,
-            sampler_atlas_len: material_opaque_bind_groups.texture_sampler_keys.len() as u32,
-            clamp_sampler_index: material_opaque_bind_groups.clamp_sampler_index,
+            texture_pool_arrays_len: material_opaque_bind_groups.texture_pool_arrays_len,
+            texture_pool_samplers_len: material_opaque_bind_groups.texture_pool_sampler_keys.len()
+                as u32,
             msaa_sample_count,
         };
 

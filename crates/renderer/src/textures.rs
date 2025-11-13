@@ -8,8 +8,9 @@ use awsm_renderer_core::{
     renderer::AwsmRendererWebGpu,
     sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor},
     texture::{
-        mega_texture::{self, MegaTexture, MegaTextureEntry, MegaTextureEntryInfo},
-        TextureViewDescriptor,
+        mipmap::MipmapTextureKind,
+        texture_pool::{TextureColorInfo, TexturePool, TexturePoolEntryInfo},
+        TextureFormat, TextureViewDescriptor,
     },
 };
 use ordered_float::OrderedFloat;
@@ -31,11 +32,11 @@ impl AwsmRenderer {
     pub async fn finalize_gpu_textures(&mut self) -> std::result::Result<(), AwsmError> {
         let was_dirty = self
             .textures
-            .write_gpu_megatexture(&self.logging, &self.gpu)
+            .write_gpu_pool(&self.logging, &self.gpu)
             .await?;
 
         if was_dirty {
-            // If the mega texture was changed on the GPU, we need to recreate any render passes
+            // If the pool was changed on the GPU, we need to recreate any render passes
             // that depend on it, as well as any pipelines that depend on those render passes
             let mut render_pass_ctx = RenderPassInitContext {
                 gpu: &mut self.gpu,
@@ -52,19 +53,13 @@ impl AwsmRenderer {
             // Update all the things that depend on opaque materials changing due to textures
 
             // First, that's the render pass itself - necessary because the actual number of bindings
-            // may have changed due to new mega texture arrays being created and this affects the bind group layout
+            // may have changed due to new texture pool arrays being created and this affects the bind group layout
             // and thus the pipeline layout as well, requiring a full recreation of the render pass
             // however, internally, it will clone the bind groups and layouts that aren't affected
             self.render_passes
                 .material_opaque
-                .mega_texture_changed(&mut render_pass_ctx)
+                .texture_pool_changed(&mut render_pass_ctx)
                 .await?;
-
-            self.textures
-                .mega_texture
-                .info(&self.gpu.device.limits())
-                .into_report()
-                .console_log();
         }
 
         // Either way, gotta also deal with all the meshes that need their shader/pipelines (re)created
@@ -101,12 +96,9 @@ impl AwsmRenderer {
 }
 
 pub struct Textures {
-    pub gpu_texture_arrays: Vec<web_sys::GpuTexture>,
-    pub gpu_texture_array_views: Vec<web_sys::GpuTextureView>,
-    pub mega_texture: MegaTexture<TextureKey>,
-    pub mega_texture_sampler_set: BTreeSet<SamplerKey>,
-    pub clamp_sampler_key: SamplerKey,
-    textures: SlotMap<TextureKey, MegaTextureEntryInfo<TextureKey>>,
+    pub pool: TexturePool<TextureKey>,
+    pub pool_sampler_set: BTreeSet<SamplerKey>,
+    pool_textures: SlotMap<TextureKey, TexturePoolEntryInfo<TextureKey>>,
     cubemaps: SlotMap<CubemapTextureKey, web_sys::GpuTexture>,
     samplers: SlotMap<SamplerKey, web_sys::GpuSampler>,
     sampler_cache: HashMap<SamplerCacheKey, SamplerKey>,
@@ -114,7 +106,6 @@ pub struct Textures {
     // sampling inside the mega texture. This is especially important for clamp/mirror behaviour.
     sampler_address_modes: SecondaryMap<SamplerKey, (Option<AddressMode>, Option<AddressMode>)>,
     texture_samplers: SecondaryMap<TextureKey, SamplerKey>,
-    gpu_megatexture_dirty: bool,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -159,67 +150,38 @@ impl std::hash::Hash for SamplerCacheKey {
 
 impl Textures {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let clamp_sampler_cache_key = SamplerCacheKey {
-            // This looks better with our mipmap generation...
-            // if it's overridden by the glTF sampler, fine.
-            // but otherwise, let's just do what looks best.
-            min_filter: Some(FilterMode::Linear),
-            mag_filter: Some(FilterMode::Linear),
-            mipmap_filter: Some(MipmapFilterMode::Linear),
-            // Enable anisotropic filtering for thin lines at oblique angles
-            // Without this, textures become severely aliased when viewed at angles
-            max_anisotropy: Some(16),
-            address_mode_u: Some(AddressMode::ClampToEdge),
-            address_mode_v: Some(AddressMode::ClampToEdge),
-            address_mode_w: Some(AddressMode::ClampToEdge),
-            ..Default::default()
-        };
-
         let mut samplers = SlotMap::with_key();
         let mut sampler_cache = HashMap::new();
         let mut sampler_address_modes = SecondaryMap::new();
 
-        let clamp_sampler_key = create_sampler_key(
-            &gpu,
-            clamp_sampler_cache_key,
-            &mut samplers,
-            &mut sampler_cache,
-            &mut sampler_address_modes,
-        )?;
-
         Ok(Self {
-            gpu_texture_arrays: Vec::new(),
-            gpu_texture_array_views: Vec::new(),
-            mega_texture: MegaTexture::new(&gpu.device.limits(), 8), // 8 pixels recommended for 16× AF safety
-            mega_texture_sampler_set: BTreeSet::new(),
-            textures: SlotMap::with_key(),
+            pool: TexturePool::new(),
+            pool_sampler_set: BTreeSet::new(),
+            pool_textures: SlotMap::with_key(),
             cubemaps: SlotMap::with_key(),
             texture_samplers: SecondaryMap::new(),
-            gpu_megatexture_dirty: false,
             samplers,
             sampler_cache,
             sampler_address_modes,
-            clamp_sampler_key,
         })
     }
 
     pub fn add_image(
         &mut self,
         image_data: ImageData,
-        is_srgb_encoded: bool,
+        texture_format: TextureFormat,
         sampler_key: SamplerKey,
+        color: TextureColorInfo,
     ) -> Result<TextureKey> {
-        let key = self.textures.try_insert_with_key(|key| {
-            self.mega_texture
-                .add_entries(vec![(image_data, key, is_srgb_encoded, Default::default())])
-                .map_err(AwsmTextureError::from)
-                .and_then(|mut entries| entries.pop().ok_or(AwsmTextureError::MegaTexture))
+        let key = self.pool_textures.try_insert_with_key(|key| {
+            self.pool.add_image(key, image_data, texture_format, color);
+            self.pool
+                .entry(key)
+                .ok_or(AwsmTextureError::TextureNotFound(key))
         })?;
 
         self.texture_samplers.insert(key, sampler_key);
-        self.mega_texture_sampler_set.insert(sampler_key);
-
-        self.gpu_megatexture_dirty = true;
+        self.pool_sampler_set.insert(sampler_key);
 
         Ok(key)
     }
@@ -234,41 +196,18 @@ impl Textures {
             .ok_or(AwsmTextureError::CubemapTextureNotFound(key))
     }
 
-    async fn write_gpu_megatexture(
+    async fn write_gpu_pool(
         &mut self,
         logging: &AwsmRendererLogging,
         gpu: &AwsmRendererWebGpu,
     ) -> Result<bool> {
-        let was_gpu_dirty = self.gpu_megatexture_dirty;
-        if self.gpu_megatexture_dirty {
-            let _maybe_span_guard = if logging.render_timings {
-                Some(tracing::span!(tracing::Level::INFO, "Textures GPU write").entered())
-            } else {
-                None
-            };
+        let _maybe_span_guard = if logging.render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "Textures GPU write").entered())
+        } else {
+            None
+        };
 
-            // TODO - only need to write _new_ arrays, not all of them...
-            self.gpu_texture_arrays = self.mega_texture.write_texture_arrays(gpu).await?;
-            self.gpu_texture_array_views = self
-                .gpu_texture_arrays
-                .iter()
-                .enumerate()
-                .map(|(index, texture)| {
-                    let descriptor = TextureViewDescriptor::new(Some("Mega Texture View"))
-                        .with_dimension(web_sys::GpuTextureViewDimension::N2dArray)
-                        .with_array_layer_count(self.mega_texture.layer_len(index) as u32)
-                        .with_mip_level_count(self.mega_texture.mipmap_levels() as u32);
-
-                    texture
-                        .create_view_with_descriptor(&descriptor.into())
-                        .map_err(|e| AwsmTextureError::from(AwsmCoreError::texture_view(e)))
-                })
-                .collect::<Result<Vec<_>>>()?;
-
-            self.gpu_megatexture_dirty = false;
-        }
-
-        Ok(was_gpu_dirty)
+        self.pool.write_gpu(gpu).await.map_err(|e| e.into())
     }
 
     pub fn get_texture_sampler_key(&self, texture_key: TextureKey) -> Result<SamplerKey> {
@@ -278,8 +217,8 @@ impl Textures {
             .ok_or(AwsmTextureError::SamplerForTextureNotFound(texture_key))
     }
 
-    pub fn get_entry(&self, key: TextureKey) -> Result<&MegaTextureEntryInfo<TextureKey>> {
-        self.textures
+    pub fn get_entry(&self, key: TextureKey) -> Result<&TexturePoolEntryInfo<TextureKey>> {
+        self.pool_textures
             .get(key)
             .ok_or(AwsmTextureError::TextureNotFound(key))
     }
@@ -388,8 +327,8 @@ pub enum AwsmTextureError {
     #[error("[texture] {0:?}")]
     Core(#[from] AwsmCoreError),
 
-    #[error("[texture] mega-texture failure")]
-    MegaTexture,
+    #[error("[texture] pool failure")]
+    Pool,
 
     #[error("[texture] sampler not found: {0:?}")]
     SamplerNotFound(SamplerKey),

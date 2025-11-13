@@ -138,9 +138,28 @@ pub enum AwsmCoreError {
         max_atlases: u32,
     },
 
+    #[cfg(feature = "texture-pool")]
+    #[error("[gpu] texture pool too many arrays: {total_arrays} (max {max_arrays})")]
+    TexturePoolTooManyArrays { total_arrays: u32, max_arrays: u32 },
+
+    #[cfg(feature = "texture-pool")]
+    #[error("[gpu] texture pool too many layers: {total_layers} (max {max_layers}) in array index {array_index}")]
+    TexturePoolTooManyLayers {
+        array_index: u32,
+        total_layers: u32,
+        max_layers: u32,
+    },
+
     #[cfg(feature = "mega-texture")]
     #[error("[gpu] mega texture too many samplers: {total_samplers} (max {max_samplers})")]
     MegaTextureTooManySamplers {
+        total_samplers: u32,
+        max_samplers: u32,
+    },
+
+    #[cfg(feature = "texture-pool")]
+    #[error("[gpu] texture pool too many samplers: {total_samplers} (max {max_samplers})")]
+    TexturePoolTooManySamplers {
         total_samplers: u32,
         max_samplers: u32,
     },

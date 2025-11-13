@@ -1,4 +1,7 @@
-use awsm_renderer_core::sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor};
+use awsm_renderer_core::{
+    sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor},
+    texture::{mipmap::MipmapTextureKind, texture_pool::TextureColorInfo, TextureFormat},
+};
 
 use crate::{
     gltf::{
@@ -173,36 +176,70 @@ impl GltfTextureInfo {
                     .get(texture_index)
                     .ok_or(AwsmGltfError::MissingTextureIndex(texture_index))?;
 
-                let is_srgb_encoded = {
+                let color_info = {
                     // for BaseColor and Emissive, use sRGB
                     // for everything else, use linear
 
-                    let mut is_srgb_encoded = false;
+                    let mut srgb_encoded = false;
                     for material in ctx.data.doc.materials() {
                         let pbr = material.pbr_metallic_roughness();
                         if let Some(tex) = pbr.base_color_texture() {
                             if tex.texture().index() == self.index {
-                                is_srgb_encoded = true;
+                                srgb_encoded = true;
                                 break;
                             }
                         }
                         if let Some(tex) = material.emissive_texture() {
                             if tex.texture().index() == self.index {
-                                is_srgb_encoded = true;
+                                srgb_encoded = true;
                                 break;
                             }
                         }
                     }
 
-                    is_srgb_encoded
+                    let mut mipmap_kind = MipmapTextureKind::Albedo;
+
+                    for material in ctx.data.doc.materials() {
+                        let pbr = material.pbr_metallic_roughness();
+                        if let Some(tex) = pbr.metallic_roughness_texture() {
+                            if tex.texture().index() == self.index {
+                                mipmap_kind = MipmapTextureKind::MetallicRoughness;
+                                break;
+                            }
+                        }
+                        if let Some(tex) = material.normal_texture() {
+                            if tex.texture().index() == self.index {
+                                mipmap_kind = MipmapTextureKind::Normal;
+                                break;
+                            }
+                        }
+                        if let Some(tex) = material.occlusion_texture() {
+                            if tex.texture().index() == self.index {
+                                mipmap_kind = MipmapTextureKind::Occlusion;
+                                break;
+                            }
+                        }
+                        if let Some(tex) = material.emissive_texture() {
+                            if tex.texture().index() == self.index {
+                                mipmap_kind = MipmapTextureKind::Emissive;
+                                break;
+                            }
+                        }
+                    }
+
+                    TextureColorInfo {
+                        srgb_encoded,
+                        mipmap_kind,
+                    }
                 };
 
                 let sampler_key = self.create_sampler_key(renderer, ctx)?;
 
                 let texture_key = renderer.textures.add_image(
                     image_data.clone(),
-                    is_srgb_encoded,
+                    TextureFormat::Rgba16float,
                     sampler_key,
+                    color_info,
                 )?;
 
                 ctx.textures.lock().unwrap().insert(self.index, texture_key);

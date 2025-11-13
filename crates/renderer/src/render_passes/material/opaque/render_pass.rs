@@ -31,11 +31,11 @@ impl MaterialOpaqueRenderPass {
         })
     }
 
-    pub async fn mega_texture_changed(
+    pub async fn texture_pool_changed(
         &mut self,
         ctx: &mut RenderPassInitContext<'_>,
     ) -> Result<()> {
-        self.bind_groups = self.bind_groups.clone_because_mega_texture_changed(ctx)?;
+        self.bind_groups = self.bind_groups.clone_because_texture_pool_changed(ctx)?;
         self.pipelines = MaterialOpaquePipelines::new(ctx, &self.bind_groups).await?;
 
         Ok(())

@@ -8,12 +8,12 @@ authors.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["all"]
-all = ["ktx", "exr", "mega-texture", "serde", "texture-export"]
+all = ["ktx", "exr", "image", "mega-texture", "texture-pool", "serde", "texture-export"]
 ktx = ["dep:ktx2"]
 exr = ["dep:exr", "image"]
 image = ["dep:gloo-net"]
 mega-texture = ["dep:binpack2d"]
+texture-pool = ["image"]
 serde = ["dep:serde", "dep:serde-wasm-bindgen"]
 texture-export = ["dep:image", "dep:half"]
 

@@ -14,8 +14,8 @@ pub struct ShaderTemplateMaterialOpaque {
     /// Offset (in floats) within the packed vertex attribute array
     /// where the first UV component lives for each vertex.
     pub uv_sets_index: u32,
-    pub texture_atlas_len: u32,
-    pub sampler_atlas_len: u32,
+    pub texture_pool_arrays_len: u32,
+    pub texture_pool_samplers_len: u32,
     /// Offset (in floats) within the packed vertex attribute array
     /// where the first vertex color component lives for each vertex.
     pub color_sets_index: u32,
@@ -29,7 +29,6 @@ pub struct ShaderTemplateMaterialOpaque {
     pub debug: ShaderTemplateMaterialOpaqueDebug,
     pub mipmap: MipmapMode,
     pub multisampled_geometry: bool,
-    pub clamp_sampler_index: u32,
     pub msaa_sample_count: u32, // 0 if no MSAA
 }
 
@@ -87,9 +86,8 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
         uv_sets_index += (value.attributes.color_sets.unwrap_or(0) * 4) as u32; // colors use 4 floats each
 
         let _self = Self {
-            texture_atlas_len: value.texture_atlas_len,
-            sampler_atlas_len: value.sampler_atlas_len,
-            clamp_sampler_index: value.clamp_sampler_index,
+            texture_pool_arrays_len: value.texture_pool_arrays_len,
+            texture_pool_samplers_len: value.texture_pool_samplers_len,
             color_sets_index,
             uv_sets_index,
             normals: value.attributes.normals,
@@ -156,7 +154,7 @@ impl ShaderTemplateMaterialOpaque {
     pub fn into_source(self) -> Result<String> {
         let source = self.render()?;
 
-        //print_shader_source(&source, false);
+        // print_shader_source(&source, true);
 
         //debug_unique_string(1, &source, || print_shader_source(&source, false));
 

@@ -1,3 +1,4 @@
+pub mod mipmap;
 /// A "MegaTexture" can be used to store a large number of images
 /// in a way that ultimately maps to a collection of large GPU texture arrays.
 ///

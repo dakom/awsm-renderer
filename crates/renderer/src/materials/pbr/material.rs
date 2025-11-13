@@ -7,7 +7,11 @@ use awsm_renderer_core::{
     buffers::{BufferDescriptor, BufferUsage},
     renderer::AwsmRendererWebGpu,
     sampler::AddressMode,
-    texture::{mega_texture::MegaTextureEntryInfo, TextureSampleType, TextureViewDimension},
+    texture::{
+        mipmap::MipmapTextureKind,
+        texture_pool::{TexturePoolArray, TexturePoolEntryInfo},
+        TextureSampleType, TextureViewDimension,
+    },
 };
 
 use crate::materials::{AwsmMaterialError, Result};
@@ -139,12 +143,12 @@ impl PbrMaterial {
             F32(f32),
             U32(u32),
             Texture {
-                entry_info: &'a MegaTextureEntryInfo<TextureKey>,
+                array: &'a TexturePoolArray<TextureKey>,
+                entry_info: &'a TexturePoolEntryInfo<TextureKey>,
                 uv_index: u32,
                 sampler_index: u32,
                 address_mode_u: u32,
                 address_mode_v: u32,
-                padding: u32,
             },
             SkipTexture,
         }
@@ -162,8 +166,8 @@ impl PbrMaterial {
 
         impl<'a>
             From<(
-                &'a MegaTextureEntryInfo<TextureKey>,
-                u32,
+                &'a TexturePoolArray<TextureKey>,
+                &'a TexturePoolEntryInfo<TextureKey>,
                 u32,
                 u32,
                 u32,
@@ -172,8 +176,8 @@ impl PbrMaterial {
         {
             fn from(
                 value: (
-                    &'a MegaTextureEntryInfo<TextureKey>,
-                    u32,
+                    &'a TexturePoolArray<TextureKey>,
+                    &'a TexturePoolEntryInfo<TextureKey>,
                     u32,
                     u32,
                     u32,
@@ -181,12 +185,12 @@ impl PbrMaterial {
                 ),
             ) -> Self {
                 Value::Texture {
-                    entry_info: value.0,
-                    uv_index: value.1,
-                    sampler_index: value.2,
-                    address_mode_u: value.3,
-                    address_mode_v: value.4,
-                    padding: value.5,
+                    array: value.0,
+                    entry_info: value.1,
+                    uv_index: value.2,
+                    sampler_index: value.3,
+                    address_mode_u: value.4,
+                    address_mode_v: value.5,
                 }
             }
         }
@@ -205,38 +209,30 @@ impl PbrMaterial {
                         offset += 4;
                     }
                     Value::Texture {
+                        array,
                         entry_info,
                         uv_index,
                         sampler_index,
                         address_mode_u,
                         address_mode_v,
-                        padding,
                     } => {
-                        offset = write_inner(data, entry_info.pixel_offset[0].into(), offset);
-                        offset = write_inner(data, entry_info.pixel_offset[1].into(), offset);
-                        offset = write_inner(data, entry_info.size[0].into(), offset);
-                        offset = write_inner(data, entry_info.size[1].into(), offset);
+                        let packed = pack_texture_info_raw(
+                            array,
+                            entry_info,
+                            uv_index,
+                            sampler_index,
+                            address_mode_u,
+                            address_mode_v,
+                        );
 
-                        let packed_index_1 = (entry_info.index.atlas as u32)
-                            | ((entry_info.index.layer as u32) << 16);
-                        let packed_index_2 = (entry_info.index.entry as u32) | (uv_index << 16);
-
-                        offset = write_inner(data, packed_index_1.into(), offset);
-                        offset = write_inner(data, packed_index_2.into(), offset);
-                        offset = write_inner(data, sampler_index.into(), offset);
-                        offset = write_inner(data, address_mode_u.into(), offset);
-                        offset = write_inner(data, address_mode_v.into(), offset);
-                        offset = write_inner(data, padding.into(), offset);
-
-                        offset = write_inner(data, entry_info.uv_offset[0].into(), offset);
-                        offset = write_inner(data, entry_info.uv_offset[1].into(), offset);
-                        offset = write_inner(data, entry_info.uv_scale[0].into(), offset);
-                        offset = write_inner(data, entry_info.uv_scale[1].into(), offset);
-                        offset = write_inner(data, entry_info.grad_scale[0].into(), offset);
-                        offset = write_inner(data, entry_info.grad_scale[1].into(), offset);
+                        for word in packed {
+                            let bytes = word.to_le_bytes();
+                            data[offset..offset + 4].copy_from_slice(&bytes);
+                            offset += 4;
+                        }
                     }
                     Value::SkipTexture => {
-                        offset += 64; // 16 * 4 bytes
+                        offset += 16; // 4 * 4 bytes (packed)
                     }
                 }
 
@@ -285,25 +281,22 @@ impl PbrMaterial {
 
         let mut bitmask = 0u32;
 
-        let sampler_key_list: Vec<SamplerKey> =
-            textures.mega_texture_sampler_set.iter().cloned().collect();
-
-        let texture_padding = textures.mega_texture.padding;
-        let atlas_size = textures.mega_texture.texture_size;
+        let sampler_key_list: Vec<SamplerKey> = textures.pool_sampler_set.iter().cloned().collect();
 
         if let Some(tex) = self.base_color_tex.and_then(|texture_key| {
             let entry_info = textures.get_entry(texture_key).ok()?;
+            let array = textures.pool.array_by_index(entry_info.array_index)?;
             let sampler_key = self.base_color_sampler?;
             let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
             let uv_index = self.base_color_uv_index?;
             let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
             Some((
+                array,
                 entry_info,
                 uv_index,
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
-                texture_padding,
             ))
         }) {
             write(tex.into());
@@ -314,18 +307,19 @@ impl PbrMaterial {
 
         if let Some(tex) = self.metallic_roughness_tex.and_then(|texture_key| {
             let entry_info = textures.get_entry(texture_key).ok()?;
+            let array = textures.pool.array_by_index(entry_info.array_index)?;
             let sampler_key = self.metallic_roughness_sampler?;
             let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
             let uv_index = self.metallic_roughness_uv_index?;
             let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
 
             Some((
+                array,
                 entry_info,
                 uv_index,
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
-                texture_padding,
             ))
         }) {
             write(tex.into());
@@ -336,17 +330,18 @@ impl PbrMaterial {
 
         if let Some(tex) = self.normal_tex.and_then(|texture_key| {
             let entry_info = textures.get_entry(texture_key).ok()?;
+            let array = textures.pool.array_by_index(entry_info.array_index)?;
             let sampler_key = self.normal_sampler?;
             let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
             let uv_index = self.normal_uv_index?;
             let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
             Some((
+                array,
                 entry_info,
                 uv_index,
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
-                texture_padding,
             ))
         }) {
             write(tex.into());
@@ -357,17 +352,18 @@ impl PbrMaterial {
 
         if let Some(tex) = self.occlusion_tex.and_then(|texture_key| {
             let entry_info = textures.get_entry(texture_key).ok()?;
+            let array = textures.pool.array_by_index(entry_info.array_index)?;
             let sampler_key = self.occlusion_sampler?;
             let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
             let uv_index = self.occlusion_uv_index?;
             let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
             Some((
+                array,
                 entry_info,
                 uv_index,
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
-                texture_padding,
             ))
         }) {
             write(tex.into());
@@ -378,17 +374,18 @@ impl PbrMaterial {
 
         if let Some(tex) = self.emissive_tex.and_then(|texture_key| {
             let entry_info = textures.get_entry(texture_key).ok()?;
+            let array = textures.pool.array_by_index(entry_info.array_index)?;
             let sampler_key = self.emissive_sampler?;
             let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
             let uv_index = self.emissive_uv_index?;
             let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
             Some((
+                array,
                 entry_info,
                 uv_index,
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
-                texture_padding,
             ))
         }) {
             write(tex.into());
@@ -408,4 +405,72 @@ impl PbrMaterial {
 
         Ok(data)
     }
+}
+
+fn pack_texture_info_raw<ID>(
+    array: &TexturePoolArray<ID>,
+    entry_info: &TexturePoolEntryInfo<ID>,
+    uv_index: u32,
+    sampler_index: u32,
+    address_mode_u: u32,
+    address_mode_v: u32,
+) -> [u32; 4] {
+    // --- size: width (16 bits) + height (16 bits) ---
+    let width = array.width;
+    let height = array.height;
+
+    debug_assert!(width <= 0xFFFF, "texture width too large for 16 bits");
+    debug_assert!(height <= 0xFFFF, "texture height too large for 16 bits");
+
+    let size = (height << 16) | (width & 0xFFFF);
+
+    // --- array_and_layer: array_index (12 bits) + layer_index (20 bits) ---
+    let array_index = entry_info.array_index as u32;
+    let layer_index = entry_info.layer_index as u32;
+
+    debug_assert!(array_index <= 0xFFF, "array_index too large for 12 bits");
+    debug_assert!(layer_index <= 0xFFFFF, "layer_index too large for 20 bits");
+
+    let array_and_layer = (layer_index << 12) | (array_index & 0xFFF);
+
+    // --- uv_and_sampler: uv_set_index (8 bits) + sampler_index (24 bits) ---
+    debug_assert!(uv_index <= 0xFF, "uv_index too large for 8 bits");
+    debug_assert!(
+        sampler_index <= 0xFFFFFF,
+        "sampler_index too large for 24 bits"
+    );
+
+    let uv_and_sampler = (sampler_index << 8) | (uv_index & 0xFF);
+
+    // --- extra: flags (8) + addr_u (8) + addr_v (8) + padding (8) ---
+    // flags:
+    //   bit 0: has mipmaps
+    //   bit 1: sRGB
+    let color = &entry_info.color;
+
+    let has_mipmaps = array.mipmap;
+
+    let srgb = color.srgb_encoded;
+
+    let mut flags: u32 = 0;
+    if has_mipmaps {
+        flags |= 1 << 0;
+    }
+    if srgb {
+        flags |= 1 << 1;
+    }
+
+    debug_assert!(
+        address_mode_u <= 0xFF,
+        "address_mode_u too large for 8 bits"
+    );
+    debug_assert!(
+        address_mode_v <= 0xFF,
+        "address_mode_v too large for 8 bits"
+    );
+
+    let extra = (flags & 0xFF) | ((address_mode_u & 0xFF) << 8) | ((address_mode_v & 0xFF) << 16);
+    // top 8 bits (24..31) left as 0 for now
+
+    [size, array_and_layer, uv_and_sampler, extra]
 }

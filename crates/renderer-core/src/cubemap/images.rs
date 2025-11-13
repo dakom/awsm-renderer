@@ -2,7 +2,7 @@ use crate::command::color::Color;
 use crate::cubemap::CubemapImage;
 use crate::image::bitmap::{create_color, create_vertical_gradient};
 use crate::image::ImageData;
-use crate::texture::mipmap::{calculate_mipmap_levels, generate_mipmaps};
+use crate::texture::mipmap::{calculate_mipmap_levels, generate_mipmaps, MipmapTextureKind};
 use crate::{
     command::copy_texture::Origin3d,
     error::{AwsmCoreError, Result},
@@ -269,7 +269,20 @@ pub async fn create_texture(
     // Generate mipmaps for the cubemap if requested
     if generate_mipmap {
         // Cubemaps occupy the entire texture, so pass empty tiles vec (no tile-aware processing needed)
-        generate_mipmaps(gpu, &texture, vec![], 0, 6, true, mipmap_levels).await?;
+        generate_mipmaps(
+            gpu,
+            &texture,
+            &[
+                MipmapTextureKind::Albedo,
+                MipmapTextureKind::Albedo,
+                MipmapTextureKind::Albedo,
+                MipmapTextureKind::Albedo,
+                MipmapTextureKind::Albedo,
+                MipmapTextureKind::Albedo,
+            ],
+            mipmap_levels,
+        )
+        .await?;
     }
 
     Ok((texture, mipmap_levels))

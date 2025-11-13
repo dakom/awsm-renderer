@@ -1,7 +1,7 @@
 use crate::command::copy_texture::Origin3d;
 use crate::error::Result;
 use crate::renderer::AwsmRendererWebGpu;
-use crate::texture::mipmap::generate_mipmaps;
+use crate::texture::mipmap::{generate_mipmaps, MipmapTextureKind};
 use crate::texture::{
     mipmap, Extent3d, TextureAspect, TextureDescriptor, TextureFormat, TextureUsage,
 };
@@ -185,8 +185,13 @@ impl ImageData {
         gpu.copy_external_image_to_texture(&source.into(), &dest.into(), &self.extent_3d().into())?;
 
         if let Some(mipmap_levels) = mipmap_levels {
-            // Single images occupy the entire texture, so pass empty tiles vec (no tile-aware processing needed)
-            generate_mipmaps(gpu, &texture, vec![], 0, 1, false, mipmap_levels).await?;
+            generate_mipmaps(
+                gpu,
+                &texture,
+                &[MipmapTextureKind::Albedo], // assuming albedo for now
+                mipmap_levels,
+            )
+            .await?;
         }
 
         Ok(texture)

@@ -1,4 +1,4 @@
-# Barycentric derivatives via dFdx/dFdy
+# Texture Pool instead of Atlas
 # Fix perspective projection skybox
 # discard and single-sample the non-depth targets in the geometry pass
 

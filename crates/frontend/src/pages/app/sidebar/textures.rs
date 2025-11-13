@@ -1,7 +1,7 @@
 use std::cell::Cell;
 
 use awsm_renderer::{
-    core::texture::{mega_texture::report::MegaTextureReport, TextureFormat},
+    core::texture::{texture_pool::report::TexturePoolReport, TextureFormat},
     textures::TextureKey,
 };
 use awsm_web::file::save::save_file;
@@ -18,8 +18,8 @@ use super::render_dropdown_label;
 pub struct SidebarTextures {
     ctx: AppContext,
     phase: Mutable<Phase>,
-    report: Mutex<Option<MegaTextureReport<TextureKey>>>,
-    to_export: Mutex<Option<(usize, usize)>>,
+    report: Mutex<Option<TexturePoolReport<TextureKey>>>,
+    to_export: Mutable<Option<(usize, usize, u32)>>,
     mipmap_level: Cell<Option<u32>>,
 }
 
@@ -36,7 +36,7 @@ impl SidebarTextures {
             ctx,
             phase: Mutable::new(Phase::Initializing),
             report: Mutex::new(None),
-            to_export: Mutex::new(None),
+            to_export: Mutable::new(None),
             mipmap_level: Cell::new(None),
         })
     }
@@ -77,9 +77,8 @@ impl SidebarTextures {
 
         let size_report = renderer
             .textures
-            .mega_texture
-            .info(&renderer.gpu.device.limits())
-            .into_report();
+            .pool
+            .generate_report(&renderer.gpu.device.limits());
 
         *state.report.lock().unwrap() = Some(size_report);
 
@@ -91,29 +90,29 @@ impl SidebarTextures {
 
         let finished = Mutable::new(false);
 
-        let (atlas_index, layer_index) = state.to_export.lock().unwrap().unwrap().clone();
+        let (array_index, layer_index, mip_levels) = state.to_export.lock_ref().unwrap().clone();
         let mipmap_level = state.mipmap_level.get();
 
         html!("div", {
             .future(clone!(state, finished => async move {
-                let layer_size = {
+                let (width, height) = {
                     let report = state.report.lock().unwrap();
                     let report = report.as_ref().unwrap();
-                    report.size.layers[atlas_index][layer_index].max_size.clone()
+                    (report.arrays[array_index].width, report.arrays[array_index].height)
                 };
 
                 let (gpu, texture_array) = {
                     let renderer = state.ctx.scene.lock_ref();
                     let renderer = renderer.as_ref().unwrap().renderer.lock().await;
                     let gpu = renderer.gpu.clone();
-                    let texture_array = renderer.textures.gpu_texture_arrays[atlas_index].clone();
+                    let texture_array = renderer.textures.pool.textures().nth(array_index).unwrap().clone();
                     (gpu, texture_array)
                 };
 
                 let png_data = gpu.export_texture_as_png(
                     &texture_array,
-                    layer_size.width,
-                    layer_size.height,
+                    width,
+                    height,
                     layer_index as u32,
                     TextureFormat::Rgba16float,
                     mipmap_level,
@@ -124,10 +123,10 @@ impl SidebarTextures {
                 match png_data {
                     Ok(png_data) => {
                         let filename = match mipmap_level {
-                            Some(level) => format!("mega_texture_atlas_{}_layer_{}_mip_{}.png", atlas_index + 1, layer_index + 1, level),
-                            None => format!("mega_texture_atlas_{}_layer_{}.png", atlas_index + 1, layer_index + 1),
+                            Some(level) => format!("texture_pool_{}_layer_{}_mip_{}.png", array_index + 1, layer_index + 1, level),
+                            None => format!("texture_pool_{}_layer_{}.png", array_index + 1, layer_index + 1),
                         };
-                        tracing::info!("Exported PNG data for Atlas {} - Layer {}: {:?}", atlas_index + 1, layer_index + 1, png_data.len());
+                        tracing::info!("Exported PNG data for Texture Pool {} - Layer {}: {:?}", array_index + 1, layer_index + 1, png_data.len());
                         match save_file(&png_data, &filename, Some("image/png")) {
                             Ok(_) => {
                             }
@@ -135,7 +134,7 @@ impl SidebarTextures {
                                 Modal::open(move || {
                                     html!("div", {
                                         .class([FontSize::Lg.class(), ColorText::Error.class()])
-                                        .text(&format!("Failed to save PNG data for Atlas {} - Layer {}: {:?}", atlas_index + 1, layer_index + 1, err))
+                                        .text(&format!("Failed to save PNG data for Texture Pool {} - Layer {}: {:?}", array_index + 1, layer_index + 1, err))
                                     })
                                 });
                             }
@@ -145,7 +144,7 @@ impl SidebarTextures {
                         Modal::open(move || {
                             html!("div", {
                                 .class([FontSize::Lg.class(), ColorText::Error.class()])
-                                .text(&format!("Failed to export PNG data for Atlas {} - Layer {}: {:?}", atlas_index + 1, layer_index + 1, err))
+                                .text(&format!("Failed to export PNG data for Texture Pool {} - Layer {}: {:?}", array_index + 1, layer_index + 1, err))
                             })
                         });
                     }
@@ -161,7 +160,7 @@ impl SidebarTextures {
                 } else {
                     Some(html!("div", {
                         .class([FontSize::Lg.class(), ColorText::Byline.class()])
-                        .text(&format!("Exporting Atlas {} - Layer {}", atlas_index + 1, layer_index + 1))
+                        .text(&format!("Exporting Texture Pool {} - Layer {}", array_index + 1, layer_index + 1))
                     }))
                 }
             })))
@@ -188,21 +187,23 @@ impl SidebarTextures {
             }
         });
 
-        let has_mips = state
-            .report
-            .lock()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .mip_levels
-            .is_some();
-
         html!("div", {
             .class(&*CONTAINER)
             .child(html!("div", {
                 .class(&*INNER_CONTAINER)
                 .child(state.render_export_selector())
-                .apply_if(has_mips, |dom| dom.child(state.render_mipmap_selector()))
+                .child_signal(state.to_export.signal().map(clone!(state => move |to_export| {
+                    match to_export {
+                        None => None,
+                        Some((_, _, mipmap_levels)) => {
+                            if mipmap_levels > 1 {
+                                Some(state.render_mipmap_selector(mipmap_levels))
+                            } else {
+                                None
+                            }
+                        }
+                    }
+                })))
                 .child(state.render_export_button())
             }))
             .child(state.render_report_button())
@@ -212,21 +213,28 @@ impl SidebarTextures {
     fn render_export_selector(self: &Arc<Self>) -> Dom {
         let state = self;
 
-        let options: Vec<(String, (usize, usize))> = state
+        let options: Vec<(String, (usize, usize, u32))> = state
             .report
             .lock()
             .unwrap()
             .as_ref()
             .unwrap()
-            .size
-            .layers
+            .arrays
             .iter()
             .enumerate()
-            .map(|(atlas_index, atlas)| {
-                atlas.iter().enumerate().map(move |(layer_index, area)| {
-                    let label = format!("Atlas {} - Layer {}", atlas_index + 1, layer_index + 1);
-                    (label, (atlas_index, layer_index))
-                })
+            .map(|(array_index, array)| {
+                array
+                    .entries
+                    .iter()
+                    .enumerate()
+                    .map(move |(layer_index, layer)| {
+                        let label = format!(
+                            "Texture Pool {} - Layer {}",
+                            array_index + 1,
+                            layer_index + 1
+                        );
+                        (label, (array_index, layer_index, array.mip_levels))
+                    })
             })
             .flatten()
             .collect();
@@ -236,26 +244,18 @@ impl SidebarTextures {
             Dropdown::new()
                 .with_intial_selected(None)
                 .with_bg_color(ColorBackground::Dropdown)
-                .with_on_change(clone!(state => move |(atlas_index, layer_index)| {
-                    *state.to_export.lock().unwrap() = Some((*atlas_index, *layer_index));
-                }))
+                .with_on_change(
+                    clone!(state => move |(atlas_index, layer_index, mip_levels)| {
+                        state.to_export.set_neq(Some((*atlas_index, *layer_index, *mip_levels)));
+                    }),
+                )
                 .with_options(options)
                 .render(),
         )
     }
 
-    fn render_mipmap_selector(self: &Arc<Self>) -> Dom {
+    fn render_mipmap_selector(self: &Arc<Self>, mipmap_levels: u32) -> Dom {
         let state = self;
-
-        // safe, this is only called if mip_levels is Some, but might as well be safer :p
-        let mipmap_levels = state
-            .report
-            .lock()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .mip_levels
-            .unwrap_or_default();
 
         let options: Vec<(String, u32)> = (0..mipmap_levels)
             .map(|level| {
@@ -284,7 +284,7 @@ impl SidebarTextures {
             .with_style(ButtonStyle::Outline)
             .with_text("Export")
             .with_on_click(clone!(state => move || {
-                if state.to_export.lock().unwrap().is_some() {
+                if state.to_export.lock_ref().is_some() {
                     state.phase.set(Phase::Exporting);
                 }
             }))

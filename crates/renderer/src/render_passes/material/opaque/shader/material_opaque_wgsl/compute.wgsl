@@ -108,11 +108,11 @@ struct CameraUniform {
 @group(1) @binding(0) var<uniform> lights_info: LightsInfoPacked;
 @group(1) @binding(1) var<storage, read> lights: array<LightPacked>;
 
-{% for i in 0..texture_atlas_len %}
-    @group(2) @binding({{ i }}u) var atlas_tex_{{ i }}: texture_2d_array<f32>;
+{% for i in 0..texture_pool_arrays_len %}
+    @group(2) @binding({{ i }}u) var pool_tex_{{ i }}: texture_2d_array<f32>;
 {% endfor %}
-{% for i in 0..sampler_atlas_len %}
-    @group(3) @binding({{ i }}u) var atlas_sampler_{{ i }}: sampler;
+{% for i in 0..texture_pool_samplers_len %}
+    @group(3) @binding({{ i }}u) var pool_sampler_{{ i }}: sampler;
 {% endfor %}
 
 
@@ -706,7 +706,7 @@ fn texture_fits_uv_budget(has_texture: bool, info: TextureInfo, uv_set_count: u3
     }
 
     // Reject textures that reference UV sets the mesh never uploaded.
-    return info.attribute_uv_set_index < uv_set_count;
+    return info.uv_set_index < uv_set_count;
 }
 
 fn get_triangle_indices(attribute_indices_offset: u32, triangle_index: u32) -> vec3<u32> {

@@ -217,13 +217,13 @@ impl BindGroups {
                     render_passes
                         .material_opaque
                         .bind_groups
-                        .recreate_textures(&ctx)?;
+                        .recreate_texture_pool_textures(&ctx)?;
                 }
                 FunctionToCall::OpaqueSamplers => {
                     render_passes
                         .material_opaque
                         .bind_groups
-                        .recreate_samplers(&ctx)?;
+                        .recreate_texture_pool_samplers(&ctx)?;
                 }
                 FunctionToCall::TransparentMain => {
                     render_passes

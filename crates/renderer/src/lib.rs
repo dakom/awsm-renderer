@@ -23,6 +23,7 @@ pub mod shaders;
 pub mod textures;
 pub mod transforms;
 pub mod update;
+// re-export
 pub mod core {
     pub use awsm_renderer_core::*;
 }

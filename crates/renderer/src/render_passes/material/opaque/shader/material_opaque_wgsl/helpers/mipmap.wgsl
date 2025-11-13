@@ -91,98 +91,47 @@ fn get_uv_derivatives(
     vertex_stride: u32,
     tex_info: TextureInfo
 ) -> UvDerivs {
-    let uv_set_index = tex_info.attribute_uv_set_index;
+    let uv_set_index = tex_info.uv_set_index;
 
-    // Fetch per-vertex UVs (raw, as authored)
-        let uv0 = _texture_uv_per_vertex(attribute_data_offset, tex_info.attribute_uv_set_index, tri.x, vertex_stride);
-        let uv1 = _texture_uv_per_vertex(attribute_data_offset, tex_info.attribute_uv_set_index, tri.y, vertex_stride);
-        let uv2 = _texture_uv_per_vertex(attribute_data_offset, tex_info.attribute_uv_set_index, tri.z, vertex_stride);
+    let uv0 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, tri.x, vertex_stride);
+    let uv1 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, tri.y, vertex_stride);
+    let uv2 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, tri.z, vertex_stride);
 
-        let db1dx = bary_derivs.x;
-        let db1dy = bary_derivs.y;
-        let db2dx = bary_derivs.z;
-        let db2dy = bary_derivs.w;
+    let db1dx = bary_derivs.x;
+    let db1dy = bary_derivs.y;
+    let db2dx = bary_derivs.z;
+    let db2dy = bary_derivs.w;
 
-        // If nearly zero derivatives, short-circuit (selects base mip).
-        let m = abs(db1dx) + abs(db1dy) + abs(db2dx) + abs(db2dy);
-        if (m < 1e-20) {
-            return UvDerivs(vec2<f32>(0.0), vec2<f32>(0.0));
-        }
+    // If nearly zero derivatives, short-circuit (selects base mip).
+    let m = abs(db1dx) + abs(db1dy) + abs(db2dx) + abs(db2dy);
+    if (m < 1e-20) {
+        return UvDerivs(vec2<f32>(0.0), vec2<f32>(0.0));
+    }
 
-        // Perspective barycentrics: b0 = 1 - b1 - b2
-        let db0dx = -db1dx - db2dx;
-        let db0dy = -db1dy - db2dy;
+    // Perspective barycentrics: b0 = 1 - b1 - b2
+    let db0dx = -db1dx - db2dx;
+    let db0dy = -db1dy - db2dy;
 
-        // Make the THREE vertex UVs locally continuous per axis based on the address mode.
-        var U0 = uv0;
-        var U1 = uv1;
-        var U2 = uv2;
+    // Make the THREE vertex UVs locally continuous per axis based on the address mode.
+    var U0 = uv0;
+    var U1 = uv1;
+    var U2 = uv2;
 
-        // TEMPORARY FIX: Skip unwrapping for REPEAT mode entirely
-        // The unwrapping logic was collapsing large UV spans, causing incorrect mip selection
-        // For MIRROR_REPEAT, we still need linearization + unwrapping
-        // Handle U axis:
-        switch (tex_info.address_mode_u) {
-            case ADDRESS_MODE_REPEAT: {
-                // Don't unwrap - use raw UVs
-                // This preserves large spans but may have seams at boundaries
-            }
-            case ADDRESS_MODE_MIRROR_REPEAT: {
-                let L0 = mirror_linearize(vec2<f32>(U0.x, 0.0));
-                let L1 = mirror_linearize(vec2<f32>(U1.x, 0.0));
-                let L2 = mirror_linearize(vec2<f32>(U2.x, 0.0));
-                let R  = unwrap_repeat(vec2<f32>(L0.uv.x, 0.0), vec2<f32>(L1.uv.x, 0.0), vec2<f32>(L2.uv.x, 0.0));
-                U0.x = R.u0.x; U1.x = R.u1.x; U2.x = R.u2.x;
-            }
-            default: { /* CLAMP: nothing */ }
-        }
 
-        // Handle V axis:
-        switch (tex_info.address_mode_v) {
-            case ADDRESS_MODE_REPEAT: {
-                // Don't unwrap - use raw UVs
-            }
-            case ADDRESS_MODE_MIRROR_REPEAT: {
-                let L0 = mirror_linearize(vec2<f32>(0.0, U0.y));
-                let L1 = mirror_linearize(vec2<f32>(0.0, U1.y));
-                let L2 = mirror_linearize(vec2<f32>(0.0, U2.y));
-                let R  = unwrap_repeat(vec2<f32>(0.0, L0.uv.y), vec2<f32>(0.0, L1.uv.y), vec2<f32>(0.0, L2.uv.y));
-                U0.y = R.u0.y; U1.y = R.u1.y; U2.y = R.u2.y;
-            }
-            default: { /* CLAMP: nothing */ }
-        }
+    // Chain rule with the unwrapped / linearized UVs
+    var dudx = U0.x * db0dx + U1.x * db1dx + U2.x * db2dx;
+    var dvdx = U0.y * db0dx + U1.y * db1dx + U2.y * db2dx;
 
-        // Chain rule with the unwrapped / linearized UVs
-        var dudx = U0.x * db0dx + U1.x * db1dx + U2.x * db2dx;
-        var dvdx = U0.y * db0dx + U1.y * db1dx + U2.y * db2dx;
+    var dudy = U0.x * db0dy + U1.x * db1dy + U2.x * db2dy;
+    var dvdy = U0.y * db0dy + U1.y * db1dy + U2.y * db2dy;
 
-        var dudy = U0.x * db0dy + U1.x * db1dy + U2.x * db2dy;
-        var dvdy = U0.y * db0dy + U1.y * db1dy + U2.y * db2dy;
+    // NaN/Inf guard (don’t clamp magnitudes)
+    let ok = (dudx == dudx) && (dudy == dudy) && (dvdx == dvdx) && (dvdy == dvdy);
+    if (!ok) {
+        return UvDerivs(vec2<f32>(0.0), vec2<f32>(0.0));
+    }
 
-        // For MIRROR_REPEAT, apply local slope sign (+1/-1) at THIS PIXEL so grads reflect flips.
-        if (tex_info.address_mode_u == ADDRESS_MODE_MIRROR_REPEAT ||
-            tex_info.address_mode_v == ADDRESS_MODE_MIRROR_REPEAT) {
-
-            // Interpolated raw UV at this pixel (no wrapping) just to decide parity:
-            let uv_pix = barycentric.x * uv0 + barycentric.y * uv1 + barycentric.z * uv2;
-
-            if (tex_info.address_mode_u == ADDRESS_MODE_MIRROR_REPEAT) {
-                let sx = mirror_linearize_axis(uv_pix.x).y; // +1 or -1
-                dudx *= sx; dudy *= sx;
-            }
-            if (tex_info.address_mode_v == ADDRESS_MODE_MIRROR_REPEAT) {
-                let sy = mirror_linearize_axis(uv_pix.y).y; // +1 or -1
-                dvdx *= sy; dvdy *= sy;
-            }
-        }
-
-        // NaN/Inf guard (don’t clamp magnitudes)
-        let ok = (dudx == dudx) && (dudy == dudy) && (dvdx == dvdx) && (dvdy == dvdy);
-        if (!ok) {
-            return UvDerivs(vec2<f32>(0.0), vec2<f32>(0.0));
-        }
-
-        return UvDerivs(vec2<f32>(dudx, dvdx), vec2<f32>(dudy, dvdy));
+    return UvDerivs(vec2<f32>(dudx, dvdx), vec2<f32>(dudy, dvdy));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -272,39 +221,5 @@ fn debug_calculate_mip_level(
     let rho = max(rho_x, rho_y);
 
     // Hardware mip selection: LOD = log2(rho)
-    return log2(max(rho, 1e-6));
-}
-
-// Debug helper: Calculate actual atlas mip level (what hardware selects)
-// Takes atlas dimensions to compute the real mip level
-fn debug_calculate_atlas_mip_level(
-    ddx_local: vec2<f32>,
-    ddy_local: vec2<f32>,
-    grad_scale: vec2<f32>,
-    atlas_index: u32
-) -> f32 {
-    // Get atlas dimensions
-    var atlas_dims = vec2<f32>(0.0);
-    switch (atlas_index) {
-        {% for i in 0..texture_atlas_len %}
-        case {{ i }}u: {
-            atlas_dims = vec2<f32>(textureDimensions(atlas_tex_{{ i }}, 0u));
-        }
-        {% endfor %}
-        default: {}
-    }
-
-    // Convert from local UV space to atlas UV space
-    let ddx_atlas = ddx_local * grad_scale;
-    let ddy_atlas = ddy_local * grad_scale;
-
-    // Convert to texel space using ATLAS dimensions (what hardware actually sees)
-    let ddx_texels = ddx_atlas * atlas_dims;
-    let ddy_texels = ddy_atlas * atlas_dims;
-
-    let rho_x = length(ddx_texels);
-    let rho_y = length(ddy_texels);
-    let rho = max(rho_x, rho_y);
-
     return log2(max(rho, 1e-6));
 }

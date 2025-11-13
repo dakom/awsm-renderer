@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use awsm_renderer_core::{renderer::AwsmRendererWebGpu, texture::mega_texture::MegaTexture};
+use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::Mat4;
 
 use crate::{

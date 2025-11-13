@@ -117,7 +117,7 @@ fn _pbr_material_base_color_no_mips(material: PbrMaterial, attribute_uv: vec2<f3
 
     if material.has_base_color_texture {
         color *=
-            texture_sample_atlas_no_mips(material.base_color_tex_info, attribute_uv);
+            texture_pool_sample_no_mips(material.base_color_tex_info, attribute_uv);
     }
 
 
@@ -134,7 +134,7 @@ fn _pbr_material_metallic_roughness_color_no_mips(
 ) -> vec2<f32> {
     var color = vec2<f32>(material.metallic_factor, material.roughness_factor);
     if material.has_metallic_roughness_texture {
-        let tex = texture_sample_atlas_no_mips(material.metallic_roughness_tex_info, attribute_uv);
+        let tex = texture_pool_sample_no_mips(material.metallic_roughness_tex_info, attribute_uv);
         // glTF uses B channel for metallic, G channel for roughness
         color *= vec2<f32>(tex.b, tex.g);
     }
@@ -161,7 +161,7 @@ fn _pbr_normal_color_no_mips(
 
     // Sample normal map and unpack from [0,1] to [-1,1] range
     // Use mip_level parameter (not forced to 0) to get proper filtering
-    let tex = texture_sample_atlas_no_mips(material.normal_tex_info, attribute_uv);
+    let tex = texture_pool_sample_no_mips(material.normal_tex_info, attribute_uv);
     var tangent_normal = vec3<f32>(
         (tex.r * 2.0 - 1.0) * material.normal_scale,
         (tex.g * 2.0 - 1.0) * material.normal_scale,
@@ -191,7 +191,7 @@ fn _pbr_normal_color_no_mips(
 
     // Method 2: Compute tangent space from triangle UV derivatives (fallback for missing tangents)
     // This is used for glTF models that don't include TANGENT attributes (e.g., NormalTangentTest)
-    let set_index = material.normal_tex_info.attribute_uv_set_index;
+    let set_index = material.normal_tex_info.uv_set_index;
     let uv0 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.x, vertex_attribute_stride);
     let uv1 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.y, vertex_attribute_stride);
     let uv2 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.z, vertex_attribute_stride);
@@ -235,7 +235,7 @@ fn _pbr_occlusion_color_no_mips(
 ) -> f32 {
     var occlusion = 1.0;
     if material.has_occlusion_texture {
-        let tex = texture_sample_atlas_no_mips(material.occlusion_tex_info, attribute_uv);
+        let tex = texture_pool_sample_no_mips(material.occlusion_tex_info, attribute_uv);
         occlusion = mix(1.0, tex.r, material.occlusion_strength);
     }
     return occlusion;
@@ -248,7 +248,7 @@ fn _pbr_material_emissive_color_no_mips(
     var color = material.emissive_factor;
     if material.has_emissive_texture {
         color *=
-            texture_sample_atlas_no_mips(material.emissive_tex_info, attribute_uv).rgb;
+            texture_pool_sample_no_mips(material.emissive_tex_info, attribute_uv).rgb;
     }
 
     color *= material.emissive_strength;
@@ -409,7 +409,7 @@ fn pbr_get_material_color_grad(
 fn _pbr_material_base_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> vec4<f32> {
     var color = material.base_color_factor;
     if material.has_base_color_texture {
-        color *= texture_sample_atlas_grad(material.base_color_tex_info, attribute_uv, uv_derivs);
+        color *= texture_pool_sample_grad(material.base_color_tex_info, attribute_uv, uv_derivs);
     }
     color.a = 1.0;
     return color;
@@ -418,7 +418,7 @@ fn _pbr_material_base_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>,
 fn _pbr_material_metallic_roughness_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs ) -> vec2<f32> {
     var color = vec2<f32>(material.metallic_factor, material.roughness_factor);
     if material.has_metallic_roughness_texture {
-        let tex = texture_sample_atlas_grad(material.metallic_roughness_tex_info, attribute_uv, uv_derivs);
+        let tex = texture_pool_sample_grad(material.metallic_roughness_tex_info, attribute_uv, uv_derivs);
         color *= vec2<f32>(tex.b, tex.g);
     }
     return color;
@@ -440,7 +440,7 @@ fn _pbr_normal_color_grad(
         return world_normal;
     }
 
-    let tex = texture_sample_atlas_grad(material.normal_tex_info, attribute_uv, uv_derivs);
+    let tex = texture_pool_sample_grad(material.normal_tex_info, attribute_uv, uv_derivs);
     var tangent_normal = vec3<f32>(
         (tex.r * 2.0 - 1.0) * material.normal_scale,
         (tex.g * 2.0 - 1.0) * material.normal_scale,
@@ -464,7 +464,7 @@ fn _pbr_normal_color_grad(
         }
     }
 
-    let set_index = material.normal_tex_info.attribute_uv_set_index;
+    let set_index = material.normal_tex_info.uv_set_index;
     let uv0 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.x, vertex_attribute_stride);
     let uv1 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.y, vertex_attribute_stride);
     let uv2 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.z, vertex_attribute_stride);
@@ -503,7 +503,7 @@ fn _pbr_normal_color_grad(
 fn _pbr_occlusion_color_grad( material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs ) -> f32 {
     var occlusion = 1.0;
     if material.has_occlusion_texture {
-        let tex = texture_sample_atlas_grad(material.occlusion_tex_info, attribute_uv, uv_derivs);
+        let tex = texture_pool_sample_grad(material.occlusion_tex_info, attribute_uv, uv_derivs);
         occlusion = mix(1.0, tex.r, material.occlusion_strength);
     }
     return occlusion;
@@ -512,7 +512,7 @@ fn _pbr_occlusion_color_grad( material: PbrMaterial, attribute_uv: vec2<f32>, uv
 fn _pbr_material_emissive_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs ) -> vec3<f32> {
     var color = material.emissive_factor;
     if material.has_emissive_texture {
-        color *= texture_sample_atlas_grad(material.emissive_tex_info, attribute_uv, uv_derivs).rgb;
+        color *= texture_pool_sample_grad(material.emissive_tex_info, attribute_uv, uv_derivs).rgb;
     }
     color *= material.emissive_strength;
     return color;

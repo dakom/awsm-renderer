@@ -28,11 +28,10 @@ pub struct MaterialOpaqueBindGroups {
     pub multisampled_main_bind_group_layout_key: BindGroupLayoutKey,
     pub singlesampled_main_bind_group_layout_key: BindGroupLayoutKey,
     pub lights_bind_group_layout_key: BindGroupLayoutKey,
-    pub texture_bind_group_layout_key: BindGroupLayoutKey,
-    pub sampler_bind_group_layout_key: BindGroupLayoutKey,
-    pub texture_atlas_len: u32,
-    pub texture_sampler_keys: BTreeSet<SamplerKey>,
-    pub clamp_sampler_index: u32,
+    pub texture_pool_textures_bind_group_layout_key: BindGroupLayoutKey,
+    pub texture_pool_samplers_bind_group_layout_key: BindGroupLayoutKey,
+    pub texture_pool_arrays_len: u32,
+    pub texture_pool_sampler_keys: BTreeSet<SamplerKey>,
     // this is set via `recreate` mechanism
     _main_bind_group: Option<web_sys::GpuBindGroup>,
     _lights_bind_group: Option<web_sys::GpuBindGroup>,
@@ -77,24 +76,22 @@ impl MaterialOpaqueBindGroups {
             },
         )?;
 
-        // Mega texture
-        let MegaTextureDeps {
-            texture_bind_group_layout_key,
-            sampler_bind_group_layout_key,
-            texture_atlas_len,
-            texture_sampler_keys,
-            clamp_sampler_index,
-        } = MegaTextureDeps::new(ctx)?;
+        // Texture Pool
+        let TexturePoolDeps {
+            texture_bind_group_layout_key: texture_pool_textures_bind_group_layout_key,
+            sampler_bind_group_layout_key: texture_pool_samplers_bind_group_layout_key,
+            texture_arrays_len: texture_pool_arrays_len,
+            texture_sampler_keys: texture_pool_sampler_keys,
+        } = TexturePoolDeps::new(ctx)?;
 
         Ok(Self {
             singlesampled_main_bind_group_layout_key,
             multisampled_main_bind_group_layout_key,
             lights_bind_group_layout_key,
-            texture_bind_group_layout_key,
-            sampler_bind_group_layout_key,
-            clamp_sampler_index,
-            texture_atlas_len,
-            texture_sampler_keys,
+            texture_pool_textures_bind_group_layout_key,
+            texture_pool_samplers_bind_group_layout_key,
+            texture_pool_arrays_len,
+            texture_pool_sampler_keys,
             _main_bind_group: None,
             _lights_bind_group: None,
             _texture_bind_group: None,
@@ -102,27 +99,25 @@ impl MaterialOpaqueBindGroups {
         })
     }
 
-    pub fn clone_because_mega_texture_changed(
+    pub fn clone_because_texture_pool_changed(
         &self,
         ctx: &mut RenderPassInitContext<'_>,
     ) -> Result<Self> {
-        let MegaTextureDeps {
-            texture_bind_group_layout_key,
-            sampler_bind_group_layout_key,
-            texture_atlas_len,
-            texture_sampler_keys,
-            clamp_sampler_index,
-        } = MegaTextureDeps::new(ctx)?;
+        let TexturePoolDeps {
+            texture_bind_group_layout_key: texture_pool_textures_bind_group_layout_key,
+            sampler_bind_group_layout_key: texture_pool_samplers_bind_group_layout_key,
+            texture_arrays_len: texture_pool_arrays_len,
+            texture_sampler_keys: texture_pool_sampler_keys,
+        } = TexturePoolDeps::new(ctx)?;
 
         let mut _self = Self {
             multisampled_main_bind_group_layout_key: self.multisampled_main_bind_group_layout_key,
             singlesampled_main_bind_group_layout_key: self.singlesampled_main_bind_group_layout_key,
             lights_bind_group_layout_key: self.lights_bind_group_layout_key,
-            texture_bind_group_layout_key,
-            sampler_bind_group_layout_key,
-            texture_atlas_len,
-            texture_sampler_keys,
-            clamp_sampler_index,
+            texture_pool_textures_bind_group_layout_key,
+            texture_pool_samplers_bind_group_layout_key,
+            texture_pool_arrays_len,
+            texture_pool_sampler_keys,
             _main_bind_group: self._main_bind_group.clone(),
             _lights_bind_group: self._lights_bind_group.clone(),
             _texture_bind_group: None,
@@ -340,21 +335,22 @@ impl MaterialOpaqueBindGroups {
         Ok(())
     }
 
-    pub fn recreate_textures(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
+    pub fn recreate_texture_pool_textures(
+        &mut self,
+        ctx: &BindGroupRecreateContext<'_>,
+    ) -> Result<()> {
         let mut entries = Vec::new();
 
-        for i in 0..self.texture_atlas_len as usize {
+        for (i, view) in ctx.textures.pool.texture_views().enumerate() {
             entries.push(BindGroupEntry::new(
                 entries.len() as u32,
-                BindGroupResource::TextureView(Cow::Borrowed(
-                    &ctx.textures.gpu_texture_array_views[i],
-                )),
+                BindGroupResource::TextureView(Cow::Borrowed(&view)),
             ));
         }
 
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts
-                .get(self.texture_bind_group_layout_key)?,
+                .get(self.texture_pool_textures_bind_group_layout_key)?,
             Some("Material Opaque - Texture"),
             entries,
         );
@@ -364,10 +360,13 @@ impl MaterialOpaqueBindGroups {
         Ok(())
     }
 
-    pub fn recreate_samplers(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
+    pub fn recreate_texture_pool_samplers(
+        &mut self,
+        ctx: &BindGroupRecreateContext<'_>,
+    ) -> Result<()> {
         let mut entries = Vec::new();
 
-        for sampler_key in self.texture_sampler_keys.iter() {
+        for sampler_key in self.texture_pool_sampler_keys.iter() {
             let sampler = ctx.textures.get_sampler(*sampler_key)?;
 
             entries.push(BindGroupEntry::new(
@@ -378,7 +377,7 @@ impl MaterialOpaqueBindGroups {
 
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts
-                .get(self.sampler_bind_group_layout_key)?,
+                .get(self.texture_pool_samplers_bind_group_layout_key)?,
             Some("Material Opaque - Sampler"),
             entries,
         );
@@ -389,23 +388,30 @@ impl MaterialOpaqueBindGroups {
     }
 }
 
-struct MegaTextureDeps {
+struct TexturePoolDeps {
     pub texture_bind_group_layout_key: BindGroupLayoutKey,
     pub sampler_bind_group_layout_key: BindGroupLayoutKey,
-    pub texture_atlas_len: u32,
+    pub texture_arrays_len: u32,
     pub texture_sampler_keys: BTreeSet<SamplerKey>,
-    pub clamp_sampler_index: u32,
 }
 
-impl MegaTextureDeps {
+impl TexturePoolDeps {
     fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         // textures
         let device_limits = ctx.gpu.device.limits();
-        let texture_atlas_len = ctx.textures.mega_texture.bindings_len(&device_limits)?;
+        let texture_arrays_len = ctx.textures.pool.arrays_len();
 
         let mut texture_entries = Vec::new();
 
-        for i in 0..texture_atlas_len {
+        if texture_arrays_len > device_limits.max_sampled_textures_per_shader_stage() as usize {
+            return Err(AwsmCoreError::TexturePoolTooManyArrays {
+                total_arrays: texture_arrays_len as u32,
+                max_arrays: device_limits.max_sampled_textures_per_shader_stage(),
+            }
+            .into());
+        }
+
+        for i in 0..texture_arrays_len {
             texture_entries.push(BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::Texture(
                     TextureBindingLayout::new()
@@ -416,6 +422,22 @@ impl MegaTextureDeps {
                 visibility_fragment: false,
                 visibility_compute: true,
             });
+
+            let layer_count = ctx
+                .textures
+                .pool
+                .array_by_index(i)
+                .map(|arr| arr.images.len())
+                .unwrap_or_default();
+
+            if layer_count > device_limits.max_texture_array_layers() as usize {
+                return Err(AwsmCoreError::TexturePoolTooManyLayers {
+                    array_index: i as u32,
+                    total_layers: layer_count as u32,
+                    max_layers: device_limits.max_texture_array_layers(),
+                }
+                .into());
+            }
         }
 
         let texture_bind_group_layout_key = ctx.bind_group_layouts.get_key(
@@ -426,28 +448,10 @@ impl MegaTextureDeps {
         )?;
 
         // samplers
-        let mut texture_sampler_keys = ctx.textures.mega_texture_sampler_set.clone();
-
-        // gotta make sure we have a clamp sampler in there
-        let clamp_sampler_index = texture_sampler_keys
-            .iter()
-            .position(|key| *key == ctx.textures.clamp_sampler_key);
-
-        let clamp_sampler_index = match clamp_sampler_index {
-            Some(index) => index as u32,
-            None => {
-                // add it
-                texture_sampler_keys.insert(ctx.textures.clamp_sampler_key);
-                // indexing is by hash set, not necessarily last
-                texture_sampler_keys
-                    .iter()
-                    .position(|key| *key == ctx.textures.clamp_sampler_key)
-                    .unwrap() as u32
-            }
-        };
+        let mut texture_sampler_keys = ctx.textures.pool_sampler_set.clone();
 
         if texture_sampler_keys.len() > device_limits.max_samplers_per_shader_stage() as usize {
-            return Err(AwsmCoreError::MegaTextureTooManySamplers {
+            return Err(AwsmCoreError::TexturePoolTooManySamplers {
                 total_samplers: texture_sampler_keys.len() as u32,
                 max_samplers: device_limits.max_samplers_per_shader_stage(),
             }
@@ -475,11 +479,10 @@ impl MegaTextureDeps {
         )?;
 
         Ok(Self {
-            texture_atlas_len,
+            texture_arrays_len: texture_arrays_len as u32,
             texture_bind_group_layout_key,
             texture_sampler_keys,
             sampler_bind_group_layout_key,
-            clamp_sampler_index,
         })
     }
 }

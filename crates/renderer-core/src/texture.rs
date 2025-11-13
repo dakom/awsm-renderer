@@ -1,10 +1,14 @@
 #[cfg(feature = "texture-export")]
 pub mod exporter;
-#[cfg(feature = "mega-texture")]
-pub mod mega_texture;
+// #[cfg(feature = "mega-texture")]
+// pub mod mega_texture;
+#[cfg(feature = "texture-pool")]
+pub mod texture_pool;
 
 pub mod clear;
 pub mod mipmap;
+
+use wasm_bindgen::convert::IntoWasmAbi;
 
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuTextureFormat.html
 pub type TextureFormat = web_sys::GpuTextureFormat;
@@ -229,6 +233,48 @@ impl<'a> ExternalTextureDescriptor<'a> {
 pub enum ExternalTextureDescriptorSource {
     VideoElement(web_sys::HtmlVideoElement),
     VideoFrame(web_sys::VideoFrame),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct TextureFormatKey(TextureFormat);
+
+impl From<TextureFormat> for TextureFormatKey {
+    fn from(format: TextureFormat) -> Self {
+        Self(format)
+    }
+}
+
+impl From<TextureFormatKey> for TextureFormat {
+    fn from(key: TextureFormatKey) -> Self {
+        key.0
+    }
+}
+
+impl std::hash::Hash for TextureFormatKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.into_abi().hash(state);
+    }
+}
+
+impl PartialOrd for TextureFormatKey {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.into_abi().partial_cmp(&other.0.into_abi())
+    }
+}
+
+impl Ord for TextureFormatKey {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.into_abi().cmp(&other.0.into_abi())
+    }
+}
+
+pub fn texture_format_to_wgsl_storage(format: TextureFormat) -> crate::error::Result<&'static str> {
+    match format {
+        TextureFormat::Rgba8unorm => Ok("rgba8unorm"),
+        TextureFormat::Rgba16float => Ok("rgba16float"),
+        TextureFormat::Rgba32float => Ok("rgba32float"),
+        _ => Err(crate::error::AwsmCoreError::MipmapUnsupportedFormat(format)),
+    }
 }
 
 // js conversions

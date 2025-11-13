@@ -3,6 +3,8 @@ use std::sync::LazyLock;
 use std::{borrow::Cow, cell::RefCell};
 
 use crate::error::{AwsmCoreError, Result};
+use crate::texture::mega_texture::mipmap::{generate_mipmaps, TileInfo};
+use crate::texture::mipmap::calculate_mipmap_levels;
 use crate::texture::TextureDimension;
 use crate::{
     bind_groups::{BindGroupDescriptor, BindGroupEntry, BindGroupResource},
@@ -13,7 +15,6 @@ use crate::{
         mega_texture::{
             pipeline::get_atlas_pipeline, MegaTexture, MegaTextureAtlas, MegaTextureLayer,
         },
-        mipmap::{calculate_mipmap_levels, generate_mipmaps, TileInfo},
         Extent3d, TextureDescriptor, TextureFormat, TextureUsage, TextureViewDescriptor,
         TextureViewDimension,
     },

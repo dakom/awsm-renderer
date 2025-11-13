@@ -8,20 +8,24 @@ authors.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["gltf", "exr", "animation"]
+default = ["gltf", "animation"]
+all = ["gltf", "animation", "awsm-renderer-core/all"]
+# specifics
 gltf = [
     "dep:gltf",
     "dep:gloo-net",
     "awsm-renderer-core/image",
-    "awsm-renderer-core/mega-texture",
-]
-exr = [
-    "awsm-renderer-core/exr",
 ]
 animation = []
+# Optional features to enable optional parts of awsm-renderer-core
+ktx = ["awsm-renderer-core/ktx"]
+serde = ["awsm-renderer-core/serde"]
+mega-texture = ["awsm-renderer-core/mega-texture"]
+exr = ["awsm-renderer-core/exr"]
+texture-export = ["awsm-renderer-core/texture-export"]
 
 [dependencies]
-awsm-renderer-core = {workspace = true} 
+awsm-renderer-core = { version = "0.1.0-alpha.3", path = "../renderer-core", features = ["texture-pool"] }
 web-sys = {workspace = true}
 tracing = {workspace = true}
 thiserror = {workspace = true}
