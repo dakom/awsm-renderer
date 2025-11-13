@@ -131,12 +131,11 @@ fn _texture_pool_sample_grad(
     attribute_uv: vec2<f32>,
     uv_derivs: UvDerivs
 ) -> vec4<f32> {
-    // TEMP debug: force base LOD if needed
-    // return textureSampleLevel(atlas_tex, atlas_sampler_0, uv, i32(info.layer_index), 0.0);
+    var color: vec4<f32>;
     switch info.sampler_index {
         {% for i in 0..texture_pool_samplers_len %}
             case {{ i }}u: {
-                return textureSampleGrad(
+                color = textureSampleGrad(
                     tex,
                     pool_sampler_{{ i }},
                     attribute_uv,
@@ -147,9 +146,16 @@ fn _texture_pool_sample_grad(
             }
         {% endfor %}
         default: {
-            return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
         }
     }
+
+    // Convert sRGB to linear if needed
+    if info.srgb {
+        color = vec4<f32>(srgb_to_linear(color.rgb), color.a);
+    }
+
+    return color;
 }
 
 
@@ -175,10 +181,11 @@ fn _texture_pool_sample_no_mips(
     tex: texture_2d_array<f32>,
     uv: vec2<f32>,
 ) -> vec4<f32> {
+    var color: vec4<f32>;
     switch info.sampler_index {
         {% for i in 0..texture_pool_samplers_len %}
             case {{ i }}u: {
-                return textureSampleLevel(
+                color = textureSampleLevel(
                     tex,
                     pool_sampler_{{ i }},
                     uv,
@@ -188,7 +195,14 @@ fn _texture_pool_sample_no_mips(
             }
         {% endfor %}
         default: {
-            return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
         }
     }
+
+    // Convert sRGB to linear if needed
+    if info.srgb {
+        color = vec4<f32>(srgb_to_linear(color.rgb), color.a);
+    }
+
+    return color;
 }

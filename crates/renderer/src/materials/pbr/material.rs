@@ -64,9 +64,9 @@ pub struct VertexColorInfo {
 
 impl PbrMaterial {
     pub const INITIAL_ELEMENTS: usize = 32; // 32 elements is a good starting point
-                                            // NOTE: keep this in sync with `PbrMaterialRaw` in WGSL. Each texture packs 56 bytes
-                                            // (including sampler + address mode + padding + UV transforms) so 5 textures + 60 byte header + padding = 348.
-    pub const BYTE_SIZE: usize = 388; // must be under Materials::MAX_SIZE
+                                            // NOTE: keep this in sync with `PbrMaterialRaw` in WGSL. Each texture packs 16 bytes
+                                            // (compact format) so 5 textures + 60 byte header + 8 bytes = 148.
+    pub const BYTE_SIZE: usize = 148; // must be under Materials::MAX_SIZE
 
     pub const BITMASK_BASE_COLOR: u32 = 1;
     pub const BITMASK_METALIC_ROUGHNESS: u32 = 1 << 1;
