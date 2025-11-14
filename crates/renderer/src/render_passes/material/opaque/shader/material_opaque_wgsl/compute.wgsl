@@ -228,6 +228,8 @@ fn main(
                             tri_indices_{{s}},
                             attribute_data_offset_{{s}},
                             vertex_attribute_stride_{{s}},
+                            normal_{{s}},
+                            camera.view
                         );
 
                         // Compute material color with proper mipmapping
@@ -344,6 +346,8 @@ fn main(
                 triangle_indices,
                 attribute_data_offset,
                 vertex_attribute_stride,
+                world_normal,
+                camera.view
             );
 
             let material_color = pbr_get_material_color_grad(
@@ -405,43 +409,68 @@ fn main(
                     // Show gradient magnitude
                     let grad_mag = max(length(ddx_uv), length(ddy_uv));
 
-                    // COLOR MODE 1: Show mip level as color
-                    // Uncomment this block to see mip levels
+                    // Visualize raw LOD as a smooth color gradient
+                    // This shows the exact fractional LOD value that hardware uses
+                    //
+                    // Color mapping (smooth gradient):
+                    //   LOD 0.0 → Blue (sharpest)
+                    //   LOD 1.0 → Cyan
+                    //   LOD 2.0 → Green
+                    //   LOD 3.0 → Yellow
+                    //   LOD 4.0 → Orange
+                    //   LOD 5.0+ → Red (blurriest)
 
-                    if (mip_level < 0.5) {
-                        color = vec3<f32>(0.0, 0.0, 1.0); // Blue = mip 0
-                    } else if (mip_level < 1.5) {
-                        color = vec3<f32>(0.0, 1.0, 0.0); // Green = mip 1
-                    } else if (mip_level < 2.5) {
-                        color = vec3<f32>(0.5, 1.0, 0.0); // Yellow-green = mip 2
-                    } else if (mip_level < 3.5) {
-                        color = vec3<f32>(1.0, 1.0, 0.0); // Yellow = mip 3
-                    } else if (mip_level < 4.5) {
-                        color = vec3<f32>(1.0, 0.5, 0.0); // Orange = mip 4
+                    let lod_clamped = clamp(mip_level, 0.0, 5.0);
+                    let lod_normalized = lod_clamped / 5.0;  // Map [0, 5] to [0, 1]
+
+                    // Create smooth gradient: Blue → Cyan → Green → Yellow → Red
+                    // Using a heatmap-style color ramp
+                    if (lod_clamped < 1.0) {
+                        // 0.0-1.0: Blue → Cyan
+                        let t = lod_clamped;
+                        color = vec3<f32>(0.0, t, 1.0);
+                    } else if (lod_clamped < 2.0) {
+                        // 1.0-2.0: Cyan → Green
+                        let t = lod_clamped - 1.0;
+                        color = vec3<f32>(0.0, 1.0, 1.0 - t);
+                    } else if (lod_clamped < 3.0) {
+                        // 2.0-3.0: Green → Yellow
+                        let t = lod_clamped - 2.0;
+                        color = vec3<f32>(t, 1.0, 0.0);
+                    } else if (lod_clamped < 4.0) {
+                        // 3.0-4.0: Yellow → Orange
+                        let t = lod_clamped - 3.0;
+                        color = vec3<f32>(1.0, 1.0 - 0.5 * t, 0.0);
                     } else {
-                        color = vec3<f32>(1.0, 0.0, 0.0); // Red = mip 5+
+                        // 4.0-5.0: Orange → Red
+                        let t = lod_clamped - 4.0;
+                        color = vec3<f32>(1.0, 0.5 - 0.5 * t, 0.0);
                     }
 
 
-                    // COLOR MODE 2: Show UV gradients vs barycentric gradients
-                    // Uncomment to debug which stage has the problem
-                    /*
-                    let bary_derivs_data = textureLoad(barycentric_derivatives_tex, coords, 0);
-                    let bary_mag = max(
-                        length(vec2<f32>(bary_derivs_data.x, bary_derivs_data.y)),
-                        length(vec2<f32>(bary_derivs_data.z, bary_derivs_data.w))
-                    );
-                    let uv_grad_mag = max(length(ddx_uv), length(ddy_uv));
+                    // COLOR MODE 2: Show orthographic correction effect
+                    // Visualize how surface tilt affects anisotropic filtering
+                    let packed_nt = textureLoad(normal_tangent_tex, coords, 0);
+                    let tbn_debug = unpack_normal_tangent(packed_nt);
+                    let world_normal_debug = tbn_debug.N;
 
-                    // Red = barycentric gradient magnitude (scaled)
-                    // Green = UV gradient magnitude (scaled)
-                    // Blue = ratio (should be proportional to UV range)
+                    // Extract view direction
+                    let view_forward = -normalize(vec3<f32>(camera.view[0][2], camera.view[1][2], camera.view[2][2]));
+                    let n_dot_v = abs(dot(world_normal_debug, view_forward));
+
+                    // UV derivative magnitudes (with orthographic correction applied)
+                    let ddx_mag = length(ddx_uv);
+                    let ddy_mag = length(ddy_uv);
+                    let uv_ratio = max(ddx_mag, ddy_mag) / max(min(ddx_mag, ddy_mag), 0.0001);
+
+                    // Red channel: Surface tilt (0 = perpendicular/edge-on, 1 = face-on)
+                    // Green channel: UV anisotropy ratio (should be HIGH now on tilted surfaces!)
+                    // Blue channel: Inverse tilt (high = needs correction)
                     color = vec3<f32>(
-                        bary_mag * 100.0,
-                        uv_grad_mag * 100.0,
-                        min(uv_grad_mag / max(bary_mag, 0.0001), 1.0)
+                        n_dot_v,                        // Face-on = bright red
+                        min(uv_ratio / 4.0, 1.0),      // Anisotropy = green
+                        1.0 - n_dot_v                   // Edge-on = bright blue
                     );
-                    */
 
                     // COLOR MODE 3: Show both gradients and mip level side-by-side
                     // Uncomment to use this mode instead
@@ -577,6 +606,8 @@ fn main(
                             triangle_indices_{{s}},
                             attribute_data_offset_{{s}},
                             vertex_attribute_stride_{{s}},
+                            normal_{{s}},
+                            camera.view
                         );
 
                         // Compute material color with proper mipmapping
