@@ -1,4 +1,8 @@
 # Texture Pool instead of Atlas
+  - pre-convert srgb textures to linear on load
+    - TO_BE_CONTINUED.md
+  - fix TextureSettings test, text is unreadable (mipmap picking issue?)
+  - fix EmissiveStrength text, textures aren't appearing on some faces
 # Fix perspective projection skybox
 # discard and single-sample the non-depth targets in the geometry pass
 

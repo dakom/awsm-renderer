@@ -6,19 +6,19 @@
 // 1. Transform triangle vertices to screen space
 // 2. Compute barycentric derivatives analytically: d(bary)/d(screen)
 //    - This has been verified to match hardware dFdx/dFdy
-// 3. Apply chain rule: d(UV)/d(screen) = d(UV)/d(bary) × d(bary)/d(screen)
-// 4. Scale by atlas uv_scale transform
+// 3. Handle texture address modes (repeat/mirror) by unwrapping UVs:
+//    - For repeat mode: make UVs continuous across 0→1 boundaries
+//    - For mirror mode: convert to texture space, then unwrap
+//    - This fixes mip selection when UVs cross wrapping boundaries
+// 4. Apply chain rule: d(UV)/d(screen) = d(UV)/d(bary) × d(bary)/d(screen)
 // 5. Pass gradients to textureSampleGrad for hardware mip selection
 //
 // Benefits:
 // - Hardware handles mip selection (anisotropic filtering, etc.)
 // - No manual LOD calculation needed
 // - No triangle seams
+// - Correct gradients even when UVs wrap/repeat
 // - Mathematically correct gradient computation
-//
-// Note: There appears to be a systematic 4x gradient magnitude discrepancy between
-// this geometric calculation and what produces optimal mip selection. The root cause
-// is under investigation - see DEBUG_MIPMAPS.md for current status and next steps.
 // ============================================================================
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,6 +32,17 @@ struct UvDerivs {
 struct UV3 { u0: vec2<f32>, u1: vec2<f32>, u2: vec2<f32> }
 
 struct MirrorLocal { uv: vec2<f32>, slope: vec2<f32> } // slope per axis is ±1
+
+// Convert a UV coordinate from mirror-repeat space to texture space [0,1)
+// This handles the reflection: [0,1) maps to [0,1), [1,2) maps to [1,0), [2,3) maps to [0,1), etc.
+fn mirror_to_texture_space(uv: f32) -> f32 {
+    let k = floor(uv);
+    let frac = uv - k;
+    let is_odd = (i32(k) & 1) != 0;
+    // In odd segments, reflect: texture_coord = 1.0 - frac
+    // In even segments, pass through: texture_coord = frac
+    return select(frac, 1.0 - frac, is_odd);
+}
 
 // Unwrap aX relative to a0 for repeat textures
 // This makes vertices continuous when they cross the 0→1 boundary,
@@ -63,6 +74,14 @@ fn unwrap_repeat(u0: vec2<f32>, u1: vec2<f32>, u2: vec2<f32>) -> UV3 {
         vec2<f32>(unwrap_repeat_axis(u0.x, u2.x), unwrap_repeat_axis(u0.y, u2.y))
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Alternative mirror mode approach (not currently used, kept for reference)
+// ─────────────────────────────────────────────────────────────────────────────
+// These functions create a continuous "sawtooth" space for mirror coordinates,
+// but require slope adjustment which complicates the implementation.
+// Current approach uses mirror_to_texture_space() instead, which is simpler.
+
 fn mirror_linearize_axis(a: f32) -> vec2<f32> {
     // Returns (u_lin, slope)
     let k = floor(a);
@@ -97,33 +116,70 @@ fn get_uv_derivatives(
     let uv1 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, tri.y, vertex_stride);
     let uv2 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, tri.z, vertex_stride);
 
-    let db1dx = bary_derivs.x;
-    let db1dy = bary_derivs.y;
-    let db2dx = bary_derivs.z;
-    let db2dy = bary_derivs.w;
+    // Barycentric derivatives from geometry pass
+    // bary_derivs contains: (d(bary.x)/dx, d(bary.x)/dy, d(bary.y)/dx, d(bary.y)/dy)
+    // Where bary is the vec2 barycentric coordinate being interpolated
+    // The full vec3 barycentric is: (bary.x, bary.y, 1 - bary.x - bary.y)
+    let dAlphaDx = bary_derivs.x;  // d(bary.x)/dx
+    let dAlphaDy = bary_derivs.y;  // d(bary.x)/dy
+    let dBetaDx = bary_derivs.z;   // d(bary.y)/dx
+    let dBetaDy = bary_derivs.w;   // d(bary.y)/dy
 
     // If nearly zero derivatives, short-circuit (selects base mip).
-    let m = abs(db1dx) + abs(db1dy) + abs(db2dx) + abs(db2dy);
+    let m = abs(dAlphaDx) + abs(dAlphaDy) + abs(dBetaDx) + abs(dBetaDy);
     if (m < 1e-20) {
         return UvDerivs(vec2<f32>(0.0), vec2<f32>(0.0));
     }
 
-    // Perspective barycentrics: b0 = 1 - b1 - b2
-    let db0dx = -db1dx - db2dx;
-    let db0dy = -db1dy - db2dy;
+    // Third barycentric component derivative: d(1 - alpha - beta)/d(x or y)
+    let dGammaDx = -dAlphaDx - dBetaDx;
+    let dGammaDy = -dAlphaDy - dBetaDy;
 
     // Make the THREE vertex UVs locally continuous per axis based on the address mode.
     var U0 = uv0;
     var U1 = uv1;
     var U2 = uv2;
 
+    // Address mode constants (matching WebGPU GPUAddressMode enum values)
+    const ADDR_MODE_CLAMP_TO_EDGE: u32 = 0u;
+    const ADDR_MODE_REPEAT: u32 = 1u;
+    const ADDR_MODE_MIRROR_REPEAT: u32 = 2u;
 
-    // Chain rule with the unwrapped / linearized UVs
-    var dudx = U0.x * db0dx + U1.x * db1dx + U2.x * db2dx;
-    var dvdx = U0.y * db0dx + U1.y * db1dx + U2.y * db2dx;
+    // For mirror mode: convert UVs from mirror space to texture space [0,1)
+    // This maps mirrored coordinates to their actual texture locations
+    // Example: UV=1.1 (mirrored) becomes 0.9 (texture space)
+    if (tex_info.address_mode_u == ADDR_MODE_MIRROR_REPEAT) {
+        U0.x = mirror_to_texture_space(U0.x);
+        U1.x = mirror_to_texture_space(U1.x);
+        U2.x = mirror_to_texture_space(U2.x);
+    }
+    if (tex_info.address_mode_v == ADDR_MODE_MIRROR_REPEAT) {
+        U0.y = mirror_to_texture_space(U0.y);
+        U1.y = mirror_to_texture_space(U1.y);
+        U2.y = mirror_to_texture_space(U2.y);
+    }
 
-    var dudy = U0.x * db0dy + U1.x * db1dy + U2.x * db2dy;
-    var dvdy = U0.y * db0dy + U1.y * db1dy + U2.y * db2dy;
+    // For repeat/mirror modes: unwrap UVs to make them continuous across 0→1 boundaries
+    // This fixes derivatives when UVs wrap (e.g., from 0.99 to 0.01)
+    // Without unwrapping: gradient would be -0.98 (huge!)
+    // With unwrapping: gradient becomes 0.02 (correct!)
+    if (tex_info.address_mode_u == ADDR_MODE_REPEAT || tex_info.address_mode_u == ADDR_MODE_MIRROR_REPEAT) {
+        U1.x = unwrap_repeat_axis(U0.x, U1.x);
+        U2.x = unwrap_repeat_axis(U0.x, U2.x);
+    }
+    if (tex_info.address_mode_v == ADDR_MODE_REPEAT || tex_info.address_mode_v == ADDR_MODE_MIRROR_REPEAT) {
+        U1.y = unwrap_repeat_axis(U0.y, U1.y);
+        U2.y = unwrap_repeat_axis(U0.y, U2.y);
+    }
+
+    // Chain rule: d(UV)/d(screen) = d(UV)/d(bary) × d(bary)/d(screen)
+    // UV = alpha*uv0 + beta*uv1 + gamma*uv2
+    // So: d(UV)/dx = uv0*dAlpha/dx + uv1*dBeta/dx + uv2*dGamma/dx
+    var dudx = U0.x * dAlphaDx + U1.x * dBetaDx + U2.x * dGammaDx;
+    var dvdx = U0.y * dAlphaDx + U1.y * dBetaDx + U2.y * dGammaDx;
+
+    var dudy = U0.x * dAlphaDy + U1.x * dBetaDy + U2.x * dGammaDy;
+    var dvdy = U0.y * dAlphaDy + U1.y * dBetaDy + U2.y * dGammaDy;
 
     // NaN/Inf guard (don’t clamp magnitudes)
     let ok = (dudx == dudx) && (dudy == dudy) && (dvdx == dvdx) && (dvdy == dvdy);

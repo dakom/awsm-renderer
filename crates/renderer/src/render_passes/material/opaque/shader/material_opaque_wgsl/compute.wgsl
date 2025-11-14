@@ -393,13 +393,13 @@ fn main(
                     // Get the actual gradients being used
                     let ddx_uv = gradients.base_color.ddx;
                     let ddy_uv = gradients.base_color.ddy;
+                    let tex_info = pbr_material.base_color_tex_info;
 
-                    // Calculate ACTUAL atlas mip level (what hardware selects)
-                    let atlas_mip = debug_calculate_atlas_mip_level(
+                    // Calculate mip level that hardware will select
+                    let mip_level = debug_calculate_mip_level(
                         ddx_uv,
                         ddy_uv,
-                        pbr_material.base_color_tex_info.grad_scale,
-                        pbr_material.base_color_tex_info.atlas_index
+                        tex_info.size
                     );
 
                     // Show gradient magnitude
@@ -407,32 +407,41 @@ fn main(
 
                     // COLOR MODE 1: Show mip level as color
                     // Uncomment this block to see mip levels
-                    /*
-                    if (atlas_mip < 0.5) {
-                        color = vec3<f32>(0.0, 0.0, 1.0); // Blue = atlas mip 0
-                    } else if (atlas_mip < 1.5) {
-                        color = vec3<f32>(0.0, 1.0, 0.0); // Green = atlas mip 1
-                    } else if (atlas_mip < 2.5) {
-                        color = vec3<f32>(0.5, 1.0, 0.0); // Yellow-green = atlas mip 2
-                    } else if (atlas_mip < 3.5) {
-                        color = vec3<f32>(1.0, 1.0, 0.0); // Yellow = atlas mip 3
-                    } else if (atlas_mip < 4.5) {
-                        color = vec3<f32>(1.0, 0.5, 0.0); // Orange = atlas mip 4
-                    } else {
-                        color = vec3<f32>(1.0, 0.0, 0.0); // Red = atlas mip 5+
-                    }
-                    */
 
-                    // COLOR MODE 2: Show raw gradient magnitudes
-                    // Scale gradients to visible range - adjust multiplier as needed
-                    // For a 1024x1024 texture at 1:1 pixel ratio, expect ddx/ddy ~ 1/1024 = 0.001
-                    // Multiply by 100 to make 0.001 appear as 0.1 brightness
-                    let scale = 100.0;
-                    color = vec3<f32>(
-                        length(ddx_uv) * scale,  // Red channel = ddx magnitude
-                        length(ddy_uv) * scale,  // Green channel = ddy magnitude
-                        atlas_mip / 5.0          // Blue channel = mip level (normalized to 0-5 range)
+                    if (mip_level < 0.5) {
+                        color = vec3<f32>(0.0, 0.0, 1.0); // Blue = mip 0
+                    } else if (mip_level < 1.5) {
+                        color = vec3<f32>(0.0, 1.0, 0.0); // Green = mip 1
+                    } else if (mip_level < 2.5) {
+                        color = vec3<f32>(0.5, 1.0, 0.0); // Yellow-green = mip 2
+                    } else if (mip_level < 3.5) {
+                        color = vec3<f32>(1.0, 1.0, 0.0); // Yellow = mip 3
+                    } else if (mip_level < 4.5) {
+                        color = vec3<f32>(1.0, 0.5, 0.0); // Orange = mip 4
+                    } else {
+                        color = vec3<f32>(1.0, 0.0, 0.0); // Red = mip 5+
+                    }
+
+
+                    // COLOR MODE 2: Show UV gradients vs barycentric gradients
+                    // Uncomment to debug which stage has the problem
+                    /*
+                    let bary_derivs_data = textureLoad(barycentric_derivatives_tex, coords, 0);
+                    let bary_mag = max(
+                        length(vec2<f32>(bary_derivs_data.x, bary_derivs_data.y)),
+                        length(vec2<f32>(bary_derivs_data.z, bary_derivs_data.w))
                     );
+                    let uv_grad_mag = max(length(ddx_uv), length(ddy_uv));
+
+                    // Red = barycentric gradient magnitude (scaled)
+                    // Green = UV gradient magnitude (scaled)
+                    // Blue = ratio (should be proportional to UV range)
+                    color = vec3<f32>(
+                        bary_mag * 100.0,
+                        uv_grad_mag * 100.0,
+                        min(uv_grad_mag / max(bary_mag, 0.0001), 1.0)
+                    );
+                    */
 
                     // COLOR MODE 3: Show both gradients and mip level side-by-side
                     // Uncomment to use this mode instead
@@ -445,15 +454,15 @@ fn main(
                         color = vec3<f32>(brightness);
                     } else {
                         // Mip level color mode
-                        if (atlas_mip < 0.5) {
+                        if (mip_level < 0.5) {
                             color = vec3<f32>(0.0, 0.0, 1.0);
-                        } else if (atlas_mip < 1.5) {
+                        } else if (mip_level < 1.5) {
                             color = vec3<f32>(0.0, 1.0, 0.0);
-                        } else if (atlas_mip < 2.5) {
+                        } else if (mip_level < 2.5) {
                             color = vec3<f32>(0.5, 1.0, 0.0);
-                        } else if (atlas_mip < 3.5) {
+                        } else if (mip_level < 3.5) {
                             color = vec3<f32>(1.0, 1.0, 0.0);
-                        } else if (atlas_mip < 4.5) {
+                        } else if (mip_level < 4.5) {
                             color = vec3<f32>(1.0, 0.5, 0.0);
                         } else {
                             color = vec3<f32>(1.0, 0.0, 0.0);
