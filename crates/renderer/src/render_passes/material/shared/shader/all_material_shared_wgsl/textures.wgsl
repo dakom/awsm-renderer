@@ -13,7 +13,7 @@
 // - 20 bits for layer_index => up to 1,048,576 layers (way above spec limits).
 // - 8 bits for uv_set_index => up to 256 UV sets (you'll use < 8).
 // - 24 bits for sampler_index => up to ~16M samplers (effectively unlimited).
-// - flags byte: bit 0 = has mipmaps, bit 1 = sRGB; rest reserved.
+// - flags byte: bit 0 = has mipmaps; rest reserved.
 struct TextureInfoRaw {
     // packed: width (low 16 bits), height (high 16 bits)
     size: u32,
@@ -31,8 +31,7 @@ struct TextureInfoRaw {
     // packed:
     //   bits  0..7  : flags
     //                  bit 0 -> has mipmaps
-    //                  bit 1 -> is sRGB
-    //                  bits 2..7 reserved
+    //                  bits 1..7 reserved
     //   bits  8..15 : address_mode_u
     //   bits 16..23 : address_mode_v
     //   bits 24..31 : padding / reserved
@@ -46,7 +45,6 @@ struct TextureInfo {
     uv_set_index: u32,
     sampler_index: u32,
     mipmapped: bool,
-    srgb: bool,
     address_mode_u: u32,
     address_mode_v: u32,
 };
@@ -67,7 +65,6 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
     // flags + address modes
     let flags: u32          = raw.extra & 0xFFu;                // bits 0..7
     let mipmapped: bool     = (flags & 0x1u) != 0u;
-    let srgb: bool          = (flags & 0x2u) != 0u;
 
     let address_mode_u: u32 = (raw.extra >> 8u)  & 0xFFu;       // bits 8..15
     let address_mode_v: u32 = (raw.extra >> 16u) & 0xFFu;       // bits 16..23
@@ -79,7 +76,6 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
         uv_set_index,
         sampler_index,
         mipmapped,
-        srgb,
         address_mode_u,
         address_mode_v,
     );
@@ -150,11 +146,6 @@ fn _texture_pool_sample_grad(
         }
     }
 
-    // Convert sRGB to linear if needed
-    if info.srgb {
-        color = vec4<f32>(srgb_to_linear(color.rgb), color.a);
-    }
-
     return color;
 }
 
@@ -197,11 +188,6 @@ fn _texture_pool_sample_no_mips(
         default: {
             color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
         }
-    }
-
-    // Convert sRGB to linear if needed
-    if info.srgb {
-        color = vec4<f32>(srgb_to_linear(color.rgb), color.a);
     }
 
     return color;

@@ -445,19 +445,11 @@ fn pack_texture_info_raw<ID>(
     // --- extra: flags (8) + addr_u (8) + addr_v (8) + padding (8) ---
     // flags:
     //   bit 0: has mipmaps
-    //   bit 1: sRGB
-    let color = &entry_info.color;
-
     let has_mipmaps = array.mipmap;
-
-    let srgb = color.srgb_encoded;
 
     let mut flags: u32 = 0;
     if has_mipmaps {
         flags |= 1 << 0;
-    }
-    if srgb {
-        flags |= 1 << 1;
     }
 
     debug_assert!(

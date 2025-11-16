@@ -9,11 +9,12 @@ use std::{
 
 use crate::texture::TextureUsage;
 use crate::{
-    command::copy_texture::Origin3d,
+    command::copy_texture::{Origin3d, TexelCopyTextureInfo},
     error::{AwsmCoreError, Result},
     image::{CopyExternalImageDestInfo, ImageData},
     renderer::AwsmRendererWebGpu,
     texture::{
+        convert_srgb::convert_srgb_to_linear,
         mipmap::{calculate_mipmap_levels, generate_mipmaps, MipmapTextureKind},
         Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureFormatKey,
         TextureViewDescriptor, TextureViewDimension,
@@ -187,26 +188,91 @@ impl<ID> TexturePoolArray<ID> {
                 Extent3d::new(self.width, Some(self.height), Some(layers)),
                 texture_usage,
             )
+            .with_label("Texture Pool Array Dest")
             .with_mip_level_count(mipmap_levels)
             .with_dimension(TextureDimension::N2d)
             .into(),
         )?;
 
         let mut mipmap_texture_kinds: Vec<MipmapTextureKind> = Vec::new();
-        // Write to mip level 0 of each layer
-        for (index, (_, image, color)) in self.images.iter().enumerate() {
-            let source = image.source_info(None, None)?;
 
-            let dest = CopyExternalImageDestInfo::new(&dest_tex)
-                .with_origin(Origin3d::new().with_z(index as u32))
+        // Staging textures usage flags
+        let staging_usage = TextureUsage::new()
+            .with_texture_binding()
+            .with_storage_binding()
+            .with_copy_dst()
+            .with_copy_src()
+            .with_render_attachment();
+
+        // Process each layer: copy to staging, optionally convert, then copy to dest array
+        for (index, (_, image, color)) in self.images.iter().enumerate() {
+            // Create fresh staging textures for this layer to avoid GPU race conditions
+            let staging_src = gpu.create_texture(
+                &TextureDescriptor::new(
+                    self.format,
+                    Extent3d::new(self.width, Some(self.height), Some(1)),
+                    staging_usage.clone(),
+                )
+                .with_label("Texture Pool Staging Src")
+                .with_dimension(TextureDimension::N2d)
+                .into(),
+            )?;
+
+            let staging_dst = gpu.create_texture(
+                &TextureDescriptor::new(
+                    self.format,
+                    Extent3d::new(self.width, Some(self.height), Some(1)),
+                    staging_usage.clone(),
+                )
+                .with_label("Texture Pool Staging Dst")
+                .with_dimension(TextureDimension::N2d)
+                .into(),
+            )?;
+
+            // Copy external image to staging_src (this is a queue operation)
+            let source = image.source_info(None, None)?;
+            let staging_dest = CopyExternalImageDestInfo::new(&staging_src)
                 .with_mip_level(0)
                 .with_premultiplied_alpha(image.premultiplied_alpha());
 
             gpu.copy_external_image_to_texture(
                 &source.into(),
-                &dest.into(),
+                &staging_dest.into(),
                 &Extent3d::new(self.width, Some(self.height), Some(1)).into(),
             )?;
+
+            // Create command encoder for this layer's operations
+            let layer_encoder = gpu.create_command_encoder(Some("Texture Pool Layer Upload"));
+
+            // Convert sRGB to linear if needed
+            let final_staging = if color.srgb_encoded {
+                convert_srgb_to_linear(gpu, &layer_encoder, &staging_src, &staging_dst, self.width, self.height)
+                    .await?;
+                &staging_dst
+            } else {
+                &staging_src
+            };
+
+            // Copy from staging to destination array layer
+            let src_info = TexelCopyTextureInfo::new(final_staging).with_mip_level(0);
+            let dst_info = TexelCopyTextureInfo::new(&dest_tex)
+                .with_mip_level(0)
+                .with_origin(Origin3d::new().with_z(index as u32));
+
+            layer_encoder.copy_texture_to_texture(
+                &src_info.into(),
+                &dst_info.into(),
+                &Extent3d::new(self.width, Some(self.height), Some(1)).into(),
+            )?;
+
+            // Submit this layer's operations
+            let layer_buffer = layer_encoder.finish();
+            gpu.submit_commands(&layer_buffer);
+
+            // Destroy staging textures for this layer
+            // GPU will keep them alive until commands complete
+            staging_src.destroy();
+            staging_dst.destroy();
 
             mipmap_texture_kinds.push(color.mipmap_kind);
         }
@@ -238,7 +304,6 @@ static TEXTURE_USAGE_MIPMAP: LazyLock<TextureUsage> = LazyLock::new(|| {
     TextureUsage::new()
         .with_storage_binding()
         .with_texture_binding()
-        .with_render_attachment()
         .with_copy_src()
         .with_copy_dst()
 });
@@ -248,12 +313,13 @@ static TEXTURE_USAGE_MIPMAP: LazyLock<TextureUsage> = LazyLock::new(|| {
     TextureUsage::new()
         .with_storage_binding()
         .with_texture_binding()
+        .with_copy_dst()
 });
 
 #[cfg(feature = "texture-export")]
 static TEXTURE_USAGE_NO_MIPMAP: LazyLock<TextureUsage> =
-    LazyLock::new(|| TextureUsage::new().with_storage_binding().with_copy_src());
+    LazyLock::new(|| TextureUsage::new().with_storage_binding().with_copy_src().with_copy_dst());
 
 #[cfg(not(feature = "texture-export"))]
 static TEXTURE_USAGE_NO_MIPMAP: LazyLock<TextureUsage> =
-    LazyLock::new(|| TextureUsage::new().with_storage_binding());
+    LazyLock::new(|| TextureUsage::new().with_storage_binding().with_copy_dst());

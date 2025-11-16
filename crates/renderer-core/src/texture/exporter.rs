@@ -162,7 +162,11 @@ impl AwsmRendererWebGpu {
 
         // 2. Create a destination buffer on the GPU to copy the texture data into.
         // The buffer must have MAP_READ usage to allow reading its data on the CPU.
-        let buffer_size = width * height * format_info.bytes_per_pixel;
+        // WebGPU requires bytes_per_row to be a multiple of 256 for copy_texture_to_buffer
+        let unpadded_bytes_per_row = width * format_info.bytes_per_pixel;
+        let padded_bytes_per_row = ((unpadded_bytes_per_row + 255) / 256) * 256;
+        let buffer_size = padded_bytes_per_row * height;
+
         let buffer_descriptor = BufferDescriptor::new(
             Some("Texture Exporter"),
             buffer_size as usize,
@@ -182,7 +186,7 @@ impl AwsmRendererWebGpu {
         }
 
         let image_copy_buffer = TexelCopyBufferInfo::new(&destination_buffer)
-            .with_bytes_per_row(width * format_info.bytes_per_pixel)
+            .with_bytes_per_row(padded_bytes_per_row)
             .with_rows_per_image(height);
 
         // always copying a single layer
@@ -208,7 +212,15 @@ impl AwsmRendererWebGpu {
         let array_buffer = destination_buffer
             .get_mapped_range()
             .map_err(AwsmCoreError::buffer_map_range)?;
-        let mut data: Vec<u8> = js_sys::Uint8Array::new(&array_buffer).to_vec();
+        let padded_data: Vec<u8> = js_sys::Uint8Array::new(&array_buffer).to_vec();
+
+        // Remove padding from each row to get the actual texture data
+        let mut data: Vec<u8> = Vec::with_capacity((unpadded_bytes_per_row * height) as usize);
+        for row in 0..height {
+            let row_start = (row * padded_bytes_per_row) as usize;
+            let row_end = row_start + unpadded_bytes_per_row as usize;
+            data.extend_from_slice(&padded_data[row_start..row_end]);
+        }
 
         // It's important to unmap the buffer once we're done with the data.
         destination_buffer.unmap();

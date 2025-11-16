@@ -6,6 +6,7 @@ pub mod exporter;
 pub mod texture_pool;
 
 pub mod clear;
+pub mod convert_srgb;
 pub mod mipmap;
 
 use wasm_bindgen::convert::IntoWasmAbi;

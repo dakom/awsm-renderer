@@ -12,14 +12,11 @@
 - load lights via KHR_lights_punctual
   - point, spot, directional
 
-- Megatexture tool/load
-
 - Support different kinds of Materials
   - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
   - unlit as example?
 
 - at this point can probably use for demos :)
-
 
 - Get started with light culling pass
   - research best practices
@@ -84,13 +81,13 @@ If it's supported here, corresponding core functionality is also supported
         - [ ] Spot
     - [ ]  more at https://github.com/KhronosGroup/glTF/blob/main/extensions/README.md#ratified-khronos-extensions
 - Materials
-    - [ ] PBR metallic-roughness
+    - [x] PBR metallic-roughness
         - [x] base color
         - [x] metallic
         - [x] roughness
         - [x] normal
-        - [ ] occlusion (need to test)
-        - [ ] emissive (need to test)
+        - [x] occlusion
+        - [x] emissive
     - [x] mipmaps
 - Lighting
     - [x] IBL
@@ -111,8 +108,6 @@ If it's supported here, corresponding core functionality is also supported
 ## Textures
 - [x] 2D textures
 - [x] Mipmaps (port https://github.com/JolifantoBambla/webgpu-spd)
-- [ ] Tool to precreate megatextures
-- [ ] Load precreated megatextures
 
 ## Skybox
 - [x] load ktf
