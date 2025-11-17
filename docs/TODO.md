@@ -1,6 +1,4 @@
-# Texture Pool instead of Atlas
-  - pre-convert srgb textures to linear on load
-    - TO_BE_CONTINUED.md
+# mipmap in texture settings on one checkmark is shifty
 # discard and single-sample the non-depth targets in the geometry pass
   -  "I've completed Phase 1 shader simplification. Please read MULTISAMPLE_OPTIMIZATION.md and PHASE1_COMPLETE.md, then execute Phase 2."
 

@@ -227,8 +227,6 @@ impl GltfTextureInfo {
                         }
                     }
 
-                    tracing::info!("srgb_encoded: {}", srgb_encoded);
-
                     TextureColorInfo {
                         srgb_encoded,
                         mipmap_kind,

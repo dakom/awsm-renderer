@@ -28,6 +28,8 @@ tracing = { workspace = true}
 web-sys = { workspace = true}
 thiserror = { workspace = true}
 ordered-float = { workspace = true}
+indexmap = { workspace = true}
+
 # optional deps
 gloo-net = {workspace = true, optional = true}
 exr = {workspace = true, optional = true}

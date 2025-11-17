@@ -2,10 +2,9 @@
 pub mod report;
 
 use std::sync::LazyLock;
-use std::{
-    collections::{BTreeMap, HashMap},
-    hash::Hash,
-};
+use std::{collections::HashMap, hash::Hash};
+
+use indexmap::IndexMap;
 
 use crate::texture::TextureUsage;
 use crate::{
@@ -22,7 +21,7 @@ use crate::{
 };
 
 pub struct TexturePool<ID> {
-    arrays: BTreeMap<TexturePoolArrayKey, TexturePoolArray<ID>>,
+    arrays: IndexMap<TexturePoolArrayKey, TexturePoolArray<ID>>,
     id_to_array_key: HashMap<ID, TexturePoolArrayKey>,
 }
 
@@ -60,7 +59,7 @@ struct TexturePoolArrayKey {
 impl<ID: Eq + Hash + Clone> TexturePool<ID> {
     pub fn new() -> Self {
         Self {
-            arrays: BTreeMap::new(),
+            arrays: IndexMap::new(),
             id_to_array_key: HashMap::new(),
         }
     }
@@ -246,8 +245,15 @@ impl<ID> TexturePoolArray<ID> {
 
             // Convert sRGB to linear if needed
             let final_staging = if color.srgb_encoded {
-                convert_srgb_to_linear(gpu, &layer_encoder, &staging_src, &staging_dst, self.width, self.height)
-                    .await?;
+                convert_srgb_to_linear(
+                    gpu,
+                    &layer_encoder,
+                    &staging_src,
+                    &staging_dst,
+                    self.width,
+                    self.height,
+                )
+                .await?;
                 &staging_dst
             } else {
                 &staging_src
@@ -317,8 +323,12 @@ static TEXTURE_USAGE_MIPMAP: LazyLock<TextureUsage> = LazyLock::new(|| {
 });
 
 #[cfg(feature = "texture-export")]
-static TEXTURE_USAGE_NO_MIPMAP: LazyLock<TextureUsage> =
-    LazyLock::new(|| TextureUsage::new().with_storage_binding().with_copy_src().with_copy_dst());
+static TEXTURE_USAGE_NO_MIPMAP: LazyLock<TextureUsage> = LazyLock::new(|| {
+    TextureUsage::new()
+        .with_storage_binding()
+        .with_copy_src()
+        .with_copy_dst()
+});
 
 #[cfg(not(feature = "texture-export"))]
 static TEXTURE_USAGE_NO_MIPMAP: LazyLock<TextureUsage> =
