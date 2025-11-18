@@ -1,4 +1,7 @@
-# mipmap in texture settings on one checkmark is shifty
+# khr_texture_transform support
+
+# conditionally compile mipmap vs. non-mipmap code in shaders (textures, material_color, etc.)
+
 # discard and single-sample the non-depth targets in the geometry pass
   -  "I've completed Phase 1 shader simplification. Please read MULTISAMPLE_OPTIMIZATION.md and PHASE1_COMPLETE.md, then execute Phase 2."
 
@@ -6,10 +9,6 @@
 - like opaque
 - cutoff
 - complete getting alpha blend mode working again
-
-# Do DEBUG_MIPMAPS.md
-
-
 
 ------
 

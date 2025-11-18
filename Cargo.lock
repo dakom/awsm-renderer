@@ -82,6 +82,7 @@ dependencies = [
  "glam",
  "gloo-net",
  "gltf",
+ "indexmap",
  "ordered-float",
  "slotmap",
  "strum",

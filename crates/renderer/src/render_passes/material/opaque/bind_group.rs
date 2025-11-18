@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::collections::BTreeSet;
 
 use awsm_renderer_core::bind_groups::{
     self, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutResource, BindGroupResource,
@@ -10,6 +9,7 @@ use awsm_renderer_core::buffers::BufferBinding;
 use awsm_renderer_core::error::AwsmCoreError;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use awsm_renderer_core::texture::{self, TextureSampleType, TextureViewDimension};
+use indexmap::IndexSet;
 
 use crate::bind_group_layout::{BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry};
 use crate::bind_groups::{AwsmBindGroupError, BindGroupRecreateContext};
@@ -31,7 +31,7 @@ pub struct MaterialOpaqueBindGroups {
     pub texture_pool_textures_bind_group_layout_key: BindGroupLayoutKey,
     pub texture_pool_samplers_bind_group_layout_key: BindGroupLayoutKey,
     pub texture_pool_arrays_len: u32,
-    pub texture_pool_sampler_keys: BTreeSet<SamplerKey>,
+    pub texture_pool_sampler_keys: IndexSet<SamplerKey>,
     // this is set via `recreate` mechanism
     _main_bind_group: Option<web_sys::GpuBindGroup>,
     _lights_bind_group: Option<web_sys::GpuBindGroup>,
@@ -392,7 +392,7 @@ struct TexturePoolDeps {
     pub texture_bind_group_layout_key: BindGroupLayoutKey,
     pub sampler_bind_group_layout_key: BindGroupLayoutKey,
     pub texture_arrays_len: u32,
-    pub texture_sampler_keys: BTreeSet<SamplerKey>,
+    pub texture_sampler_keys: IndexSet<SamplerKey>,
 }
 
 impl TexturePoolDeps {

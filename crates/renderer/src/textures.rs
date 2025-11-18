@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use awsm_renderer_core::{
     compare::CompareFunction,
@@ -13,6 +13,7 @@ use awsm_renderer_core::{
         TextureFormat, TextureViewDescriptor,
     },
 };
+use indexmap::IndexSet;
 use ordered_float::OrderedFloat;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use thiserror::Error;
@@ -97,7 +98,7 @@ impl AwsmRenderer {
 
 pub struct Textures {
     pub pool: TexturePool<TextureKey>,
-    pub pool_sampler_set: BTreeSet<SamplerKey>,
+    pub pool_sampler_set: IndexSet<SamplerKey>,
     pool_textures: SlotMap<TextureKey, TexturePoolEntryInfo<TextureKey>>,
     cubemaps: SlotMap<CubemapTextureKey, web_sys::GpuTexture>,
     samplers: SlotMap<SamplerKey, web_sys::GpuSampler>,
@@ -156,7 +157,7 @@ impl Textures {
 
         Ok(Self {
             pool: TexturePool::new(),
-            pool_sampler_set: BTreeSet::new(),
+            pool_sampler_set: IndexSet::new(),
             pool_textures: SlotMap::with_key(),
             cubemaps: SlotMap::with_key(),
             texture_samplers: SecondaryMap::new(),

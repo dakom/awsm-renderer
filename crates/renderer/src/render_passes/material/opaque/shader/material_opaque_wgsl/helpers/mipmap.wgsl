@@ -11,48 +11,22 @@
 //    - For mirror mode: convert to texture space, then unwrap
 //    - This fixes mip selection when UVs cross wrapping boundaries
 // 4. Apply chain rule: d(UV)/d(screen) = d(UV)/d(bary) × d(bary)/d(screen)
-// 5. Apply orthographic projection correction for anisotropic filtering
-// 6. Pass gradients to textureSampleGrad for hardware mip selection
+// 5. Pass gradients to textureSampleGrad for hardware mip selection
 //
 // Benefits:
 // - Hardware handles mip selection (anisotropic filtering, etc.)
 // - No manual LOD calculation needed
 // - No triangle seams
 // - Correct gradients even when UVs wrap/repeat
-// - Orthographic projection gets proper anisotropic filtering on tilted surfaces
 // - Mathematically correct gradient computation
 // ============================================================================
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Orthographic Anisotropic Filtering Configuration
+// Orthographic Anisotropic Filtering Configuration - REMOVED
 // ─────────────────────────────────────────────────────────────────────────────
-// With orthographic projection, tilted surfaces don't get foreshortened naturally,
-// so we need to manually scale UV gradients based on surface tilt to enable
-// anisotropic filtering. These constants control that behavior.
-
-// Angle threshold for applying correction (n_dot_v = cos(angle))
-// - 0.95 = ~18° tilt (current default - balanced)
-// - 0.98 = ~11° tilt (more aggressive, starts correction earlier)
-// - 0.99 = ~8° tilt (very aggressive, may over-blur face-on surfaces)
-// - 0.90 = ~26° tilt (conservative, only corrects steep angles)
-const ORTHO_ANISO_THRESHOLD: f32 = 0.95;
-
-// Minimum n_dot_v clamp to prevent infinite scaling at edge-on angles
-// This determines the maximum anisotropic scale factor = 1.0 / ORTHO_ANISO_MIN_NDOTV
-// - 0.05 = 20x max scale (current default - safe)
-// - 0.02 = 50x max scale (more aggressive, better at grazing angles)
-// - 0.01 = 100x max scale (very aggressive, may cause artifacts)
-// - 0.10 = 10x max scale (conservative, may under-filter steep angles)
-const ORTHO_ANISO_MIN_NDOTV: f32 = 0.05;
-
-// Cross-gradient scale factor (0.0 to 1.0)
-// When one gradient is scaled, apply this fraction to the perpendicular gradient
-// - 0.3 = 30% (current default - handles slightly misaligned UVs)
-// - 0.5 = 50% (more aggressive, better for rotated UV layouts)
-// - 0.1 = 10% (conservative, assumes UVs perfectly aligned with geometry)
-// - 0.0 = none (only scale the primary gradient, may cause artifacts)
-const ORTHO_ANISO_CROSS_SCALE: f32 = 0.3;
-
+// These constants were removed as the orthographic correction was causing more
+// problems than it solved. Hardware anisotropic filtering should handle tilted
+// surfaces automatically.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -218,57 +192,18 @@ fn get_uv_derivatives(
     var dvdy = U0.y * dAlphaDy + U1.y * dBetaDy + U2.y * dGammaDy;
 
     // ========================================================================
-    // Orthographic projection correction for anisotropic filtering
+    // Orthographic projection correction - REMOVED
     // ========================================================================
-    // Problem: With orthographic projection, barycentric derivatives only capture
-    // 2D screen-space triangle shape, not 3D surface tilt. A tilted surface doesn't
-    // get foreshortened, so UV gradients remain isotropic even when viewing at angles.
+    // This was attempting to fix anisotropic filtering for orthographic cameras,
+    // but it causes problems:
+    // - Makes assumptions about camera projection
+    // - Causes blur or over-sharpening depending on settings
+    // - Looks bad with perspective projection
     //
-    // Solution: Use the surface normal and view direction to compute the true 3D tilt
-    // and scale the UV gradients to create proper anisotropic filtering.
-    //
-    // Extract view direction from view matrix (orthographic = constant direction)
-    // View matrix transforms world to view space, so -Z axis in view space = forward in world
-    let view_forward = -normalize(vec3<f32>(view_matrix[0][2], view_matrix[1][2], view_matrix[2][2]));
-
-    // Compute surface tilt: how much the surface faces away from the camera
-    let n_dot_v = abs(dot(world_normal, view_forward));
-
-    // When surface is tilted, one texture dimension gets "compressed" in screen space
-    // The compression factor is 1/cos(θ) where θ is the tilt angle
-    // For anisotropic filtering, we need to scale gradients by this factor
-    //
-    // At face-on (n_dot_v=1.0): no scaling needed
-    // At 45° tilt (n_dot_v=0.707): scale by √2 ≈ 1.414
-    // At 60° tilt (n_dot_v=0.5): scale by 2.0
-    // At edge-on (n_dot_v=0.0): scale approaches infinity (clamp to prevent issues)
-    let aniso_scale = 1.0 / max(n_dot_v, ORTHO_ANISO_MIN_NDOTV);
-
-    // Apply anisotropic scaling to BOTH gradient directions
-    // The larger gradient likely aligns with the tilt direction and needs more scaling
-    let ddx_vec = vec2<f32>(dudx, dvdx);
-    let ddy_vec = vec2<f32>(dudy, dvdy);
-    let ddx_mag = length(ddx_vec);
-    let ddy_mag = length(ddy_vec);
-
-    // Apply scaling when tilted
-    if (n_dot_v < ORTHO_ANISO_THRESHOLD) {
-        if (ddx_mag > ddy_mag) {
-            // X gradient is larger - scale it more aggressively
-            dudx *= aniso_scale;
-            dvdx *= aniso_scale;
-            // Also scale Y gradient slightly (surface isn't perfectly aligned)
-            dudy *= mix(1.0, aniso_scale, ORTHO_ANISO_CROSS_SCALE);
-            dvdy *= mix(1.0, aniso_scale, ORTHO_ANISO_CROSS_SCALE);
-        } else {
-            // Y gradient is larger - scale it more aggressively
-            dudy *= aniso_scale;
-            dvdy *= aniso_scale;
-            // Also scale X gradient slightly (surface isn't perfectly aligned)
-            dudx *= mix(1.0, aniso_scale, ORTHO_ANISO_CROSS_SCALE);
-            dvdx *= mix(1.0, aniso_scale, ORTHO_ANISO_CROSS_SCALE);
-        }
-    }
+    // Hardware anisotropic filtering (via max_anisotropy sampler setting) should
+    // handle this automatically when proper gradients are provided to textureSampleGrad.
+    // If thin lines still swim, that may be an inherent limitation of the compute
+    // shader gradient calculation approach.
 
     // LOD bias simulation: Scale gradients to shift mip selection
     // LOD = log2(rho) where rho is gradient magnitude
