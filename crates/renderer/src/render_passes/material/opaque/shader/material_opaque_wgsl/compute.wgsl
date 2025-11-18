@@ -1,59 +1,81 @@
 /*************** START color_space.wgsl ******************/
 {% include "all_material_shared_wgsl/color_space.wgsl" %}
 /*************** END color_space.wgsl ******************/
+
 /*************** START debug.wgsl ******************/
 {% include "all_material_shared_wgsl/debug.wgsl" %}
 /*************** END debug.wgsl ******************/
+
 /*************** START math.wgsl ******************/
 {% include "all_material_shared_wgsl/math.wgsl" %}
 /*************** END math.wgsl ******************/
+
 /*************** START mesh_meta.wgsl ******************/
 {% include "all_material_shared_wgsl/mesh_meta.wgsl" %}
 /*************** END mesh_meta.wgsl ******************/
+
 /*************** START projection.wgsl ******************/
 {% include "all_material_shared_wgsl/projection.wgsl" %}
 /*************** END projection.wgsl ******************/
+
 /*************** START textures.wgsl ******************/
 {% include "all_material_shared_wgsl/textures.wgsl" %}
 /*************** END textures.wgsl ******************/
+
 /*************** START vertex_color.wgsl ******************/
 {% include "all_material_shared_wgsl/vertex_color.wgsl" %}
 /*************** END vertex_color.wgsl ******************/
+
 /*************** START transforms.wgsl ******************/
 {% include "all_material_shared_wgsl/transforms.wgsl" %}
 /*************** END transforms.wgsl ******************/
+
 /*************** START positions.wgsl ******************/
 {% include "all_material_shared_wgsl/positions.wgsl" %}
 /*************** END positions.wgsl ******************/
+
 /*************** START lights.wgsl ******************/
 {% include "pbr_shared_wgsl/lighting/lights.wgsl" %}
 /*************** END lights.wgsl ******************/
+
 /*************** START brdf.wgsl ******************/
 {% include "pbr_shared_wgsl/lighting/brdf.wgsl" %}
 /*************** END brdf.wgsl ******************/
+
 /*************** START unlit.wgsl ******************/
 {% include "pbr_shared_wgsl/lighting/unlit.wgsl" %}
 /*************** END unlit.wgsl ******************/
+
 /*************** START material.wgsl ******************/
 {% include "pbr_shared_wgsl/material.wgsl" %}
 /*************** END material.wgsl ******************/
+
 /*************** START material_color.wgsl ******************/
 {% include "pbr_shared_wgsl/material_color.wgsl" %}
 /*************** END material_color.wgsl ******************/
+
+{% match mipmap %}
+    {% when MipmapMode::Gradient %}
 /*************** START mipmap.wgsl ******************/
 {% include "material_opaque_wgsl/helpers/mipmap.wgsl" %}
 /*************** END mipmap.wgsl ******************/
+    {% when _ %}
+{% endmatch %}
+
 /*************** START standard.wgsl ******************/
 {% include "material_opaque_wgsl/helpers/standard.wgsl" %}
 /*************** END standard.wgsl ******************/
+
 /*************** START skybox.wgsl ******************/
 {% include "material_opaque_wgsl/helpers/skybox.wgsl" %}
 /*************** END skybox.wgsl ******************/
+
 {% if multisampled_geometry %}
 /*************** START msaa.wgsl ******************/
 {% include "material_opaque_wgsl/helpers/msaa.wgsl" %}
 /*************** END msaa.wgsl ******************/
 {% endif %}
+
 {% if debug.any() %}
 /*************** START debug.wgsl ******************/
 {% include "material_opaque_wgsl/helpers/debug.wgsl" %}
@@ -220,31 +242,46 @@ fn main(
                         let os_verts_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_{{s}});
                         let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
 
-                        // Calculate proper gradients for this MSAA sample to enable mipmapping
-                        let gradients_{{s}} = pbr_get_gradients(
-                            barycentric_{{s}},
-                            bary_derivs_{{s}},
-                            pbr_material_{{s}},
-                            tri_indices_{{s}},
-                            attribute_data_offset_{{s}},
-                            vertex_attribute_stride_{{s}},
-                            normal_{{s}},
-                            camera.view
-                        );
+                        {% match mipmap %}
+                            {% when MipmapMode::Gradient %}
+                                // Calculate proper gradients for this MSAA sample to enable mipmapping
+                                let gradients_{{s}} = pbr_get_gradients(
+                                    barycentric_{{s}},
+                                    bary_derivs_{{s}},
+                                    pbr_material_{{s}},
+                                    tri_indices_{{s}},
+                                    attribute_data_offset_{{s}},
+                                    vertex_attribute_stride_{{s}},
+                                    normal_{{s}},
+                                    camera.view
+                                );
 
-                        // Compute material color with proper mipmapping
-                        let mat_color_{{s}} = pbr_get_material_color_grad(
-                            tri_indices_{{s}},
-                            attribute_data_offset_{{s}},
-                            tri_{{s}},
-                            pbr_material_{{s}},
-                            barycentric_{{s}},
-                            vertex_attribute_stride_{{s}},
-                            gradients_{{s}},
-                            normal_{{s}},
-                            transforms_{{s}}.world_normal,
-                            os_verts_{{s}}
-                        );
+                                // Compute material color with proper mipmapping
+                                let mat_color_{{s}} = pbr_get_material_color_grad(
+                                    tri_indices_{{s}},
+                                    attribute_data_offset_{{s}},
+                                    tri_{{s}},
+                                    pbr_material_{{s}},
+                                    barycentric_{{s}},
+                                    vertex_attribute_stride_{{s}},
+                                    gradients_{{s}},
+                                    normal_{{s}},
+                                    transforms_{{s}}.world_normal,
+                                    os_verts_{{s}}
+                                );
+                            {% when MipmapMode::None %}
+                                let mat_color_{{s}} = pbr_get_material_color_no_mips(
+                                    tri_indices_{{s}},
+                                    attribute_data_offset_{{s}},
+                                    tri_{{s}},
+                                    pbr_material_{{s}},
+                                    barycentric_{{s}},
+                                    vertex_attribute_stride_{{s}},
+                                    normal_{{s}},
+                                    transforms_{{s}}.world_normal,
+                                    os_verts_{{s}}
+                                );
+                        {% endmatch %}
 
                         var sample_color = vec3<f32>(0.0);
 
@@ -323,18 +360,6 @@ fn main(
     let lights_info = get_lights_info();
 
     {% match mipmap %}
-        {% when MipmapMode::None %}
-            let material_color = pbr_get_material_color_no_mips(
-                triangle_indices,
-                attribute_data_offset,
-                triangle_index,
-                pbr_material,
-                barycentric,
-                vertex_attribute_stride,
-                world_normal,
-                transforms.world_normal,
-                os_vertices
-            );
         {% when MipmapMode::Gradient %}
 
             let bary_derivs = textureLoad(barycentric_derivatives_tex, coords, 0);
@@ -358,6 +383,18 @@ fn main(
                 barycentric,
                 vertex_attribute_stride,
                 gradients,
+                world_normal,
+                transforms.world_normal,
+                os_vertices
+            );
+        {% when MipmapMode::None %}
+            let material_color = pbr_get_material_color_no_mips(
+                triangle_indices,
+                attribute_data_offset,
+                triangle_index,
+                pbr_material,
+                barycentric,
+                vertex_attribute_stride,
                 world_normal,
                 transforms.world_normal,
                 os_vertices
@@ -599,32 +636,47 @@ fn main(
                         let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
 
                         // Calculate proper gradients for this MSAA sample to enable mipmapping
-                        let gradients_{{s}} = pbr_get_gradients(
-                            barycentric_{{s}},
-                            bary_derivs_{{s}},
-                            pbr_material_{{s}},
-                            triangle_indices_{{s}},
-                            attribute_data_offset_{{s}},
-                            vertex_attribute_stride_{{s}},
-                            normal_{{s}},
-                            camera.view
-                        );
+                        {% match mipmap %}
+                            {% when MipmapMode::Gradient %}
+                                let gradients_{{s}} = pbr_get_gradients(
+                                    barycentric_{{s}},
+                                    bary_derivs_{{s}},
+                                    pbr_material_{{s}},
+                                    triangle_indices_{{s}},
+                                    attribute_data_offset_{{s}},
+                                    vertex_attribute_stride_{{s}},
+                                    normal_{{s}},
+                                    camera.view
+                                );
 
-                        // Compute material color with proper mipmapping
-                        let material_color_{{s}} = pbr_get_material_color_grad(
-                            triangle_indices_{{s}},
-                            attribute_data_offset_{{s}},
-                            tri_id_{{s}},
-                            pbr_material_{{s}},
-                            barycentric_{{s}},
-                            vertex_attribute_stride_{{s}},
-                            gradients_{{s}},
-                            normal_{{s}},
-                            transforms_{{s}}.world_normal,
-                            os_vertices_{{s}}
-                        );
+                                // Compute material color with proper mipmapping
+                                let material_color_{{s}} = pbr_get_material_color_grad(
+                                    triangle_indices_{{s}},
+                                    attribute_data_offset_{{s}},
+                                    tri_id_{{s}},
+                                    pbr_material_{{s}},
+                                    barycentric_{{s}},
+                                    vertex_attribute_stride_{{s}},
+                                    gradients_{{s}},
+                                    normal_{{s}},
+                                    transforms_{{s}}.world_normal,
+                                    os_vertices_{{s}}
+                                );
+                            {% when MipmapMode::None %}
+                                let material_color_{{s}} = pbr_get_material_color_no_mips(
+                                    triangle_indices_{{s}},
+                                    attribute_data_offset_{{s}},
+                                    tri_id_{{s}},
+                                    pbr_material_{{s}},
+                                    barycentric_{{s}},
+                                    vertex_attribute_stride_{{s}},
+                                    normal_{{s}},
+                                    transforms_{{s}}.world_normal,
+                                    os_vertices_{{s}}
+                                );
+                        {% endmatch %}
 
-                        // Compute lighting for this sample
+                            // Compute lighting for this sample
                         var sample_color = vec3<f32>(0.0);
 
                         {% match debug.lighting %}

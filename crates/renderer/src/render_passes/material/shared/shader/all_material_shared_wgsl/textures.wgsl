@@ -105,90 +105,94 @@ fn _texture_uv_per_vertex(attribute_data_offset: u32, set_index: u32, vertex_ind
 }
 
 
-
-// NEW: Sampling with explicit gradients for anisotropic filtering support in compute shaders
-fn texture_pool_sample_grad(info: TextureInfo, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> vec4<f32> {
-    switch info.array_index {
-        {% for i in 0..texture_pool_arrays_len %}
-            case {{ i }}u: {
-                return _texture_pool_sample_grad(info, pool_tex_{{ i }}, attribute_uv, uv_derivs);
+{% match mipmap %}
+    {% when MipmapMode::Gradient %}
+        // NEW: Sampling with explicit gradients for anisotropic filtering support in compute shaders
+        fn texture_pool_sample_grad(info: TextureInfo, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> vec4<f32> {
+            switch info.array_index {
+                {% for i in 0..texture_pool_arrays_len %}
+                    case {{ i }}u: {
+                        return _texture_pool_sample_grad(info, pool_tex_{{ i }}, attribute_uv, uv_derivs);
+                    }
+                {% endfor %}
+                default: {
+                    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+                }
             }
-        {% endfor %}
-        default: {
-            return vec4<f32>(0.0, 0.0, 0.0, 0.0);
         }
-    }
-}
 
 
-fn _texture_pool_sample_grad(
-    info: TextureInfo,
-    tex: texture_2d_array<f32>,
-    attribute_uv: vec2<f32>,
-    uv_derivs: UvDerivs
-) -> vec4<f32> {
-    var color: vec4<f32>;
-    switch info.sampler_index {
-        {% for i in 0..texture_pool_samplers_len %}
-            case {{ i }}u: {
-                color = textureSampleGrad(
-                    tex,
-                    pool_sampler_{{ i }},
-                    attribute_uv,
-                    i32(info.layer_index),
-                    uv_derivs.ddx,
-                    uv_derivs.ddy,
-                );
+        fn _texture_pool_sample_grad(
+            info: TextureInfo,
+            tex: texture_2d_array<f32>,
+            attribute_uv: vec2<f32>,
+            uv_derivs: UvDerivs
+        ) -> vec4<f32> {
+            var color: vec4<f32>;
+            switch info.sampler_index {
+                {% for i in 0..texture_pool_samplers_len %}
+                    case {{ i }}u: {
+                        color = textureSampleGrad(
+                            tex,
+                            pool_sampler_{{ i }},
+                            attribute_uv,
+                            i32(info.layer_index),
+                            uv_derivs.ddx,
+                            uv_derivs.ddy,
+                        );
+                    }
+                {% endfor %}
+                default: {
+                    color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+                }
             }
-        {% endfor %}
-        default: {
-            color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+
+            return color;
         }
-    }
-
-    return color;
-}
 
 
-// Sampling helpers for the mega-texture atlas. Every fetch receives an explicit LOD so the compute
-// pass can emulate hardware derivative selection.
-fn texture_pool_sample_no_mips(info: TextureInfo, attribute_uv: vec2<f32>) -> vec4<f32> {
-    switch info.array_index {
-        {% for i in 0..texture_pool_arrays_len %}
-            case {{ i }}u: {
-                return _texture_pool_sample_no_mips(info, pool_tex_{{ i }}, attribute_uv);
+    {% when MipmapMode::None %}
+        // Sampling helpers for the mega-texture atlas. Every fetch receives an explicit LOD so the compute
+        // pass can emulate hardware derivative selection.
+        fn texture_pool_sample_no_mips(info: TextureInfo, attribute_uv: vec2<f32>) -> vec4<f32> {
+            switch info.array_index {
+                {% for i in 0..texture_pool_arrays_len %}
+                    case {{ i }}u: {
+                        return _texture_pool_sample_no_mips(info, pool_tex_{{ i }}, attribute_uv);
+                    }
+                {% endfor %}
+                default: {
+                    // If we somehow reference an out-of-range sampler (should not happen), return black to
+                    // avoid propagating NaNs that could poison later colour math.
+                    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+                }
             }
-        {% endfor %}
-        default: {
-            // If we somehow reference an out-of-range sampler (should not happen), return black to
-            // avoid propagating NaNs that could poison later colour math.
-            return vec4<f32>(0.0, 0.0, 0.0, 0.0);
         }
-    }
-}
 
-fn _texture_pool_sample_no_mips(
-    info: TextureInfo,
-    tex: texture_2d_array<f32>,
-    uv: vec2<f32>,
-) -> vec4<f32> {
-    var color: vec4<f32>;
-    switch info.sampler_index {
-        {% for i in 0..texture_pool_samplers_len %}
-            case {{ i }}u: {
-                color = textureSampleLevel(
-                    tex,
-                    pool_sampler_{{ i }},
-                    uv,
-                    i32(info.layer_index),
-                    0
-                );
+        fn _texture_pool_sample_no_mips(
+            info: TextureInfo,
+            tex: texture_2d_array<f32>,
+            uv: vec2<f32>,
+        ) -> vec4<f32> {
+            var color: vec4<f32>;
+            switch info.sampler_index {
+                {% for i in 0..texture_pool_samplers_len %}
+                    case {{ i }}u: {
+                        color = textureSampleLevel(
+                            tex,
+                            pool_sampler_{{ i }},
+                            uv,
+                            i32(info.layer_index),
+                            0
+                        );
+                    }
+                {% endfor %}
+                default: {
+                    color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+                }
             }
-        {% endfor %}
-        default: {
-            color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-        }
-    }
 
-    return color;
-}
+            return color;
+        }
+
+{% endmatch %}
