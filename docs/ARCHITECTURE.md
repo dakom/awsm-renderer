@@ -9,7 +9,7 @@
 - **Pay up-front, reap rewards later**: Expensive operations happen during initialization, not per-frame
 - **Unified buffers**: Allocation primitives replace thousands of individual GPU buffers with a handful of shared ones
 - **Texture pooling**: Batch uploads and organize textures by size/format for efficient GPU access
-- **Bandwidth is precious**: e.g. aggressive MSAA optimization saves ~480MB/frame at 1080p
+- **Compute-driven materials**: Decouple material evaluation from geometry, process each screen pixel exactly once
 
 ---
 
@@ -107,14 +107,11 @@
 | **Bary Derivatives** | `RGBA16float` | ddx barycentric (2ch) + ddy barycentric (2ch) - for texture LOD calculation |
 | **Depth** | `Depth24plus` | Standard depth buffer |
 
-**MSAA Optimization:**
-- Rasterization to **4x multisampled render targets** (kept in tile memory)
-- Hardware **MSAA resolve** to single-sample textures (averaging done by GPU)
-- **`StoreOp::Discard`** on color attachments - multisampled intermediates never written to VRAM
-- **Bandwidth savings: ~480MB/frame at 1080p**
-  - ~240MB write eliminated (discard operation)
-  - ~240MB read eliminated (compute reads single-sample)
-- Depth remains multisampled for future depth-aware effects
+**MSAA Architecture:**
+- All G-buffer textures (including visibility data) are **4x multisampled** and fully stored to VRAM
+- **Why not use resolve targets?** The visibility data texture contains **discrete integer IDs** (triangle indices, buffer offsets). Hardware MSAA resolve averages samples, which would corrupt these IDs into invalid values
+- **Memory cost:** ~320MB for G-buffer at 1080p with 4x MSAA (4× single-sample cost)
+- **Trade-off:** Higher memory/bandwidth usage in exchange for preserving discrete ID integrity and enabling intelligent per-sample material evaluation in the compute pass
 
 ---
 
@@ -161,10 +158,17 @@ Cost = screen_pixels × active_material_types
 - Evaluates materials and lighting based on material type
 
 **MSAA Handling:**
-- Depth texture remains multisampled from geometry pass
-- Material evaluation samples depth at each MSAA location and manually samples material textures for blending
-- **Same quality as hardware MSAA** - identical to what a fragment shader would do
-- **But more flexible** - enables custom resolve operations, selective MSAA per material, or depth-aware blending techniques
+- All G-buffer textures (visibility, barycentric, normals, derivatives, depth) remain multisampled
+- **Intelligent edge detection** using depth variation and normal discontinuity:
+  - **Interior pixels:** Read sample 0 only → single material evaluation (1× cost)
+  - **Edge pixels:** Read all 4 samples → per-sample material evaluation with full shading (4× cost)
+- **Per-sample shading on edges:** Each MSAA sample can hit a different triangle/material, requiring separate:
+  - Triangle ID lookup and material parameters
+  - Barycentric interpolation for UVs
+  - Texture sampling with proper mipmapping gradients
+  - Full lighting evaluation
+- **Quality benefit:** Accurate antialiasing at material boundaries where different surfaces meet
+- **Performance benefit:** Most pixels are non-edges, so majority of screen processes at 1× cost despite 4× MSAA
 
 **Output:**
 - Single `RGBA16float` texture: final color (lit or unlit, depending on material)
