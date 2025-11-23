@@ -48,8 +48,8 @@ impl CubemapSkyGradient {
 impl Default for CubemapSkyGradient {
     fn default() -> Self {
         Self {
-            zenith: Color::new_values(0.75, 0.86, 1.0, 1.0),
-            nadir: Color::new_values(0.08, 0.07, 0.05, 1.0),
+            zenith: Color::new_values(0.4, 0.65, 1.0, 1.0),
+            nadir: Color::new_values(0.55, 0.45, 0.35, 1.0),
         }
     }
 }
