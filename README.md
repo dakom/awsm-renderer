@@ -26,13 +26,13 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for insight into how this all w
 
 ### ECS (or any other game framework)
 
-This is a renderer, not a full game engine or framework. There is no entity-component-system (ECS) or any other opinionated way to organize game objects according to the rules of your game.
+This is a renderer, not a full game engine or framework. There is no entity-component-system (ECS) or any other opinionated way to organize game objects.
 
-However- there is a transform-based scene graph, and all the data structures are designed to be easy to very efficiently manipulate and integrate with an ECS or other game framework by way of "keys" (TransformKey, MeshKey, MaterialKey, etc.)
+However, there is a transform-based scene graph, and all the data structures are designed to be very easy and efficient to manipulate and integrate with an ECS or other game framework by way of "keys" (TransformKey, MeshKey, MaterialKey, etc.)
 
-It's highly recommended to think of these keys as components and assign them to some EntityId of your choice.
+Feel free to think of these keys as components and assign them to some EntityId of your choice.
 
-Keep in mind that it's _very fast_ to update any data in the system many times per-tick (e.g. for physics), and it's uploaded to the GPU once per tick if needed, so you can have a very dynamic scene.
+It's _very fast_ to update any data in the system many times per-tick (e.g. for physics), it's almost just a memcpy, and the data is only uploaded to the GPU once per tick if needed. Ultimately you can have a very dynamic scene without worrying about overhead (especially when just transforming objects - inserting/removing may hit some very small burps when bind groups need to be recreated. See [ARCHITECTURE](docs/ARCHITECTURE.md) for more details)
 
 ### Physics
 
