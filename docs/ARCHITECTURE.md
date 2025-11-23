@@ -122,9 +122,37 @@
 
 **Purpose:** Evaluate materials and lighting only for visible pixels.
 
-**Why compute shader?**
-- Material evaluation only happens for visible pixels - massive performance win
-- Early-exit per pixel for unaffected materials - zero cost
+**Why compute shader?** Because it fundamentally changes the performance equation.
+
+**Traditional fragment shading (per-mesh):**
+```
+Cost = Σ(fragments per mesh) × material_cost
+     = Depends on draw order, overdraw, and per-mesh processing
+```
+
+Even with early-Z helping for opaque geometry, you still have:
+- **Draw order dependency** - front-to-back sorting helps, but never perfect
+- **Per-mesh overhead** - vertex processing, rasterization, and setup for every mesh
+- **Material switching** - pipeline/bind group changes between different materials
+- **Redundant work** - same pixel evaluated multiple times if draws aren't perfectly sorted
+
+**Our compute approach (per-pixel):**
+```
+Cost = screen_pixels × active_material_types
+     = At most 2M pixels @ 1080p
+```
+
+**The massive win:**
+- **Upper bound is screen resolution** - 1920×1080 = 2M pixels maximum, regardless of scene complexity
+- **Process each pixel exactly once** per material type - no draw order dependency, no redundant evaluations
+- **Tile-level early-exit** - entire tiles skip materials they don't contain (zero cost)
+- **No per-mesh overhead** - one dispatch per material type, not per mesh
+- **Perfect cache coherency** - processing screen-space tiles, not scattered mesh fragments
+
+**Example:** Scene with 1000 meshes using 3 material types:
+- Traditional: Vertex + fragment processing for all 1000 meshes, order-dependent overdraw
+- Our approach: Visibility pass for all 1000 meshes (cheap, geometry-only), then 3 material dispatches over screen pixels with tile early-exit
+- **Win scales with scene complexity** - more meshes = more win, since material cost stays bounded by screen size
 
 **What it does:**
 - Reads G-buffer data (IDs, barycentrics, normals, derivatives)
