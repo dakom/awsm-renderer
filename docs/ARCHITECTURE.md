@@ -9,6 +9,80 @@
 - **Pay up-front, reap rewards later**: Expensive operations happen during initialization, not per-frame
 - **Bandwidth is precious**: Aggressive MSAA optimization saves ~480MB/frame at 1080p
 - **Texture pooling**: Batch uploads and organize textures by size/format for efficient GPU access
+- **Unified buffers over per-object buffers**: Dynamic allocation replaces thousands of individual GPU buffers with a handful of shared ones
+
+---
+
+## Dynamic Buffer Architecture
+
+**Philosophy:** One unified buffer beats a thousand small ones.
+
+**The problem:** Traditional approaches create individual GPU buffers for each mesh, material, light, transform, etc. This leads to:
+- Thousands of bind group creations and recreations
+- Expensive GPU buffer allocation/deallocation per object
+- Bind group layout explosion (one per object type)
+- Poor memory locality and cache behavior
+
+**Our solution:** Two specialized dynamic buffer types that handle **all** object data in unified buffers:
+
+### DynamicUniformBuffer - For Fixed-Size Data
+
+**Use for:** Transforms, lights, PBR materials - anything where all items are the same size.
+
+**Characteristics:**
+- **O(1) insert/update/remove** (amortized) - constant time operations
+- **Zero fragmentation** - fixed-size slots with perfect reuse
+- **Slot recycling** - removed items' slots immediately available for reuse
+- **Minimal overhead** - just slot index tracking, no complex allocation logic
+
+**Performance:**
+```
+• CPU operations:    O(1) all operations
+• Memory efficiency: 100% (no internal fragmentation)
+• Slot reuse:        Immediate (via free list)
+• GPU uploads:       Full buffer per frame (unified write)
+```
+
+**Example:** Managing 10,000 transforms in a single buffer instead of 10,000 individual buffers.
+
+### DynamicStorageBuffer - For Variable-Size Data
+
+**Use for:** Morph weights, skin joints, mesh attributes - data with heterogeneous sizes.
+
+**Characteristics:**
+- **O(log N) insert/update/remove** (amortized) - buddy allocation tree traversal
+- **Zero external fragmentation** - buddy blocks always coalesce
+- **≤50% internal fragmentation** - power-of-two rounding per allocation
+- **Automatic growth** - buffer doubles when needed
+
+**Performance:**
+```
+• CPU operations:    O(log N) with buddy tree
+• Memory efficiency: 50-100% per allocation (power-of-two rounding)
+• Block coalescing:  Automatic (buddy algorithm)
+• GPU uploads:       Full buffer per frame (unified write)
+```
+
+**Example:** Storing morph target weights where mesh A needs 8 targets (32 bytes) and mesh B needs 128 targets (512 bytes).
+
+### The Payoff
+
+**Before (per-object buffers):**
+- 1,000 meshes = 1,000 GPU buffers + 1,000 bind groups
+- Every add/remove triggers GPU buffer create/destroy
+- Bind group chaos - constant recreation on updates
+
+**After (unified buffers):**
+- 1,000 meshes = 1 GPU buffer + 1 bind group
+- Add/remove is pure CPU bookkeeping (O(1) or O(log N))
+- Single bind group persists - recreate only on buffer growth (rare)
+- All data uploaded together - better locality and batching
+
+**Real-world impact:**
+- Bind group count: **1,000x reduction** (one per buffer type, not per object)
+- GPU buffer allocations: **1,000x reduction**
+- Per-frame overhead: **Pure CPU allocation** (no GPU calls except data upload)
+- Memory layout: **Contiguous and cache-friendly**
 
 ---
 
