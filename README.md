@@ -6,6 +6,12 @@
 
 It's specifically for the browser in that it does *not* use wgpu, but rather uses the WebGPU API directly via the web-sys bindings. This is a bit of a departure from the Rust ecosystem, but it allows for a more direct mapping to the WebGPU API and potentially better performance, control, and easier debugging.
 
+# ARCHITECTURE
+
+This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient shading without the drawbacks of classic deferred or forward+ rendering.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for insight into how this all works and where the tradeoffs are made. 
+
 # STATUS
 
 Nothing much to see here yet, early days, slow-moving hobby and learning in progress :)
@@ -16,11 +22,6 @@ See [ROADMAP](docs/ROADMAP.md) for details.
 
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for details on setting up the development environment, building, and running the examples.
 
-# ARCHITECTURE
-
-This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient shading, transparency, and anti-aliasing without the drawbacks of classic deferred or forward+ rendering.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for insight into how this all works and where the tradeoffs are made. 
 
 # NON-GOALS
 
