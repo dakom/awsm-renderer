@@ -157,8 +157,14 @@ Cost = screen_pixels × active_material_types
 **What it does:**
 - Reads G-buffer data (IDs, barycentrics, normals, derivatives)
 - Uses IDs to look up material parameters from storage buffers
-- Manual mipmapping using barycentric derivatives
+- **Mipmapping via geometry derivatives** - barycentric derivatives from geometry pass drive texture LOD selection, exactly as hardware does in fragment shaders (but with full control)
 - Evaluates materials and lighting based on material type
+
+**MSAA Handling:**
+- Depth texture remains multisampled from geometry pass
+- Material evaluation samples depth at each MSAA location and manually samples material textures for blending
+- **Same quality as hardware MSAA** - identical to what a fragment shader would do
+- **But more flexible** - enables custom resolve operations, selective MSAA per material, or depth-aware blending techniques
 
 **Output:**
 - Single `RGBA16float` texture: final color (lit or unlit, depending on material)
