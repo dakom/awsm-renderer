@@ -1,10 +1,12 @@
-# [live demo](https://dakom.github.io/awsm-renderer)
+# awsm-renderer
+
+[Live Demo](https://dakom.github.io/awsm-renderer)
 
 # OVERVIEW
 
 **`awsmrenderer`** is a browser-based Rust/WASM/WebGPU renderer
 
-It's specifically for the browser in that it does *not* use wgpu, but rather uses the WebGPU API directly via the web-sys bindings. This is a bit of a departure from the Rust ecosystem, but it allows for a more direct mapping to the WebGPU API and potentially better performance, control, and easier debugging.
+It's specifically for the browser in that it does *not* use wgpu, but rather uses the WebGPU API directly via the web-sys bindings. While this is somewhat unconventional in the Rust ecosystem, it allows for a more direct mapping to the WebGPU API and potentially better performance, control, and easier debugging.
 
 # ARCHITECTURE
 
@@ -52,8 +54,8 @@ However, the foundation is there to allow building a higher-level abstraction, a
 This really depends on the specific needs of a project. Some examples:
 
 * no culling at all (e.g. a fighting game)
-* portal-based (e.g. a first-person shooter in an interior) 
-* space partitiong (e.g. in an open world game).
+* portal-based (e.g. a first-person shooter in an interior)
+* space partitioning (e.g. in an open world game).
 * quadtrees (e.g. in top-down view)
 
 However, due to the visibility buffer optimization, the impact of rendering unnecessary geometry does not reach the shading stage. Also, frustum culling will eliminate other game world objects... so the only optimization would really be to reduce the frustum culling tests which are already very cheap.

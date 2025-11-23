@@ -41,8 +41,7 @@ Used to re-package into ktx2 containers
 
 Use the releases: https://github.com/KhronosGroup/KTX-Software/releases
 
-
-### Project layout
+## Project layout
 
 * [awsm-renderer](crates/renderer): The renderer in all its glory 
 * [awsm-renderer-core](crates/renderer-core): Wraps the WebGPU API with very little opinion, just a nicer Rust API
@@ -51,11 +50,11 @@ Use the releases: https://github.com/KhronosGroup/KTX-Software/releases
 * [media](media): Media assets for the demo scenes
 * [licenses](licenses): Any third-party licenses needed for demo purposes
 
-### Media
+## Media
 
-For the sake of keeping the repo clean, media files are referenced remotely on the release build, and be downloaded locally to gitignored directories for dev builds.
+For the sake of keeping the repo clean, media files are referenced remotely on the release build, and can be downloaded locally to gitignored directories for dev builds.
 
-As of right now, it needs manual cloning/downloading, is not done through git submodules. So, clone into `media` the following repos:
+Currently, these need to be manually cloned/downloaded (not via git submodules). Clone into `media` the following repos:
 
 1. https://github.com/KhronosGroup/glTF-Sample-Assets.git
 2. https://github.com/dakom/awsm-renderer-assets.git

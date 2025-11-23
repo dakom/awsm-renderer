@@ -2,18 +2,13 @@
 
 ## Overview
 
-**awsm-renderer** is a WebGPU-based visibility buffer renderer that separates geometry processing from material evaluation. Unlike traditional deferred rendering, it makes **zero assumptions about material models** - giving you complete freedom to use PBR, toon shading, unlit materials, or any custom material in the same scene.
-
-Optimized for performance through smart resource management and aggressive bandwidth optimization.
+**awsm-renderer** is a WebGPU-based visibility buffer renderer that separates geometry processing from material evaluation. Unlike traditional deferred rendering, the G-Buffer stores **zero material properties** - only geometry IDs and surface data. This gives you complete freedom to mix any material models (PBR, toon, unlit, custom BRDFs) in the same scene.
 
 ### Core Philosophy
 
-- **Visibility buffer approach**: G-Buffer stores **zero material properties** - only geometry IDs and surface data
-  - Complete material flexibility: PBR, toon/cel-shading, unlit, or any exotic material model
-  - Material evaluation happens in compute shader using geometry IDs to look up parameters
-- **Pay up-front, reap rewards later**: Expensive operations (texture uploads, pipeline/bind group creation) happen during initialization
-- **Bandwidth is precious**: Aggressive optimization to minimize memory traffic (~480MB/frame savings at 1080p)
-- **Texture pooling**: Organize textures into arrays by size/format for efficient GPU access
+- **Pay up-front, reap rewards later**: Expensive operations happen during initialization, not per-frame
+- **Bandwidth is precious**: Aggressive MSAA optimization saves ~480MB/frame at 1080p
+- **Texture pooling**: Batch uploads and organize textures by size/format for efficient GPU access
 
 ---
 
@@ -26,16 +21,7 @@ Optimized for performance through smart resource management and aggressive bandw
 **What it does:**
 - Vertex transformations: positions, normals, tangents (including skinning and morph targets)
 - Fast rasterization: just vertex processing + triangle rasterization
-- Outputs **pure geometry/visibility data** - zero material properties
-
-**Why this matters:**
-Unlike traditional deferred rendering, the G-Buffer encodes **no assumptions about material models**. It only stores:
-- **What was hit** (triangle/mesh IDs)
-- **Where on the surface** (barycentric coordinates)
-- **Geometric orientation** (normals/tangents for the surface, not material-specific)
-- **Texture sampling math** (derivatives for mipmapping)
-
-This gives you **complete material flexibility** - PBR, toon shading, unlit, or any exotic material can be evaluated in the compute pass.
+- Outputs pure geometry data - **what** was hit (triangle/mesh IDs), **where** on the surface (barycentrics), and surface math for shading (normals/tangents/derivatives)
 
 **G-Buffer Outputs (4 color + depth):**
 
@@ -63,23 +49,14 @@ This gives you **complete material flexibility** - PBR, toon shading, unlit, or 
 **Purpose:** Evaluate materials and lighting only for visible pixels.
 
 **Why compute shader?**
-- Operates in screen space over resolved G-buffer textures
-- **Material evaluation only happens where geometry was rasterized** - massive performance win
-- Early-exit per pixel: "this pixel isn't mine" → zero cost
+- Material evaluation only happens for visible pixels - massive performance win
+- Early-exit per pixel for unaffected materials - zero cost
 
 **What it does:**
-- Reads G-buffer data (triangle/mesh IDs, barycentric coords, normals, derivatives)
-- **Uses IDs to look up which material to evaluate** - no material assumptions in G-Buffer!
-- Loads material parameters from storage buffers (UVs, colors, material-specific settings)
-- **Manual mipmapping** using barycentric derivatives from geometry pass
-- **Evaluates any material model**: PBR, toon/cel-shading, unlit, custom BRDFs, etc.
-- Supports multiple material types via branching or separate pipelines
-
-**Material flexibility:**
-Because the G-Buffer stores no material properties, you can:
-- Mix PBR and non-photorealistic materials in the same scene
-- Add exotic materials without changing the visibility pass
-- Switch material models per-mesh based on metadata
+- Reads G-buffer data (IDs, barycentrics, normals, derivatives)
+- Uses IDs to look up material parameters from storage buffers
+- Manual mipmapping using barycentric derivatives
+- Evaluates materials and lighting based on material type
 
 **Output:**
 - Single `RGBA16float` texture: final color (lit or unlit, depending on material)
