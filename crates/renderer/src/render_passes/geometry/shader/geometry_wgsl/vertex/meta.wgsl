@@ -11,5 +11,7 @@ struct GeometryMeshMeta {
     skin_matrices_offset: u32,
     skin_index_weights_offset: u32,
     transform_offset: u32,
+    // this is not the offset of the material
+    // it's the offset of the mesh_meta data in the material *pass*
     material_offset: u32,
 }

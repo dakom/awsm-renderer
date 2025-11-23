@@ -266,8 +266,8 @@ impl PbrMaterial {
 
         write(self.emissive_strength.into());
 
-        // Encode the WebGPU address mode so the shader can reproduce clamp/repeat/mirror behaviour
-        // after the sampling coordinates are adjusted to the mega texture tile.
+        // Encode the WebGPU address mode for mipmap selection.
+        // The shader uses this to compute correct UV derivatives when textures wrap/repeat.
         let encode_address_mode = |mode: Option<AddressMode>| -> u32 {
             match mode.unwrap_or(AddressMode::Repeat) {
                 AddressMode::ClampToEdge => 0,

@@ -21,6 +21,11 @@
 - Get started with light culling pass
   - research best practices
   - should optimize for opaque pass (i.e. only light fragments that made it to the screen?)
+  - MAYBE:
+    - One draw call
+    - Divides the screen into tiles (e.g., 16x16 pixels)
+    - For each tile, build a list of lights that affect that region of the screen.
+    - Write list of lights to storage buffer, indexed by tile
 
 - optimize wgsl structs
   - use FooPacked (or FooRaw) and members should be vec4

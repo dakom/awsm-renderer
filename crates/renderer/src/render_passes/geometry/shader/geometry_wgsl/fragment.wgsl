@@ -30,6 +30,8 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
 
     // Pack visibility buffer data
     let t = split16(input.triangle_index);
+    // see `mesh_meta`, this is not the material material_offset
+    // it's the offset of the mesh_meta data in the material *pass*
     let m = split16(mesh_meta.material_offset);
     // it's 16 bits, not u32, but we store as u32 for simplicity
     out.visibility_data = vec4<u32>(

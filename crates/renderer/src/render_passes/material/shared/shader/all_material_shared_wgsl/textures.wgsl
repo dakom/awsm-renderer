@@ -6,6 +6,7 @@
 // - uv_and_sampler:     uv set index (8 bits), sampler index (24 bits)
 // - extra:              flags (8 bits), address_mode_u (8 bits),
 //                       address_mode_v (8 bits), padding (8 bits)
+//                       (address modes used for mipmap gradient calculation only)
 //
 // Notes:
 // - 16 bits for width/height covers all practical WebGPU limits.
@@ -32,8 +33,8 @@ struct TextureInfoRaw {
     //   bits  0..7  : flags
     //                  bit 0 -> has mipmaps
     //                  bits 1..7 reserved
-    //   bits  8..15 : address_mode_u
-    //   bits 16..23 : address_mode_v
+    //   bits  8..15 : address_mode_u (for mipmap gradient calculation)
+    //   bits 16..23 : address_mode_v (for mipmap gradient calculation)
     //   bits 24..31 : padding / reserved
     extra: u32,
 };

@@ -63,7 +63,7 @@ pub enum BindGroupCreate {
     MeshAttributeIndexResize,
     PbrMaterialResize,
     TextureViewResize,
-    MegaTexture,
+    TexturePool,
     AntiAliasingChange,
 }
 
@@ -142,7 +142,7 @@ impl BindGroups {
                     functions_to_call.insert(FunctionToCall::Display);
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
                 }
-                BindGroupCreate::MegaTexture => {
+                BindGroupCreate::TexturePool => {
                     functions_to_call.insert(FunctionToCall::OpaqueTextures);
                     functions_to_call.insert(FunctionToCall::OpaqueSamplers);
                 }

@@ -49,7 +49,7 @@ impl AwsmRenderer {
                 pipeline_layouts: &mut self.pipeline_layouts,
             };
 
-            self.bind_groups.mark_create(BindGroupCreate::MegaTexture);
+            self.bind_groups.mark_create(BindGroupCreate::TexturePool);
 
             // Update all the things that depend on opaque materials changing due to textures
 
@@ -64,7 +64,7 @@ impl AwsmRenderer {
         }
 
         // Either way, gotta also deal with all the meshes that need their shader/pipelines (re)created
-        // because the mega texture change may have affected the dynamically generated number of bindings etc.
+        // because the texture pool change may have affected the dynamically generated number of bindings etc.
         // This isn't so bad, it's okay if it's the same container as before, actual heavy creation uses cache
         let mut has_seen_buffer_info = SecondaryMap::new();
         let mut has_seen_material = SecondaryMap::new();
@@ -104,7 +104,6 @@ pub struct Textures {
     samplers: SlotMap<SamplerKey, web_sys::GpuSampler>,
     sampler_cache: HashMap<SamplerCacheKey, SamplerKey>,
     // We keep a mirror of the sampler address modes so that materials can adjust UVs manually when
-    // sampling inside the mega texture. This is especially important for clamp/mirror behaviour.
     sampler_address_modes: SecondaryMap<SamplerKey, (Option<AddressMode>, Option<AddressMode>)>,
     texture_samplers: SecondaryMap<TextureKey, SamplerKey>,
 }
@@ -303,7 +302,6 @@ fn create_sampler_key(
     let address_mode_v = cache_key.address_mode_v;
     sampler_cache.insert(cache_key, key);
     // Persist the original (U,V) wrap modes so that shader-side helpers can reproduce the
-    // desired behaviour after UVs are remapped into the mega texture atlas.
     sampler_address_modes.insert(key, (address_mode_u, address_mode_v));
 
     Ok(key)

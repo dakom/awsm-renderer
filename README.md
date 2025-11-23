@@ -1,8 +1,8 @@
 # [live demo](https://dakom.github.io/awsm-renderer)
 
-# WHAT IT HOPES TO BE 
+# OVERVIEW
 
-A browser-based Rust/WASM/WebGPU renderer, without using a full game engine framework like Bevy or a modular ECS like Shipyard (bring your own game engine!).
+Awsmrenderer is a browser-based Rust/WASM/WebGPU renderer, without using a full game engine framework like Bevy or a modular ECS like Shipyard (bring your own game engine!).
 
 This does *not* use wgpu, but rather uses the WebGPU API directly via the `web-sys` bindings. This is a bit of a departure from the Rust ecosystem, but it allows for a more direct mapping to the WebGPU API and potentially better performance, control, and easier debugging.
 
@@ -12,167 +12,39 @@ Nothing much to see here yet, early days, slow-moving hobby and learning in prog
 
 See [ROADMAP](docs/ROADMAP.md) for details.
 
-# DEV
+# DEVELOPERS
 
-* `just frontend-dev`
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for details on setting up the development environment, building, and running the examples.
 
-# CRATES
+# ARCHITECTURE
 
-* [awsm-renderer](crates/renderer): The renderer in all its glory 
-* [awsm-renderer-core](crates/renderer-core): Wraps the WebGPU API with very little opinion, just a nicer Rust API
-* [frontend](crates/frontend): Just for demo and debugging purposes 
+This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient shading, transparency, and anti-aliasing without the drawbacks of classic deferred or forward+ rendering.
 
-# MEDIA
-
-For the sake of keeping the repo clean, media files are referenced remotely on the release build, and be downloaded locally to gitignored directories for dev builds. 
-
-See [media/README.md](media/README.md) for more details.
-
-# GRAVEYARD
-
-I've taken some stabs at some variation of this sorta thing before. Some projects got further than others:
-
-* [Pure3d (typescript + webgl1)](https://github.com/dakom/pure3d-typescript)
-* [Shipyard ECS (webgl2)](https://github.com/dakom/shipyard-webgl-renderer)
-* [WebGL1+2 Rust bindings](https://github.com/dakom/awsm-web/tree/master/crate/src/webgl)
-
-# TEXTURES
-
-We use a single "MegaTexture" (currently without streaming), which is an of texture-arrays constructed up to resource limits
-
-This allows accessing all the materials from a single shading pass (more on this below)
-
-# RENDER PIPELINE
-
-This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient shading, transparency, and TAA without the drawbacks of classic deferred or forward+ rendering.
-
----
-
-## 🎯 Pipeline Overview
-
-### 1. Geometry Pass (Vertex + Fragment)
-- One draw call (using instancing)
-- Rendering benefits from hardware occlusion culling, objects are drawn front-to-back
-- Outputs to multiple render targets (MRTs):
-  - `material_offset_texture`: Encodes material reference per pixel
-  - `world_normal_texture`: Interpolated world-space normal
-  - `screen_pos_texture`: Clip-space/NDC position for TAA (post-skinning/morphs) _and linear eye_space depth_ in z coordinate
-  - `motion_vector_texture`: Computed as difference between current and previous `screen_pos_texture`
-
-> This pass is animated/skinned, so all mesh deformations are already applied before output
-
-### 2. Light Culling Pass (Compute Shader)
-- One draw call
-- Divides the screen into tiles (e.g., 16x16 pixels)
-- For each tile, build a list of lights that affect that region of the screen.
-- Write list of lights to storage buffer, indexed by tile
-
-### 3. Opaque Material Shading Pass (Compute Shader)
-- One draw call
-- Single fullscreen compute dispatch (using same workgroup/tiling as Light Culling)
-- For each screen pixel:
-  - Read material offset 
-  - Fetch the material data from a single, large uniform buffer (via material offset)
-  - Fetch the relevant light list from the associated tile
-  - Sample the `world_normal_texture` and `screen_pos_texture`
-  - Calculate world position by using (screen_pos,depth), inverse view matrix, and 
-  - Calculate lighting as needed (may use Camera world position etc.)
-- Output: shaded color to `opaque_color_texture`
-
-### 4. Transparent Material Shading Pass (Vertex + Fragment)
-- One draw call per material-kind (pbr, unlit, etc.) 
-- Fetch the material data from a the same material uniform buffer (bound w/ dynamic offset)
-- Uses Weighted Blended Order-Independent Transparency (OIT)
-- Uses the Depth buffer from (1) to discard occluded fragments w/ depth testing (but writes are off)
-- Outputs to multiple textures:
-  - `oit_rgb_texture`: accumulated weighted sum of colors
-  - `oit_alpha_texture`: accumulated weighted product of transparencies
-
-### 5. Composition (Compute Shader)
-- Single fullscreen compute dispatch
-- Resolve OIT: Read from `oit_rgb_texture` and `oit_alpha_texture` and calculate the final transparent color.
-- Composite: Blend the resolved transparent color over the `opaque_color_texture`.
-- Apply TAA: Use `motion_vector_texture` to blend the current, composited frame with the previous frame's history buffer.
-- Tonemapping, gamma-correction, etc.
-- Outputs final resolved frame to `composite_texture`
-
-### 6. Display 
-- Blits the output to screen texture view
-
----
-
-## 🚦 Render Pass Order
-
-```
-1. Geometry Pass            → MRTs (object ID, normals, screen pos, motion vec)
-2. Light culling Pass (CS)  → Per-tile light lists 
-3. Opaque Shading (CS)      → shaded opaque color
-4. Transparent Shading      → blended with Weighted Blended OIT
-5. Composition (CS)         → final post-processed image
-6. Display 
-```
-
----
-
-## 🆚 Comparison to Deferred Rendering
-
-### Classic Deferred Rendering
-
-Stores full material and geometric data in a G-buffer:
-
-- Albedo, normals, roughness, metalness, emissive, position, etc.
-- Lighting applied via fullscreen pixel shader
-- Inflexible material model
-- Transparency is difficult (deferred blending is hard)
-
-### This Pipeline (Visibility Buffer+)
-
-| Feature              | Deferred Rendering      | Visibility Buffer+        |
-| -------------------- | ----------------------- | ------------------------- |
-| Shading pass         | Fullscreen pixel shader | Fullscreen compute shader |
-| Overdraw for shading | None                    | None                      |
-| G-buffer size        | Large (>5 MRTs)         | Medium (4 MRTs)          |
-| Material info        | Baked into G-buffer     | Fetched via object ID     |
-| Flexibility          | Low                     | High (more dynamic logic) |
-| Transparency         | Hard (multiple passes)  | Easy (Weighted OIT pass)  |
-
-> ✅ This approach keeps bandwidth low while still enabling high material complexity and post-processing effects like TAA.
-
----
-
-## 🔀 Comparison to Forward+
-
-### Forward+ Rendering
-
-- Uses compute pass to build light clusters or screen-space tiles
-- Rasterizes geometry and performs per-fragment lighting using local light lists
-- Struggles with overdraw and duplicate lighting cost
-
-### Visibility Buffer+
-
-| Feature                     | Forward+           | Visibility Buffer+           |
-| --------------------------- | ------------------ | ---------------------------- |
-| Light culling               | Clustered per tile | Optional (based on material) |
-| Lighting pass               | Per-fragment       | Per-pixel (one-time)         |
-| Material evaluation         | During raster      | In compute                   |
-| Overdraw impact             | High               | Low                          |
-| Transparency                | Native             | Weighted OIT (separate pass) |
-| Performance on dense scenes | Degrades           | Stable (no shading overdraw) |
-
-> 🚀 Visibility Buffer+ maintains forward’s material flexibility and transparency support, but eliminates redundant lighting work by separating visibility from shading.
-
----
-
-## 🧠 Notes
-
-- Compute-based shading benefits from modern GPUs (wave/group operations, coalesced reads)
-- Geometry pass performs early-Z and ensures only visible fragments are shaded for opaque objects
-- Motion vectors are derived from screen-space movement (ping-ponging previous frame data)
-- Transparent objects are shaded in fragment shaders using Weighted Blended OIT to approximate correct order without sorting
-- The single draw-call with instancing in Geometry pass reduces per-mesh throughput
-
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for insight into how this all works and where the tradeoffs are made. 
 
 # NON-GOALS
+
+### ECS (or any other game framework)
+
+This is a renderer, not a full game engine or framework. There is no entity-component-system (ECS) or any other opinionated way to organize game objects according to the rules of your game.
+
+However- there is a transform-based scene graph, and all the data structures are designed to be easy to very efficiently manipulate and integrate with an ECS or other game framework by way of "keys" (TransformKey, MeshKey, MaterialKey, etc.)
+
+It's highly recommended to think of these keys as components and assign them to some EntityId of your choice.
+
+Keep in mind that it's _very fast_ to update any data in the system many times per-tick (e.g. for physics), and it's uploaded to the GPU once per tick if needed, so you can have a very dynamic scene.
+
+### Physics
+
+The renderer does include transformation, morphs, skins, and animation support, but does not include any physics engine or collision detection.
+
+It's expected that another subsystem using this renderer would handle physics/collision detection separately, and provide the resulting transforms/animations to the renderer.
+
+### Material system
+
+There is no easy-to-work-with material system, shader graph, or node-based editor. Instead, materials are hardcoded structures with a specific memory alignment and size, with code on both the Rust and WGSL side that must be in sync. 
+
+However, the foundation is there to allow building a higher-level abstraction, and material tooling could be built on top of this renderer.
 
 ### Game world culling
 
@@ -184,3 +56,17 @@ This really depends on the specific needs of a project. Some examples:
 * quadtrees (e.g. in top-down view)
 
 However, due to the visibility buffer optimization, the impact of rendering unnecessary geometry does not reach the shading stage. Also, frustum culling will eliminate other game world objects... so the only optimization would really be to reduce the frustum culling tests which are already very cheap.
+
+
+
+# GRAVEYARD
+
+I've taken some stabs at some variation of this sorta thing before, got a few battle scars along the way. Some projects got further than others:
+
+* [Pure3d (typescript + webgl1)](https://github.com/dakom/pure3d-typescript)
+* [Shipyard ECS (webgl2)](https://github.com/dakom/shipyard-webgl-renderer)
+* [WebGL1+2 Rust bindings](https://github.com/dakom/awsm-web/tree/master/crate/src/webgl)
+
+Similarly, built many projects in Unity ages ago, unfortunately those repos are lost to time or were closed source.
+
+The point is - I very well may have made some boneheaded mistakes again, but hopefully I've learned a few things along the way :)
