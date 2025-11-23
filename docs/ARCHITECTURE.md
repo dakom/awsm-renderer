@@ -2,7 +2,7 @@
 
 ## Overview
 
-**awsm-renderer** is a WebGPU-based visibility buffer renderer that separates geometry processing from material evaluation. Unlike traditional deferred rendering, the G-Buffer stores **zero material properties** - only geometry IDs and surface data. This gives you complete freedom to mix any material models (PBR, toon, unlit, custom BRDFs) in the same scene.
+**awsm-renderer** is a WebGPU-based renderer that separates geometry processing from material evaluation. Unlike traditional deferred rendering, the G-Buffer stores **zero material properties** - only geometry IDs and surface data. This gives you complete freedom to mix any material models (PBR, toon, unlit, custom BRDFs) in the same scene.
 
 ### Core Philosophy
 
