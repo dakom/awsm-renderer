@@ -22,10 +22,9 @@ Nothing much to see here yet, early days, slow-moving hobby and learning in prog
 
 See [ROADMAP](docs/ROADMAP.md) for details.
 
-# DEVELOPERS
+# DEVELOPMENT
 
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for details on setting up the development environment, building, and running the examples.
-
 
 # NON-GOALS
 
