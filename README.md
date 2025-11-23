@@ -58,7 +58,6 @@ This really depends on the specific needs of a project. Some examples:
 However, due to the visibility buffer optimization, the impact of rendering unnecessary geometry does not reach the shading stage. Also, frustum culling will eliminate other game world objects... so the only optimization would really be to reduce the frustum culling tests which are already very cheap.
 
 
-
 # GRAVEYARD
 
 I've taken some stabs at some variation of this sorta thing before, got a few battle scars along the way. Some projects got further than others:
@@ -66,7 +65,3 @@ I've taken some stabs at some variation of this sorta thing before, got a few ba
 * [Pure3d (typescript + webgl1)](https://github.com/dakom/pure3d-typescript)
 * [Shipyard ECS (webgl2)](https://github.com/dakom/shipyard-webgl-renderer)
 * [WebGL1+2 Rust bindings](https://github.com/dakom/awsm-web/tree/master/crate/src/webgl)
-
-Similarly, built many projects in Unity ages ago, unfortunately those repos are lost to time or were closed source.
-
-The point is - I very well may have made some boneheaded mistakes again, but hopefully I've learned a few things along the way :)
