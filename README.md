@@ -8,6 +8,8 @@
 
 It's specifically for the browser in that it does *not* use wgpu, but rather uses the WebGPU API directly via the web-sys bindings. While this is somewhat unconventional in the Rust ecosystem, it allows for a more direct mapping to the WebGPU API and potentially better performance, control, and easier debugging.
 
+That said, it's not unthinkable for a future version to support native binaries as well ;)
+
 # ARCHITECTURE
 
 This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient shading without the drawbacks of classic deferred or forward+ rendering.
