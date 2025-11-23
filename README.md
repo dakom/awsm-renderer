@@ -2,9 +2,9 @@
 
 # OVERVIEW
 
-`awsmrenderer` is a browser-based Rust/WASM/WebGPU renderer
+**`awsmrenderer`** is a browser-based Rust/WASM/WebGPU renderer
 
-It's specifically for the browser in that it does *not* use wgpu, but rather uses the WebGPU API directly via the `web-sys` bindings. This is a bit of a departure from the Rust ecosystem, but it allows for a more direct mapping to the WebGPU API and potentially better performance, control, and easier debugging.
+It's specifically for the browser in that it does *not* use wgpu, but rather uses the WebGPU API directly via the web-sys bindings. This is a bit of a departure from the Rust ecosystem, but it allows for a more direct mapping to the WebGPU API and potentially better performance, control, and easier debugging.
 
 # STATUS
 
