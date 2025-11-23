@@ -7,9 +7,9 @@
 ### Core Philosophy
 
 - **Pay up-front, reap rewards later**: Expensive operations happen during initialization, not per-frame
-- **Bandwidth is precious**: Aggressive MSAA optimization saves ~480MB/frame at 1080p
-- **Texture pooling**: Batch uploads and organize textures by size/format for efficient GPU access
 - **Unified buffers over per-object buffers**: Dynamic allocation replaces thousands of individual GPU buffers with a handful of shared ones
+- **Texture pooling**: Batch uploads and organize textures by size/format for efficient GPU access
+- **Bandwidth is precious**: e.g. aggressive MSAA optimization saves ~480MB/frame at 1080p
 
 ---
 
