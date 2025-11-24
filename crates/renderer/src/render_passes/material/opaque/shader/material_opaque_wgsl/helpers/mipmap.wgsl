@@ -116,15 +116,16 @@ fn get_uv_derivatives(
     tri: vec3<u32>,
     attribute_data_offset: u32,
     vertex_stride: u32,
+    uv_sets_index: u32,
     tex_info: TextureInfo,
     world_normal: vec3<f32>,        // Surface normal in world space
     view_matrix: mat4x4<f32>        // Camera view matrix
 ) -> UvDerivs {
     let uv_set_index = tex_info.uv_set_index;
 
-    let uv0 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, tri.x, vertex_stride);
-    let uv1 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, tri.y, vertex_stride);
-    let uv2 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, tri.z, vertex_stride);
+    let uv0 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, tri.x, vertex_stride, uv_sets_index);
+    let uv1 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, tri.y, vertex_stride, uv_sets_index);
+    let uv2 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, tri.z, vertex_stride, uv_sets_index);
 
     // Barycentric derivatives from geometry pass
     // bary_derivs contains: (d(bary.x)/dx, d(bary.x)/dy, d(bary.y)/dx, d(bary.y)/dy)
@@ -150,37 +151,9 @@ fn get_uv_derivatives(
     var U1 = uv1;
     var U2 = uv2;
 
-    // Address mode constants (matching WebGPU GPUAddressMode enum values)
-    const ADDR_MODE_CLAMP_TO_EDGE: u32 = 0u;
-    const ADDR_MODE_REPEAT: u32 = 1u;
-    const ADDR_MODE_MIRROR_REPEAT: u32 = 2u;
-
-    // For mirror mode: convert UVs from mirror space to texture space [0,1)
-    // This maps mirrored coordinates to their actual texture locations
-    // Example: UV=1.1 (mirrored) becomes 0.9 (texture space)
-    if (tex_info.address_mode_u == ADDR_MODE_MIRROR_REPEAT) {
-        U0.x = mirror_to_texture_space(U0.x);
-        U1.x = mirror_to_texture_space(U1.x);
-        U2.x = mirror_to_texture_space(U2.x);
-    }
-    if (tex_info.address_mode_v == ADDR_MODE_MIRROR_REPEAT) {
-        U0.y = mirror_to_texture_space(U0.y);
-        U1.y = mirror_to_texture_space(U1.y);
-        U2.y = mirror_to_texture_space(U2.y);
-    }
-
-    // For repeat/mirror modes: unwrap UVs to make them continuous across 0→1 boundaries
-    // This fixes derivatives when UVs wrap (e.g., from 0.99 to 0.01)
-    // Without unwrapping: gradient would be -0.98 (huge!)
-    // With unwrapping: gradient becomes 0.02 (correct!)
-    if (tex_info.address_mode_u == ADDR_MODE_REPEAT || tex_info.address_mode_u == ADDR_MODE_MIRROR_REPEAT) {
-        U1.x = unwrap_repeat_axis(U0.x, U1.x);
-        U2.x = unwrap_repeat_axis(U0.x, U2.x);
-    }
-    if (tex_info.address_mode_v == ADDR_MODE_REPEAT || tex_info.address_mode_v == ADDR_MODE_MIRROR_REPEAT) {
-        U1.y = unwrap_repeat_axis(U0.y, U1.y);
-        U2.y = unwrap_repeat_axis(U0.y, U2.y);
-    }
+    // NOTE: UV unwrapping for repeat/mirror modes removed.
+    // The address modes apply to the FINAL transformed coordinates.
+    // Unwrapping in attribute space causes incorrect gradients when transforms are present.
 
     // Chain rule: d(UV)/d(screen) = d(UV)/d(bary) × d(bary)/d(screen)
     // UV = alpha*uv0 + beta*uv1 + gamma*uv2
@@ -244,6 +217,7 @@ fn pbr_get_gradients(
     triangle_indices: vec3<u32>,
     attribute_data_offset: u32,
     vertex_attribute_stride: u32,
+    uv_sets_index: u32,
     world_normal: vec3<f32>,        // For orthographic anisotropic correction
     view_matrix: mat4x4<f32>        // For orthographic anisotropic correction
 ) -> PbrMaterialGradients {
@@ -256,6 +230,7 @@ fn pbr_get_gradients(
             bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
             material.base_color_tex_info,
             world_normal,
             view_matrix
@@ -268,6 +243,7 @@ fn pbr_get_gradients(
             bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
             material.metallic_roughness_tex_info,
             world_normal,
             view_matrix
@@ -280,6 +256,7 @@ fn pbr_get_gradients(
             bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
             material.normal_tex_info,
             world_normal,
             view_matrix
@@ -292,6 +269,7 @@ fn pbr_get_gradients(
             bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
             material.occlusion_tex_info,
             world_normal,
             view_matrix
@@ -304,6 +282,7 @@ fn pbr_get_gradients(
             bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
             material.emissive_tex_info,
             world_normal,
             view_matrix

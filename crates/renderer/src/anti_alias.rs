@@ -5,13 +5,16 @@ pub struct AntiAliasing {
     // if None, no MSAA
     pub msaa_sample_count: Option<u32>,
     pub smaa: bool,
+    pub mipmap: bool,
 }
 
 impl Default for AntiAliasing {
     fn default() -> Self {
         Self {
             msaa_sample_count: Some(4),
+            //msaa_sample_count: None,
             smaa: true,
+            mipmap: true,
         }
     }
 }

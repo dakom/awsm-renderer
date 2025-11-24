@@ -94,6 +94,7 @@ impl MaterialOpaquePipelines {
             texture_pool_samplers_len: material_opaque_bind_groups.texture_pool_sampler_keys.len()
                 as u32,
             msaa_sample_count,
+            mipmaps: anti_aliasing.mipmap,
         };
 
         let shader_key = shaders

@@ -226,6 +226,7 @@ fn main(
                         let attribute_indices_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
                         let attribute_data_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
                         let visibility_data_offset_{{s}} = mesh_meta_{{s}}.visibility_data_offset / 4;
+                        let uv_sets_index_{{s}} = mesh_meta_{{s}}.uv_sets_index;
 
                         let base_tri_idx_{{s}} = attribute_indices_offset_{{s}} + (tri_{{s}} * 3u);
                         let tri_indices_{{s}} = vec3<u32>(
@@ -253,6 +254,7 @@ fn main(
                                     tri_indices_{{s}},
                                     attribute_data_offset_{{s}},
                                     vertex_attribute_stride_{{s}},
+                                    uv_sets_index_{{s}},
                                     normal_{{s}},
                                     camera.view
                                 );
@@ -265,6 +267,7 @@ fn main(
                                     pbr_material_{{s}},
                                     barycentric_{{s}},
                                     vertex_attribute_stride_{{s}},
+                                    uv_sets_index_{{s}},
                                     gradients_{{s}},
                                     normal_{{s}},
                                     transforms_{{s}}.world_normal,
@@ -278,6 +281,7 @@ fn main(
                                     pbr_material_{{s}},
                                     barycentric_{{s}},
                                     vertex_attribute_stride_{{s}},
+                                    uv_sets_index_{{s}},
                                     normal_{{s}},
                                     transforms_{{s}}.world_normal,
                                     os_verts_{{s}}
@@ -314,11 +318,13 @@ fn main(
                 }
             {% endfor %}
 
+            // Only write if we processed at least one sample that matches this shader variant.
+            // If valid_samples == 0, all samples failed pbr_should_run, meaning they belong
+            // to a different shader variant which will process them.
             if (valid_samples > 0u) {
                 textureStore(opaque_tex, coords, vec4<f32>(color_sum / f32(valid_samples), alpha_sum / f32(valid_samples)));
-            } else {
-                textureStore(opaque_tex, coords, sample_skybox(coords, screen_dims_f32, camera, skybox_tex, skybox_sampler));
             }
+            // Note: Don't write skybox if valid_samples == 0, let another pass handle it
             return;
         }
     {% endif %}
@@ -342,6 +348,7 @@ fn main(
     let attribute_indices_offset = mesh_meta.vertex_attribute_indices_offset / 4;
     let attribute_data_offset = mesh_meta.vertex_attribute_data_offset / 4;
     let visibility_data_offset = mesh_meta.visibility_data_offset / 4;
+    let uv_sets_index = mesh_meta.uv_sets_index;
 
     let transforms = get_transforms(mesh_meta);
 
@@ -372,6 +379,7 @@ fn main(
                 triangle_indices,
                 attribute_data_offset,
                 vertex_attribute_stride,
+                uv_sets_index,
                 world_normal,
                 camera.view
             );
@@ -383,6 +391,7 @@ fn main(
                 pbr_material,
                 barycentric,
                 vertex_attribute_stride,
+                uv_sets_index,
                 gradients,
                 world_normal,
                 transforms.world_normal,
@@ -396,6 +405,7 @@ fn main(
                 pbr_material,
                 barycentric,
                 vertex_attribute_stride,
+                uv_sets_index,
                 world_normal,
                 transforms.world_normal,
                 os_vertices
@@ -468,6 +478,7 @@ fn main(
                         let attribute_indices_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
                         let attribute_data_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
                         let visibility_data_offset_{{s}} = mesh_meta_{{s}}.visibility_data_offset / 4;
+                        let uv_sets_index_{{s}} = mesh_meta_{{s}}.uv_sets_index;
 
                         // Per-sample triangle indices
                         let base_triangle_index_{{s}} = attribute_indices_offset_{{s}} + (tri_id_{{s}} * 3u);
@@ -497,6 +508,7 @@ fn main(
                                     triangle_indices_{{s}},
                                     attribute_data_offset_{{s}},
                                     vertex_attribute_stride_{{s}},
+                                    uv_sets_index_{{s}},
                                     normal_{{s}},
                                     camera.view
                                 );
@@ -509,6 +521,7 @@ fn main(
                                     pbr_material_{{s}},
                                     barycentric_{{s}},
                                     vertex_attribute_stride_{{s}},
+                                    uv_sets_index_{{s}},
                                     gradients_{{s}},
                                     normal_{{s}},
                                     transforms_{{s}}.world_normal,
@@ -522,6 +535,7 @@ fn main(
                                     pbr_material_{{s}},
                                     barycentric_{{s}},
                                     vertex_attribute_stride_{{s}},
+                                    uv_sets_index_{{s}},
                                     normal_{{s}},
                                     transforms_{{s}}.world_normal,
                                     os_vertices_{{s}}

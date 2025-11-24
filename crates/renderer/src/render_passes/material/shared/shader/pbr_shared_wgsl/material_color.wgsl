@@ -27,6 +27,7 @@ struct PbrMaterialColor {
             material: PbrMaterial,
             barycentric: vec3<f32>,
             vertex_attribute_stride: u32,
+            uv_sets_index: u32,
             gradients: PbrMaterialGradients,
             world_normal: vec3<f32>,
             normal_matrix: mat3x3<f32>,
@@ -41,6 +42,7 @@ struct PbrMaterialColor {
                     barycentric,
                     material.base_color_tex_info,
                     vertex_attribute_stride,
+                    uv_sets_index,
                 ),
                 gradients.base_color,
             );
@@ -65,6 +67,7 @@ struct PbrMaterialColor {
                     barycentric,
                     material.metallic_roughness_tex_info,
                     vertex_attribute_stride,
+                    uv_sets_index,
                 ),
                 gradients.metallic_roughness,
             );
@@ -77,6 +80,7 @@ struct PbrMaterialColor {
                     barycentric,
                     material.normal_tex_info,
                     vertex_attribute_stride,
+                    uv_sets_index,
                 ),
                 gradients.normal,
                 world_normal,
@@ -84,6 +88,7 @@ struct PbrMaterialColor {
                 triangle_indices,
                 attribute_data_offset,
                 vertex_attribute_stride,
+                uv_sets_index,
                 normal_matrix,
                 os_vertices,
             );
@@ -96,6 +101,7 @@ struct PbrMaterialColor {
                     barycentric,
                     material.occlusion_tex_info,
                     vertex_attribute_stride,
+                    uv_sets_index,
                 ),
                 gradients.occlusion,
             );
@@ -108,6 +114,7 @@ struct PbrMaterialColor {
                     barycentric,
                     material.emissive_tex_info,
                     vertex_attribute_stride,
+                    uv_sets_index,
                 ),
                 gradients.emissive,
             );
@@ -148,6 +155,7 @@ struct PbrMaterialColor {
             triangle_indices: vec3<u32>,
             attribute_data_offset: u32,
             vertex_attribute_stride: u32,
+            uv_sets_index: u32,
             normal_matrix: mat3x3<f32>,
             os_vertices: ObjectSpaceVertices,
         ) -> vec3<f32> {
@@ -180,9 +188,9 @@ struct PbrMaterialColor {
             }
 
             let set_index = material.normal_tex_info.uv_set_index;
-            let uv0 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.x, vertex_attribute_stride);
-            let uv1 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.y, vertex_attribute_stride);
-            let uv2 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.z, vertex_attribute_stride);
+            let uv0 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.x, vertex_attribute_stride, uv_sets_index);
+            let uv1 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.y, vertex_attribute_stride, uv_sets_index);
+            let uv2 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.z, vertex_attribute_stride, uv_sets_index);
 
             let delta_pos1 = os_vertices.p1 - os_vertices.p0;
             let delta_pos2 = os_vertices.p2 - os_vertices.p0;
@@ -243,6 +251,7 @@ struct PbrMaterialColor {
             material: PbrMaterial,
             barycentric: vec3<f32>,
             vertex_attribute_stride: u32,
+            uv_sets_index: u32,
             world_normal: vec3<f32>,
             normal_matrix: mat3x3<f32>,
             os_vertices: ObjectSpaceVertices,
@@ -256,6 +265,7 @@ struct PbrMaterialColor {
                     barycentric,
                     material.base_color_tex_info,
                     vertex_attribute_stride,
+                    uv_sets_index,
                 ),
             );
 
@@ -280,6 +290,7 @@ struct PbrMaterialColor {
                     barycentric,
                     material.metallic_roughness_tex_info,
                     vertex_attribute_stride,
+                    uv_sets_index,
                 ),
             );
 
@@ -293,12 +304,14 @@ struct PbrMaterialColor {
                     barycentric,
                     material.normal_tex_info,
                     vertex_attribute_stride,
+                    uv_sets_index,
                 ),
                 world_normal,
                 barycentric,
                 triangle_indices,
                 attribute_data_offset,
                 vertex_attribute_stride,
+                uv_sets_index,
                 normal_matrix,
                 os_vertices,
             );
@@ -311,6 +324,7 @@ struct PbrMaterialColor {
                     barycentric,
                     material.occlusion_tex_info,
                     vertex_attribute_stride,
+                    uv_sets_index,
                 ),
             );
 
@@ -322,6 +336,7 @@ struct PbrMaterialColor {
                     barycentric,
                     material.emissive_tex_info,
                     vertex_attribute_stride,
+                    uv_sets_index,
                 ),
             );
 
@@ -376,6 +391,7 @@ struct PbrMaterialColor {
             triangle_indices: vec3<u32>,
             attribute_data_offset: u32,
             vertex_attribute_stride: u32,
+            uv_sets_index: u32,
             normal_matrix: mat3x3<f32>,
             os_vertices: ObjectSpaceVertices,
         ) -> vec3<f32> {
@@ -416,9 +432,9 @@ struct PbrMaterialColor {
             // Method 2: Compute tangent space from triangle UV derivatives (fallback for missing tangents)
             // This is used for glTF models that don't include TANGENT attributes (e.g., NormalTangentTest)
             let set_index = material.normal_tex_info.uv_set_index;
-            let uv0 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.x, vertex_attribute_stride);
-            let uv1 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.y, vertex_attribute_stride);
-            let uv2 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.z, vertex_attribute_stride);
+            let uv0 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.x, vertex_attribute_stride, uv_sets_index);
+            let uv1 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.y, vertex_attribute_stride, uv_sets_index);
+            let uv2 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.z, vertex_attribute_stride, uv_sets_index);
 
             let delta_pos1 = os_vertices.p1 - os_vertices.p0;
             let delta_pos2 = os_vertices.p2 - os_vertices.p0;

@@ -1,6 +1,6 @@
 
 // make sure this matches MATERIAL_MESH_META_BYTE_ALIGNMENT in material_opaque_meta.rs
-const META_SIZE_IN_BYTES = 52u;
+const META_SIZE_IN_BYTES = 56u;
 
 struct MeshMeta {
     mesh_key_high: u32,
@@ -15,5 +15,6 @@ struct MeshMeta {
     vertex_attribute_indices_offset: u32,
     vertex_attribute_data_offset: u32,
     vertex_attribute_stride: u32,
+    uv_sets_index: u32,
     visibility_data_offset: u32,
 }

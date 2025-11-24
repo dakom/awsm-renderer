@@ -14,7 +14,7 @@ use crate::{
 
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_NORMAL: u32 = 1;
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_TANGENT: u32 = 1 << 1;
-pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 52;
+pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 56;
 pub const MATERIAL_MESH_META_BYTE_ALIGNMENT: usize = MATERIAL_MESH_META_BYTE_SIZE; // storage buffer is less strict
 
 pub static MATERIAL_BUFFER_USAGE: LazyLock<BufferUsage> =
@@ -33,6 +33,31 @@ pub struct MaterialMeshMeta<'a> {
     pub buffer_info: &'a MeshBufferInfo,
     pub materials: &'a Materials,
     pub morphs: &'a Morphs,
+}
+
+/// Calculate the offset (in floats) to TEXCOORD_0 within the vertex attribute data.
+/// This accounts for any COLOR_n attributes that come before texture coordinates.
+fn calculate_uv_sets_index(buffer_info: &MeshBufferInfo) -> u32 {
+    use crate::mesh::buffer_info::{MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo};
+
+    let mut offset_floats = 0;
+    for attr in &buffer_info.triangles.vertex_attributes {
+        match attr {
+            MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
+                MeshBufferCustomVertexAttributeInfo::Colors { .. } => {
+                    // vertex_size() returns bytes, divide by 4 to get float count
+                    offset_floats += attr.vertex_size() / 4;
+                }
+                MeshBufferCustomVertexAttributeInfo::TexCoords { .. } => {
+                    // Found TexCoords, stop counting
+                    break;
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+    }
+    offset_floats as u32
 }
 
 impl<'a> MaterialMeshMeta<'a> {
@@ -115,6 +140,10 @@ impl<'a> MaterialMeshMeta<'a> {
 
         // Vertex attribute stride (4 bytes)
         push_u32(buffer_info.triangles.vertex_attribute_stride() as u32);
+
+        // UV sets index - offset in floats to TEXCOORD_0 within vertex attribute data (4 bytes)
+        let uv_sets_index = calculate_uv_sets_index(buffer_info);
+        push_u32(uv_sets_index);
 
         // Visibility data offset (4 bytes)
         push_u32(visibility_data_offset as u32);

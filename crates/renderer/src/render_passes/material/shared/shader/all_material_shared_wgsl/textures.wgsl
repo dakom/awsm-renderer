@@ -178,22 +178,22 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
 {% endmatch %}
 
 
-fn texture_uv(attribute_data_offset: u32, triangle_indices: vec3<u32>, barycentric: vec3<f32>, tex_info: TextureInfo, vertex_attribute_stride: u32) -> vec2<f32> {
-    let uv0 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, triangle_indices.x, vertex_attribute_stride);
-    let uv1 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, triangle_indices.y, vertex_attribute_stride);
-    let uv2 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, triangle_indices.z, vertex_attribute_stride);
+fn texture_uv(attribute_data_offset: u32, triangle_indices: vec3<u32>, barycentric: vec3<f32>, tex_info: TextureInfo, vertex_attribute_stride: u32, uv_sets_index: u32) -> vec2<f32> {
+    let uv0 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, triangle_indices.x, vertex_attribute_stride, uv_sets_index);
+    let uv1 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, triangle_indices.y, vertex_attribute_stride, uv_sets_index);
+    let uv2 = _texture_uv_per_vertex(attribute_data_offset, tex_info.uv_set_index, triangle_indices.z, vertex_attribute_stride, uv_sets_index);
 
     let interpolated_uv = barycentric.x * uv0 + barycentric.y * uv1 + barycentric.z * uv2;
 
     return interpolated_uv;
 }
 
-fn _texture_uv_per_vertex(attribute_data_offset: u32, set_index: u32, vertex_index: u32, vertex_attribute_stride: u32) -> vec2<f32> {
+fn _texture_uv_per_vertex(attribute_data_offset: u32, set_index: u32, vertex_index: u32, vertex_attribute_stride: u32, uv_sets_index: u32) -> vec2<f32> {
     // First get to the right vertex, THEN to the right UV set within that vertex
     let vertex_start = attribute_data_offset + (vertex_index * vertex_attribute_stride);
     // `uv_sets_index` points to the beginning of TEXCOORD_0 inside the packed stream.
     // Each additional UV set contributes two more floats per vertex.
-    let uv_offset = {{ uv_sets_index }}u + (set_index * 2u);
+    let uv_offset = uv_sets_index + (set_index * 2u);
     let index = vertex_start + uv_offset;
     let uv = vec2<f32>(attribute_data[index], attribute_data[index + 1]);
 

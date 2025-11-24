@@ -94,7 +94,11 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             tangents: value.attributes.tangents,
             color_sets: value.attributes.color_sets,
             uv_sets: value.attributes.uv_sets,
-            mipmap: MipmapMode::Gradient,
+            mipmap: if value.mipmaps {
+                MipmapMode::Gradient
+            } else {
+                MipmapMode::None
+            },
             multisampled_geometry: value.msaa_sample_count > 0,
             msaa_sample_count: value.msaa_sample_count,
             debug: ShaderTemplateMaterialOpaqueDebug {

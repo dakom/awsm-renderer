@@ -71,11 +71,11 @@ struct PbrMaterial {
 
 fn pbr_get_material(offset: u32) -> PbrMaterial {
     const MATERIAL_BITMASK_BASE_COLOR: u32 = 1u;
-    const MATERIAL_BITMASK_METALIC_ROUGHNESS: u32 = 1u << 1u;;
-    const MATERIAL_BITMASK_NORMAL: u32 = 1u << 2u;;
-    const MATERIAL_BITMASK_OCCLUSION: u32 = 1u << 3u;;
-    const MATERIAL_BITMASK_EMISSIVE: u32 = 1u << 4u;;
-    const MATERIAL_BITMASK_COLOR: u32 = 1u << 5u;;
+    const MATERIAL_BITMASK_METALIC_ROUGHNESS: u32 = 1u << 1u;
+    const MATERIAL_BITMASK_NORMAL: u32 = 1u << 2u;
+    const MATERIAL_BITMASK_OCCLUSION: u32 = 1u << 3u;
+    const MATERIAL_BITMASK_EMISSIVE: u32 = 1u << 4u;
+    const MATERIAL_BITMASK_COLOR: u32 = 1u << 5u;
 
     let raw = materials[offset / material_alignment];
 
