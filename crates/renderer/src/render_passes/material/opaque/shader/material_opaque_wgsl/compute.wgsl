@@ -216,115 +216,139 @@ fn main(
                 } else {
                     // Full per-sample geometry shading
                     let mesh_meta_{{s}} = mesh_metas[mat_meta_{{s}} / META_SIZE_IN_BYTES];
-                    let material_offset_{{s}} = mesh_meta_{{s}}.material_offset;
-                    let pbr_material_{{s}} = pbr_get_material(material_offset_{{s}});
 
-                    if (pbr_should_run(pbr_material_{{s}})) {
-                        valid_samples++;
-
-                        let vertex_attribute_stride_{{s}} = mesh_meta_{{s}}.vertex_attribute_stride / 4;
-                        let attribute_indices_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
-                        let attribute_data_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
-                        let visibility_data_offset_{{s}} = mesh_meta_{{s}}.visibility_data_offset / 4;
-                        let uv_sets_index_{{s}} = mesh_meta_{{s}}.uv_sets_index;
-
-                        let base_tri_idx_{{s}} = attribute_indices_offset_{{s}} + (tri_{{s}} * 3u);
-                        let tri_indices_{{s}} = vec3<u32>(
-                            attribute_indices[base_tri_idx_{{s}}],
-                            attribute_indices[base_tri_idx_{{s}} + 1],
-                            attribute_indices[base_tri_idx_{{s}} + 2]
-                        );
-
-                        let bary_{{s}} = textureLoad(barycentric_tex, coords, {{s}});
-                        let bary_derivs_{{s}} = textureLoad(barycentric_derivatives_tex, coords, {{s}});
-                        let barycentric_{{s}} = vec3<f32>(bary_{{s}}.x, bary_{{s}}.y, 1.0 - bary_{{s}}.x - bary_{{s}}.y);
-                        let packed_nt_{{s}} = textureLoad(normal_tangent_tex, coords, {{s}});
-                        let tbn_{{s}} = unpack_normal_tangent(packed_nt_{{s}});
-                        let normal_{{s}} = tbn_{{s}}.N;
-                        let os_verts_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_{{s}});
-                        let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
-
-                        {% match mipmap %}
-                            {% when MipmapMode::Gradient %}
-                                // Calculate proper gradients for this MSAA sample to enable mipmapping
-                                let gradients_{{s}} = pbr_get_gradients(
-                                    barycentric_{{s}},
-                                    bary_derivs_{{s}},
-                                    pbr_material_{{s}},
-                                    tri_indices_{{s}},
-                                    attribute_data_offset_{{s}},
-                                    vertex_attribute_stride_{{s}},
-                                    uv_sets_index_{{s}},
-                                    normal_{{s}},
-                                    camera.view
-                                );
-
-                                // Compute material color with proper mipmapping
-                                let mat_color_{{s}} = pbr_get_material_color_grad(
-                                    tri_indices_{{s}},
-                                    attribute_data_offset_{{s}},
-                                    tri_{{s}},
-                                    pbr_material_{{s}},
-                                    barycentric_{{s}},
-                                    vertex_attribute_stride_{{s}},
-                                    uv_sets_index_{{s}},
-                                    gradients_{{s}},
-                                    normal_{{s}},
-                                    transforms_{{s}}.world_normal,
-                                    os_verts_{{s}}
-                                );
-                            {% when MipmapMode::None %}
-                                let mat_color_{{s}} = pbr_get_material_color_no_mips(
-                                    tri_indices_{{s}},
-                                    attribute_data_offset_{{s}},
-                                    tri_{{s}},
-                                    pbr_material_{{s}},
-                                    barycentric_{{s}},
-                                    vertex_attribute_stride_{{s}},
-                                    uv_sets_index_{{s}},
-                                    normal_{{s}},
-                                    transforms_{{s}}.world_normal,
-                                    os_verts_{{s}}
-                                );
-                        {% endmatch %}
-
-                        var sample_color = vec3<f32>(0.0);
-
-                        {% if has_lighting_ibl() %}
-                            sample_color = brdf_ibl(
-                                mat_color_{{s}},
-                                mat_color_{{s}}.normal,
-                                standard_coordinates.surface_to_camera,
-                                ibl_filtered_env_tex,
-                                ibl_filtered_env_sampler,
-                                ibl_irradiance_tex,
-                                ibl_irradiance_sampler,
-                                brdf_lut_tex,
-                                brdf_lut_sampler,
-                                lights_info.ibl
-                            );
-                        {% endif %}
-
-                        {% if has_lighting_punctual() %}
-                            for(var i = 0u; i < lights_info.n_lights; i = i + 1u) {
-                                let light_brdf = light_to_brdf(get_light(i), mat_color_{{s}}.normal, standard_coordinates.world_position);
-                                sample_color += brdf_direct(mat_color_{{s}}, light_brdf, standard_coordinates.surface_to_camera);
+                    // Check if this shader variant matches this sample's mesh attributes
+                    var sample_matches_variant = true;
+                    {%- match uv_sets %}
+                        {% when Some with (variant_uv_sets) %}
+                            if (mesh_meta_{{s}}.uv_set_count != {{ variant_uv_sets }}u) {
+                                sample_matches_variant = false;
                             }
-                        {% endif %}
+                        {% when None %}
+                            if (mesh_meta_{{s}}.uv_set_count != 0u) {
+                                sample_matches_variant = false;
+                            }
+                    {% endmatch %}
+                    {%- match color_sets %}
+                        {% when Some with (variant_color_sets) %}
+                            if (mesh_meta_{{s}}.color_set_count != {{ variant_color_sets }}u) {
+                                sample_matches_variant = false;
+                            }
+                        {% when None %}
+                            if (mesh_meta_{{s}}.color_set_count != 0u) {
+                                sample_matches_variant = false;
+                            }
+                    {% endmatch %}
 
-                        color_sum += sample_color;
-                        alpha_sum += mat_color_{{s}}.base.a;
+                    if (sample_matches_variant) {
+                        valid_samples++;
+                        let material_offset_{{s}} = mesh_meta_{{s}}.material_offset;
+                        let pbr_material_{{s}} = pbr_get_material(material_offset_{{s}});
+
+                    let vertex_attribute_stride_{{s}} = mesh_meta_{{s}}.vertex_attribute_stride / 4;
+                    let attribute_indices_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
+                    let attribute_data_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
+                    let visibility_data_offset_{{s}} = mesh_meta_{{s}}.visibility_data_offset / 4;
+                    let uv_sets_index_{{s}} = mesh_meta_{{s}}.uv_sets_index;
+
+                    let base_tri_idx_{{s}} = attribute_indices_offset_{{s}} + (tri_{{s}} * 3u);
+                    let tri_indices_{{s}} = vec3<u32>(
+                        attribute_indices[base_tri_idx_{{s}}],
+                        attribute_indices[base_tri_idx_{{s}} + 1],
+                        attribute_indices[base_tri_idx_{{s}} + 2]
+                    );
+
+                    let bary_{{s}} = textureLoad(barycentric_tex, coords, {{s}});
+                    let bary_derivs_{{s}} = textureLoad(barycentric_derivatives_tex, coords, {{s}});
+                    let barycentric_{{s}} = vec3<f32>(bary_{{s}}.x, bary_{{s}}.y, 1.0 - bary_{{s}}.x - bary_{{s}}.y);
+                    let packed_nt_{{s}} = textureLoad(normal_tangent_tex, coords, {{s}});
+                    let tbn_{{s}} = unpack_normal_tangent(packed_nt_{{s}});
+                    let normal_{{s}} = tbn_{{s}}.N;
+                    let os_verts_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_{{s}});
+                    let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
+
+                    {% match mipmap %}
+                        {% when MipmapMode::Gradient %}
+                            // Calculate proper gradients for this MSAA sample to enable mipmapping
+                            let gradients_{{s}} = pbr_get_gradients(
+                                barycentric_{{s}},
+                                bary_derivs_{{s}},
+                                pbr_material_{{s}},
+                                tri_indices_{{s}},
+                                attribute_data_offset_{{s}},
+                                vertex_attribute_stride_{{s}},
+                                uv_sets_index_{{s}},
+                                normal_{{s}},
+                                camera.view
+                            );
+
+                            // Compute material color with proper mipmapping
+                            let mat_color_{{s}} = pbr_get_material_color_grad(
+                                tri_indices_{{s}},
+                                attribute_data_offset_{{s}},
+                                tri_{{s}},
+                                pbr_material_{{s}},
+                                barycentric_{{s}},
+                                vertex_attribute_stride_{{s}},
+                                uv_sets_index_{{s}},
+                                gradients_{{s}},
+                                normal_{{s}},
+                                transforms_{{s}}.world_normal,
+                                os_verts_{{s}}
+                            );
+                        {% when MipmapMode::None %}
+                            let mat_color_{{s}} = pbr_get_material_color_no_mips(
+                                tri_indices_{{s}},
+                                attribute_data_offset_{{s}},
+                                tri_{{s}},
+                                pbr_material_{{s}},
+                                barycentric_{{s}},
+                                vertex_attribute_stride_{{s}},
+                                uv_sets_index_{{s}},
+                                normal_{{s}},
+                                transforms_{{s}}.world_normal,
+                                os_verts_{{s}}
+                            );
+                    {% endmatch %}
+
+                    var sample_color = vec3<f32>(0.0);
+
+                    {% if has_lighting_ibl() %}
+                        sample_color = brdf_ibl(
+                            mat_color_{{s}},
+                            mat_color_{{s}}.normal,
+                            standard_coordinates.surface_to_camera,
+                            ibl_filtered_env_tex,
+                            ibl_filtered_env_sampler,
+                            ibl_irradiance_tex,
+                            ibl_irradiance_sampler,
+                            brdf_lut_tex,
+                            brdf_lut_sampler,
+                            lights_info.ibl
+                        );
+                    {% endif %}
+
+                    {% if has_lighting_punctual() %}
+                        for(var i = 0u; i < lights_info.n_lights; i = i + 1u) {
+                            let light_brdf = light_to_brdf(get_light(i), mat_color_{{s}}.normal, standard_coordinates.world_position);
+                            sample_color += brdf_direct(mat_color_{{s}}, light_brdf, standard_coordinates.surface_to_camera);
+                        }
+                    {% endif %}
+
+                    color_sum += sample_color;
+                    alpha_sum += mat_color_{{s}}.base.a;
                     }
                 }
             {% endfor %}
 
-            // Only write if we processed at least one sample that matches this shader variant.
-            // If valid_samples == 0, all samples failed pbr_should_run, meaning they belong
-            // to a different shader variant which will process them.
+            // Average and write the result
             if (valid_samples > 0u) {
                 textureStore(opaque_tex, coords, vec4<f32>(color_sum / f32(valid_samples), alpha_sum / f32(valid_samples)));
+            } else {
+                // All samples failed validation - this shouldn't happen in correct scenes
+                // Write magenta to make it obvious
+                textureStore(opaque_tex, coords, vec4<f32>(1.0, 0.0, 1.0, 1.0));
             }
-            // Note: Don't write skybox if valid_samples == 0, let another pass handle it
             return;
         }
     {% endif %}
@@ -335,14 +359,32 @@ fn main(
 
     let mesh_meta = mesh_metas[material_meta_offset / META_SIZE_IN_BYTES];
 
+    // Early exit if this shader variant doesn't match this mesh's attributes
+    // Each shader variant is compiled for specific uv_sets/color_sets counts
+    // Only process pixels where the mesh matches what this variant expects
+    {%- match uv_sets %}
+        {% when Some with (variant_uv_sets) %}
+            if (mesh_meta.uv_set_count != {{ variant_uv_sets }}u) {
+                return;
+            }
+        {% when None %}
+            if (mesh_meta.uv_set_count != 0u) {
+                return;
+            }
+    {% endmatch %}
+    {%- match color_sets %}
+        {% when Some with (variant_color_sets) %}
+            if (mesh_meta.color_set_count != {{ variant_color_sets }}u) {
+                return;
+            }
+        {% when None %}
+            if (mesh_meta.color_set_count != 0u) {
+                return;
+            }
+    {% endmatch %}
 
     let material_offset = mesh_meta.material_offset;
     let pbr_material = pbr_get_material(material_offset);
-
-    // Skip work when the mesh doesn't provide enough UV data for the material.
-    if !pbr_should_run(pbr_material) {
-        return;
-    }
 
     let vertex_attribute_stride = mesh_meta.vertex_attribute_stride / 4; // 4 bytes per float
     let attribute_indices_offset = mesh_meta.vertex_attribute_indices_offset / 4;
@@ -350,13 +392,16 @@ fn main(
     let visibility_data_offset = mesh_meta.visibility_data_offset / 4;
     let uv_sets_index = mesh_meta.uv_sets_index;
 
+    let base_triangle_index = attribute_indices_offset + (triangle_index * 3u);
+    let triangle_indices = vec3<u32>(
+        attribute_indices[base_triangle_index],
+        attribute_indices[base_triangle_index + 1],
+        attribute_indices[base_triangle_index + 2]
+    );
+
     let transforms = get_transforms(mesh_meta);
 
     let standard_coordinates = get_standard_coordinates(coords, screen_dims);
-
-    // Get the vertex indices for this triangle
-    let base_triangle_index = attribute_indices_offset + (triangle_index * 3u);
-    let triangle_indices = vec3<u32>(attribute_indices[base_triangle_index], attribute_indices[base_triangle_index + 1], attribute_indices[base_triangle_index + 2]);
 
     // Load world-space normal directly from geometry pass output (already transformed with morphs/skins)
     let packed_nt = textureLoad(normal_tangent_tex, coords, 0);
@@ -466,88 +511,131 @@ fn main(
                 } else {
                     // Each sample needs its own mesh/material data
                     let mesh_meta_{{s}} = mesh_metas[material_meta_offset_{{s}} / META_SIZE_IN_BYTES];
-                    let material_offset_{{s}} = mesh_meta_{{s}}.material_offset;
-                    let pbr_material_{{s}} = pbr_get_material(material_offset_{{s}});
 
-                    // Only process if this sample's mesh provides required data
-                    if (pbr_should_run(pbr_material_{{s}})) {
+                    // Check if this shader variant matches this sample's mesh attributes
+                    var sample_matches_variant_{{s}} = true;
+                    {%- match uv_sets %}
+                        {% when Some with (variant_uv_sets) %}
+                            if (mesh_meta_{{s}}.uv_set_count != {{ variant_uv_sets }}u) {
+                                sample_matches_variant_{{s}} = false;
+                            }
+                        {% when None %}
+                            if (mesh_meta_{{s}}.uv_set_count != 0u) {
+                                sample_matches_variant_{{s}} = false;
+                            }
+                    {% endmatch %}
+                    {%- match color_sets %}
+                        {% when Some with (variant_color_sets) %}
+                            if (mesh_meta_{{s}}.color_set_count != {{ variant_color_sets }}u) {
+                                sample_matches_variant_{{s}} = false;
+                            }
+                        {% when None %}
+                            if (mesh_meta_{{s}}.color_set_count != 0u) {
+                                sample_matches_variant_{{s}} = false;
+                            }
+                    {% endmatch %}
+
+                    if (sample_matches_variant_{{s}}) {
                         valid_samples++;
+                        let material_offset_{{s}} = mesh_meta_{{s}}.material_offset;
+                        let pbr_material_{{s}} = pbr_get_material(material_offset_{{s}});
 
                         // Per-sample mesh data
                         let vertex_attribute_stride_{{s}} = mesh_meta_{{s}}.vertex_attribute_stride / 4;
-                        let attribute_indices_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
-                        let attribute_data_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
-                        let visibility_data_offset_{{s}} = mesh_meta_{{s}}.visibility_data_offset / 4;
-                        let uv_sets_index_{{s}} = mesh_meta_{{s}}.uv_sets_index;
+                    let attribute_indices_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
+                    let attribute_data_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
+                    let visibility_data_offset_{{s}} = mesh_meta_{{s}}.visibility_data_offset / 4;
+                    let uv_sets_index_{{s}} = mesh_meta_{{s}}.uv_sets_index;
 
-                        // Per-sample triangle indices
-                        let base_triangle_index_{{s}} = attribute_indices_offset_{{s}} + (tri_id_{{s}} * 3u);
-                        let triangle_indices_{{s}} = vec3<u32>(
-                            attribute_indices[base_triangle_index_{{s}}],
-                            attribute_indices[base_triangle_index_{{s}} + 1],
-                            attribute_indices[base_triangle_index_{{s}} + 2]
+                    // Per-sample triangle indices
+                    let base_triangle_index_{{s}} = attribute_indices_offset_{{s}} + (tri_id_{{s}} * 3u);
+                    let triangle_indices_{{s}} = vec3<u32>(
+                        attribute_indices[base_triangle_index_{{s}}],
+                        attribute_indices[base_triangle_index_{{s}} + 1],
+                        attribute_indices[base_triangle_index_{{s}} + 2]
+                    );
+
+                    // Per-sample geometry
+                    let bary_{{s}} = textureLoad(barycentric_tex, coords, {{s}});
+                    let bary_derivs_{{s}} = textureLoad(barycentric_derivatives_tex, coords, {{s}});
+                    let barycentric_{{s}} = vec3<f32>(bary_{{s}}.x, bary_{{s}}.y, 1.0 - bary_{{s}}.x - bary_{{s}}.y);
+                    let packed_nt_{{s}} = textureLoad(normal_tangent_tex, coords, {{s}});
+                    let tbn_{{s}} = unpack_normal_tangent(packed_nt_{{s}});
+                    let normal_{{s}} = tbn_{{s}}.N;
+                    let os_vertices_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_id_{{s}});
+                    let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
+
+                    // Calculate proper gradients for this MSAA sample to enable mipmapping
+                    {% match mipmap %}
+                        {% when MipmapMode::Gradient %}
+                            let gradients_{{s}} = pbr_get_gradients(
+                                barycentric_{{s}},
+                                bary_derivs_{{s}},
+                                pbr_material_{{s}},
+                                triangle_indices_{{s}},
+                                attribute_data_offset_{{s}},
+                                vertex_attribute_stride_{{s}},
+                                uv_sets_index_{{s}},
+                                normal_{{s}},
+                                camera.view
+                            );
+
+                            // Compute material color with proper mipmapping
+                            let material_color_{{s}} = pbr_get_material_color_grad(
+                                triangle_indices_{{s}},
+                                attribute_data_offset_{{s}},
+                                tri_id_{{s}},
+                                pbr_material_{{s}},
+                                barycentric_{{s}},
+                                vertex_attribute_stride_{{s}},
+                                uv_sets_index_{{s}},
+                                gradients_{{s}},
+                                normal_{{s}},
+                                transforms_{{s}}.world_normal,
+                                os_vertices_{{s}}
+                            );
+                        {% when MipmapMode::None %}
+                            let material_color_{{s}} = pbr_get_material_color_no_mips(
+                                triangle_indices_{{s}},
+                                attribute_data_offset_{{s}},
+                                tri_id_{{s}},
+                                pbr_material_{{s}},
+                                barycentric_{{s}},
+                                vertex_attribute_stride_{{s}},
+                                uv_sets_index_{{s}},
+                                normal_{{s}},
+                                transforms_{{s}}.world_normal,
+                                os_vertices_{{s}}
+                            );
+                    {% endmatch %}
+
+                    // Compute lighting for this sample
+                    var sample_color = vec3<f32>(0.0);
+
+                    {% if has_lighting_ibl() %}
+                        sample_color = brdf_ibl(
+                            material_color_{{s}},
+                            material_color_{{s}}.normal,
+                            standard_coordinates.surface_to_camera,
+                            ibl_filtered_env_tex,
+                            ibl_filtered_env_sampler,
+                            ibl_irradiance_tex,
+                            ibl_irradiance_sampler,
+                            brdf_lut_tex,
+                            brdf_lut_sampler,
+                            lights_info.ibl
                         );
+                    {% endif %}
 
-                        // Per-sample geometry
-                        let bary_{{s}} = textureLoad(barycentric_tex, coords, {{s}});
-                        let bary_derivs_{{s}} = textureLoad(barycentric_derivatives_tex, coords, {{s}});
-                        let barycentric_{{s}} = vec3<f32>(bary_{{s}}.x, bary_{{s}}.y, 1.0 - bary_{{s}}.x - bary_{{s}}.y);
-                        let packed_nt_{{s}} = textureLoad(normal_tangent_tex, coords, {{s}});
-                        let tbn_{{s}} = unpack_normal_tangent(packed_nt_{{s}});
-                        let normal_{{s}} = tbn_{{s}}.N;
-                        let os_vertices_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_id_{{s}});
-                        let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
+                    {% if has_lighting_punctual() %}
+                        for(var i = 0u; i < lights_info.n_lights; i = i + 1u) {
+                            let light_brdf = light_to_brdf(get_light(i), material_color_{{s}}.normal, standard_coordinates.world_position);
+                            sample_color += brdf_direct(material_color_{{s}}, light_brdf, standard_coordinates.surface_to_camera);
+                        }
+                    {% endif %}
 
-                        // Calculate proper gradients for this MSAA sample to enable mipmapping
-                        {% match mipmap %}
-                            {% when MipmapMode::Gradient %}
-                                let gradients_{{s}} = pbr_get_gradients(
-                                    barycentric_{{s}},
-                                    bary_derivs_{{s}},
-                                    pbr_material_{{s}},
-                                    triangle_indices_{{s}},
-                                    attribute_data_offset_{{s}},
-                                    vertex_attribute_stride_{{s}},
-                                    uv_sets_index_{{s}},
-                                    normal_{{s}},
-                                    camera.view
-                                );
-
-                                // Compute material color with proper mipmapping
-                                let material_color_{{s}} = pbr_get_material_color_grad(
-                                    triangle_indices_{{s}},
-                                    attribute_data_offset_{{s}},
-                                    tri_id_{{s}},
-                                    pbr_material_{{s}},
-                                    barycentric_{{s}},
-                                    vertex_attribute_stride_{{s}},
-                                    uv_sets_index_{{s}},
-                                    gradients_{{s}},
-                                    normal_{{s}},
-                                    transforms_{{s}}.world_normal,
-                                    os_vertices_{{s}}
-                                );
-                            {% when MipmapMode::None %}
-                                let material_color_{{s}} = pbr_get_material_color_no_mips(
-                                    triangle_indices_{{s}},
-                                    attribute_data_offset_{{s}},
-                                    tri_id_{{s}},
-                                    pbr_material_{{s}},
-                                    barycentric_{{s}},
-                                    vertex_attribute_stride_{{s}},
-                                    uv_sets_index_{{s}},
-                                    normal_{{s}},
-                                    transforms_{{s}}.world_normal,
-                                    os_vertices_{{s}}
-                                );
-                        {% endmatch %}
-
-                            // Compute lighting for this sample
-                        var sample_color = vec3<f32>(0.0);
-
-                        // DEBUG LIGHTING SLOG_1
-                        color_sum += sample_color;
-                        alpha_sum += material_color_{{s}}.base.a;
+                    color_sum += sample_color;
+                    alpha_sum += material_color_{{s}}.base.a;
                     }
                 }
             {% endfor %}
@@ -566,6 +654,36 @@ fn main(
 
     // Write to output texture (non-edge path or non-MSAA)
     textureStore(opaque_tex, coords, vec4<f32>(color, material_color.base.a));
+}
+
+// Validate that the material's texture and color requirements can be satisfied by this specific mesh.
+// This prevents reading garbage data when materials request attributes the mesh doesn't have.
+fn pbr_can_run_for_mesh(material: PbrMaterial, mesh_meta: MeshMeta) -> bool {
+    // Check UV requirements
+    if material.has_base_color_texture && material.base_color_tex_info.uv_set_index >= mesh_meta.uv_set_count {
+        return false;
+    }
+    if material.has_metallic_roughness_texture && material.metallic_roughness_tex_info.uv_set_index >= mesh_meta.uv_set_count {
+        return false;
+    }
+    if material.has_normal_texture && material.normal_tex_info.uv_set_index >= mesh_meta.uv_set_count {
+        return false;
+    }
+    if material.has_occlusion_texture && material.occlusion_tex_info.uv_set_index >= mesh_meta.uv_set_count {
+        return false;
+    }
+    if material.has_emissive_texture && material.emissive_tex_info.uv_set_index >= mesh_meta.uv_set_count {
+        return false;
+    }
+
+    // Check color requirements
+    if material.has_color_info {
+        if material.color_info.set_index >= mesh_meta.color_set_count {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 fn pbr_should_run(material: PbrMaterial) -> bool {

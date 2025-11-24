@@ -14,7 +14,7 @@ use crate::{
 
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_NORMAL: u32 = 1;
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_TANGENT: u32 = 1 << 1;
-pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 56;
+pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 64;
 pub const MATERIAL_MESH_META_BYTE_ALIGNMENT: usize = MATERIAL_MESH_META_BYTE_SIZE; // storage buffer is less strict
 
 pub static MATERIAL_BUFFER_USAGE: LazyLock<BufferUsage> =
@@ -58,6 +58,32 @@ fn calculate_uv_sets_index(buffer_info: &MeshBufferInfo) -> u32 {
         }
     }
     offset_floats as u32
+}
+
+/// Calculate how many UV sets and color sets this mesh has.
+/// Returns (uv_set_count, color_set_count).
+fn calculate_attribute_counts(buffer_info: &MeshBufferInfo) -> (u32, u32) {
+    use crate::mesh::buffer_info::{MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo};
+
+    let mut uv_set_count = 0u32;
+    let mut color_set_count = 0u32;
+
+    for attr in &buffer_info.triangles.vertex_attributes {
+        match attr {
+            MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
+                MeshBufferCustomVertexAttributeInfo::TexCoords { count, .. } => {
+                    uv_set_count = uv_set_count.max(*count + 1);
+                }
+                MeshBufferCustomVertexAttributeInfo::Colors { count, .. } => {
+                    color_set_count = color_set_count.max(*count + 1);
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+    }
+
+    (uv_set_count, color_set_count)
 }
 
 impl<'a> MaterialMeshMeta<'a> {
@@ -144,6 +170,11 @@ impl<'a> MaterialMeshMeta<'a> {
         // UV sets index - offset in floats to TEXCOORD_0 within vertex attribute data (4 bytes)
         let uv_sets_index = calculate_uv_sets_index(buffer_info);
         push_u32(uv_sets_index);
+
+        // UV set count and color set count (8 bytes)
+        let (uv_set_count, color_set_count) = calculate_attribute_counts(buffer_info);
+        push_u32(uv_set_count);
+        push_u32(color_set_count);
 
         // Visibility data offset (4 bytes)
         push_u32(visibility_data_offset as u32);
