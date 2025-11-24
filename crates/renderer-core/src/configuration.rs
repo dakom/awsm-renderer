@@ -53,7 +53,6 @@ impl CanvasConfiguration {
             .format
             .unwrap_or_else(|| gpu.get_preferred_canvas_format());
 
-        tracing::info!("Using canvas format: {:?}", format);
         let configuration_js = web_sys::GpuCanvasConfiguration::new(device, format);
 
         if let Some(alpha_mode) = self.alpha_mode {

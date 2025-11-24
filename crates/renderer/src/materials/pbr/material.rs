@@ -14,7 +14,6 @@ use awsm_renderer_core::{
     },
 };
 
-use crate::materials::{AwsmMaterialError, Result};
 use crate::{
     bind_group_layout::{
         BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey,
@@ -25,31 +24,40 @@ use crate::{
     textures::{SamplerKey, TextureKey, Textures},
     AwsmRenderer, AwsmRendererLogging,
 };
+use crate::{
+    materials::{AwsmMaterialError, Result},
+    textures::TextureTransformKey,
+};
 
 #[derive(Clone, Debug)]
 pub struct PbrMaterial {
     pub base_color_tex: Option<TextureKey>,
     pub base_color_sampler: Option<SamplerKey>,
+    pub base_color_texture_transform: Option<TextureTransformKey>,
     pub base_color_uv_index: Option<u32>,
     pub base_color_factor: [f32; 4],
     pub metallic_roughness_tex: Option<TextureKey>,
     pub metallic_roughness_sampler: Option<SamplerKey>,
     pub metallic_roughness_uv_index: Option<u32>,
+    pub metallic_roughness_texture_transform: Option<TextureTransformKey>,
     pub metallic_factor: f32,
     pub roughness_factor: f32,
     pub normal_tex: Option<TextureKey>,
     pub normal_sampler: Option<SamplerKey>,
     pub normal_uv_index: Option<u32>,
     pub normal_scale: f32,
+    pub normal_texture_transform: Option<TextureTransformKey>,
     pub occlusion_tex: Option<TextureKey>,
     pub occlusion_sampler: Option<SamplerKey>,
     pub occlusion_uv_index: Option<u32>,
     pub occlusion_strength: f32,
+    pub occlusion_texture_transform: Option<TextureTransformKey>,
     pub emissive_tex: Option<TextureKey>,
     pub emissive_sampler: Option<SamplerKey>,
     pub emissive_uv_index: Option<u32>,
     pub emissive_factor: [f32; 3],
     pub emissive_strength: f32,
+    pub emissive_texture_transform: Option<TextureTransformKey>,
     pub vertex_color_info: Option<VertexColorInfo>,
     // these come from initial settings which affects bind group, mesh pipeline etc.
     // so the only way to change them is to create a new material
@@ -83,24 +91,29 @@ impl PbrMaterial {
             base_color_sampler: None,
             base_color_uv_index: None,
             base_color_factor: [1.0, 1.0, 1.0, 1.0],
+            base_color_texture_transform: None,
             metallic_roughness_tex: None,
             metallic_roughness_sampler: None,
             metallic_roughness_uv_index: None,
             metallic_factor: 1.0,
+            metallic_roughness_texture_transform: None,
             roughness_factor: 1.0,
             normal_tex: None,
             normal_sampler: None,
             normal_uv_index: None,
             normal_scale: 1.0,
+            normal_texture_transform: None,
             occlusion_tex: None,
             occlusion_sampler: None,
             occlusion_uv_index: None,
             occlusion_strength: 1.0,
+            occlusion_texture_transform: None,
             emissive_tex: None,
             emissive_sampler: None,
             emissive_uv_index: None,
             emissive_factor: [0.0, 0.0, 0.0],
             emissive_strength: 1.0,
+            emissive_texture_transform: None,
             vertex_color_info: None,
         }
     }
@@ -149,6 +162,7 @@ impl PbrMaterial {
                 sampler_index: u32,
                 address_mode_u: u32,
                 address_mode_v: u32,
+                texture_transform_offset: usize,
             },
             SkipTexture,
         }
@@ -172,6 +186,7 @@ impl PbrMaterial {
                 u32,
                 u32,
                 u32,
+                usize,
             )> for Value<'a>
         {
             fn from(
@@ -182,6 +197,7 @@ impl PbrMaterial {
                     u32,
                     u32,
                     u32,
+                    usize,
                 ),
             ) -> Self {
                 Value::Texture {
@@ -191,6 +207,7 @@ impl PbrMaterial {
                     sampler_index: value.3,
                     address_mode_u: value.4,
                     address_mode_v: value.5,
+                    texture_transform_offset: value.6,
                 }
             }
         }
@@ -215,6 +232,7 @@ impl PbrMaterial {
                         sampler_index,
                         address_mode_u,
                         address_mode_v,
+                        texture_transform_offset,
                     } => {
                         let packed = pack_texture_info_raw(
                             array,
@@ -223,6 +241,7 @@ impl PbrMaterial {
                             sampler_index,
                             address_mode_u,
                             address_mode_v,
+                            texture_transform_offset,
                         );
 
                         for word in packed {
@@ -297,6 +316,9 @@ impl PbrMaterial {
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
+                self.base_color_texture_transform
+                    .and_then(|key| textures.get_texture_transform_offset(key))
+                    .unwrap_or(textures.texture_transform_identity_offset),
             ))
         }) {
             write(tex.into());
@@ -320,6 +342,9 @@ impl PbrMaterial {
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
+                self.metallic_roughness_texture_transform
+                    .and_then(|key| textures.get_texture_transform_offset(key))
+                    .unwrap_or(textures.texture_transform_identity_offset),
             ))
         }) {
             write(tex.into());
@@ -342,6 +367,9 @@ impl PbrMaterial {
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
+                self.normal_texture_transform
+                    .and_then(|key| textures.get_texture_transform_offset(key))
+                    .unwrap_or(textures.texture_transform_identity_offset),
             ))
         }) {
             write(tex.into());
@@ -364,6 +392,9 @@ impl PbrMaterial {
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
+                self.occlusion_texture_transform
+                    .and_then(|key| textures.get_texture_transform_offset(key))
+                    .unwrap_or(textures.texture_transform_identity_offset),
             ))
         }) {
             write(tex.into());
@@ -386,6 +417,9 @@ impl PbrMaterial {
                 sampler_index,
                 encode_address_mode(address_mode_u),
                 encode_address_mode(address_mode_v),
+                self.emissive_texture_transform
+                    .and_then(|key| textures.get_texture_transform_offset(key))
+                    .unwrap_or(textures.texture_transform_identity_offset),
             ))
         }) {
             write(tex.into());
@@ -414,6 +448,7 @@ fn pack_texture_info_raw<ID>(
     sampler_index: u32,
     address_mode_u: u32,
     address_mode_v: u32,
+    texture_transform_offset: usize,
 ) -> [u32; 4] {
     // --- size: width (16 bits) + height (16 bits) ---
     let width = array.width;
@@ -442,7 +477,7 @@ fn pack_texture_info_raw<ID>(
 
     let uv_and_sampler = (sampler_index << 8) | (uv_index & 0xFF);
 
-    // --- extra: flags (8) + addr_u (8) + addr_v (8) + padding (8) ---
+    // --- extra: flags (8) + addr_u (8) + addr_v (8) + transform_index (8) ---
     // flags:
     //   bit 0: has mipmaps
     let has_mipmaps = array.mipmap;
@@ -461,8 +496,10 @@ fn pack_texture_info_raw<ID>(
         "address_mode_v too large for 8 bits"
     );
 
-    let extra = (flags & 0xFF) | ((address_mode_u & 0xFF) << 8) | ((address_mode_v & 0xFF) << 16);
-    // top 8 bits (24..31) left as 0 for now
+    let extra = (flags & 0xFF)
+        | ((address_mode_u & 0xFF) << 8)
+        | ((address_mode_v & 0xFF) << 16)
+        | ((texture_transform_offset as u32) << 24);
 
     [size, array_and_layer, uv_and_sampler, extra]
 }

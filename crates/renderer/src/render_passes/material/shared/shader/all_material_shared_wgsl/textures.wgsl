@@ -35,7 +35,7 @@ struct TextureInfoRaw {
     //                  bits 1..7 reserved
     //   bits  8..15 : address_mode_u (for mipmap gradient calculation)
     //   bits 16..23 : address_mode_v (for mipmap gradient calculation)
-    //   bits 24..31 : padding / reserved
+    //   bits 24..31 : texture transform offset
     extra: u32,
 };
 
@@ -48,6 +48,18 @@ struct TextureInfo {
     mipmapped: bool,
     address_mode_u: u32,
     address_mode_v: u32,
+    uv_transform_index: u32,
+};
+
+struct TextureTransform {
+    // M = [ m00  m01 ]
+    //     [ m10  m11 ]
+    // stored as vec4: (m00, m01, m10, m11)
+    m: vec4<f32>,
+
+    // B = offset + origin - M * origin
+    b: vec2<f32>,
+    _pad: vec2<f32>, // keep 32 bytes total
 };
 
 fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
@@ -69,6 +81,8 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
 
     let address_mode_u: u32 = (raw.extra >> 8u)  & 0xFFu;       // bits 8..15
     let address_mode_v: u32 = (raw.extra >> 16u) & 0xFFu;       // bits 16..23
+    let texture_transform_offset: u32 = (raw.extra >> 24u) & 0xFFu; // bits 24..31
+    let uv_transform_index = texture_transform_offset / 32u; // each transform is 32 bytes
 
     return TextureInfo(
         vec2<u32>(width, height),
@@ -79,8 +93,87 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
         mipmapped,
         address_mode_u,
         address_mode_v,
+        uv_transform_index
     );
 }
+
+{% match mipmap %}
+    {% when MipmapMode::Gradient %}
+        struct TextureTransformUvs {
+            uv: vec2<f32>,
+            derivs: UvDerivs,
+        }
+
+        fn apply_texture_transform(
+            uv: vec2<f32>,
+            derivs: UvDerivs,
+            tex_info: TextureInfo
+        ) -> TextureTransformUvs {
+            // CPU assigns index to identity if needed, no special branch required.
+            let t = texture_transforms[tex_info.uv_transform_index];
+
+            let m00 = t.m.x;
+            let m01 = t.m.y;
+            let m10 = t.m.z;
+            let m11 = t.m.w;
+            let B   = t.b;
+
+            let uv_transformed = vec2<f32>(
+                m00 * uv.x + m01 * uv.y,
+                m10 * uv.x + m11 * uv.y
+            ) + B;
+
+            let ddx_transformed = vec2<f32>(
+                m00 * derivs.ddx.x + m01 * derivs.ddx.y,
+                m10 * derivs.ddx.x + m11 * derivs.ddx.y
+            );
+
+            let ddy_transformed = vec2<f32>(
+                m00 * derivs.ddy.x + m01 * derivs.ddy.y,
+                m10 * derivs.ddy.x + m11 * derivs.ddy.y
+            );
+
+            let derivs_transformed = UvDerivs(ddx_transformed, ddy_transformed);
+
+            // return TextureTransformUvs(
+            //     uv,
+            //     derivs,
+            // );
+            return TextureTransformUvs(
+                uv_transformed,
+                derivs_transformed,
+            );
+        }
+
+    {% when MipmapMode::None %}
+        struct TextureTransformUvs {
+            uv: vec2<f32>,
+        }
+
+        fn apply_texture_transform(
+            uv: vec2<f32>,
+            tex_info: TextureInfo
+        ) -> TextureTransformUvs {
+            // CPU assigns index to identity if needed, no special branch required.
+            let t = texture_transforms[tex_info.uv_transform_index];
+
+            let m00 = t.m.x;
+            let m01 = t.m.y;
+            let m10 = t.m.z;
+            let m11 = t.m.w;
+            let B   = t.b;
+
+            let uv_transformed = vec2<f32>(
+                m00 * uv.x + m01 * uv.y,
+                m10 * uv.x + m11 * uv.y
+            ) + B;
+
+            return TextureTransformUvs(
+                uv_transformed,
+            );
+        }
+
+{% endmatch %}
 
 
 fn texture_uv(attribute_data_offset: u32, triangle_indices: vec3<u32>, barycentric: vec3<f32>, tex_info: TextureInfo, vertex_attribute_stride: u32) -> vec2<f32> {
@@ -108,12 +201,18 @@ fn _texture_uv_per_vertex(attribute_data_offset: u32, set_index: u32, vertex_ind
 
 {% match mipmap %}
     {% when MipmapMode::Gradient %}
-        // NEW: Sampling with explicit gradients for anisotropic filtering support in compute shaders
+        // Sampling with explicit gradients for anisotropic filtering support in compute shaders
         fn texture_pool_sample_grad(info: TextureInfo, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> vec4<f32> {
+            let transformed_uvs = apply_texture_transform(
+                attribute_uv,
+                uv_derivs,
+                info,
+            );
+
             switch info.array_index {
                 {% for i in 0..texture_pool_arrays_len %}
                     case {{ i }}u: {
-                        return _texture_pool_sample_grad(info, pool_tex_{{ i }}, attribute_uv, uv_derivs);
+                        return _texture_pool_sample_grad(info, pool_tex_{{ i }}, transformed_uvs.uv, transformed_uvs.derivs);
                     }
                 {% endfor %}
                 default: {
@@ -130,6 +229,8 @@ fn _texture_uv_per_vertex(attribute_data_offset: u32, set_index: u32, vertex_ind
             uv_derivs: UvDerivs
         ) -> vec4<f32> {
             var color: vec4<f32>;
+
+
             switch info.sampler_index {
                 {% for i in 0..texture_pool_samplers_len %}
                     case {{ i }}u: {
@@ -156,10 +257,14 @@ fn _texture_uv_per_vertex(attribute_data_offset: u32, set_index: u32, vertex_ind
         // Sampling helpers for the mega-texture atlas. Every fetch receives an explicit LOD so the compute
         // pass can emulate hardware derivative selection.
         fn texture_pool_sample_no_mips(info: TextureInfo, attribute_uv: vec2<f32>) -> vec4<f32> {
+            let transformed_uvs = apply_texture_transform(
+                attribute_uv,
+                info,
+            );
             switch info.array_index {
                 {% for i in 0..texture_pool_arrays_len %}
                     case {{ i }}u: {
-                        return _texture_pool_sample_no_mips(info, pool_tex_{{ i }}, attribute_uv);
+                        return _texture_pool_sample_no_mips(info, pool_tex_{{ i }}, transformed_uvs.uv);
                     }
                 {% endfor %}
                 default: {

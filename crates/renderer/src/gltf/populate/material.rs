@@ -2,6 +2,7 @@ use awsm_renderer_core::{
     sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor},
     texture::{mipmap::MipmapTextureKind, texture_pool::TextureColorInfo, TextureFormat},
 };
+use ordered_float::OrderedFloat;
 
 use crate::{
     gltf::{
@@ -17,7 +18,7 @@ use crate::{
         cache_key::ShaderCacheKeyMaterial,
         transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent,
     },
-    textures::{SamplerCacheKey, SamplerKey, TextureKey},
+    textures::{SamplerCacheKey, SamplerKey, TextureKey, TextureTransform, TextureTransformKey},
     AwsmRenderer,
 };
 
@@ -46,52 +47,71 @@ impl GltfMaterialInfo {
         let pbr = gltf_material.pbr_metallic_roughness();
 
         if let Some(tex) = pbr.base_color_texture().map(GltfTextureInfo::from) {
-            let (uv_index, texture_cache_key, sampler_key) =
-                tex.create_material_cache_key(renderer, ctx).await?;
-            material.base_color_tex = Some(texture_cache_key);
+            let GLtfMaterialCacheKey {
+                uv_index,
+                texture_key,
+                sampler_key,
+                texture_transform_key,
+            } = tex.create_material_cache_key(renderer, ctx).await?;
+            material.base_color_tex = Some(texture_key);
             material.base_color_sampler = Some(sampler_key);
             material.base_color_uv_index = Some(uv_index as u32);
+            material.base_color_texture_transform = texture_transform_key;
         }
 
         if let Some(tex) = pbr.metallic_roughness_texture().map(GltfTextureInfo::from) {
-            let (uv_index, texture_cache_key, sampler_key) =
-                tex.create_material_cache_key(renderer, ctx).await?;
-            material.metallic_roughness_tex = Some(texture_cache_key);
+            let GLtfMaterialCacheKey {
+                uv_index,
+                texture_key,
+                sampler_key,
+                texture_transform_key,
+            } = tex.create_material_cache_key(renderer, ctx).await?;
+            material.metallic_roughness_tex = Some(texture_key);
             material.metallic_roughness_sampler = Some(sampler_key);
             material.metallic_roughness_uv_index = Some(uv_index as u32);
+            material.metallic_roughness_texture_transform = texture_transform_key;
         }
 
-        if let Some(normal_tex) = gltf_material.normal_texture() {
-            let tex = GltfTextureInfo {
-                index: normal_tex.texture().index(),
-                tex_coord_index: normal_tex.tex_coord() as usize,
-            };
-            let (uv_index, tex, sampler_key) = tex.create_material_cache_key(renderer, ctx).await?;
-            material.normal_tex = Some(tex);
+        if let Some(tex) = gltf_material.normal_texture().map(GltfTextureInfo::from) {
+            let GLtfMaterialCacheKey {
+                uv_index,
+                texture_key,
+                sampler_key,
+                texture_transform_key,
+            } = tex.create_material_cache_key(renderer, ctx).await?;
+
+            material.normal_tex = Some(texture_key);
             material.normal_sampler = Some(sampler_key);
             material.normal_uv_index = Some(uv_index as u32);
+            material.normal_texture_transform = texture_transform_key;
         }
 
-        if let Some(occlusion_tex) = gltf_material.occlusion_texture() {
-            let tex = GltfTextureInfo {
-                index: occlusion_tex.texture().index(),
-                tex_coord_index: occlusion_tex.tex_coord() as usize,
-            };
-            let (uv_index, tex, sampler_key) = tex.create_material_cache_key(renderer, ctx).await?;
-            material.occlusion_tex = Some(tex);
+        if let Some(tex) = gltf_material.occlusion_texture().map(GltfTextureInfo::from) {
+            let GLtfMaterialCacheKey {
+                uv_index,
+                texture_key,
+                sampler_key,
+                texture_transform_key,
+            } = tex.create_material_cache_key(renderer, ctx).await?;
+
+            material.occlusion_tex = Some(texture_key);
             material.occlusion_sampler = Some(sampler_key);
             material.occlusion_uv_index = Some(uv_index as u32);
+            material.occlusion_texture_transform = texture_transform_key;
         }
 
-        if let Some(emissive_tex) = gltf_material.emissive_texture() {
-            let tex = GltfTextureInfo {
-                index: emissive_tex.texture().index(),
-                tex_coord_index: emissive_tex.tex_coord() as usize,
-            };
-            let (uv_index, tex, sampler_key) = tex.create_material_cache_key(renderer, ctx).await?;
-            material.emissive_tex = Some(tex);
+        if let Some(tex) = gltf_material.emissive_texture().map(GltfTextureInfo::from) {
+            let GLtfMaterialCacheKey {
+                uv_index,
+                texture_key,
+                sampler_key,
+                texture_transform_key,
+            } = tex.create_material_cache_key(renderer, ctx).await?;
+
+            material.emissive_tex = Some(texture_key);
             material.emissive_sampler = Some(sampler_key);
             material.emissive_uv_index = Some(uv_index as u32);
+            material.emissive_texture_transform = texture_transform_key;
         }
 
         if let Some(normal_tex) = gltf_material.normal_texture() {
@@ -118,7 +138,6 @@ impl GltfMaterialInfo {
                     MeshBufferCustomVertexAttributeInfo::Colors { count, .. },
                 ) = attr
                 {
-                    tracing::info!("GOT COUNT: {}", count);
                     // for right now just always use highest count
                     Some(VertexColorInfo { set_index: count })
                 } else {
@@ -134,34 +153,108 @@ impl GltfMaterialInfo {
 pub(crate) struct GltfTextureInfo {
     pub index: usize,
     pub tex_coord_index: usize,
+    pub texture_transform: Option<GltfTextureTransform>,
+}
+
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) struct GltfTextureTransform {
+    // The offset of the UV coordinate origin as a factor of the texture dimensions.
+    pub offset: [OrderedFloat<f32>; 2],
+
+    /// Rotate the UVs by this many radians counter-clockwise around the origin.
+    /// This is equivalent to a similar rotation of the image clockwise.
+    pub rotation: OrderedFloat<f32>,
+
+    /// The scale factor applied to the components of the UV coordinates.
+    pub scale: [OrderedFloat<f32>; 2],
 }
 
 impl<'a> From<gltf::texture::Info<'a>> for GltfTextureInfo {
     fn from(info: gltf::texture::Info<'a>) -> Self {
         Self {
             index: info.texture().index(),
+            tex_coord_index: match info.texture_transform().and_then(|x| x.tex_coord()) {
+                Some(tex_coord_index) => tex_coord_index,
+                None => info.tex_coord(),
+            } as usize,
+            texture_transform: info.texture_transform().map(GltfTextureTransform::from),
+        }
+    }
+}
+
+impl<'a> From<gltf::material::NormalTexture<'a>> for GltfTextureInfo {
+    fn from(info: gltf::material::NormalTexture<'a>) -> Self {
+        if info
+            .extensions()
+            .map(|exts| exts.is_empty())
+            .unwrap_or_default()
+        {
+            tracing::warn!("GLTF NormalTexture has unhandled extensions....");
+        }
+        Self {
+            index: info.texture().index(),
             tex_coord_index: info.tex_coord() as usize,
+            texture_transform: None,
+        }
+    }
+}
+
+impl<'a> From<gltf::material::OcclusionTexture<'a>> for GltfTextureInfo {
+    fn from(info: gltf::material::OcclusionTexture<'a>) -> Self {
+        if info
+            .extensions()
+            .map(|exts| exts.is_empty())
+            .unwrap_or_default()
+        {
+            tracing::warn!("GLTF OcclusionTexture has unhandled extensions....");
+        }
+        Self {
+            index: info.texture().index(),
+            tex_coord_index: info.tex_coord() as usize,
+            texture_transform: None,
+        }
+    }
+}
+
+impl<'a> From<gltf::texture::TextureTransform<'a>> for GltfTextureTransform {
+    fn from(transform: gltf::texture::TextureTransform<'a>) -> Self {
+        Self {
+            offset: [
+                OrderedFloat(transform.offset()[0]),
+                OrderedFloat(transform.offset()[1]),
+            ],
+            rotation: OrderedFloat(transform.rotation()),
+            scale: [
+                OrderedFloat(transform.scale()[0]),
+                OrderedFloat(transform.scale()[1]),
+            ],
         }
     }
 }
 
 type UvIndex = usize;
+
+pub struct GLtfMaterialCacheKey {
+    pub uv_index: usize,
+    pub texture_key: TextureKey,
+    pub sampler_key: SamplerKey,
+    pub texture_transform_key: Option<TextureTransformKey>,
+}
 impl GltfTextureInfo {
     pub async fn create_material_cache_key(
         &self,
         renderer: &mut AwsmRenderer,
         ctx: &GltfPopulateContext,
-    ) -> Result<(UvIndex, TextureKey, SamplerKey)> {
+    ) -> Result<GLtfMaterialCacheKey> {
         let texture_key = {
             let textures = ctx.textures.lock().unwrap();
             textures.get(&self.index).cloned()
         };
 
-        let (texture_key, sampler_key) = match texture_key {
-            Some(texture_key) => {
-                let sampler_key = renderer.textures.get_texture_sampler_key(texture_key)?;
-                (texture_key, sampler_key)
-            }
+        let sampler_key = self.create_sampler_key(renderer, ctx)?;
+
+        let texture_key = match texture_key {
+            Some(texture_key) => texture_key,
             None => {
                 let gltf_texture = ctx
                     .data
@@ -233,8 +326,6 @@ impl GltfTextureInfo {
                     }
                 };
 
-                let sampler_key = self.create_sampler_key(renderer, ctx)?;
-
                 let texture_key = renderer.textures.add_image(
                     image_data.clone(),
                     image_data.format(),
@@ -244,11 +335,28 @@ impl GltfTextureInfo {
 
                 ctx.textures.lock().unwrap().insert(self.index, texture_key);
 
-                (texture_key, sampler_key)
+                texture_key
             }
         };
 
-        Ok((self.tex_coord_index, texture_key, sampler_key))
+        let texture_transform_key = match self.texture_transform {
+            None => None,
+            Some(texture_transform) => Some(renderer.textures.insert_texture_transform(
+                &TextureTransform {
+                    offset: [*texture_transform.offset[0], *texture_transform.offset[1]],
+                    origin: [0.0, 0.0],
+                    rotation: *texture_transform.rotation,
+                    scale: [*texture_transform.scale[0], *texture_transform.scale[1]],
+                },
+            )),
+        };
+
+        Ok(GLtfMaterialCacheKey {
+            uv_index: self.tex_coord_index,
+            texture_key,
+            sampler_key,
+            texture_transform_key,
+        })
     }
 
     fn create_sampler_key(

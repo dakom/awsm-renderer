@@ -64,6 +64,7 @@ pub enum BindGroupCreate {
     PbrMaterialResize,
     TextureViewResize,
     TexturePool,
+    TextureTransformsResize,
     AntiAliasingChange,
 }
 
@@ -145,6 +146,9 @@ impl BindGroups {
                 BindGroupCreate::TexturePool => {
                     functions_to_call.insert(FunctionToCall::OpaqueTextures);
                     functions_to_call.insert(FunctionToCall::OpaqueSamplers);
+                }
+                BindGroupCreate::TextureTransformsResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueTextures);
                 }
                 BindGroupCreate::BrdfLutTextures => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);

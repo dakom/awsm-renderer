@@ -30,7 +30,6 @@ pub fn init_logger() {
             .with(level_filter)
             .init();
 
-        tracing::warn!("(warn) Logger initialized");
         tracing::info!("(info) Logger initialized");
         tracing::debug!("(debug) Logger initialized");
 

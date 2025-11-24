@@ -240,6 +240,13 @@ impl MaterialOpaqueBindGroups {
             entries.len() as u32,
             BindGroupResource::Buffer(BufferBinding::new(&ctx.transforms.normals_gpu_buffer)),
         ));
+        // texture transforms
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Buffer(BufferBinding::new(
+                &ctx.textures.texture_transforms_gpu_buffer,
+            )),
+        ));
         // camera
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
@@ -607,6 +614,15 @@ async fn create_main_bind_group_layout_key(
             visibility_compute: true,
         },
         // Normal matrices buffer
+        BindGroupLayoutCacheKeyEntry {
+            resource: BindGroupLayoutResource::Buffer(
+                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
+            ),
+            visibility_vertex: false,
+            visibility_fragment: false,
+            visibility_compute: true,
+        },
+        // Texture transforms buffer
         BindGroupLayoutCacheKeyEntry {
             resource: BindGroupLayoutResource::Buffer(
                 BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),

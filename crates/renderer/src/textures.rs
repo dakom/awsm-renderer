@@ -1,6 +1,10 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
 use awsm_renderer_core::{
+    buffers::{BufferDescriptor, BufferUsage},
     compare::CompareFunction,
     cubemap::CubemapImage,
     error::AwsmCoreError,
@@ -21,6 +25,7 @@ use web_sys::{GpuMipmapFilterMode, GpuSupportedLimits};
 
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
+    buffer::dynamic_uniform::DynamicUniformBuffer,
     error::AwsmError,
     render_passes::{
         material::opaque::render_pass::MaterialOpaqueRenderPass, RenderPassInitContext,
@@ -28,12 +33,18 @@ use crate::{
     AwsmRenderer, AwsmRendererLogging,
 };
 
+static TEXTURE_TRANSFORM_BUFFER_USAGE: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
+
+pub const TEXTURE_TRANSFORMS_INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
+pub const TEXTURE_TRANSFORMS_BYTE_SIZE: usize = 32; // 32 bytes per texture transform (must match shader struct size)
+
 impl AwsmRenderer {
     // this should ideally only be called after all the textures have been loaded
     pub async fn finalize_gpu_textures(&mut self) -> std::result::Result<(), AwsmError> {
         let was_dirty = self
             .textures
-            .write_gpu_pool(&self.logging, &self.gpu)
+            .write_gpu_texture_pool(&self.logging, &self.gpu)
             .await?;
 
         if was_dirty {
@@ -99,13 +110,17 @@ impl AwsmRenderer {
 pub struct Textures {
     pub pool: TexturePool<TextureKey>,
     pub pool_sampler_set: IndexSet<SamplerKey>,
+    pub texture_transform_identity_offset: usize,
     pool_textures: SlotMap<TextureKey, TexturePoolEntryInfo<TextureKey>>,
     cubemaps: SlotMap<CubemapTextureKey, web_sys::GpuTexture>,
     samplers: SlotMap<SamplerKey, web_sys::GpuSampler>,
     sampler_cache: HashMap<SamplerCacheKey, SamplerKey>,
     // We keep a mirror of the sampler address modes so that materials can adjust UVs manually when
     sampler_address_modes: SecondaryMap<SamplerKey, (Option<AddressMode>, Option<AddressMode>)>,
-    texture_samplers: SecondaryMap<TextureKey, SamplerKey>,
+    texture_transforms: SlotMap<TextureTransformKey, ()>,
+    texture_transforms_buffer: DynamicUniformBuffer<TextureTransformKey>,
+    texture_transforms_gpu_dirty: bool,
+    pub(crate) texture_transforms_gpu_buffer: web_sys::GpuBuffer,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -148,18 +163,105 @@ impl std::hash::Hash for SamplerCacheKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextureTransform {
+    pub offset: [f32; 2],
+    pub origin: [f32; 2],
+    pub rotation: f32,
+    pub scale: [f32; 2],
+}
+
+impl TextureTransform {
+    pub fn identity() -> Self {
+        Self {
+            offset: [0.0, 0.0],
+            origin: [0.0, 0.0],
+            rotation: 0.0,
+            scale: [1.0, 1.0],
+        }
+    }
+
+    pub fn as_gpu_bytes(&self) -> [u8; TEXTURE_TRANSFORMS_BYTE_SIZE] {
+        let mut bytes = [0u8; TEXTURE_TRANSFORMS_BYTE_SIZE];
+
+        let sx = self.scale[0];
+        let sy = self.scale[1];
+        let ox = self.offset[0];
+        let oy = self.offset[1];
+        let px = self.origin[0];
+        let py = self.origin[1];
+
+        let c = self.rotation.cos();
+        let s = self.rotation.sin();
+
+        // M = R * S
+        let m00 = c * sx;
+        let m01 = -s * sy;
+        let m10 = s * sx;
+        let m11 = c * sy;
+
+        // B = offset + origin - M * origin
+        let mx_px = m00 * px + m01 * py;
+        let my_py = m10 * px + m11 * py;
+
+        let bx = ox + px - mx_px;
+        let by = oy + py - my_py;
+
+        bytes[0..4].copy_from_slice(&m00.to_le_bytes());
+        bytes[4..8].copy_from_slice(&m01.to_le_bytes());
+        bytes[8..12].copy_from_slice(&m10.to_le_bytes());
+        bytes[12..16].copy_from_slice(&m11.to_le_bytes());
+        bytes[16..20].copy_from_slice(&bx.to_le_bytes());
+        bytes[20..24].copy_from_slice(&by.to_le_bytes());
+
+        bytes
+    }
+}
+
 impl Textures {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let mut samplers = SlotMap::with_key();
         let mut sampler_cache = HashMap::new();
         let mut sampler_address_modes = SecondaryMap::new();
 
+        let texture_transforms_gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Texture Transforms"),
+                TEXTURE_TRANSFORMS_INITIAL_CAPACITY * TEXTURE_TRANSFORMS_BYTE_SIZE,
+                *TEXTURE_TRANSFORM_BUFFER_USAGE,
+            )
+            .into(),
+        )?;
+        let mut texture_transforms_buffer = DynamicUniformBuffer::new(
+            TEXTURE_TRANSFORMS_INITIAL_CAPACITY,
+            TEXTURE_TRANSFORMS_BYTE_SIZE,
+            None,
+            Some("Texture Transforms".to_string()),
+        );
+
+        let mut texture_transforms = SlotMap::with_key();
+
+        let texture_transform_identity_offset = {
+            let transform = TextureTransform::identity();
+            let key = texture_transforms.insert(());
+
+            texture_transforms_buffer.update(key, &transform.as_gpu_bytes());
+
+            texture_transforms_buffer
+                .offset(key)
+                .expect("just inserted key must have offset")
+        };
+
         Ok(Self {
             pool: TexturePool::new(),
             pool_sampler_set: IndexSet::new(),
             pool_textures: SlotMap::with_key(),
             cubemaps: SlotMap::with_key(),
-            texture_samplers: SecondaryMap::new(),
+            texture_transforms,
+            texture_transforms_buffer,
+            texture_transforms_gpu_buffer,
+            texture_transforms_gpu_dirty: true,
+            texture_transform_identity_offset,
             samplers,
             sampler_cache,
             sampler_address_modes,
@@ -180,10 +282,37 @@ impl Textures {
                 .ok_or(AwsmTextureError::TextureNotFound(key))
         })?;
 
-        self.texture_samplers.insert(key, sampler_key);
         self.pool_sampler_set.insert(sampler_key);
 
         Ok(key)
+    }
+
+    pub fn insert_texture_transform(
+        &mut self,
+        transform: &TextureTransform,
+    ) -> TextureTransformKey {
+        let key = self.texture_transforms.insert(());
+        self.update_texture_transform(key, transform);
+        key
+    }
+    pub fn update_texture_transform(
+        &mut self,
+        key: TextureTransformKey,
+        transform: &TextureTransform,
+    ) {
+        self.texture_transforms_buffer
+            .update(key, &transform.as_gpu_bytes());
+
+        self.texture_transforms_gpu_dirty = true;
+    }
+
+    pub fn remove_texture_transform(&mut self, key: TextureTransformKey) {
+        self.texture_transforms_buffer.remove(key);
+        self.texture_transforms_gpu_dirty = true;
+    }
+
+    pub fn get_texture_transform_offset(&self, key: TextureTransformKey) -> Option<usize> {
+        self.texture_transforms_buffer.offset(key)
     }
 
     pub fn insert_cubemap(&mut self, texture: web_sys::GpuTexture) -> CubemapTextureKey {
@@ -196,7 +325,7 @@ impl Textures {
             .ok_or(AwsmTextureError::CubemapTextureNotFound(key))
     }
 
-    async fn write_gpu_pool(
+    async fn write_gpu_texture_pool(
         &mut self,
         logging: &AwsmRendererLogging,
         gpu: &AwsmRendererWebGpu,
@@ -210,11 +339,43 @@ impl Textures {
         self.pool.write_gpu(gpu).await.map_err(|e| e.into())
     }
 
-    pub fn get_texture_sampler_key(&self, texture_key: TextureKey) -> Result<SamplerKey> {
-        self.texture_samplers
-            .get(texture_key)
-            .copied()
-            .ok_or(AwsmTextureError::SamplerForTextureNotFound(texture_key))
+    pub fn write_texture_transforms_gpu(
+        &mut self,
+        logging: &AwsmRendererLogging,
+        gpu: &AwsmRendererWebGpu,
+        bind_groups: &mut BindGroups,
+    ) -> Result<()> {
+        if self.texture_transforms_gpu_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Texture Transforms GPU write").entered())
+            } else {
+                None
+            };
+
+            if let Some(new_size) = self.texture_transforms_buffer.take_gpu_needs_resize() {
+                self.texture_transforms_gpu_buffer = gpu.create_buffer(
+                    &BufferDescriptor::new(
+                        Some("Texture Transforms"),
+                        new_size,
+                        *TEXTURE_TRANSFORM_BUFFER_USAGE,
+                    )
+                    .into(),
+                )?;
+
+                bind_groups.mark_create(BindGroupCreate::TextureTransformsResize);
+            }
+
+            gpu.write_buffer(
+                &self.texture_transforms_gpu_buffer,
+                None,
+                self.texture_transforms_buffer.raw_slice(),
+                None,
+                None,
+            )?;
+
+            self.texture_transforms_gpu_dirty = false;
+        }
+        Ok(())
     }
 
     pub fn get_entry(&self, key: TextureKey) -> Result<&TexturePoolEntryInfo<TextureKey>> {
@@ -312,6 +473,10 @@ new_key_type! {
 }
 
 new_key_type! {
+    pub struct TextureTransformKey;
+}
+
+new_key_type! {
     pub struct SamplerKey;
 }
 
@@ -334,9 +499,6 @@ pub enum AwsmTextureError {
 
     #[error("[texture] texture not found: {0:?}")]
     TextureNotFound(TextureKey),
-
-    #[error("[texture] sampler for texture not found: {0:?}")]
-    SamplerForTextureNotFound(TextureKey),
 
     #[error("[texture] subemap texture not found: {0:?}")]
     CubemapTextureNotFound(CubemapTextureKey),

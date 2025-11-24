@@ -117,6 +117,7 @@ pub struct DeviceRequestLimits {
     pub max_texture_array_layers: bool,
     pub max_bindings_per_bind_group: bool,
     pub max_sampled_textures_per_shader_stage: bool,
+    pub max_storage_buffers_per_shader_stage: bool,
     pub max_buffer_size: bool,
     pub max_bind_groups: bool,
     pub max_storage_buffer_binding_size: bool,
@@ -129,17 +130,21 @@ impl DeviceRequestLimits {
             max_texture_array_layers: true,
             max_bindings_per_bind_group: true,
             max_sampled_textures_per_shader_stage: true,
+            max_storage_buffers_per_shader_stage: true,
             max_buffer_size: true,
             max_bind_groups: true,
             max_storage_buffer_binding_size: true,
         }
     }
 
-    pub fn max_storage_buffer_binding_size() -> Self {
-        Self {
-            max_storage_buffer_binding_size: true,
-            ..Default::default()
-        }
+    pub fn with_max_storage_buffer_binding_size(mut self) -> Self {
+        self.max_storage_buffer_binding_size = true;
+        self
+    }
+
+    pub fn with_max_storage_buffers_per_shader_stage(mut self) -> Self {
+        self.max_storage_buffers_per_shader_stage = true;
+        self
     }
 
     pub fn into_js(self, limits: &GpuSupportedLimits) -> js_sys::Object {
@@ -182,6 +187,15 @@ impl DeviceRequestLimits {
                 &obj,
                 &"maxSampledTexturesPerShaderStage".into(),
                 &JsValue::from_f64(limits.max_sampled_textures_per_shader_stage() as f64),
+            )
+            .unwrap();
+        }
+
+        if self.max_storage_buffers_per_shader_stage {
+            js_sys::Reflect::set(
+                &obj,
+                &"maxStorageBuffersPerShaderStage".into(),
+                &JsValue::from_f64(limits.max_storage_buffers_per_shader_stage() as f64),
             )
             .unwrap();
         }

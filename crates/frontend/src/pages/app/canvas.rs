@@ -73,7 +73,7 @@ impl AppCanvas {
                                 .with_alpha_mode(CanvasAlphaMode::Opaque)
                                 .with_tone_mapping(CanvasToneMappingMode::Standard)
                             )
-                            .with_device_request_limits(DeviceRequestLimits::max_storage_buffer_binding_size());
+                            .with_device_request_limits(DeviceRequestLimits::default().with_max_storage_buffer_binding_size().with_max_storage_buffers_per_shader_stage());
                             //.with_device_request_limits(DeviceRequestLimits::max_all());
 
                         let renderer = AwsmRendererBuilder::new(gpu_builder)
