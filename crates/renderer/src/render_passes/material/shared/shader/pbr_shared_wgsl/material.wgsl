@@ -20,7 +20,7 @@ struct PbrMaterialRaw {
     emissive_factor_b: f32,
     emissive_strength: f32,
 
-    // Textures, 5 * 16 = 80 bytes (packed format)
+    // Textures, 5 * 20 = 100 bytes (packed format)
     base_color_tex_info: TextureInfoRaw,
     metallic_roughness_tex_info: TextureInfoRaw,
     normal_tex_info: TextureInfoRaw,
@@ -33,8 +33,8 @@ struct PbrMaterialRaw {
     // this is set last, 4 bytes
     bitmask: u32,
 
-    // Padding to align to 512 bytes (60 + 80 + 4 + 4 = 148, so 512 - 148 = 364 bytes = 91 u32s)
-    padding: array<u32, 91>
+    // Padding to align to 512 bytes (60 + 100 + 4 + 4 = 168, so 512 - 168 = 344 bytes = 86 u32s)
+    padding: array<u32, 86>
 };
 
 struct PbrMaterial {

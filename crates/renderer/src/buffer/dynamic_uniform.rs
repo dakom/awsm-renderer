@@ -71,7 +71,7 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
             raw_data,
             gpu_buffer_needs_resize: false,
             slot_indices: SecondaryMap::new(),
-            free_slots: (0..initial_capacity).collect(),
+            free_slots: (0..initial_capacity).rev().collect(), // Reverse so slot 0 is used first
             capacity_slots: initial_capacity,
             next_slot: initial_capacity,
             label,
@@ -186,6 +186,10 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         let slot = self.slot_indices.get(key)?;
 
         Some(slot * self.aligned_slice_size)
+    }
+
+    pub fn slot_index(&self, key: K) -> Option<usize> {
+        self.slot_indices.get(key).copied()
     }
 
     pub fn keys(&self) -> slotmap::secondary::Keys<K, usize> {

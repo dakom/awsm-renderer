@@ -72,9 +72,9 @@ pub struct VertexColorInfo {
 
 impl PbrMaterial {
     pub const INITIAL_ELEMENTS: usize = 32; // 32 elements is a good starting point
-                                            // NOTE: keep this in sync with `PbrMaterialRaw` in WGSL. Each texture packs 16 bytes
-                                            // (compact format) so 5 textures + 60 byte header + 8 bytes = 148.
-    pub const BYTE_SIZE: usize = 148; // must be under Materials::MAX_SIZE
+                                            // NOTE: keep this in sync with `PbrMaterialRaw` in WGSL. Each texture packs 20 bytes
+                                            // (compact format) so 5 textures + 60 byte header + 8 bytes = 168.
+    pub const BYTE_SIZE: usize = 168; // must be under Materials::MAX_SIZE
 
     pub const BITMASK_BASE_COLOR: u32 = 1;
     pub const BITMASK_METALIC_ROUGHNESS: u32 = 1 << 1;
@@ -251,7 +251,7 @@ impl PbrMaterial {
                         }
                     }
                     Value::SkipTexture => {
-                        offset += 16; // 4 * 4 bytes (packed)
+                        offset += 20; // 5 * 4 bytes (packed)
                     }
                 }
 
@@ -449,7 +449,7 @@ fn pack_texture_info_raw<ID>(
     address_mode_u: u32,
     address_mode_v: u32,
     texture_transform_offset: usize,
-) -> [u32; 4] {
+) -> [u32; 5] {
     // --- size: width (16 bits) + height (16 bits) ---
     let width = array.width;
     let height = array.height;
@@ -477,7 +477,7 @@ fn pack_texture_info_raw<ID>(
 
     let uv_and_sampler = (sampler_index << 8) | (uv_index & 0xFF);
 
-    // --- extra: flags (8) + addr_u (8) + addr_v (8) + transform_index (8) ---
+    // --- extra: flags (8) + addr_u (8) + addr_v (8) + padding (8) ---
     // flags:
     //   bit 0: has mipmaps
     let has_mipmaps = array.mipmap;
@@ -498,8 +498,11 @@ fn pack_texture_info_raw<ID>(
 
     let extra = (flags & 0xFF)
         | ((address_mode_u & 0xFF) << 8)
-        | ((address_mode_v & 0xFF) << 16)
-        | ((texture_transform_offset as u32) << 24);
+        | ((address_mode_v & 0xFF) << 16);
+    // top 8 bits left as 0 (padding/reserved)
 
-    [size, array_and_layer, uv_and_sampler, extra]
+    // --- transform_offset: full 32 bits for byte offset ---
+    let transform_offset = texture_transform_offset as u32;
+
+    [size, array_and_layer, uv_and_sampler, extra, transform_offset]
 }

@@ -184,34 +184,96 @@ impl<'a> From<gltf::texture::Info<'a>> for GltfTextureInfo {
 
 impl<'a> From<gltf::material::NormalTexture<'a>> for GltfTextureInfo {
     fn from(info: gltf::material::NormalTexture<'a>) -> Self {
-        if info
-            .extensions()
-            .map(|exts| exts.is_empty())
-            .unwrap_or_default()
-        {
-            tracing::warn!("GLTF NormalTexture has unhandled extensions....");
-        }
+        // Extract KHR_texture_transform from extensions if present
+        let texture_transform = info.extensions().and_then(|ext| {
+            ext.get("KHR_texture_transform").and_then(|transform_json| {
+                // Parse the extension manually
+                let offset = transform_json.get("offset")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| [
+                        arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                        arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                    ])
+                    .unwrap_or([0.0, 0.0]);
+
+                let rotation = transform_json.get("rotation")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0) as f32;
+
+                let scale = transform_json.get("scale")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| [
+                        arr.get(0).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                        arr.get(1).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                    ])
+                    .unwrap_or([1.0, 1.0]);
+
+                Some(GltfTextureTransform {
+                    offset: [ordered_float::OrderedFloat(offset[0]), ordered_float::OrderedFloat(offset[1])],
+                    rotation: ordered_float::OrderedFloat(rotation),
+                    scale: [ordered_float::OrderedFloat(scale[0]), ordered_float::OrderedFloat(scale[1])],
+                })
+            })
+        });
+
+        let tex_coord_override = info.extensions()
+            .and_then(|ext| ext.get("KHR_texture_transform"))
+            .and_then(|t| t.get("texCoord"))
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize);
+
         Self {
             index: info.texture().index(),
-            tex_coord_index: info.tex_coord() as usize,
-            texture_transform: None,
+            tex_coord_index: tex_coord_override.unwrap_or(info.tex_coord() as usize),
+            texture_transform,
         }
     }
 }
 
 impl<'a> From<gltf::material::OcclusionTexture<'a>> for GltfTextureInfo {
     fn from(info: gltf::material::OcclusionTexture<'a>) -> Self {
-        if info
-            .extensions()
-            .map(|exts| exts.is_empty())
-            .unwrap_or_default()
-        {
-            tracing::warn!("GLTF OcclusionTexture has unhandled extensions....");
-        }
+        // Extract KHR_texture_transform from extensions if present
+        let texture_transform = info.extensions().and_then(|ext| {
+            ext.get("KHR_texture_transform").and_then(|transform_json| {
+                // Parse the extension manually
+                let offset = transform_json.get("offset")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| [
+                        arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                        arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                    ])
+                    .unwrap_or([0.0, 0.0]);
+
+                let rotation = transform_json.get("rotation")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0) as f32;
+
+                let scale = transform_json.get("scale")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| [
+                        arr.get(0).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                        arr.get(1).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                    ])
+                    .unwrap_or([1.0, 1.0]);
+
+                Some(GltfTextureTransform {
+                    offset: [ordered_float::OrderedFloat(offset[0]), ordered_float::OrderedFloat(offset[1])],
+                    rotation: ordered_float::OrderedFloat(rotation),
+                    scale: [ordered_float::OrderedFloat(scale[0]), ordered_float::OrderedFloat(scale[1])],
+                })
+            })
+        });
+
+        let tex_coord_override = info.extensions()
+            .and_then(|ext| ext.get("KHR_texture_transform"))
+            .and_then(|t| t.get("texCoord"))
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize);
+
         Self {
             index: info.texture().index(),
-            tex_coord_index: info.tex_coord() as usize,
-            texture_transform: None,
+            tex_coord_index: tex_coord_override.unwrap_or(info.tex_coord() as usize),
+            texture_transform,
         }
     }
 }

@@ -222,7 +222,7 @@ fn get_uv_derivatives(
     // dudy /= lod_bias_scale;
     // dvdy /= lod_bias_scale;
 
-    // NaN/Inf guard (don’t clamp magnitudes)
+    // NaN/Inf guard (don't clamp magnitudes)
     let ok = (dudx == dudx) && (dudy == dudy) && (dvdx == dvdx) && (dvdy == dvdy);
     if (!ok) {
         return UvDerivs(vec2<f32>(0.0), vec2<f32>(0.0));

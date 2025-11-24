@@ -195,9 +195,12 @@ impl TextureTransform {
         let s = self.rotation.sin();
 
         // M = R * S
+        // glTF rotation matrix (counter-clockwise, with V pointing down):
+        // [ cos   sin ] * [ sx  0  ]   =   [ cos*sx   sin*sy ]
+        // [ -sin  cos ]   [ 0   sy ]       [ -sin*sx  cos*sy ]
         let m00 = c * sx;
-        let m01 = -s * sy;
-        let m10 = s * sx;
+        let m01 = s * sy;
+        let m10 = -s * sx;
         let m11 = c * sy;
 
         // B = offset + origin - M * origin
@@ -300,9 +303,8 @@ impl Textures {
         key: TextureTransformKey,
         transform: &TextureTransform,
     ) {
-        self.texture_transforms_buffer
-            .update(key, &transform.as_gpu_bytes());
-
+        let bytes = transform.as_gpu_bytes();
+        self.texture_transforms_buffer.update(key, &bytes);
         self.texture_transforms_gpu_dirty = true;
     }
 
@@ -313,6 +315,10 @@ impl Textures {
 
     pub fn get_texture_transform_offset(&self, key: TextureTransformKey) -> Option<usize> {
         self.texture_transforms_buffer.offset(key)
+    }
+
+    pub fn get_texture_transform_slot_index(&self, key: TextureTransformKey) -> Option<usize> {
+        self.texture_transforms_buffer.slot_index(key)
     }
 
     pub fn insert_cubemap(&mut self, texture: web_sys::GpuTexture) -> CubemapTextureKey {
