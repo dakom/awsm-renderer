@@ -1,6 +1,3 @@
-# khr_texture_transform support
-  - CompareBaseColor is a good test model
-
 # Transparent material pass
 - like opaque
 - cutoff

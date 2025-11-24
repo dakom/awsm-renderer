@@ -6,17 +6,11 @@
 - get demo working again
   - fix "dev-release" mode (just base path?)
 
-- support KHR_texture_transform
-  - see base color comparison for example
-
-- load lights via KHR_lights_punctual
-  - point, spot, directional
-
 - Support different kinds of Materials
   - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
   - unlit as example?
 
-- at this point can probably use for demos :)
+- More extensions (see below)
 
 - Get started with light culling pass
   - research best practices
@@ -79,12 +73,25 @@ If it's supported here, corresponding core functionality is also supported
     - [x] cubic spline interpolation
 - Extensions
     - [x] EXT_mesh_gpu_instancing
-    - [ ] KHR_materials_unlit
-    - [ ] KHR_lights_punctual
-        - [ ] Directional
-        - [ ] Point
-        - [ ] Spot
-    - [ ]  more at https://github.com/KhronosGroup/glTF/blob/main/extensions/README.md#ratified-khronos-extensions
+    - Can be done in opaque-only
+      - [ ] KHR_materials_unlit
+      - [x] KHR_materials_emissive_strength
+      - [ ] KHR_materials_clearcoat
+      - [ ] KHR_materials_sheen
+      - [ ] KHR_materials_specular
+      - [ ] KHR_materials_ior (maybe... subtle... mostly transparent)
+      - [ ] KHR_materials_anisotropy
+      - [x] KHR_texture_transform
+      - [ ] KHR_materials_iridescence
+      - [ ] KHR_lights_punctual
+          - [ ] Directional
+          - [ ] Point
+          - [ ] Spot
+    - Requires transparent
+      - [ ] KHR_materials_ior
+      - [ ] KHR_materials_transmission
+      - [ ] KHR_materials_volume
+      - [ ] KHR_materials_dispersion
 - Materials
     - [x] PBR metallic-roughness
         - [x] base color
@@ -109,10 +116,13 @@ If it's supported here, corresponding core functionality is also supported
 - [ ] Early z pre-pass
 - [x] Opaque front to back
 - [x] Transparent back to front
+- [x] Anti-aliasing
+  - [x] MSAA
+  - [x] SMAA
 
 ## Textures
 - [x] 2D textures
-- [x] Mipmaps (port https://github.com/JolifantoBambla/webgpu-spd)
+- [x] Mipmaps
 
 ## Skybox
 - [x] load ktf
@@ -154,7 +164,7 @@ If it's supported here, corresponding core functionality is also supported
 ## Optimizations
 
 - [ ] Multithreading
-- [x] MegaTextures
+- [x] Texture pools 
 - [x] Dynamic buffer primitives
     - Single gpu binding
     - Offset-driven
