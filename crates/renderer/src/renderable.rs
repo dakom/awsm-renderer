@@ -50,10 +50,8 @@ impl AwsmRenderer {
                     .pipelines
                     .get_compute_pipeline_key(mesh.buffer_info_key, mesh.material_key),
             };
-            if self
-                .materials
-                .has_alpha_blend(mesh.material_key)
-                .unwrap_or(false)
+            if self.materials.has_alpha_blend(mesh.material_key)
+                || self.materials.has_alpha_mask(mesh.material_key)
             {
                 transparent.push(renderable);
             } else {

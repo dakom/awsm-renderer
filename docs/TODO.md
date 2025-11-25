@@ -1,3 +1,6 @@
+- vertex buffer data from geometry
+- *another* vertex buffer data from non-geometry attributes (what we use for storage in opaque)
+
 # Transparent material pass
 - like opaque
 - cutoff

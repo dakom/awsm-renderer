@@ -48,34 +48,32 @@ impl GeometryRenderPass {
     }
 
     pub fn render(&self, ctx: &RenderContext, renderables: &[Renderable]) -> Result<()> {
-        let mut color_attachments = vec![
-            ColorAttachment::new(
-                &ctx.render_texture_views.visibility_data,
-                LoadOp::Clear,
-                StoreOp::Store,
-            )
-            .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
-            ColorAttachment::new(
-                &ctx.render_texture_views.barycentric,
-                LoadOp::Clear,
-                StoreOp::Store,
-            ),
-            ColorAttachment::new(
-                &ctx.render_texture_views.normal_tangent,
-                LoadOp::Clear,
-                StoreOp::Store,
-            ),
-            ColorAttachment::new(
-                &ctx.render_texture_views.barycentric_derivatives,
-                LoadOp::Clear,
-                StoreOp::Store,
-            ),
-        ];
-
         let render_pass = ctx.command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 label: Some("Geometry Render Pass"),
-                color_attachments,
+                color_attachments: vec![
+                    ColorAttachment::new(
+                        &ctx.render_texture_views.visibility_data,
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    )
+                    .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
+                    ColorAttachment::new(
+                        &ctx.render_texture_views.barycentric,
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    ),
+                    ColorAttachment::new(
+                        &ctx.render_texture_views.normal_tangent,
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    ),
+                    ColorAttachment::new(
+                        &ctx.render_texture_views.barycentric_derivatives,
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    ),
+                ],
                 depth_stencil_attachment: Some(
                     DepthStencilAttachment::new(&ctx.render_texture_views.depth)
                         .with_depth_load_op(LoadOp::Clear)

@@ -15,7 +15,8 @@ pub mod pbr;
 pub struct Materials {
     lookup: SlotMap<MaterialKey, Material>,
     // optimization to avoid loading whole material to check if it has alpha blend
-    alpha_blend: SecondaryMap<MaterialKey, bool>,
+    alpha_blend: SecondaryMap<MaterialKey, ()>,
+    alpha_mask: SecondaryMap<MaterialKey, f32>,
     buffers: MaterialBuffers,
 }
 
@@ -54,6 +55,7 @@ impl Materials {
         Ok(Materials {
             lookup: SlotMap::with_key(),
             alpha_blend: SecondaryMap::new(),
+            alpha_mask: SecondaryMap::new(),
             buffers: MaterialBuffers::new(gpu)?,
         })
     }
@@ -64,10 +66,16 @@ impl Materials {
 
     pub fn insert(&mut self, material: Material, textures: &Textures) -> MaterialKey {
         let has_alpha_blend = material.has_alpha_blend();
+        let alpha_mask = material.alpha_mask();
         let buffer_kind = material.buffer_kind();
 
         let key = self.lookup.insert(material);
-        self.alpha_blend.insert(key, has_alpha_blend);
+        if has_alpha_blend {
+            self.alpha_blend.insert(key, ());
+        }
+        if let Some(alpha_mask) = alpha_mask {
+            self.alpha_mask.insert(key, alpha_mask);
+        }
         self.buffers.buffer_kind.insert(key, buffer_kind);
         self.update(key, |_| {}, textures);
 
@@ -105,12 +113,28 @@ impl Materials {
     ) {
         if let Some(material) = self.lookup.get_mut(key) {
             let old_has_alpha_blend = material.has_alpha_blend();
+            let old_alpha_mask = material.alpha_mask();
             let old_buffer_kind = material.buffer_kind();
             f(material);
             let new_has_alpha_blend = material.has_alpha_blend();
+            let new_alpha_mask = material.alpha_mask();
             let new_buffer_kind = material.buffer_kind();
             if old_has_alpha_blend != new_has_alpha_blend {
-                self.alpha_blend.insert(key, new_has_alpha_blend);
+                if new_has_alpha_blend {
+                    self.alpha_blend.insert(key, ());
+                } else {
+                    self.alpha_blend.remove(key);
+                }
+            }
+            if old_alpha_mask != new_alpha_mask {
+                match new_alpha_mask {
+                    Some(cutoff) => {
+                        self.alpha_mask.insert(key, cutoff);
+                    }
+                    None => {
+                        self.alpha_mask.remove(key);
+                    }
+                }
             }
             if old_buffer_kind != new_buffer_kind {
                 self.buffers.buffer_kind.insert(key, new_buffer_kind);
@@ -123,11 +147,12 @@ impl Materials {
         }
     }
 
-    pub fn has_alpha_blend(&self, key: MaterialKey) -> Result<bool> {
-        self.alpha_blend
-            .get(key)
-            .cloned()
-            .ok_or(AwsmMaterialError::MissingAlphaBlendLookup(key))
+    pub fn has_alpha_blend(&self, key: MaterialKey) -> bool {
+        self.alpha_blend.contains_key(key)
+    }
+
+    pub fn has_alpha_mask(&self, key: MaterialKey) -> bool {
+        self.alpha_mask.contains_key(key)
     }
 
     pub fn write_gpu(
@@ -152,6 +177,12 @@ impl Material {
     pub fn has_alpha_blend(&self) -> bool {
         match self {
             Material::Pbr(pbr_material) => pbr_material.has_alpha_blend(),
+        }
+    }
+
+    pub fn alpha_mask(&self) -> Option<f32> {
+        match self {
+            Material::Pbr(pbr_material) => pbr_material.alpha_mask(),
         }
     }
 
@@ -192,6 +223,9 @@ pub type Result<T> = std::result::Result<T, AwsmMaterialError>;
 pub enum AwsmMaterialError {
     #[error("[material] missing alpha blend lookup: {0:?}")]
     MissingAlphaBlendLookup(MaterialKey),
+
+    #[error("[material] missing alpha cutoff lookup: {0:?}")]
+    MissingAlphaCutoffLookup(MaterialKey),
 
     #[error("[material] create texture view: {0}")]
     CreateTextureView(String),

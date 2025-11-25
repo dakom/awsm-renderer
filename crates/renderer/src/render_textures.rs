@@ -231,7 +231,7 @@ impl RenderTexturesInner {
         height: u32,
         anti_aliasing: AntiAliasing,
     ) -> Result<Self> {
-        let geometry_texture =
+        let maybe_multisample_texture =
             |format: TextureFormat, label: &'static str| -> TextureDescriptor<'static> {
                 let mut descriptor = TextureDescriptor::new(
                     format,
@@ -252,13 +252,18 @@ impl RenderTexturesInner {
         // 1. Create all textures
         let visibility_data = gpu
             .create_texture(
-                &geometry_texture(render_texture_formats.visiblity_data, "Visibility Data").into(),
+                &maybe_multisample_texture(
+                    render_texture_formats.visiblity_data,
+                    "Visibility Data",
+                )
+                .into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
         let barycentric = gpu
             .create_texture(
-                &geometry_texture(render_texture_formats.barycentric, "Barycentric").into(),
+                &maybe_multisample_texture(render_texture_formats.barycentric, "Barycentric")
+                    .into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
@@ -283,13 +288,14 @@ impl RenderTexturesInner {
 
         let normal_tangent = gpu
             .create_texture(
-                &geometry_texture(render_texture_formats.normal_tangent, "Normal Tangent").into(),
+                &maybe_multisample_texture(render_texture_formats.normal_tangent, "Normal Tangent")
+                    .into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
         let barycentric_derivatives = gpu
             .create_texture(
-                &geometry_texture(
+                &maybe_multisample_texture(
                     render_texture_formats.barycentric_derivatives,
                     "Barycentric Derivatives",
                 )
@@ -312,36 +318,22 @@ impl RenderTexturesInner {
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let oit_rgb = gpu
+        let oit_alpha = gpu
             .create_texture(
-                &TextureDescriptor::new(
-                    render_texture_formats.oit_rgb,
-                    Extent3d::new(width, Some(height), Some(1)),
-                    TextureUsage::new()
-                        .with_render_attachment()
-                        .with_texture_binding(),
-                )
-                .with_label("OIT RGB")
-                .into(),
+                &maybe_multisample_texture(render_texture_formats.oit_alpha, "OIT Alpha").into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let oit_alpha = gpu
+        let oit_rgb = gpu
             .create_texture(
-                &TextureDescriptor::new(
-                    render_texture_formats.oit_alpha,
-                    Extent3d::new(width, Some(height), Some(1)),
-                    TextureUsage::new()
-                        .with_render_attachment()
-                        .with_texture_binding(),
-                )
-                .with_label("OIT Alpha")
-                .into(),
+                &maybe_multisample_texture(render_texture_formats.oit_rgb, "OIT RGB").into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
         let depth = gpu
-            .create_texture(&geometry_texture(render_texture_formats.depth, "Depth").into())
+            .create_texture(
+                &maybe_multisample_texture(render_texture_formats.depth, "Depth").into(),
+            )
             // Keeping the depth buffer bindable allows later passes (e.g. compute shading) to
             // sample it directly for world-position reconstruction.
             .map_err(AwsmRenderTextureError::CreateTexture)?;

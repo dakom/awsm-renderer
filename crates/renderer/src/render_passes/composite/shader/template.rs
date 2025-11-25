@@ -7,13 +7,17 @@ use crate::{
 
 #[derive(Template, Debug)]
 #[template(path = "composite_wgsl/compute.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateComposite {}
+pub struct ShaderTemplateComposite {
+    pub multisampled_geometry: bool,
+}
 
 impl TryFrom<&ShaderCacheKeyComposite> for ShaderTemplateComposite {
     type Error = AwsmShaderError;
 
     fn try_from(value: &ShaderCacheKeyComposite) -> Result<Self> {
-        Ok(Self {})
+        Ok(Self {
+            multisampled_geometry: value.multisampled_geometry,
+        })
     }
 }
 

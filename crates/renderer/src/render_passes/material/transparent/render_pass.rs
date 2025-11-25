@@ -10,7 +10,13 @@ use crate::{
     renderable::{self, Renderable},
     AwsmRenderer,
 };
-use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+use awsm_renderer_core::{
+    command::{
+        render_pass::{ColorAttachment, DepthStencilAttachment, RenderPassDescriptor},
+        LoadOp, StoreOp,
+    },
+    renderer::AwsmRendererWebGpu,
+};
 
 pub struct MaterialTransparentRenderPass {
     pub bind_groups: MaterialTransparentBindGroups,
@@ -29,7 +35,35 @@ impl MaterialTransparentRenderPass {
     }
 
     pub fn render(&self, ctx: &RenderContext, renderables: Vec<Renderable>) -> Result<()> {
+        let render_pass = ctx.command_encoder.begin_render_pass(
+            &RenderPassDescriptor {
+                label: Some("Material Transparent Pass"),
+                color_attachments: vec![
+                    ColorAttachment::new(
+                        &ctx.render_texture_views.oit_alpha,
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    ),
+                    ColorAttachment::new(
+                        &ctx.render_texture_views.oit_rgb,
+                        LoadOp::Clear,
+                        StoreOp::Store,
+                    ),
+                ],
+                depth_stencil_attachment: Some(
+                    DepthStencilAttachment::new(&ctx.render_texture_views.depth)
+                        .with_depth_load_op(LoadOp::Clear)
+                        .with_depth_store_op(StoreOp::Store)
+                        .with_depth_clear_value(1.0),
+                ),
+                ..Default::default()
+            }
+            .into(),
+        )?;
+
         // TODO!
+
+        render_pass.end();
 
         Ok(())
     }

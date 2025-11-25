@@ -148,6 +148,13 @@ impl PbrMaterial {
         matches!(self.alpha_mode, MaterialAlphaMode::Blend)
     }
 
+    pub fn alpha_mask(&self) -> Option<f32> {
+        match self.alpha_mode {
+            MaterialAlphaMode::Mask { cutoff } => Some(cutoff),
+            _ => None,
+        }
+    }
+
     pub fn uniform_buffer_data(&self, textures: &Textures) -> Result<[u8; Self::BYTE_SIZE]> {
         let mut data = [0u8; Self::BYTE_SIZE];
         let mut offset = 0;
@@ -496,13 +503,17 @@ fn pack_texture_info_raw<ID>(
         "address_mode_v too large for 8 bits"
     );
 
-    let extra = (flags & 0xFF)
-        | ((address_mode_u & 0xFF) << 8)
-        | ((address_mode_v & 0xFF) << 16);
+    let extra = (flags & 0xFF) | ((address_mode_u & 0xFF) << 8) | ((address_mode_v & 0xFF) << 16);
     // top 8 bits left as 0 (padding/reserved)
 
     // --- transform_offset: full 32 bits for byte offset ---
     let transform_offset = texture_transform_offset as u32;
 
-    [size, array_and_layer, uv_and_sampler, extra, transform_offset]
+    [
+        size,
+        array_and_layer,
+        uv_and_sampler,
+        extra,
+        transform_offset,
+    ]
 }
