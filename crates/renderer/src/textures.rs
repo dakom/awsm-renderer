@@ -72,6 +72,11 @@ impl AwsmRenderer {
                 .material_opaque
                 .texture_pool_changed(&mut render_pass_ctx)
                 .await?;
+
+            self.render_passes
+                .material_transparent
+                .texture_pool_changed(&mut render_pass_ctx)
+                .await?;
         }
 
         // Either way, gotta also deal with all the meshes that need their shader/pipelines (re)created
@@ -89,9 +94,9 @@ impl AwsmRenderer {
                     .material_opaque
                     .pipelines
                     .set_compute_pipeline_key(
-                        mesh.buffer_info_key,
-                        mesh.material_key,
                         &self.gpu,
+                        &mesh,
+                        key,
                         &mut self.shaders,
                         &mut self.pipelines,
                         &self.render_passes.material_opaque.bind_groups,
@@ -99,6 +104,24 @@ impl AwsmRenderer {
                         &self.meshes.buffer_infos,
                         &self.anti_aliasing,
                         &self.textures,
+                    )
+                    .await?;
+
+                self.render_passes
+                    .material_transparent
+                    .pipelines
+                    .set_render_pipeline_key(
+                        &self.gpu,
+                        &mesh,
+                        key,
+                        &mut self.shaders,
+                        &mut self.pipelines,
+                        &self.render_passes.material_transparent.bind_groups,
+                        &self.pipeline_layouts,
+                        &self.meshes.buffer_infos,
+                        &self.anti_aliasing,
+                        &self.textures,
+                        &self.render_textures.formats,
                     )
                     .await?;
             }

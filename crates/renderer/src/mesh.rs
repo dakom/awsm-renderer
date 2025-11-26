@@ -16,6 +16,7 @@ use crate::pipelines::compute_pipeline::ComputePipelineKey;
 use crate::render::RenderContext;
 use crate::render_passes::geometry::bind_group::GeometryBindGroups;
 use crate::render_passes::material::opaque::bind_group::MaterialOpaqueBindGroups;
+use crate::render_passes::material::transparent::bind_group::MaterialTransparentBindGroups;
 use crate::transforms::TransformKey;
 use crate::{bounds::Aabb, pipelines::render_pipeline::RenderPipelineKey};
 use skins::SkinKey;
@@ -97,15 +98,62 @@ impl Mesh {
         ctx: &RenderContext,
         mesh_key: MeshKey,
         render_pass: &RenderPassEncoder,
-        geometry_bind_groups: &GeometryBindGroups,
+        bind_groups: &GeometryBindGroups,
     ) -> Result<()> {
         let meta_offset = ctx.meshes.meta.geometry_buffer_offset(mesh_key)? as u32;
 
-        render_pass.set_bind_group(
-            2,
-            geometry_bind_groups.meta.get_bind_group()?,
-            Some(&[meta_offset]),
-        )?;
+        render_pass.set_bind_group(2, bind_groups.meta.get_bind_group()?, Some(&[meta_offset]))?;
+
+        render_pass.set_vertex_buffer(
+            0,
+            ctx.meshes.visibility_data_gpu_buffer(),
+            Some(ctx.meshes.visibility_data_buffer_offset(mesh_key)? as u64),
+            None,
+        );
+
+        if let Ok(offset) = ctx.instances.transform_buffer_offset(self.transform_key) {
+            render_pass.set_vertex_buffer(
+                1,
+                ctx.instances.gpu_transform_buffer(),
+                Some(offset as u64),
+                None,
+            );
+        }
+
+        let buffer_info = ctx.meshes.buffer_infos.get(self.buffer_info_key)?;
+
+        render_pass.set_index_buffer(
+            ctx.meshes.visibility_index_gpu_buffer(),
+            IndexFormat::Uint32,
+            Some(ctx.meshes.visibility_index_buffer_offset(mesh_key)? as u64),
+            None,
+        );
+
+        match ctx.instances.transform_instance_count(self.transform_key) {
+            Some(instance_count) => {
+                render_pass.draw_indexed_with_instance_count(
+                    buffer_info.vertex.count as u32,
+                    instance_count as u32,
+                );
+            }
+            _ => {
+                render_pass.draw_indexed(buffer_info.vertex.count as u32);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn push_material_transparent_pass_commands(
+        &self,
+        ctx: &RenderContext,
+        mesh_key: MeshKey,
+        render_pass: &RenderPassEncoder,
+        main_bind_group: &web_sys::GpuBindGroup,
+    ) -> Result<()> {
+        let meta_offset = ctx.meshes.meta.geometry_buffer_offset(mesh_key)? as u32;
+
+        render_pass.set_bind_group(0, main_bind_group, Some(&[meta_offset]))?;
 
         render_pass.set_vertex_buffer(
             0,

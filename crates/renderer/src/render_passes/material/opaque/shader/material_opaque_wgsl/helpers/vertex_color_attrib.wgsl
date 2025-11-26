@@ -1,9 +1,3 @@
-// 4 bytes
-struct ColorInfo {
-    set_index: u32, // 0 for COLOR_0
-}
-
-
 fn vertex_color(attribute_data_offset: u32, triangle_indices: vec3<u32>, barycentric: vec3<f32>, color_info: ColorInfo, vertex_attribute_stride: u32) -> vec4<f32> {
     let color0 = _vertex_color_per_vertex(attribute_data_offset, color_info.set_index, triangle_indices.x, vertex_attribute_stride);
     let color1 = _vertex_color_per_vertex(attribute_data_offset, color_info.set_index, triangle_indices.y, vertex_attribute_stride);

@@ -1,5 +1,3 @@
-@group(2) @binding(0)
-var<uniform> mesh_meta: GeometryMeshMeta;
 
 struct GeometryMeshMeta {
     mesh_key_high: u32,

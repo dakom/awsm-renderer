@@ -1,6 +1,10 @@
 - vertex buffer data from geometry
 - *another* vertex buffer data from non-geometry attributes (what we use for storage in opaque)
 
+- combine `texture_bind_group` and `sampler_bind_group` into a single bind group 
+  - probably just need to encode the sampler bind group starting index in shader template
+    then sampler bindings can be offset from there
+
 # Transparent material pass
 - like opaque
 - cutoff

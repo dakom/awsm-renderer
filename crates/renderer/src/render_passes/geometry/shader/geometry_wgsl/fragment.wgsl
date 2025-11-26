@@ -1,4 +1,4 @@
-{% include "all_material_shared_wgsl/math.wgsl" %}
+{% include "utils_wgsl/math.wgsl" %}
 
 // Fragment input from vertex shader
 struct FragmentInput {

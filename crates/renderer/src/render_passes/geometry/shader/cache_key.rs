@@ -6,7 +6,7 @@ use crate::{
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyGeometry {
     pub instancing_transforms: bool,
-    pub msaa_samples: u32,
+    pub msaa_samples: Option<u32>,
 }
 
 impl From<ShaderCacheKeyGeometry> for ShaderCacheKey {

@@ -5,7 +5,7 @@ use crate::anti_alias::AntiAliasing;
 use crate::bind_groups::BindGroups;
 use crate::error::Result;
 use crate::materials::MaterialKey;
-use crate::mesh::{MeshBufferInfo, MeshBufferInfoKey, MeshBufferInfos};
+use crate::mesh::{Mesh, MeshBufferInfo, MeshBufferInfoKey, MeshBufferInfos, MeshKey};
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::compute_pipeline::{ComputePipelineCacheKey, ComputePipelineKey};
 use crate::pipelines::Pipelines;
@@ -20,8 +20,7 @@ use crate::textures::{AwsmTextureError, Textures};
 pub struct MaterialOpaquePipelines {
     multisampled_pipeline_layout_key: PipelineLayoutKey,
     singlesampled_pipeline_layout_key: PipelineLayoutKey,
-    compute_pipeline_keys:
-        SecondaryMap<MeshBufferInfoKey, SecondaryMap<MaterialKey, ComputePipelineKey>>,
+    compute_pipeline_keys: SecondaryMap<MeshKey, ComputePipelineKey>,
 }
 
 impl MaterialOpaquePipelines {
@@ -60,39 +59,31 @@ impl MaterialOpaquePipelines {
         })
     }
 
-    pub fn get_compute_pipeline_key(
-        &self,
-        mesh_buffer_info_key: MeshBufferInfoKey,
-        material_key: MaterialKey,
-    ) -> Option<ComputePipelineKey> {
-        self.compute_pipeline_keys
-            .get(mesh_buffer_info_key)
-            .and_then(|m| m.get(material_key))
-            .copied()
+    pub fn get_compute_pipeline_key(&self, mesh_key: MeshKey) -> Option<ComputePipelineKey> {
+        self.compute_pipeline_keys.get(mesh_key).cloned()
     }
 
     pub async fn set_compute_pipeline_key(
         &mut self,
-        mesh_buffer_info_key: MeshBufferInfoKey,
-        material_key: MaterialKey,
         gpu: &AwsmRendererWebGpu,
+        mesh: &Mesh,
+        mesh_key: MeshKey,
         shaders: &mut Shaders,
         pipelines: &mut Pipelines,
-        material_opaque_bind_groups: &MaterialOpaqueBindGroups,
+        material_bind_groups: &MaterialOpaqueBindGroups,
         pipeline_layouts: &PipelineLayouts,
         mesh_buffer_infos: &MeshBufferInfos,
         anti_aliasing: &AntiAliasing,
         textures: &Textures,
     ) -> Result<ComputePipelineKey> {
-        let mesh_buffer_info = mesh_buffer_infos.get(mesh_buffer_info_key)?;
+        let mesh_buffer_info = mesh_buffer_infos.get(mesh.buffer_info_key)?;
 
         let msaa_sample_count = anti_aliasing.msaa_sample_count.unwrap_or(0);
 
         let shader_cache_key = ShaderCacheKeyMaterialOpaque {
             attributes: mesh_buffer_info.into(),
-            texture_pool_arrays_len: material_opaque_bind_groups.texture_pool_arrays_len,
-            texture_pool_samplers_len: material_opaque_bind_groups.texture_pool_sampler_keys.len()
-                as u32,
+            texture_pool_arrays_len: material_bind_groups.texture_pool_arrays_len,
+            texture_pool_samplers_len: material_bind_groups.texture_pool_sampler_keys.len() as u32,
             msaa_sample_count,
             mipmaps: anti_aliasing.mipmap,
         };
@@ -123,19 +114,8 @@ impl MaterialOpaquePipelines {
             )
             .await?;
 
-        match self.compute_pipeline_keys.entry(mesh_buffer_info_key) {
-            None => {
-                // this isn't "if the key doesn't exist yet"
-                // it's "if the key was removed"
-                let mut m = SecondaryMap::new();
-                m.insert(material_key, compute_pipeline_key);
-                self.compute_pipeline_keys.insert(mesh_buffer_info_key, m);
-            }
-            Some(x) => {
-                x.or_insert_with(SecondaryMap::new)
-                    .insert(material_key, compute_pipeline_key);
-            }
-        }
+        self.compute_pipeline_keys
+            .insert(mesh_key, compute_pipeline_key);
 
         Ok(compute_pipeline_key)
     }

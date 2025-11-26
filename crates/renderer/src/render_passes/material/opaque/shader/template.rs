@@ -2,9 +2,7 @@ use askama::Template;
 
 use crate::{
     debug::{debug_once, debug_unique_string},
-    render_passes::material::opaque::shader::{
-        attributes::ShaderMaterialOpaqueVertexAttributes, cache_key::ShaderCacheKeyMaterialOpaque,
-    },
+    render_passes::material::opaque::shader::cache_key::ShaderCacheKeyMaterialOpaque,
     shaders::{print_shader_source, AwsmShaderError, Result},
 };
 

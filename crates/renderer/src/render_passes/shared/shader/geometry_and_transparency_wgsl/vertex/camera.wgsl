@@ -9,6 +9,3 @@ struct CameraUniform {
     frame_count: u32,
     frustum_rays: array<vec4<f32>, 4>,
 };
-
-@group(0) @binding(0)
-var<uniform> camera: CameraUniform;

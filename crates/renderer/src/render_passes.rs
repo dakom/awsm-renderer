@@ -1,3 +1,12 @@
+pub mod composite;
+pub mod display;
+pub mod geometry;
+pub mod light_culling;
+pub mod material;
+pub mod shader_cache_key;
+pub mod shader_template;
+pub mod shared;
+
 use awsm_renderer_core::{renderer::AwsmRendererWebGpu, texture::TextureFormat};
 
 use crate::anti_alias::AntiAliasing;
@@ -21,14 +30,6 @@ use crate::{
     shaders::Shaders,
     textures::Textures,
 };
-
-pub mod composite;
-pub mod display;
-pub mod geometry;
-pub mod light_culling;
-pub mod material;
-pub mod shader_cache_key;
-pub mod shader_template;
 
 pub struct RenderPasses {
     pub geometry: GeometryRenderPass,

@@ -51,14 +51,10 @@ impl CompositeBindGroups {
             ),
             BindGroupEntry::new(
                 1,
-                BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.oit_rgb)),
+                BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.oit_color)),
             ),
             BindGroupEntry::new(
                 2,
-                BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.oit_alpha)),
-            ),
-            BindGroupEntry::new(
-                3,
                 BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.composite)),
             ),
         ];
@@ -91,17 +87,6 @@ async fn create_bind_group_layout_key(
                     TextureBindingLayout::new()
                         .with_view_dimension(TextureViewDimension::N2d)
                         .with_sample_type(TextureSampleType::UnfilterableFloat),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new()
-                        .with_view_dimension(TextureViewDimension::N2d)
-                        .with_sample_type(TextureSampleType::UnfilterableFloat)
-                        .with_multisampled(multisampled_geometry),
                 ),
                 visibility_vertex: false,
                 visibility_fragment: false,

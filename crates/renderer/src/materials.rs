@@ -60,8 +60,8 @@ impl Materials {
         })
     }
 
-    pub fn get(&self, key: MaterialKey) -> Option<&Material> {
-        self.lookup.get(key)
+    pub fn get(&self, key: MaterialKey) -> Result<&Material> {
+        self.lookup.get(key).ok_or(AwsmMaterialError::NotFound(key))
     }
 
     pub fn insert(&mut self, material: Material, textures: &Textures) -> MaterialKey {
@@ -221,6 +221,8 @@ pub type Result<T> = std::result::Result<T, AwsmMaterialError>;
 
 #[derive(Error, Debug)]
 pub enum AwsmMaterialError {
+    #[error("[material] not found: {0:?}")]
+    NotFound(MaterialKey),
     #[error("[material] missing alpha blend lookup: {0:?}")]
     MissingAlphaBlendLookup(MaterialKey),
 

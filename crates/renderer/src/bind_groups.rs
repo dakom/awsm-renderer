@@ -104,6 +104,9 @@ impl BindGroups {
             OpaqueTextures,
             OpaqueSamplers,
             TransparentMain,
+            TransparentLights,
+            TransparentTextures,
+            TransparentSamplers,
             LightCulling,
             Composite,
             Display,
@@ -115,70 +118,90 @@ impl BindGroups {
             match create {
                 BindGroupCreate::CameraInitOnly => {
                     functions_to_call.insert(FunctionToCall::GeometryCamera);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::LightsInfoCreate => {
                     functions_to_call.insert(FunctionToCall::OpaqueLights);
+                    functions_to_call.insert(FunctionToCall::TransparentLights);
                 }
                 BindGroupCreate::LightsResize => {
                     functions_to_call.insert(FunctionToCall::OpaqueLights);
+                    functions_to_call.insert(FunctionToCall::TransparentLights);
                 }
                 BindGroupCreate::TransformsResize => {
                     functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::PbrMaterialResize => {
                     functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::GeometryMeshMetaResize => {
                     functions_to_call.insert(FunctionToCall::GeometryMeta);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::GeometryMorphTargetWeightsResize
                 | BindGroupCreate::GeometryMorphTargetValuesResize
                 | BindGroupCreate::SkinJointMatricesResize
                 | BindGroupCreate::SkinJointIndexAndWeightsResize => {
                     functions_to_call.insert(FunctionToCall::GeometryAnimation);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::TextureViewResize => {
                     functions_to_call.insert(FunctionToCall::LightCulling);
                     functions_to_call.insert(FunctionToCall::Composite);
                     functions_to_call.insert(FunctionToCall::Display);
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::TexturePool => {
                     functions_to_call.insert(FunctionToCall::OpaqueTextures);
                     functions_to_call.insert(FunctionToCall::OpaqueSamplers);
+                    functions_to_call.insert(FunctionToCall::TransparentTextures);
+                    functions_to_call.insert(FunctionToCall::TransparentSamplers);
                 }
                 BindGroupCreate::TextureTransformsResize => {
                     functions_to_call.insert(FunctionToCall::OpaqueTextures);
+                    functions_to_call.insert(FunctionToCall::TransparentTextures);
                 }
                 BindGroupCreate::BrdfLutTextures => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::IblTextures => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::EnvironmentSkyboxCreate => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
                 }
                 BindGroupCreate::TransformNormalsResize => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::MaterialMorphTargetWeightsResize => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::MaterialMorphTargetValuesResize => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::MaterialMeshMetaResize => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::MeshAttributeDataResize => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::MeshAttributeIndexResize => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
                 BindGroupCreate::AntiAliasingChange => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
             }
         }
@@ -233,7 +256,25 @@ impl BindGroups {
                     render_passes
                         .material_transparent
                         .bind_groups
-                        .recreate(&ctx)?;
+                        .recreate_main(&ctx)?;
+                }
+                FunctionToCall::TransparentLights => {
+                    render_passes
+                        .material_transparent
+                        .bind_groups
+                        .recreate_lights(&ctx)?;
+                }
+                FunctionToCall::TransparentTextures => {
+                    render_passes
+                        .material_transparent
+                        .bind_groups
+                        .recreate_texture_pool_textures(&ctx)?;
+                }
+                FunctionToCall::TransparentSamplers => {
+                    render_passes
+                        .material_transparent
+                        .bind_groups
+                        .recreate_texture_pool_samplers(&ctx)?;
                 }
                 FunctionToCall::LightCulling => {
                     render_passes.light_culling.bind_groups.recreate(&ctx)?;

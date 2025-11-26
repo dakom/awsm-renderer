@@ -1,11 +1,5 @@
 //***** MORPHS *****
 
-// Geometry morph (positions, normals, tangents)
-@group(3) @binding(0)
-var<storage, read> geometry_morph_weights: array<f32>;
-
-@group(3) @binding(1)
-var<storage, read> geometry_morph_values: array<f32>; 
 
 fn apply_position_morphs(input: VertexInput) -> VertexInput {
     var output = input;

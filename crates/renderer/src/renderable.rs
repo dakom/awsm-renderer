@@ -11,7 +11,10 @@ use crate::{
     render::RenderContext,
     render_passes::{
         geometry::bind_group::GeometryBindGroups,
-        material::opaque::bind_group::MaterialOpaqueBindGroups,
+        material::{
+            opaque::bind_group::MaterialOpaqueBindGroups,
+            transparent::bind_group::MaterialTransparentBindGroups,
+        },
     },
     transforms::TransformKey,
     AwsmRenderer,
@@ -33,7 +36,7 @@ impl AwsmRenderer {
         let mut opaque = Vec::new();
         let mut transparent = Vec::new();
 
-        for (key, mesh) in self.meshes.iter() {
+        for (mesh_key, mesh) in self.meshes.iter() {
             // TODO - frustum cull here
             if let Some(world_aabb) = &mesh.world_aabb {
                 // if !self.camera.frustum.intersects_aabb(&world_aabb) {
@@ -42,13 +45,19 @@ impl AwsmRenderer {
             }
 
             let renderable = Renderable::Mesh {
-                key,
+                key: mesh_key,
                 mesh,
                 material_opaque_compute_pipeline_key: self
                     .render_passes
                     .material_opaque
                     .pipelines
-                    .get_compute_pipeline_key(mesh.buffer_info_key, mesh.material_key),
+                    // CHANGE to key too?
+                    .get_compute_pipeline_key(mesh_key),
+                material_transparent_render_pipeline_key: self
+                    .render_passes
+                    .material_transparent
+                    .pipelines
+                    .get_render_pipeline_key(mesh_key),
             };
             if self.materials.has_alpha_blend(mesh.material_key)
                 || self.materials.has_alpha_mask(mesh.material_key)
@@ -131,6 +140,7 @@ pub enum Renderable<'a> {
         key: MeshKey,
         mesh: &'a Mesh,
         material_opaque_compute_pipeline_key: Option<ComputePipelineKey>,
+        material_transparent_render_pipeline_key: Option<RenderPipelineKey>,
     },
 }
 
@@ -147,6 +157,18 @@ impl Renderable<'_> {
                 material_opaque_compute_pipeline_key,
                 ..
             } => *material_opaque_compute_pipeline_key,
+        }
+    }
+
+    pub fn material_transparent_render_pipeline_key(
+        &self,
+        ctx: &RenderContext,
+    ) -> Option<RenderPipelineKey> {
+        match self {
+            Self::Mesh {
+                material_transparent_render_pipeline_key,
+                ..
+            } => *material_transparent_render_pipeline_key,
         }
     }
 
@@ -172,6 +194,22 @@ impl Renderable<'_> {
             Self::Mesh { mesh, key, .. } => {
                 mesh.push_geometry_pass_commands(ctx, *key, render_pass, geometry_bind_groups)
             }
+        }
+    }
+
+    pub fn push_material_transparent_pass_commands(
+        &self,
+        ctx: &RenderContext,
+        render_pass: &RenderPassEncoder,
+        main_bind_group: &web_sys::GpuBindGroup,
+    ) -> Result<()> {
+        match self {
+            Self::Mesh { mesh, key, .. } => mesh.push_material_transparent_pass_commands(
+                ctx,
+                *key,
+                render_pass,
+                main_bind_group,
+            ),
         }
     }
 }

@@ -1,18 +1,15 @@
 use crate::{
     mesh::{MeshBufferInfo, MeshBufferVertexAttributeInfo},
     render_passes::{
-        material::{
-            cache_key::ShaderCacheKeyMaterial,
-            opaque::shader::attributes::ShaderMaterialOpaqueVertexAttributes,
-        },
-        shader_cache_key::ShaderCacheKeyRenderPass,
+        material::cache_key::ShaderCacheKeyMaterial, shader_cache_key::ShaderCacheKeyRenderPass,
+        shared::opaque_and_transparency::cache_key::ShaderMaterialVertexAttributes,
     },
     shaders::ShaderCacheKey,
 };
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyMaterialOpaque {
-    pub attributes: ShaderMaterialOpaqueVertexAttributes,
+    pub attributes: ShaderMaterialVertexAttributes,
     pub texture_pool_arrays_len: u32,
     pub texture_pool_samplers_len: u32,
     pub msaa_sample_count: u32, // 0 if no MSAA

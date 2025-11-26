@@ -26,8 +26,7 @@ pub struct RenderTextureFormats {
     pub opaque_color: TextureFormat,
 
     // Output from transparent shading pass
-    pub oit_rgb: TextureFormat,
-    pub oit_alpha: TextureFormat,
+    pub oit_color: TextureFormat,
 
     // Output from composite pass
     pub composite: TextureFormat,
@@ -47,8 +46,7 @@ impl RenderTextureFormats {
             normal_tangent: TextureFormat::Rgba16float,
             barycentric_derivatives: TextureFormat::Rgba16float,
             opaque_color: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
-            oit_rgb: TextureFormat::Rgba16float,      // HDR format for bloom/tonemapping
-            oit_alpha: TextureFormat::R32float,       // Alpha channel for OIT
+            oit_color: TextureFormat::Rgba16float,    // HDR format for bloom/tonemapping
             composite: TextureFormat::Rgba8unorm,     // Final composite output format
             depth: TextureFormat::Depth24plus,        // Depth format for depth testing
         }
@@ -142,8 +140,7 @@ pub struct RenderTextureViews {
     pub opaque_color: web_sys::GpuTextureView,
 
     // Output from transparent shading pass
-    pub oit_rgb: web_sys::GpuTextureView,
-    pub oit_alpha: web_sys::GpuTextureView,
+    pub oit_color: web_sys::GpuTextureView,
 
     // Output from composite pass
     pub composite: web_sys::GpuTextureView,
@@ -172,8 +169,7 @@ impl RenderTextureViews {
             normal_tangent: inner.normal_tangent_view.clone(),
             barycentric_derivatives: inner.barycentric_derivatives_view.clone(),
             opaque_color: inner.opaque_color_view.clone(),
-            oit_rgb: inner.oit_rgb_view.clone(),
-            oit_alpha: inner.oit_alpha_view.clone(),
+            oit_color: inner.oit_color_view.clone(),
             depth: inner.depth_view.clone(),
             composite: inner.composite_view.clone(),
             size_changed,
@@ -205,11 +201,8 @@ pub struct RenderTexturesInner {
     pub opaque_color_clearer: TextureClearer,
     pub opaque_color_view: web_sys::GpuTextureView,
 
-    pub oit_rgb: web_sys::GpuTexture,
-    pub oit_rgb_view: web_sys::GpuTextureView,
-
-    pub oit_alpha: web_sys::GpuTexture,
-    pub oit_alpha_view: web_sys::GpuTextureView,
+    pub oit_color: web_sys::GpuTexture,
+    pub oit_color_view: web_sys::GpuTextureView,
 
     pub depth: web_sys::GpuTexture,
     pub depth_view: web_sys::GpuTextureView,
@@ -318,15 +311,9 @@ impl RenderTexturesInner {
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let oit_alpha = gpu
+        let oit_color = gpu
             .create_texture(
-                &maybe_multisample_texture(render_texture_formats.oit_alpha, "OIT Alpha").into(),
-            )
-            .map_err(AwsmRenderTextureError::CreateTexture)?;
-
-        let oit_rgb = gpu
-            .create_texture(
-                &maybe_multisample_texture(render_texture_formats.oit_rgb, "OIT RGB").into(),
+                &maybe_multisample_texture(render_texture_formats.oit_color, "OIT Color").into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
@@ -383,13 +370,9 @@ impl RenderTexturesInner {
             AwsmRenderTextureError::CreateTextureView(format!("opaque_color: {e:?}"))
         })?;
 
-        let oit_rgb_view = oit_rgb
+        let oit_color_view = oit_color
             .create_view()
-            .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("oit_rgb: {e:?}")))?;
-
-        let oit_alpha_view = oit_alpha
-            .create_view()
-            .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("oit_alpha: {e:?}")))?;
+            .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("oit_color: {e:?}")))?;
 
         let depth_view = depth
             .create_view()
@@ -422,11 +405,8 @@ impl RenderTexturesInner {
             .map_err(AwsmRenderTextureError::CreateTextureClearer)?,
             opaque_color_view,
 
-            oit_rgb,
-            oit_rgb_view,
-
-            oit_alpha,
-            oit_alpha_view,
+            oit_color,
+            oit_color_view,
 
             depth,
             depth_view,
@@ -450,8 +430,7 @@ impl RenderTexturesInner {
         self.normal_tangent.destroy();
         self.barycentric_derivatives.destroy();
         self.opaque_color.destroy();
-        self.oit_rgb.destroy();
-        self.oit_alpha.destroy();
+        self.oit_color.destroy();
         self.depth.destroy();
         self.composite.destroy();
     }

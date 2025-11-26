@@ -1,57 +1,61 @@
 /*************** START color_space.wgsl ******************/
-{% include "all_material_shared_wgsl/color_space.wgsl" %}
+{% include "opaque_and_transparency_wgsl/color_space.wgsl" %}
 /*************** END color_space.wgsl ******************/
 
 /*************** START debug.wgsl ******************/
-{% include "all_material_shared_wgsl/debug.wgsl" %}
+{% include "opaque_and_transparency_wgsl/debug.wgsl" %}
 /*************** END debug.wgsl ******************/
 
 /*************** START math.wgsl ******************/
-{% include "all_material_shared_wgsl/math.wgsl" %}
+{% include "utils_wgsl/math.wgsl" %}
 /*************** END math.wgsl ******************/
 
 /*************** START mesh_meta.wgsl ******************/
-{% include "all_material_shared_wgsl/mesh_meta.wgsl" %}
+{% include "opaque_and_transparency_wgsl/mesh_meta.wgsl" %}
 /*************** END mesh_meta.wgsl ******************/
 
 /*************** START projection.wgsl ******************/
-{% include "all_material_shared_wgsl/projection.wgsl" %}
+{% include "opaque_and_transparency_wgsl/projection.wgsl" %}
 /*************** END projection.wgsl ******************/
 
 /*************** START textures.wgsl ******************/
-{% include "all_material_shared_wgsl/textures.wgsl" %}
+{% include "opaque_and_transparency_wgsl/textures.wgsl" %}
 /*************** END textures.wgsl ******************/
 
 /*************** START vertex_color.wgsl ******************/
-{% include "all_material_shared_wgsl/vertex_color.wgsl" %}
+{% include "opaque_and_transparency_wgsl/vertex_color.wgsl" %}
 /*************** END vertex_color.wgsl ******************/
 
+/*************** START vertex_color_attrib.wgsl ******************/
+{% include "material_opaque_wgsl/helpers/vertex_color_attrib.wgsl" %}
+/*************** END vertex_color_attrib.wgsl ******************/
+
 /*************** START transforms.wgsl ******************/
-{% include "all_material_shared_wgsl/transforms.wgsl" %}
+{% include "opaque_and_transparency_wgsl/transforms.wgsl" %}
 /*************** END transforms.wgsl ******************/
 
 /*************** START positions.wgsl ******************/
-{% include "all_material_shared_wgsl/positions.wgsl" %}
+{% include "opaque_and_transparency_wgsl/positions.wgsl" %}
 /*************** END positions.wgsl ******************/
 
 /*************** START lights.wgsl ******************/
-{% include "pbr_shared_wgsl/lighting/lights.wgsl" %}
+{% include "opaque_and_transparency_wgsl/pbr/lighting/lights.wgsl" %}
 /*************** END lights.wgsl ******************/
 
 /*************** START brdf.wgsl ******************/
-{% include "pbr_shared_wgsl/lighting/brdf.wgsl" %}
+{% include "opaque_and_transparency_wgsl/pbr/lighting/brdf.wgsl" %}
 /*************** END brdf.wgsl ******************/
 
 /*************** START unlit.wgsl ******************/
-{% include "pbr_shared_wgsl/lighting/unlit.wgsl" %}
+{% include "opaque_and_transparency_wgsl/pbr/lighting/unlit.wgsl" %}
 /*************** END unlit.wgsl ******************/
 
 /*************** START material.wgsl ******************/
-{% include "pbr_shared_wgsl/material.wgsl" %}
+{% include "opaque_and_transparency_wgsl/pbr/material.wgsl" %}
 /*************** END material.wgsl ******************/
 
 /*************** START material_color.wgsl ******************/
-{% include "pbr_shared_wgsl/material_color.wgsl" %}
+{% include "opaque_and_transparency_wgsl/pbr/material_color.wgsl" %}
 /*************** END material_color.wgsl ******************/
 
 {% match mipmap %}
@@ -61,6 +65,10 @@
 /*************** END mipmap.wgsl ******************/
     {% when _ %}
 {% endmatch %}
+
+/*************** START texture_uvs.wgsl ******************/
+{% include "material_opaque_wgsl/helpers/texture_uvs.wgsl" %}
+/*************** END texture_uvs.wgsl ******************/
 
 /*************** START standard.wgsl ******************/
 {% include "material_opaque_wgsl/helpers/standard.wgsl" %}

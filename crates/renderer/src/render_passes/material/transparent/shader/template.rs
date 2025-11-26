@@ -16,7 +16,21 @@ pub struct ShaderTemplateMaterialTransparent {
     path = "material_transparent_wgsl/vertex.wgsl",
     whitespace = "minimize"
 )]
-pub struct ShaderTemplateTransparentMaterialVertex {}
+pub struct ShaderTemplateTransparentMaterialVertex {
+    max_morph_unroll: u32,
+    max_skin_unroll: u32,
+    instancing_transforms: bool,
+}
+
+impl ShaderTemplateTransparentMaterialVertex {
+    pub fn new(cache_key: &ShaderCacheKeyMaterialTransparent) -> Self {
+        Self {
+            max_morph_unroll: 2,
+            max_skin_unroll: 2,
+            instancing_transforms: cache_key.instancing_transforms,
+        }
+    }
+}
 
 #[derive(Template, Debug)]
 #[template(
@@ -25,13 +39,19 @@ pub struct ShaderTemplateTransparentMaterialVertex {}
 )]
 pub struct ShaderTemplateTransparentMaterialFragment {}
 
+impl ShaderTemplateTransparentMaterialFragment {
+    pub fn new(_cache_key: &ShaderCacheKeyMaterialTransparent) -> Self {
+        Self {}
+    }
+}
+
 impl TryFrom<&ShaderCacheKeyMaterialTransparent> for ShaderTemplateMaterialTransparent {
     type Error = AwsmShaderError;
 
     fn try_from(value: &ShaderCacheKeyMaterialTransparent) -> Result<Self> {
         Ok(Self {
-            vertex: ShaderTemplateTransparentMaterialVertex {},
-            fragment: ShaderTemplateTransparentMaterialFragment {},
+            vertex: ShaderTemplateTransparentMaterialVertex::new(value),
+            fragment: ShaderTemplateTransparentMaterialFragment::new(value),
         })
     }
 }

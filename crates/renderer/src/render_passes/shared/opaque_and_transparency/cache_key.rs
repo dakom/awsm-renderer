@@ -1,7 +1,10 @@
-use crate::mesh::{MeshBufferInfo, MeshBufferVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo, MeshBufferCustomVertexAttributeInfo};
+use crate::mesh::{
+    MeshBufferCustomVertexAttributeInfo, MeshBufferInfo, MeshBufferVertexAttributeInfo,
+    MeshBufferVisibilityVertexAttributeInfo,
+};
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct ShaderMaterialOpaqueVertexAttributes {
+pub struct ShaderMaterialVertexAttributes {
     pub normals: bool,
     pub tangents: bool,
     pub color_sets: Option<u32>,
@@ -12,7 +15,7 @@ pub struct ShaderMaterialOpaqueVertexAttributes {
     pub uv_sets: Option<u32>,
 }
 
-impl From<&MeshBufferInfo> for ShaderMaterialOpaqueVertexAttributes {
+impl From<&MeshBufferInfo> for ShaderMaterialVertexAttributes {
     fn from(mesh_buffer_info: &MeshBufferInfo) -> Self {
         let mut _self = Self::default();
 
