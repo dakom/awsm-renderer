@@ -1,9 +1,7 @@
-- vertex buffer data from geometry
-- *another* vertex buffer data from non-geometry attributes (what we use for storage in opaque)
 
-- combine `texture_bind_group` and `sampler_bind_group` into a single bind group 
-  - probably just need to encode the sampler bind group starting index in shader template
-    then sampler bindings can be offset from there
+- refactor transparency bind group so dynamic buffer is not affecting everything else
+- vertex buffer data from non-geometry attributes (what we use for storage in opaque)
+
 
 # Transparent material pass
 - like opaque

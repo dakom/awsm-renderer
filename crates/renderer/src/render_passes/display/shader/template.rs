@@ -14,8 +14,25 @@ use crate::{
 
 #[derive(Debug)]
 pub struct ShaderTemplateDisplay {
+    pub bind_groups: ShaderTemplateDisplayBindGroups,
     pub vertex: ShaderTemplateDisplayVertex,
     pub fragment: ShaderTemplateDisplayFragment,
+}
+
+#[derive(Template, Debug)]
+#[template(path = "display_wgsl/bind_groups.wgsl", whitespace = "minimize")]
+pub struct ShaderTemplateDisplayBindGroups {
+    pub smaa_anti_alias: bool,
+    pub debug: ShaderTemplateDisplayDebug,
+}
+
+impl ShaderTemplateDisplayBindGroups {
+    pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
+        Self {
+            smaa_anti_alias: cache_key.smaa_anti_alias,
+            debug: ShaderTemplateDisplayDebug::new(),
+        }
+    }
 }
 
 #[derive(Template, Debug)]
@@ -55,6 +72,7 @@ impl TryFrom<&ShaderCacheKeyDisplay> for ShaderTemplateDisplay {
 
     fn try_from(value: &ShaderCacheKeyDisplay) -> Result<Self> {
         Ok(Self {
+            bind_groups: ShaderTemplateDisplayBindGroups::new(value),
             vertex: ShaderTemplateDisplayVertex::new(value),
             fragment: ShaderTemplateDisplayFragment::new(value),
         })
@@ -63,9 +81,13 @@ impl TryFrom<&ShaderCacheKeyDisplay> for ShaderTemplateDisplay {
 
 impl ShaderTemplateDisplay {
     pub fn into_source(self) -> Result<String> {
+        let bind_groups_source = self.bind_groups.render()?;
         let vertex_source = self.vertex.render()?;
         let fragment_source = self.fragment.render()?;
-        Ok(format!("{}\n{}", vertex_source, fragment_source))
+        Ok(format!(
+            "{}\n{}\n{}",
+            bind_groups_source, vertex_source, fragment_source
+        ))
     }
 
     #[cfg(debug_assertions)]

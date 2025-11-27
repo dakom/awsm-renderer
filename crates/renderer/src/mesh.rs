@@ -149,11 +149,11 @@ impl Mesh {
         ctx: &RenderContext,
         mesh_key: MeshKey,
         render_pass: &RenderPassEncoder,
-        main_bind_group: &web_sys::GpuBindGroup,
+        mesh_meta_bind_group: &web_sys::GpuBindGroup,
     ) -> Result<()> {
         let meta_offset = ctx.meshes.meta.geometry_buffer_offset(mesh_key)? as u32;
 
-        render_pass.set_bind_group(0, main_bind_group, Some(&[meta_offset]))?;
+        render_pass.set_bind_group(3, mesh_meta_bind_group, Some(&[meta_offset]))?;
 
         render_pass.set_vertex_buffer(
             0,

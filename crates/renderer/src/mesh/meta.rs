@@ -184,7 +184,7 @@ impl MeshMeta {
                     )
                     .into(),
                 )?;
-                bind_groups.mark_create(BindGroupCreate::GeometryMeshMetaResize);
+                bind_groups.mark_create(BindGroupCreate::MeshMetaResize);
             }
             gpu.write_buffer(
                 &self.geometry_gpu_buffer,

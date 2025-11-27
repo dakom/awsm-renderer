@@ -35,7 +35,7 @@ impl MaterialTransparentPipelines {
             bind_groups.multisampled_main_bind_group_layout_key,
             bind_groups.lights_bind_group_layout_key,
             bind_groups.texture_pool_textures_bind_group_layout_key,
-            bind_groups.texture_pool_samplers_bind_group_layout_key,
+            bind_groups.mesh_meta_bind_group_layout_key,
         ]);
         let multisampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
             &ctx.gpu,
@@ -47,7 +47,7 @@ impl MaterialTransparentPipelines {
             bind_groups.singlesampled_main_bind_group_layout_key,
             bind_groups.lights_bind_group_layout_key,
             bind_groups.texture_pool_textures_bind_group_layout_key,
-            bind_groups.texture_pool_samplers_bind_group_layout_key,
+            bind_groups.mesh_meta_bind_group_layout_key,
         ]);
         let singlesampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
             &ctx.gpu,

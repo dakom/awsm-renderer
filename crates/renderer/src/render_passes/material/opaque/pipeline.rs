@@ -32,7 +32,6 @@ impl MaterialOpaquePipelines {
             bind_groups.multisampled_main_bind_group_layout_key,
             bind_groups.lights_bind_group_layout_key,
             bind_groups.texture_pool_textures_bind_group_layout_key,
-            bind_groups.texture_pool_samplers_bind_group_layout_key,
         ]);
         let multisampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
             &ctx.gpu,
@@ -44,7 +43,6 @@ impl MaterialOpaquePipelines {
             bind_groups.singlesampled_main_bind_group_layout_key,
             bind_groups.lights_bind_group_layout_key,
             bind_groups.texture_pool_textures_bind_group_layout_key,
-            bind_groups.texture_pool_samplers_bind_group_layout_key,
         ]);
         let singlesampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
             &ctx.gpu,
@@ -78,13 +76,11 @@ impl MaterialOpaquePipelines {
     ) -> Result<ComputePipelineKey> {
         let mesh_buffer_info = mesh_buffer_infos.get(mesh.buffer_info_key)?;
 
-        let msaa_sample_count = anti_aliasing.msaa_sample_count.unwrap_or(0);
-
         let shader_cache_key = ShaderCacheKeyMaterialOpaque {
             attributes: mesh_buffer_info.into(),
             texture_pool_arrays_len: material_bind_groups.texture_pool_arrays_len,
             texture_pool_samplers_len: material_bind_groups.texture_pool_sampler_keys.len() as u32,
-            msaa_sample_count,
+            msaa_sample_count: anti_aliasing.msaa_sample_count,
             mipmaps: anti_aliasing.mipmap,
         };
 
@@ -97,7 +93,7 @@ impl MaterialOpaquePipelines {
 
         let compute_pipeline_cache_key = ComputePipelineCacheKey::new(
             shader_key,
-            if msaa_sample_count > 0 {
+            if anti_aliasing.msaa_sample_count.is_some() {
                 self.multisampled_pipeline_layout_key
             } else {
                 self.singlesampled_pipeline_layout_key

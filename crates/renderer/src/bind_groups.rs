@@ -57,7 +57,7 @@ pub enum BindGroupCreate {
     MaterialMorphTargetValuesResize,
     SkinJointMatricesResize,
     SkinJointIndexAndWeightsResize,
-    GeometryMeshMetaResize,
+    MeshMetaResize,
     MaterialMeshMetaResize,
     MeshAttributeDataResize,
     MeshAttributeIndexResize,
@@ -102,11 +102,10 @@ impl BindGroups {
             OpaqueMain,
             OpaqueLights,
             OpaqueTextures,
-            OpaqueSamplers,
             TransparentMain,
+            TransparentMeshMeta,
             TransparentLights,
             TransparentTextures,
-            TransparentSamplers,
             LightCulling,
             Composite,
             Display,
@@ -136,9 +135,9 @@ impl BindGroups {
                     functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
                     functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
-                BindGroupCreate::GeometryMeshMetaResize => {
+                BindGroupCreate::MeshMetaResize => {
                     functions_to_call.insert(FunctionToCall::GeometryMeta);
-                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMeshMeta);
                 }
                 BindGroupCreate::GeometryMorphTargetWeightsResize
                 | BindGroupCreate::GeometryMorphTargetValuesResize
@@ -156,9 +155,7 @@ impl BindGroups {
                 }
                 BindGroupCreate::TexturePool => {
                     functions_to_call.insert(FunctionToCall::OpaqueTextures);
-                    functions_to_call.insert(FunctionToCall::OpaqueSamplers);
                     functions_to_call.insert(FunctionToCall::TransparentTextures);
-                    functions_to_call.insert(FunctionToCall::TransparentSamplers);
                 }
                 BindGroupCreate::TextureTransformsResize => {
                     functions_to_call.insert(FunctionToCall::OpaqueTextures);
@@ -244,19 +241,19 @@ impl BindGroups {
                     render_passes
                         .material_opaque
                         .bind_groups
-                        .recreate_texture_pool_textures(&ctx)?;
-                }
-                FunctionToCall::OpaqueSamplers => {
-                    render_passes
-                        .material_opaque
-                        .bind_groups
-                        .recreate_texture_pool_samplers(&ctx)?;
+                        .recreate_texture_pool(&ctx)?;
                 }
                 FunctionToCall::TransparentMain => {
                     render_passes
                         .material_transparent
                         .bind_groups
                         .recreate_main(&ctx)?;
+                }
+                FunctionToCall::TransparentMeshMeta => {
+                    render_passes
+                        .material_transparent
+                        .bind_groups
+                        .recreate_mesh_meta(&ctx)?;
                 }
                 FunctionToCall::TransparentLights => {
                     render_passes
@@ -268,13 +265,7 @@ impl BindGroups {
                     render_passes
                         .material_transparent
                         .bind_groups
-                        .recreate_texture_pool_textures(&ctx)?;
-                }
-                FunctionToCall::TransparentSamplers => {
-                    render_passes
-                        .material_transparent
-                        .bind_groups
-                        .recreate_texture_pool_samplers(&ctx)?;
+                        .recreate_texture_pool(&ctx)?;
                 }
                 FunctionToCall::LightCulling => {
                     render_passes.light_culling.bind_groups.recreate(&ctx)?;

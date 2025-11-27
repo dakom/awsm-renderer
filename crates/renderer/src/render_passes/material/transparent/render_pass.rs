@@ -63,14 +63,13 @@ impl MaterialTransparentRenderPass {
             .into(),
         )?;
 
-        let (main_bind_group, lights_bind_group, texture_bind_group, sampler_bind_group) =
+        let (main_bind_group, mesh_meta_bind_group, lights_bind_group, texture_bind_group) =
             self.bind_groups.get_bind_groups()?;
 
         // set later with dynamic offsets
-        //render_pass.set_bind_group(0u32, &main_bind_group, None)?;
+        render_pass.set_bind_group(0u32, &main_bind_group, None)?;
         render_pass.set_bind_group(1u32, &lights_bind_group, None)?;
         render_pass.set_bind_group(2u32, &texture_bind_group, None)?;
-        render_pass.set_bind_group(3u32, &sampler_bind_group, None)?;
 
         let mut last_render_pipeline_key = None;
         for renderable in renderables {
@@ -85,7 +84,7 @@ impl MaterialTransparentRenderPass {
                 renderable.push_material_transparent_pass_commands(
                     ctx,
                     &render_pass,
-                    &main_bind_group,
+                    &mesh_meta_bind_group,
                 )?;
             }
         }

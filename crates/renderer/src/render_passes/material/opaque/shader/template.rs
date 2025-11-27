@@ -6,9 +6,18 @@ use crate::{
     shaders::{print_shader_source, AwsmShaderError, Result},
 };
 
-#[derive(Template, Debug)]
-#[template(path = "material_opaque_wgsl/compute.wgsl", whitespace = "minimize")]
+#[derive(Debug)]
 pub struct ShaderTemplateMaterialOpaque {
+    pub bind_groups: ShaderTemplateMaterialOpaqueBindGroups,
+    pub compute: ShaderTemplateMaterialOpaqueCompute,
+}
+
+#[derive(Template, Debug)]
+#[template(
+    path = "material_opaque_wgsl/bind_groups.wgsl",
+    whitespace = "minimize"
+)]
+pub struct ShaderTemplateMaterialOpaqueBindGroups {
     /// Offset (in floats) within the packed vertex attribute array
     /// where the first UV component lives for each vertex.
     pub uv_sets_index: u32,
@@ -30,7 +39,31 @@ pub struct ShaderTemplateMaterialOpaque {
     pub msaa_sample_count: u32, // 0 if no MSAA
 }
 
-impl ShaderTemplateMaterialOpaque {
+#[derive(Template, Debug)]
+#[template(path = "material_opaque_wgsl/compute.wgsl", whitespace = "minimize")]
+pub struct ShaderTemplateMaterialOpaqueCompute {
+    /// Offset (in floats) within the packed vertex attribute array
+    /// where the first UV component lives for each vertex.
+    pub uv_sets_index: u32,
+    pub texture_pool_arrays_len: u32,
+    pub texture_pool_samplers_len: u32,
+    /// Offset (in floats) within the packed vertex attribute array
+    /// where the first vertex color component lives for each vertex.
+    pub color_sets_index: u32,
+    pub normals: bool,
+    pub tangents: bool,
+    pub color_sets: Option<u32>,
+    /// Number of UV sets available on the mesh.
+    /// `None` means the mesh supplied no TEXCOORD attributes, which triggers the
+    /// `pbr_material_has_any_uvs` branch inside `pbr_should_run`.
+    pub uv_sets: Option<u32>,
+    pub debug: ShaderTemplateMaterialOpaqueDebug,
+    pub mipmap: MipmapMode,
+    pub multisampled_geometry: bool,
+    pub msaa_sample_count: u32, // 0 if no MSAA
+}
+
+impl ShaderTemplateMaterialOpaqueCompute {
     pub fn has_lighting_ibl(&self) -> bool {
         match self.debug.lighting {
             ShaderTemplateMaterialOpaqueDebugLighting::None => true,
@@ -83,26 +116,54 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
         let mut uv_sets_index = 0;
         uv_sets_index += (value.attributes.color_sets.unwrap_or(0) * 4) as u32; // colors use 4 floats each
 
+        // for easy copy/paste
+        let texture_pool_arrays_len = value.texture_pool_arrays_len;
+        let texture_pool_samplers_len = value.texture_pool_samplers_len;
+        let normals = value.attributes.normals;
+        let tangents = value.attributes.tangents;
+        let color_sets = value.attributes.color_sets;
+        let uv_sets = value.attributes.uv_sets;
+        let mipmap = if value.mipmaps {
+            MipmapMode::Gradient
+        } else {
+            MipmapMode::None
+        };
+        let multisampled_geometry = value.msaa_sample_count.is_some();
+        let msaa_sample_count = value.msaa_sample_count.unwrap_or_default();
+        let debug = ShaderTemplateMaterialOpaqueDebug {
+            mips: false,
+            msaa_detect_edges: false,
+            ..Default::default()
+        };
+
         let _self = Self {
-            texture_pool_arrays_len: value.texture_pool_arrays_len,
-            texture_pool_samplers_len: value.texture_pool_samplers_len,
-            color_sets_index,
-            uv_sets_index,
-            normals: value.attributes.normals,
-            tangents: value.attributes.tangents,
-            color_sets: value.attributes.color_sets,
-            uv_sets: value.attributes.uv_sets,
-            mipmap: if value.mipmaps {
-                MipmapMode::Gradient
-            } else {
-                MipmapMode::None
+            bind_groups: ShaderTemplateMaterialOpaqueBindGroups {
+                texture_pool_arrays_len,
+                texture_pool_samplers_len,
+                color_sets_index,
+                uv_sets_index,
+                normals,
+                tangents,
+                color_sets,
+                uv_sets,
+                mipmap,
+                multisampled_geometry,
+                msaa_sample_count,
+                debug,
             },
-            multisampled_geometry: value.msaa_sample_count > 0,
-            msaa_sample_count: value.msaa_sample_count,
-            debug: ShaderTemplateMaterialOpaqueDebug {
-                mips: false,
-                msaa_detect_edges: false,
-                ..Default::default()
+            compute: ShaderTemplateMaterialOpaqueCompute {
+                texture_pool_arrays_len,
+                texture_pool_samplers_len,
+                color_sets_index,
+                uv_sets_index,
+                normals,
+                tangents,
+                color_sets,
+                uv_sets,
+                mipmap,
+                multisampled_geometry,
+                msaa_sample_count,
+                debug,
             },
         };
 
@@ -110,13 +171,13 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 enum MipmapMode {
     None,
     Gradient,
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 struct ShaderTemplateMaterialOpaqueDebug {
     mips: bool,
     n_dot_v: bool,
@@ -144,7 +205,7 @@ impl ShaderTemplateMaterialOpaqueDebug {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 enum ShaderTemplateMaterialOpaqueDebugLighting {
     #[default]
     None,
@@ -154,8 +215,10 @@ enum ShaderTemplateMaterialOpaqueDebugLighting {
 
 impl ShaderTemplateMaterialOpaque {
     pub fn into_source(self) -> Result<String> {
-        let source = self.render()?;
+        let bind_groups_source = self.bind_groups.render()?;
+        let compute_source = self.compute.render()?;
 
+        let source = format!("{}\n{}", bind_groups_source, compute_source);
         // print_shader_source(&source, true);
 
         //debug_unique_string(1, &source, || print_shader_source(&source, false));

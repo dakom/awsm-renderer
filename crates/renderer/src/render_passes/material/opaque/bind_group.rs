@@ -30,14 +30,12 @@ pub struct MaterialOpaqueBindGroups {
     pub singlesampled_main_bind_group_layout_key: BindGroupLayoutKey,
     pub lights_bind_group_layout_key: BindGroupLayoutKey,
     pub texture_pool_textures_bind_group_layout_key: BindGroupLayoutKey,
-    pub texture_pool_samplers_bind_group_layout_key: BindGroupLayoutKey,
     pub texture_pool_arrays_len: u32,
     pub texture_pool_sampler_keys: IndexSet<SamplerKey>,
     // this is set via `recreate` mechanism
     _main_bind_group: Option<web_sys::GpuBindGroup>,
     _lights_bind_group: Option<web_sys::GpuBindGroup>,
     _texture_bind_group: Option<web_sys::GpuBindGroup>,
-    _sampler_bind_group: Option<web_sys::GpuBindGroup>,
 }
 
 impl MaterialOpaqueBindGroups {
@@ -79,10 +77,9 @@ impl MaterialOpaqueBindGroups {
 
         // Texture Pool
         let TexturePoolDeps {
-            texture_bind_group_layout_key: texture_pool_textures_bind_group_layout_key,
-            sampler_bind_group_layout_key: texture_pool_samplers_bind_group_layout_key,
-            texture_arrays_len: texture_pool_arrays_len,
-            texture_sampler_keys: texture_pool_sampler_keys,
+            bind_group_layout_key: texture_pool_textures_bind_group_layout_key,
+            arrays_len: texture_pool_arrays_len,
+            sampler_keys: texture_pool_sampler_keys,
         } = TexturePoolDeps::new(ctx)?;
 
         Ok(Self {
@@ -90,13 +87,11 @@ impl MaterialOpaqueBindGroups {
             multisampled_main_bind_group_layout_key,
             lights_bind_group_layout_key,
             texture_pool_textures_bind_group_layout_key,
-            texture_pool_samplers_bind_group_layout_key,
             texture_pool_arrays_len,
             texture_pool_sampler_keys,
             _main_bind_group: None,
             _lights_bind_group: None,
             _texture_bind_group: None,
-            _sampler_bind_group: None,
         })
     }
 
@@ -105,10 +100,9 @@ impl MaterialOpaqueBindGroups {
         ctx: &mut RenderPassInitContext<'_>,
     ) -> Result<Self> {
         let TexturePoolDeps {
-            texture_bind_group_layout_key: texture_pool_textures_bind_group_layout_key,
-            sampler_bind_group_layout_key: texture_pool_samplers_bind_group_layout_key,
-            texture_arrays_len: texture_pool_arrays_len,
-            texture_sampler_keys: texture_pool_sampler_keys,
+            bind_group_layout_key: texture_pool_textures_bind_group_layout_key,
+            arrays_len: texture_pool_arrays_len,
+            sampler_keys: texture_pool_sampler_keys,
         } = TexturePoolDeps::new(ctx)?;
 
         let mut _self = Self {
@@ -116,13 +110,11 @@ impl MaterialOpaqueBindGroups {
             singlesampled_main_bind_group_layout_key: self.singlesampled_main_bind_group_layout_key,
             lights_bind_group_layout_key: self.lights_bind_group_layout_key,
             texture_pool_textures_bind_group_layout_key,
-            texture_pool_samplers_bind_group_layout_key,
             texture_pool_arrays_len,
             texture_pool_sampler_keys,
             _main_bind_group: self._main_bind_group.clone(),
             _lights_bind_group: self._lights_bind_group.clone(),
             _texture_bind_group: None,
-            _sampler_bind_group: None,
         };
 
         Ok(_self)
@@ -135,7 +127,6 @@ impl MaterialOpaqueBindGroups {
             &web_sys::GpuBindGroup,
             &web_sys::GpuBindGroup,
             &web_sys::GpuBindGroup,
-            &web_sys::GpuBindGroup,
         ),
         AwsmBindGroupError,
     > {
@@ -143,30 +134,18 @@ impl MaterialOpaqueBindGroups {
             &self._main_bind_group,
             &self._lights_bind_group,
             &self._texture_bind_group,
-            &self._sampler_bind_group,
         ) {
-            (
-                Some(main_bind_group),
-                Some(lights_bind_group),
-                Some(texture_bind_group),
-                Some(sampler_bind_group),
-            ) => Ok((
-                main_bind_group,
-                lights_bind_group,
-                texture_bind_group,
-                sampler_bind_group,
-            )),
-            (None, _, _, _) => Err(AwsmBindGroupError::NotFound(
+            (Some(main_bind_group), Some(lights_bind_group), Some(texture_bind_group)) => {
+                Ok((main_bind_group, lights_bind_group, texture_bind_group))
+            }
+            (None, _, _) => Err(AwsmBindGroupError::NotFound(
                 "Material Opaque - Main".to_string(),
             )),
-            (_, None, _, _) => Err(AwsmBindGroupError::NotFound(
+            (_, None, _) => Err(AwsmBindGroupError::NotFound(
                 "Material Opaque - Lights".to_string(),
             )),
-            (_, _, None, _) => Err(AwsmBindGroupError::NotFound(
-                "Material Opaque - Texture".to_string(),
-            )),
-            (_, _, _, None) => Err(AwsmBindGroupError::NotFound(
-                "Material Opaque - Sampler".to_string(),
+            (_, _, None) => Err(AwsmBindGroupError::NotFound(
+                "Material Opaque - Texture Pool".to_string(),
             )),
             _ => Err(AwsmBindGroupError::NotFound("Material Opaque".to_string())),
         }
@@ -343,36 +322,15 @@ impl MaterialOpaqueBindGroups {
         Ok(())
     }
 
-    pub fn recreate_texture_pool_textures(
-        &mut self,
-        ctx: &BindGroupRecreateContext<'_>,
-    ) -> Result<()> {
+    pub fn recreate_texture_pool(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let mut entries = Vec::new();
 
-        for (i, view) in ctx.textures.pool.texture_views().enumerate() {
+        for view in ctx.textures.pool.texture_views() {
             entries.push(BindGroupEntry::new(
                 entries.len() as u32,
                 BindGroupResource::TextureView(Cow::Borrowed(&view)),
             ));
         }
-
-        let descriptor = BindGroupDescriptor::new(
-            ctx.bind_group_layouts
-                .get(self.texture_pool_textures_bind_group_layout_key)?,
-            Some("Material Opaque - Texture"),
-            entries,
-        );
-
-        self._texture_bind_group = Some(ctx.gpu.create_bind_group(&descriptor.into()));
-
-        Ok(())
-    }
-
-    pub fn recreate_texture_pool_samplers(
-        &mut self,
-        ctx: &BindGroupRecreateContext<'_>,
-    ) -> Result<()> {
-        let mut entries = Vec::new();
 
         for sampler_key in self.texture_pool_sampler_keys.iter() {
             let sampler = ctx.textures.get_sampler(*sampler_key)?;
@@ -385,12 +343,12 @@ impl MaterialOpaqueBindGroups {
 
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts
-                .get(self.texture_pool_samplers_bind_group_layout_key)?,
-            Some("Material Opaque - Sampler"),
+                .get(self.texture_pool_textures_bind_group_layout_key)?,
+            Some("Material Opaque - Texture Pool"),
             entries,
         );
 
-        self._sampler_bind_group = Some(ctx.gpu.create_bind_group(&descriptor.into()));
+        self._texture_bind_group = Some(ctx.gpu.create_bind_group(&descriptor.into()));
 
         Ok(())
     }

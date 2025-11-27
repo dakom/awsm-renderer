@@ -4,7 +4,6 @@
 /*************** END msaa.wgsl ******************/
 {% endif %}
 
-@group(0) @binding(0) var composite_texture: texture_2d<f32>;
 
 struct FragmentInput {
     @builtin(position) full_screen_quad_position: vec4<f32>,
