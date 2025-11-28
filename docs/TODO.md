@@ -1,5 +1,3 @@
-
-- refactor transparency bind group so dynamic buffer is not affecting everything else
 - vertex buffer data from non-geometry attributes (what we use for storage in opaque)
 
 

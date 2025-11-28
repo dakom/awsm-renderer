@@ -120,6 +120,7 @@ impl GeometryPipelines {
                 None,
                 false,
                 CullMode::None,
+                None,
             )
             .await?;
 
@@ -137,6 +138,7 @@ impl GeometryPipelines {
                 None,
                 true,
                 CullMode::None,
+                None,
             )
             .await?;
 
@@ -154,6 +156,7 @@ impl GeometryPipelines {
                 None,
                 false,
                 CullMode::Back,
+                None,
             )
             .await?;
 
@@ -171,6 +174,7 @@ impl GeometryPipelines {
                 None,
                 true,
                 CullMode::Back,
+                None,
             )
             .await?;
 
@@ -188,6 +192,7 @@ impl GeometryPipelines {
                 Some(4),
                 false,
                 CullMode::None,
+                None,
             )
             .await?;
 
@@ -205,6 +210,7 @@ impl GeometryPipelines {
                 Some(4),
                 true,
                 CullMode::None,
+                None,
             )
             .await?;
 
@@ -222,6 +228,7 @@ impl GeometryPipelines {
                 Some(4),
                 false,
                 CullMode::Back,
+                None,
             )
             .await?;
 
@@ -239,6 +246,7 @@ impl GeometryPipelines {
                 Some(4),
                 true,
                 CullMode::Back,
+                None,
             )
             .await?;
 

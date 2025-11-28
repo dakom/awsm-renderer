@@ -76,13 +76,17 @@ pub static VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY_INSTANCING: LazyLock<V
             attributes: Vec::new(),
         };
 
+        let start_location = VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY
+            .attributes
+            .len() as u32;
+
         for i in 0..4 {
             vertex_buffer_layout_instancing
                 .attributes
                 .push(VertexAttribute {
                     format: VertexFormat::Float32x4,
                     offset: i * 16,
-                    shader_location: 5 + i as u32, // Locations 5-8 (after normal at 3 and tangent at 4)
+                    shader_location: start_location + i as u32,
                 });
         }
 
@@ -102,6 +106,7 @@ pub async fn geometry_and_transparency_render_pipeline_key(
     msaa_sample_count: Option<u32>,
     instancing: bool,
     cull_mode: CullMode,
+    transparency_buffer_layout: Option<VertexBufferLayout>,
 ) -> Result<RenderPipelineKey> {
     let primitive_state = PrimitiveState::new()
         .with_topology(PrimitiveTopology::TriangleList)
@@ -121,6 +126,11 @@ pub async fn geometry_and_transparency_render_pipeline_key(
         pipeline_cache_key = pipeline_cache_key.with_push_vertex_buffer_layout(
             VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY_INSTANCING.clone(),
         );
+    }
+
+    if let Some(buffer_layout) = transparency_buffer_layout {
+        pipeline_cache_key =
+            pipeline_cache_key.with_push_vertex_buffer_layout(buffer_layout.clone());
     }
 
     if let Some(sample_count) = msaa_sample_count {

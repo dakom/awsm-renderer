@@ -12,6 +12,7 @@ use crate::pipelines::render_pipeline::RenderPipelineKey;
 use crate::pipelines::Pipelines;
 use crate::render_passes::material::cache_key::ShaderCacheKeyMaterial;
 use crate::render_passes::material::transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent;
+use crate::render_passes::material::transparent::shader::vertex::vertex_buffer_layout;
 use crate::render_passes::shared::geometry_and_transparency::vertex::geometry_and_transparency_render_pipeline_key;
 use crate::render_passes::{
     material::transparent::bind_group::MaterialTransparentBindGroups, RenderPassInitContext,
@@ -37,6 +38,7 @@ impl MaterialTransparentPipelines {
             bind_groups.texture_pool_textures_bind_group_layout_key,
             bind_groups.mesh_meta_bind_group_layout_key,
         ]);
+
         let multisampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
             &ctx.gpu,
             &ctx.bind_group_layouts,
@@ -117,6 +119,7 @@ impl MaterialTransparentPipelines {
             } else {
                 CullMode::Back
             },
+            Some(vertex_buffer_layout(&mesh)),
         )
         .await?;
 
