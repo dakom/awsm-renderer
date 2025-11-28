@@ -25,6 +25,7 @@ use crate::{
     shaders::ShaderKey,
 };
 
+// Locations 0-4
 pub static VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY: LazyLock<VertexBufferLayout> =
     LazyLock::new(|| {
         VertexBufferLayout {
@@ -67,6 +68,7 @@ pub static VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY: LazyLock<VertexBuffer
         }
     });
 
+// Locations 5-8
 pub static VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY_INSTANCING: LazyLock<VertexBufferLayout> =
     LazyLock::new(|| {
         let mut vertex_buffer_layout_instancing = VertexBufferLayout {

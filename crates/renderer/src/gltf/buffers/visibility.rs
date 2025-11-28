@@ -79,8 +79,16 @@ pub(super) fn convert_to_visibility_buffer(
     // These are the original attributes per-vertex, but only non-visibility ones
     // There is no need to repack or expand these, they are used as-is
     let attribute_vertex_offset = attribute_vertex_bytes.len();
-    let vertex_attributes =
-        pack_vertex_attributes(&attribute_data_by_kind, attribute_vertex_bytes)?;
+    pack_vertex_attributes(
+        attribute_data_by_kind
+            .iter()
+            .filter_map(|x| match x.0 {
+                MeshBufferVertexAttributeInfo::Custom(custom) => Some((custom, x.1)),
+                _ => None,
+            })
+            .collect(),
+        attribute_vertex_bytes,
+    )?;
 
     // Step 6: Pack triangle data (vertex indices)
     let triangle_data_offset = triangle_data_bytes.len();
@@ -124,7 +132,7 @@ pub(super) fn convert_to_visibility_buffer(
         triangles: MeshBufferTriangleInfoWithOffset {
             count: triangle_count,
             vertex_attribute_indices: vertex_attribute_index.clone(),
-            vertex_attributes,
+            vertex_attributes: attribute_data_by_kind.keys().cloned().collect(),
             vertex_attributes_offset: attribute_vertex_offset,
             vertex_attributes_size: attribute_vertex_bytes.len() - attribute_vertex_offset,
             triangle_data: triangle_data_info,

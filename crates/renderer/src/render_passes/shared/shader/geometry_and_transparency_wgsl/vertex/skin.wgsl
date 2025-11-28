@@ -4,7 +4,7 @@
 const floats_per_set = 8u;
 
 /// Applies skeletal skinning with support for multiple skin sets per vertex
-fn apply_position_skin(input: VertexInput) -> VertexInput {
+fn apply_position_skin(input: ApplyVertexInput) -> ApplyVertexInput {
     var output = input;
 
     let skin_sets_count = mesh_meta.skin_sets_len;
@@ -81,7 +81,7 @@ fn apply_position_skin(input: VertexInput) -> VertexInput {
 }
 
 /// Applies skeletal skinning to normals and tangents (same weights as positions)
-fn apply_normal_skin(input: VertexInput, normal: vec3<f32>) -> vec3<f32> {
+fn apply_normal_skin(input: ApplyVertexInput, normal: vec3<f32>) -> vec3<f32> {
     let skin_sets_count = mesh_meta.skin_sets_len;
 
     // Calculate base offset for this exploded vertex's skin data

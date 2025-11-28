@@ -119,7 +119,7 @@ impl MaterialTransparentPipelines {
             } else {
                 CullMode::Back
             },
-            Some(vertex_buffer_layout(&mesh)),
+            Some(vertex_buffer_layout(&mesh, &mesh_buffer_info)),
         )
         .await?;
 

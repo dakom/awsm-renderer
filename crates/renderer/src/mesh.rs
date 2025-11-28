@@ -152,9 +152,11 @@ impl Mesh {
         mesh_meta_bind_group: &web_sys::GpuBindGroup,
     ) -> Result<()> {
         let meta_offset = ctx.meshes.meta.geometry_buffer_offset(mesh_key)? as u32;
+        let buffer_info = ctx.meshes.buffer_infos.get(self.buffer_info_key)?;
 
         render_pass.set_bind_group(3, mesh_meta_bind_group, Some(&[meta_offset]))?;
 
+        // Visibility stuff Slot 0 (locations 0-4)
         render_pass.set_vertex_buffer(
             0,
             ctx.meshes.visibility_data_gpu_buffer(),
@@ -162,16 +164,30 @@ impl Mesh {
             None,
         );
 
-        if let Ok(offset) = ctx.instances.transform_buffer_offset(self.transform_key) {
-            render_pass.set_vertex_buffer(
-                1,
-                ctx.instances.gpu_transform_buffer(),
-                Some(offset as u64),
-                None,
-            );
-        }
+        // Instancing Slot 1 (locations 5-8)
+        let attribute_slot =
+            if let Ok(offset) = ctx.instances.transform_buffer_offset(self.transform_key) {
+                render_pass.set_vertex_buffer(
+                    1,
+                    ctx.instances.gpu_transform_buffer(),
+                    Some(offset as u64),
+                    None,
+                );
 
-        let buffer_info = ctx.meshes.buffer_infos.get(self.buffer_info_key)?;
+                2
+            } else {
+                1
+            };
+
+        // Attributes
+        // If instanced: slot 2 (locations 9+)
+        // If not instanced: slot 1 (locations 5+)
+        render_pass.set_vertex_buffer(
+            attribute_slot,
+            ctx.meshes.attribute_data_gpu_buffer(),
+            Some(ctx.meshes.attribute_data_buffer_offset(mesh_key)? as u64),
+            None,
+        );
 
         render_pass.set_index_buffer(
             ctx.meshes.visibility_index_gpu_buffer(),

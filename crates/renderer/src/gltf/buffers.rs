@@ -20,10 +20,10 @@ use crate::{
         visibility::convert_to_visibility_buffer,
     },
     mesh::{
-        MeshBufferAttributeIndexInfo, MeshBufferGeometryMorphInfo, MeshBufferInfo,
-        MeshBufferMaterialMorphAttributes, MeshBufferMaterialMorphInfo, MeshBufferSkinInfo,
-        MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo,
-        MeshBufferVertexInfo,
+        MeshBufferAttributeIndexInfo, MeshBufferCustomVertexAttributeInfo,
+        MeshBufferGeometryMorphInfo, MeshBufferInfo, MeshBufferMaterialMorphAttributes,
+        MeshBufferMaterialMorphInfo, MeshBufferSkinInfo, MeshBufferTriangleDataInfo,
+        MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
     },
 };
 

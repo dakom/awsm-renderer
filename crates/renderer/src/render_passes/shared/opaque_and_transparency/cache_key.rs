@@ -47,16 +47,19 @@ impl From<&MeshBufferInfo> for ShaderMaterialVertexAttributes {
                     }
                 },
                 MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
-                    MeshBufferCustomVertexAttributeInfo::Colors { count, .. } => {
+                    MeshBufferCustomVertexAttributeInfo::Colors { index, .. } => {
                         // Custom attribute - goes in attribute_data buffer
-                        _self.color_sets = Some(*count + 1);
+                        _self.color_sets = match _self.color_sets {
+                            Some(existing) => Some(existing.max(*index + 1)),
+                            None => Some(*index + 1),
+                        }
                     }
-                    MeshBufferCustomVertexAttributeInfo::TexCoords { count, .. } => {
+                    MeshBufferCustomVertexAttributeInfo::TexCoords { index, .. } => {
                         // Custom attribute - goes in attribute_data buffer
-                        // `count` is the zero-based TEXCOORD set index from glTF,
-                        // so promote it to a human-friendly "number of sets".
-                        // `pbr_should_run` compares this against the texture metadata.
-                        _self.uv_sets = Some(*count + 1);
+                        _self.uv_sets = match _self.uv_sets {
+                            Some(existing) => Some(existing.max(*index + 1)),
+                            None => Some(*index + 1),
+                        }
                     }
                     MeshBufferCustomVertexAttributeInfo::Joints { .. } => {
                         // Custom attribute - goes in attribute_data buffer

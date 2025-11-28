@@ -59,11 +59,15 @@ impl ShaderTemplateTransparentMaterialBindGroups {
     path = "material_transparent_wgsl/vertex.wgsl",
     whitespace = "minimize"
 )]
-pub struct ShaderTemplateTransparentMaterialVertex {}
+pub struct ShaderTemplateTransparentMaterialVertex {
+    pub instancing_transforms: bool,
+}
 
 impl ShaderTemplateTransparentMaterialVertex {
     pub fn new(cache_key: &ShaderCacheKeyMaterialTransparent) -> Self {
-        Self {}
+        Self {
+            instancing_transforms: cache_key.instancing_transforms,
+        }
     }
 }
 

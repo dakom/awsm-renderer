@@ -1,7 +1,7 @@
 //***** MORPHS *****
 
 
-fn apply_position_morphs(input: VertexInput) -> VertexInput {
+fn apply_position_morphs(input: ApplyVertexInput) -> ApplyVertexInput {
     var output = input;
 
     let target_count = mesh_meta.morph_geometry_target_len;
@@ -55,7 +55,7 @@ fn apply_position_morphs(input: VertexInput) -> VertexInput {
     return output;
 }
 
-fn apply_normal_morphs(input: VertexInput, normal: vec3<f32>) -> vec3<f32> {
+fn apply_normal_morphs(input: ApplyVertexInput, normal: vec3<f32>) -> vec3<f32> {
     var output = normal;
 
     let target_count = mesh_meta.morph_geometry_target_len;
@@ -109,7 +109,7 @@ fn apply_normal_morphs(input: VertexInput, normal: vec3<f32>) -> vec3<f32> {
     return output;
 }
 
-fn apply_tangent_morphs(input: VertexInput, tangent: vec4<f32>) -> vec4<f32> {
+fn apply_tangent_morphs(input: ApplyVertexInput, tangent: vec4<f32>) -> vec4<f32> {
     // Preserve the original w component (handedness) - morphs only affect xyz
     let original_w = tangent.w;
     var output_xyz = tangent.xyz;

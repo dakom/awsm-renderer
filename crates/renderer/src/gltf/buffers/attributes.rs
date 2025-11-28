@@ -8,7 +8,7 @@ use crate::{
         buffers::accessor::accessor_to_bytes,
         error::{AwsmGltfError, Result},
     },
-    mesh::MeshBufferVertexAttributeInfo,
+    mesh::{MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo},
 };
 
 // Helper function to load attribute data (similar to your existing code)
@@ -43,27 +43,17 @@ pub(super) fn load_attribute_data_by_kind<'a>(
 
 // Pack vertex attributes in interleaved layout (for indexed access)
 pub(super) fn pack_vertex_attributes(
-    attribute_data: &BTreeMap<MeshBufferVertexAttributeInfo, Cow<'_, [u8]>>,
+    attribute_data: Vec<(&MeshBufferCustomVertexAttributeInfo, &Cow<'_, [u8]>)>,
     vertex_attribute_bytes: &mut Vec<u8>,
-) -> Result<Vec<MeshBufferVertexAttributeInfo>> {
-    let mut per_vertex_attributes: Vec<(&MeshBufferVertexAttributeInfo, &Cow<'_, [u8]>)> =
-        attribute_data
-            .iter()
-            .filter(|(attr_info, _)| {
-                // Only include custom attributes (UVs, colors, joints, weights).
-                // Visibility attributes (positions, normals, tangents) go in visibility_data buffer.
-                attr_info.is_custom_attribute()
-            })
-            .collect();
-
-    if per_vertex_attributes.is_empty() {
-        return Ok(Vec::new());
+) -> Result<()> {
+    if attribute_data.is_empty() {
+        return Ok(());
     }
 
     // Determine vertex count (ensure all attributes have matching lengths).
     // This keeps silently truncated buffers from slipping through and causing
     // unpredictable out-of-bounds reads in the compute shaders later on.
-    let vertex_count = per_vertex_attributes
+    let vertex_count = attribute_data
         .iter()
         .map(|(attr_info, attr_data)| {
             let stride = attr_info.vertex_size();
@@ -88,7 +78,7 @@ pub(super) fn pack_vertex_attributes(
         .unwrap_or(0);
 
     for vertex_index in 0..vertex_count {
-        for (attr_info, attr_data) in per_vertex_attributes.iter() {
+        for (attr_info, attr_data) in attribute_data.iter() {
             let stride = attr_info.vertex_size();
             let start = vertex_index * stride;
             let end = start + stride;
@@ -98,17 +88,16 @@ pub(super) fn pack_vertex_attributes(
         }
     }
 
-    Ok(per_vertex_attributes
-        .into_iter()
-        .map(|(attr_info, _)| (*attr_info))
-        .collect())
+    Ok(())
 }
 
 pub(super) fn convert_attribute_kind(
     semantic: &gltf::Semantic,
     accessor: &gltf::Accessor<'_>,
 ) -> MeshBufferVertexAttributeInfo {
-    use crate::mesh::{MeshBufferVisibilityVertexAttributeInfo, MeshBufferCustomVertexAttributeInfo};
+    use crate::mesh::{
+        MeshBufferCustomVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo,
+    };
 
     match semantic {
         Semantic::Positions => MeshBufferVertexAttributeInfo::Visibility(
@@ -129,33 +118,33 @@ pub(super) fn convert_attribute_kind(
                 component_len: accessor.dimensions().multiplicity() as usize,
             },
         ),
-        Semantic::Colors(count) => MeshBufferVertexAttributeInfo::Custom(
-            MeshBufferCustomVertexAttributeInfo::Colors {
+        Semantic::Colors(index) => {
+            MeshBufferVertexAttributeInfo::Custom(MeshBufferCustomVertexAttributeInfo::Colors {
                 data_size: accessor.data_type().size(),
                 component_len: accessor.dimensions().multiplicity() as usize,
-                count: *count,
-            },
-        ),
-        Semantic::TexCoords(count) => MeshBufferVertexAttributeInfo::Custom(
-            MeshBufferCustomVertexAttributeInfo::TexCoords {
+                index: *index,
+            })
+        }
+        Semantic::TexCoords(index) => {
+            MeshBufferVertexAttributeInfo::Custom(MeshBufferCustomVertexAttributeInfo::TexCoords {
                 data_size: accessor.data_type().size(),
                 component_len: accessor.dimensions().multiplicity() as usize,
-                count: *count,
-            },
-        ),
-        Semantic::Joints(count) => MeshBufferVertexAttributeInfo::Custom(
-            MeshBufferCustomVertexAttributeInfo::Joints {
+                index: *index,
+            })
+        }
+        Semantic::Joints(index) => {
+            MeshBufferVertexAttributeInfo::Custom(MeshBufferCustomVertexAttributeInfo::Joints {
                 data_size: accessor.data_type().size(),
                 component_len: accessor.dimensions().multiplicity() as usize,
-                count: *count,
-            },
-        ),
-        Semantic::Weights(count) => MeshBufferVertexAttributeInfo::Custom(
-            MeshBufferCustomVertexAttributeInfo::Weights {
+                index: *index,
+            })
+        }
+        Semantic::Weights(index) => {
+            MeshBufferVertexAttributeInfo::Custom(MeshBufferCustomVertexAttributeInfo::Weights {
                 data_size: accessor.data_type().size(),
                 component_len: accessor.dimensions().multiplicity() as usize,
-                count: *count,
-            },
-        ),
+                index: *index,
+            })
+        }
     }
 }

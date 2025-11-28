@@ -103,7 +103,10 @@ impl Meshes {
                 &BufferDescriptor::new(
                     Some("MeshAttributeData"),
                     Self::ATTRIBUTE_DATA_INITIAL_SIZE,
-                    BufferUsage::new().with_copy_dst().with_storage(),
+                    BufferUsage::new()
+                        .with_copy_dst()
+                        .with_storage()
+                        .with_vertex(),
                 )
                 .into(),
             )?,
@@ -359,7 +362,10 @@ impl Meshes {
                 self.attribute_data_dirty,
                 &mut self.attribute_data_buffers,
                 &mut self.attribute_data_gpu_buffer,
-                BufferUsage::new().with_copy_dst().with_storage(),
+                BufferUsage::new()
+                    .with_copy_dst()
+                    .with_storage()
+                    .with_vertex(),
                 "MeshAttributeData",
                 Some(BindGroupCreate::MeshAttributeDataResize),
             ),

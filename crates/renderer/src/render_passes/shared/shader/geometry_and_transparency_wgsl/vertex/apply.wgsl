@@ -1,33 +1,27 @@
 //***** INPUT/OUTPUT *****
-struct VertexInput {
-    @builtin(vertex_index) vertex_index: u32,
-    @location(0) position: vec3<f32>,      // Model-space position
-    @location(1) triangle_index: u32,      // Triangle index for this vertex
-    @location(2) barycentric: vec2<f32>,   // Barycentric coordinates (x, y) - z = 1.0 - x - y
-    @location(3) normal: vec3<f32>,        // Model-space normal
-    @location(4) tangent: vec4<f32>,       // Model-space tangent (w = handedness)
-    {% if instancing_transforms %}
-    // instance transform matrix
-    @location(5) instance_transform_row_0: vec4<f32>,
-    @location(6) instance_transform_row_1: vec4<f32>,
-    @location(7) instance_transform_row_2: vec4<f32>,
-    @location(8) instance_transform_row_3: vec4<f32>,
-    {% endif %}
-};
 
-struct VertexOutput {
-    @builtin(position) screen_position: vec4<f32>,
-    // same value as screen_position
-    @location(1) clip_position: vec4<f32>,
-    @location(2) @interpolate(flat) triangle_index: u32,
-    @location(3) barycentric: vec2<f32>,  // Full barycentric coordinates
-    @location(4) world_normal: vec3<f32>,     // Transformed world-space normal
-    @location(5) world_tangent: vec4<f32>,    // Transformed world-space tangent (w = handedness)
+struct ApplyVertexInput {
+    vertex_index: u32,
+    position: vec3<f32>,      // Model-space position
+    normal: vec3<f32>,        // Model-space normal
+    tangent: vec4<f32>,       // Model-space tangent (w = handedness)
+    {% if instancing_transforms %}
+        // instance transform matrix
+        instance_transform_row_0: vec4<f32>,
+        instance_transform_row_1: vec4<f32>,
+        instance_transform_row_2: vec4<f32>,
+        instance_transform_row_3: vec4<f32>,
+    {% endif %}
 }
 
+struct ApplyVertexOutput {
+    clip_position: vec4<f32>,
+    world_normal: vec3<f32>,     // Transformed world-space normal
+    world_tangent: vec4<f32>,    // Transformed world-space tangent (w = handedness)
+}
 
-fn apply_vertex(vertex_orig: VertexInput) -> VertexOutput {
-    var out: VertexOutput;
+fn apply_vertex(vertex_orig: ApplyVertexInput) -> ApplyVertexOutput {
+    var out: ApplyVertexOutput;
 
     var vertex = vertex_orig;
     var normal = vertex_orig.normal;
@@ -65,13 +59,7 @@ fn apply_vertex(vertex_orig: VertexInput) -> VertexOutput {
 
     let pos = model_transform * vec4<f32>(vertex.position, 1.0);
     out.clip_position = camera.view_proj * pos;
-    out.screen_position = camera.view_proj * pos;
 
-    // Pass through triangle index
-    out.triangle_index = vertex.triangle_index;
-
-    // Reconstruct full barycentric coordinates
-    out.barycentric = vertex.barycentric;
 
     // Transform normal to world space (use mat3 to ignore translation)
     let normal_matrix = mat3x3<f32>(

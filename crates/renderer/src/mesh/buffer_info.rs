@@ -52,7 +52,7 @@ impl MeshBufferVertexInfo {
     // - tangents (vec4<f32>), 16 bytes per vertex (w = handedness)
     // Total size per vertex = 12 + 4 + 8 + 12 + 16 = 52 bytes
     pub const BYTE_SIZE: usize = 52;
-    // 16 floats for transform
+    // 16 * 4floats for transform
     pub const BYTE_SIZE_INSTANCE: usize = 64;
 
     pub fn size(&self) -> usize {
@@ -228,37 +228,121 @@ pub enum MeshBufferVisibilityVertexAttributeInfo {
     },
 }
 
+impl MeshBufferVisibilityVertexAttributeInfo {
+    pub fn vertex_size(&self) -> usize {
+        match self {
+            MeshBufferVisibilityVertexAttributeInfo::Positions {
+                component_len,
+                data_size,
+            } => *component_len * *data_size,
+            MeshBufferVisibilityVertexAttributeInfo::Normals {
+                component_len,
+                data_size,
+            } => *component_len * *data_size,
+            MeshBufferVisibilityVertexAttributeInfo::Tangents {
+                component_len,
+                data_size,
+            } => *component_len * *data_size,
+        }
+    }
+}
+
 /// Custom attributes: UVs, colors, joints, weights.
 /// These are stored in the attribute_data buffer and accessed via indexed lookup.
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MeshBufferCustomVertexAttributeInfo {
     /// RGB or RGBA vertex color.
     Colors {
-        count: u32,
+        index: u32,
         data_size: usize,
         component_len: usize,
     },
 
     /// UV texture co-ordinates.
     TexCoords {
-        count: u32,
+        index: u32,
         data_size: usize,
         component_len: usize,
     },
 
     /// Joint indices.
     Joints {
-        count: u32,
+        index: u32,
         data_size: usize,
         component_len: usize,
     },
 
     /// Joint weights.
     Weights {
-        count: u32,
+        index: u32,
         data_size: usize,
         component_len: usize,
     },
+}
+
+impl MeshBufferCustomVertexAttributeInfo {
+    pub fn vertex_format(&self) -> VertexFormat {
+        match self {
+            MeshBufferCustomVertexAttributeInfo::Colors { component_len, .. } => {
+                match component_len {
+                    4 => VertexFormat::Float32x4,
+                    3 => VertexFormat::Float32x3,
+                    2 => VertexFormat::Float32x2,
+                    1 => VertexFormat::Unorm8x4, // Packed RGBA8
+                    _ => panic!("Unsupported color attribute component length"),
+                }
+            }
+            MeshBufferCustomVertexAttributeInfo::TexCoords { component_len, .. } => {
+                match component_len {
+                    2 => VertexFormat::Float32x2,
+                    3 => VertexFormat::Float32x3,
+                    4 => VertexFormat::Float32x4,
+                    _ => panic!("Unsupported texcoord attribute component length"),
+                }
+            }
+            MeshBufferCustomVertexAttributeInfo::Joints { component_len, .. } => {
+                match component_len {
+                    4 => VertexFormat::Uint32x4,
+                    2 => VertexFormat::Uint32x2,
+                    1 => VertexFormat::Uint32,
+                    _ => panic!("Unsupported joints attribute component length"),
+                }
+            }
+            MeshBufferCustomVertexAttributeInfo::Weights { component_len, .. } => {
+                match component_len {
+                    4 => VertexFormat::Float32x4,
+                    2 => VertexFormat::Float32x2,
+                    1 => VertexFormat::Float32,
+                    _ => panic!("Unsupported weights attribute component length"),
+                }
+            }
+        }
+    }
+
+    pub fn vertex_size(&self) -> usize {
+        match self {
+            MeshBufferCustomVertexAttributeInfo::Colors {
+                component_len,
+                data_size,
+                index: _,
+            } => *component_len * *data_size,
+            MeshBufferCustomVertexAttributeInfo::TexCoords {
+                component_len,
+                data_size,
+                index: _,
+            } => *component_len * *data_size,
+            MeshBufferCustomVertexAttributeInfo::Joints {
+                component_len,
+                data_size,
+                index: _,
+            } => *component_len * *data_size,
+            MeshBufferCustomVertexAttributeInfo::Weights {
+                component_len,
+                data_size,
+                index: _,
+            } => *component_len * *data_size,
+        }
+    }
 }
 
 /// Combined enum for all vertex attribute types (used during GLTF loading before separation).
@@ -278,9 +362,6 @@ impl MeshBufferVertexAttributeInfo {
     pub fn is_custom_attribute(&self) -> bool {
         matches!(self, MeshBufferVertexAttributeInfo::Custom(_))
     }
-}
-
-impl MeshBufferVertexAttributeInfo {
     fn primary_val(&self) -> usize {
         match self {
             MeshBufferVertexAttributeInfo::Visibility(vis) => match vis {
@@ -301,10 +382,10 @@ impl MeshBufferVertexAttributeInfo {
         match self {
             MeshBufferVertexAttributeInfo::Visibility(_) => 0,
             MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
-                MeshBufferCustomVertexAttributeInfo::Colors { count, .. } => *count,
-                MeshBufferCustomVertexAttributeInfo::TexCoords { count, .. } => *count,
-                MeshBufferCustomVertexAttributeInfo::Joints { count, .. } => *count,
-                MeshBufferCustomVertexAttributeInfo::Weights { count, .. } => *count,
+                MeshBufferCustomVertexAttributeInfo::Colors { index, .. } => *index,
+                MeshBufferCustomVertexAttributeInfo::TexCoords { index, .. } => *index,
+                MeshBufferCustomVertexAttributeInfo::Joints { index, .. } => *index,
+                MeshBufferCustomVertexAttributeInfo::Weights { index, .. } => *index,
             },
         }
     }
@@ -383,45 +464,8 @@ impl MeshBufferVertexAttributeInfo {
 
     pub fn vertex_size(&self) -> usize {
         match self {
-            MeshBufferVertexAttributeInfo::Visibility(vis) => match vis {
-                MeshBufferVisibilityVertexAttributeInfo::Positions {
-                    component_len,
-                    data_size,
-                } => *component_len * *data_size,
-                MeshBufferVisibilityVertexAttributeInfo::Normals {
-                    component_len,
-                    data_size,
-                } => *component_len * *data_size,
-                MeshBufferVisibilityVertexAttributeInfo::Tangents {
-                    component_len,
-                    data_size,
-                } => *component_len * *data_size,
-            },
-            MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
-                MeshBufferCustomVertexAttributeInfo::Colors {
-                    component_len,
-                    data_size,
-                    // `count` stores the COLOR_n set index; the accessor only carries this set,
-                    // so the per-vertex stride is just the component width.
-                    count: _,
-                } => *component_len * *data_size,
-                MeshBufferCustomVertexAttributeInfo::TexCoords {
-                    component_len,
-                    data_size,
-                    // Same for TEXCOORD_n: each accessor is a single UV set.
-                    count: _,
-                } => *component_len * *data_size,
-                MeshBufferCustomVertexAttributeInfo::Joints {
-                    component_len,
-                    data_size,
-                    count: _,
-                } => *component_len * *data_size,
-                MeshBufferCustomVertexAttributeInfo::Weights {
-                    component_len,
-                    data_size,
-                    count: _,
-                } => *component_len * *data_size,
-            },
+            MeshBufferVertexAttributeInfo::Visibility(vis) => vis.vertex_size(),
+            MeshBufferVertexAttributeInfo::Custom(custom) => custom.vertex_size(),
         }
     }
 }

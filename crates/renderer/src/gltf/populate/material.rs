@@ -135,11 +135,11 @@ impl GltfMaterialInfo {
             .iter()
             .find_map(|attr| {
                 if let &MeshBufferVertexAttributeInfo::Custom(
-                    MeshBufferCustomVertexAttributeInfo::Colors { count, .. },
+                    MeshBufferCustomVertexAttributeInfo::Colors { index, .. },
                 ) = attr
                 {
-                    // for right now just always use highest count
-                    Some(VertexColorInfo { set_index: count })
+                    // for right now just always use the first one we find
+                    Some(VertexColorInfo { set_index: index })
                 } else {
                     None
                 }
@@ -188,35 +188,49 @@ impl<'a> From<gltf::material::NormalTexture<'a>> for GltfTextureInfo {
         let texture_transform = info.extensions().and_then(|ext| {
             ext.get("KHR_texture_transform").and_then(|transform_json| {
                 // Parse the extension manually
-                let offset = transform_json.get("offset")
+                let offset = transform_json
+                    .get("offset")
                     .and_then(|v| v.as_array())
-                    .map(|arr| [
-                        arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
-                        arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
-                    ])
+                    .map(|arr| {
+                        [
+                            arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                            arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                        ]
+                    })
                     .unwrap_or([0.0, 0.0]);
 
-                let rotation = transform_json.get("rotation")
+                let rotation = transform_json
+                    .get("rotation")
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0) as f32;
 
-                let scale = transform_json.get("scale")
+                let scale = transform_json
+                    .get("scale")
                     .and_then(|v| v.as_array())
-                    .map(|arr| [
-                        arr.get(0).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
-                        arr.get(1).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
-                    ])
+                    .map(|arr| {
+                        [
+                            arr.get(0).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                            arr.get(1).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                        ]
+                    })
                     .unwrap_or([1.0, 1.0]);
 
                 Some(GltfTextureTransform {
-                    offset: [ordered_float::OrderedFloat(offset[0]), ordered_float::OrderedFloat(offset[1])],
+                    offset: [
+                        ordered_float::OrderedFloat(offset[0]),
+                        ordered_float::OrderedFloat(offset[1]),
+                    ],
                     rotation: ordered_float::OrderedFloat(rotation),
-                    scale: [ordered_float::OrderedFloat(scale[0]), ordered_float::OrderedFloat(scale[1])],
+                    scale: [
+                        ordered_float::OrderedFloat(scale[0]),
+                        ordered_float::OrderedFloat(scale[1]),
+                    ],
                 })
             })
         });
 
-        let tex_coord_override = info.extensions()
+        let tex_coord_override = info
+            .extensions()
             .and_then(|ext| ext.get("KHR_texture_transform"))
             .and_then(|t| t.get("texCoord"))
             .and_then(|v| v.as_u64())
@@ -236,35 +250,49 @@ impl<'a> From<gltf::material::OcclusionTexture<'a>> for GltfTextureInfo {
         let texture_transform = info.extensions().and_then(|ext| {
             ext.get("KHR_texture_transform").and_then(|transform_json| {
                 // Parse the extension manually
-                let offset = transform_json.get("offset")
+                let offset = transform_json
+                    .get("offset")
                     .and_then(|v| v.as_array())
-                    .map(|arr| [
-                        arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
-                        arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
-                    ])
+                    .map(|arr| {
+                        [
+                            arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                            arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                        ]
+                    })
                     .unwrap_or([0.0, 0.0]);
 
-                let rotation = transform_json.get("rotation")
+                let rotation = transform_json
+                    .get("rotation")
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0) as f32;
 
-                let scale = transform_json.get("scale")
+                let scale = transform_json
+                    .get("scale")
                     .and_then(|v| v.as_array())
-                    .map(|arr| [
-                        arr.get(0).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
-                        arr.get(1).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
-                    ])
+                    .map(|arr| {
+                        [
+                            arr.get(0).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                            arr.get(1).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                        ]
+                    })
                     .unwrap_or([1.0, 1.0]);
 
                 Some(GltfTextureTransform {
-                    offset: [ordered_float::OrderedFloat(offset[0]), ordered_float::OrderedFloat(offset[1])],
+                    offset: [
+                        ordered_float::OrderedFloat(offset[0]),
+                        ordered_float::OrderedFloat(offset[1]),
+                    ],
                     rotation: ordered_float::OrderedFloat(rotation),
-                    scale: [ordered_float::OrderedFloat(scale[0]), ordered_float::OrderedFloat(scale[1])],
+                    scale: [
+                        ordered_float::OrderedFloat(scale[0]),
+                        ordered_float::OrderedFloat(scale[1]),
+                    ],
                 })
             })
         });
 
-        let tex_coord_override = info.extensions()
+        let tex_coord_override = info
+            .extensions()
             .and_then(|ext| ext.get("KHR_texture_transform"))
             .and_then(|t| t.get("texCoord"))
             .and_then(|v| v.as_u64())
