@@ -132,7 +132,11 @@ pub(super) fn convert_to_visibility_buffer(
         triangles: MeshBufferTriangleInfoWithOffset {
             count: triangle_count,
             vertex_attribute_indices: vertex_attribute_index.clone(),
-            vertex_attributes: attribute_data_by_kind.keys().cloned().collect(),
+            vertex_attributes: attribute_data_by_kind
+                .keys()
+                .filter(|attr| attr.is_custom_attribute())
+                .cloned()
+                .collect(),
             vertex_attributes_offset: attribute_vertex_offset,
             vertex_attributes_size: attribute_vertex_bytes.len() - attribute_vertex_offset,
             triangle_data: triangle_data_info,
