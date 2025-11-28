@@ -106,8 +106,11 @@ impl Mesh {
 
         render_pass.set_vertex_buffer(
             0,
-            ctx.meshes.visibility_data_gpu_buffer(),
-            Some(ctx.meshes.visibility_data_buffer_offset(mesh_key)? as u64),
+            ctx.meshes.visibility_geometry_data_gpu_buffer(),
+            Some(
+                ctx.meshes
+                    .visibility_geometry_data_buffer_offset(mesh_key)? as u64,
+            ),
             None,
         );
 
@@ -123,21 +126,24 @@ impl Mesh {
         let buffer_info = ctx.meshes.buffer_infos.get(self.buffer_info_key)?;
 
         render_pass.set_index_buffer(
-            ctx.meshes.visibility_index_gpu_buffer(),
+            ctx.meshes.visibility_geometry_index_gpu_buffer(),
             IndexFormat::Uint32,
-            Some(ctx.meshes.visibility_index_buffer_offset(mesh_key)? as u64),
+            Some(
+                ctx.meshes
+                    .visibility_geometry_index_buffer_offset(mesh_key)? as u64,
+            ),
             None,
         );
 
         match ctx.instances.transform_instance_count(self.transform_key) {
             Some(instance_count) => {
                 render_pass.draw_indexed_with_instance_count(
-                    buffer_info.vertex.count as u32,
+                    buffer_info.geometry_vertex.count as u32,
                     instance_count as u32,
                 );
             }
             _ => {
-                render_pass.draw_indexed(buffer_info.vertex.count as u32);
+                render_pass.draw_indexed(buffer_info.geometry_vertex.count as u32);
             }
         }
 
@@ -156,11 +162,14 @@ impl Mesh {
 
         render_pass.set_bind_group(3, mesh_meta_bind_group, Some(&[meta_offset]))?;
 
-        // Visibility stuff Slot 0 (locations 0-4)
+        // Geometry stuff Slot 0 (locations 0-4)
         render_pass.set_vertex_buffer(
             0,
-            ctx.meshes.visibility_data_gpu_buffer(),
-            Some(ctx.meshes.visibility_data_buffer_offset(mesh_key)? as u64),
+            ctx.meshes.transparency_geometry_data_gpu_buffer(),
+            Some(
+                ctx.meshes
+                    .transparency_geometry_data_buffer_offset(mesh_key)? as u64,
+            ),
             None,
         );
 
@@ -184,27 +193,30 @@ impl Mesh {
         // If not instanced: slot 1 (locations 5+)
         render_pass.set_vertex_buffer(
             attribute_slot,
-            ctx.meshes.attribute_data_gpu_buffer(),
-            Some(ctx.meshes.attribute_data_buffer_offset(mesh_key)? as u64),
+            ctx.meshes.custom_attribute_data_gpu_buffer(),
+            Some(ctx.meshes.custom_attribute_data_buffer_offset(mesh_key)? as u64),
             None,
         );
 
         render_pass.set_index_buffer(
-            ctx.meshes.visibility_index_gpu_buffer(),
+            ctx.meshes.transparency_geometry_index_gpu_buffer(),
             IndexFormat::Uint32,
-            Some(ctx.meshes.visibility_index_buffer_offset(mesh_key)? as u64),
+            Some(
+                ctx.meshes
+                    .transparency_geometry_index_buffer_offset(mesh_key)? as u64,
+            ),
             None,
         );
 
         match ctx.instances.transform_instance_count(self.transform_key) {
             Some(instance_count) => {
                 render_pass.draw_indexed_with_instance_count(
-                    buffer_info.vertex.count as u32,
+                    buffer_info.geometry_vertex.count as u32,
                     instance_count as u32,
                 );
             }
             _ => {
-                render_pass.draw_indexed(buffer_info.vertex.count as u32);
+                render_pass.draw_indexed(buffer_info.geometry_vertex.count as u32);
             }
         }
 

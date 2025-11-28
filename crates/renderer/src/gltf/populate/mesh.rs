@@ -7,7 +7,7 @@ use crate::{
         populate::material::GltfMaterialInfo,
     },
     materials::Material,
-    mesh::{skins::SkinKey, Mesh, MeshBufferInfo, MeshBufferVertexInfo},
+    mesh::{skins::SkinKey, Mesh, MeshBufferGeometryKind, MeshBufferInfo, MeshBufferVertexInfo},
     pipeline_layouts::PipelineLayoutCacheKey,
     pipelines::render_pipeline::RenderPipelineCacheKey,
     transforms::{Transform, TransformKey},
@@ -186,36 +186,50 @@ impl AwsmRenderer {
         }
 
         let _mesh_key = {
-            let visibility_data_start = primitive_buffer_info.vertex.offset;
-            let visibility_data_end = visibility_data_start
-                + MeshBufferVertexInfo::from(primitive_buffer_info.vertex.clone()).size();
-            let visibility_data = &ctx.data.buffers.visibility_vertex_bytes
-                [visibility_data_start..visibility_data_end];
+            let geometry_data_start = primitive_buffer_info.geometry_vertex.offset;
 
-            let attribute_data_start = primitive_buffer_info.triangles.vertex_attributes_offset;
-            let attribute_data_end =
-                attribute_data_start + primitive_buffer_info.triangles.vertex_attributes_size;
-            let attribute_data =
-                &ctx.data.buffers.attribute_vertex_bytes[attribute_data_start..attribute_data_end];
+            let geometry_data = match primitive_buffer_info.geometry_kind {
+                MeshBufferGeometryKind::Visibility => {
+                    let geometry_data_end = geometry_data_start
+                        + MeshBufferVertexInfo::from(primitive_buffer_info.geometry_vertex.clone())
+                            .visibility_geometry_size();
+                    &ctx.data.buffers.visibility_geometry_vertex_bytes
+                        [geometry_data_start..geometry_data_end]
+                }
+                MeshBufferGeometryKind::Transparency => {
+                    let geometry_data_end = geometry_data_start
+                        + MeshBufferVertexInfo::from(primitive_buffer_info.geometry_vertex.clone())
+                            .transparency_geometry_size();
+                    &ctx.data.buffers.transparency_geometry_vertex_bytes
+                        [geometry_data_start..geometry_data_end]
+                }
+            };
 
-            let attribute_index_start = primitive_buffer_info
+            let custom_attribute_data_start =
+                primitive_buffer_info.triangles.vertex_attributes_offset;
+            let custom_attribute_data_end = custom_attribute_data_start
+                + primitive_buffer_info.triangles.vertex_attributes_size;
+            let custom_attribute_data = &ctx.data.buffers.custom_attribute_vertex_bytes
+                [custom_attribute_data_start..custom_attribute_data_end];
+
+            let custom_attribute_index_start = primitive_buffer_info
                 .triangles
                 .vertex_attribute_indices
                 .offset;
-            let attribute_index_end = attribute_index_start
+            let custom_attribute_index_end = custom_attribute_index_start
                 + primitive_buffer_info
                     .triangles
                     .vertex_attribute_indices
                     .total_size();
-            let attribute_index =
-                &ctx.data.buffers.index_bytes[attribute_index_start..attribute_index_end];
+            let attribute_index = &ctx.data.buffers.index_bytes
+                [custom_attribute_index_start..custom_attribute_index_end];
 
             self.meshes.insert(
                 mesh,
                 &self.materials,
                 &self.transforms,
-                visibility_data,
-                attribute_data,
+                geometry_data,
+                custom_attribute_data,
                 attribute_index,
             )?
         };

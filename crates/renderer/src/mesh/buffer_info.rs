@@ -30,11 +30,18 @@ impl MeshBufferInfos {
 
 #[derive(Debug, Clone)]
 pub struct MeshBufferInfo {
-    pub vertex: MeshBufferVertexInfo,
+    pub geometry_kind: MeshBufferGeometryKind,
+    pub geometry_vertex: MeshBufferVertexInfo,
     pub triangles: MeshBufferTriangleInfo,
     pub geometry_morph: Option<MeshBufferGeometryMorphInfo>,
     pub material_morph: Option<MeshBufferMaterialMorphInfo>,
     pub skin: Option<MeshBufferSkinInfo>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MeshBufferGeometryKind {
+    Visibility,
+    Transparency,
 }
 
 #[derive(Debug, Clone)]
@@ -51,12 +58,22 @@ impl MeshBufferVertexInfo {
     // - normals (vec3<f32>), 12 bytes per vertex
     // - tangents (vec4<f32>), 16 bytes per vertex (w = handedness)
     // Total size per vertex = 12 + 4 + 8 + 12 + 16 = 52 bytes
-    pub const BYTE_SIZE: usize = 52;
+    pub const VISIBILITY_GEOMETRY_BYTE_SIZE: usize = 52;
+
+    // positions (vec3<f32>), 12 bytes per vertex
+    // normals (vec3<f32>), 12 bytes per vertex
+    // tangents (vec4<f32>), 16 bytes per vertex (w = handedness)
+    // Total size per vertex = 12 + 12 + 16 = 40 bytes
+    pub const TRANSPARENCY_GEOMETRY_BYTE_SIZE: usize = 40;
     // 16 * 4floats for transform
     pub const BYTE_SIZE_INSTANCE: usize = 64;
 
-    pub fn size(&self) -> usize {
-        self.count * Self::BYTE_SIZE
+    pub fn visibility_geometry_size(&self) -> usize {
+        self.count * Self::VISIBILITY_GEOMETRY_BYTE_SIZE
+    }
+
+    pub fn transparency_geometry_size(&self) -> usize {
+        self.count * Self::TRANSPARENCY_GEOMETRY_BYTE_SIZE
     }
 }
 

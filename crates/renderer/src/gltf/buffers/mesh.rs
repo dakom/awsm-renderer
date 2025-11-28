@@ -21,21 +21,23 @@ use crate::gltf::buffers::{
 };
 use crate::gltf::error::AwsmGltfError;
 use crate::mesh::{
-    MeshBufferAttributeIndexInfo, MeshBufferInfo, MeshBufferTriangleDataInfo,
-    MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
+    MeshBufferAttributeIndexInfo, MeshBufferGeometryKind, MeshBufferInfo,
+    MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo,
+    MeshBufferVertexInfo,
 };
 
 use super::accessor::accessor_to_bytes;
 use super::Result;
 
-pub(super) fn convert_to_visibility_buffer(
+pub(super) fn convert_to_mesh_buffer(
     primitive: &gltf::Primitive,
     front_face: FrontFace,
     buffers: &[Vec<u8>],
-    vertex_attribute_index: &MeshBufferAttributeIndexInfoWithOffset,
-    vertex_attribute_index_bytes: &[u8],
-    visibility_vertex_bytes: &mut Vec<u8>,
-    attribute_vertex_bytes: &mut Vec<u8>,
+    custom_attribute_index: &MeshBufferAttributeIndexInfoWithOffset,
+    custom_attribute_index_bytes: &[u8],
+    visibility_geometry_vertex_bytes: &mut Vec<u8>,
+    transparency_geometry_vertex_bytes: &mut Vec<u8>,
+    custom_attribute_vertex_bytes: &mut Vec<u8>,
     triangle_data_bytes: &mut Vec<u8>,
     geometry_morph_bytes: &mut Vec<u8>,
     material_morph_bytes: &mut Vec<u8>,
@@ -51,7 +53,7 @@ pub(super) fn convert_to_visibility_buffer(
         .map(|(_, accessor)| accessor.count())
         .unwrap_or(0);
 
-    let triangle_count = vertex_attribute_index.count / 3;
+    let triangle_count = custom_attribute_index.count / 3;
 
     // Step 2: Load attribute data by kind
     let attribute_data_by_kind = load_attribute_data_by_kind(&gltf_attributes, buffers)?;
@@ -59,26 +61,26 @@ pub(super) fn convert_to_visibility_buffer(
     // Step 3: Ensure normals exist (compute if missing)
     let attribute_data_by_kind = ensure_normals(
         attribute_data_by_kind,
-        vertex_attribute_index,
-        vertex_attribute_index_bytes,
+        custom_attribute_index,
+        custom_attribute_index_bytes,
     )?;
 
     // Step 4: Create visibility vertices (positions + triangle_index + barycentric)
     // These are expanded such that each vertex gets its own visibility vertex (triangle_index will be repeated for all 3)
-    let visability_vertex_offset = visibility_vertex_bytes.len();
+    let visability_vertex_offset = visibility_geometry_vertex_bytes.len();
     create_visibility_vertices(
         &attribute_data_by_kind,
-        vertex_attribute_index,
-        vertex_attribute_index_bytes,
+        custom_attribute_index,
+        custom_attribute_index_bytes,
         triangle_count,
         front_face,
-        visibility_vertex_bytes,
+        visibility_geometry_vertex_bytes,
     )?;
 
     // Step 5: Pack vertex attributes
     // These are the original attributes per-vertex, but only non-visibility ones
     // There is no need to repack or expand these, they are used as-is
-    let attribute_vertex_offset = attribute_vertex_bytes.len();
+    let attribute_vertex_offset = custom_attribute_vertex_bytes.len();
     pack_vertex_attributes(
         attribute_data_by_kind
             .iter()
@@ -87,14 +89,14 @@ pub(super) fn convert_to_visibility_buffer(
                 _ => None,
             })
             .collect(),
-        attribute_vertex_bytes,
+        custom_attribute_vertex_bytes,
     )?;
 
     // Step 6: Pack triangle data (vertex indices)
     let triangle_data_offset = triangle_data_bytes.len();
     let triangle_data_info = pack_triangle_data(
-        vertex_attribute_index,
-        vertex_attribute_index_bytes,
+        custom_attribute_index,
+        custom_attribute_index_bytes,
         triangle_count,
         triangle_data_offset,
         triangle_data_bytes,
@@ -106,8 +108,8 @@ pub(super) fn convert_to_visibility_buffer(
     let (geometry_morph, material_morph) = convert_morph_targets(
         primitive,
         buffers,
-        vertex_attribute_index,
-        vertex_attribute_index_bytes,
+        custom_attribute_index,
+        custom_attribute_index_bytes,
         triangle_count,
         geometry_morph_bytes,
         material_morph_bytes,
@@ -117,28 +119,29 @@ pub(super) fn convert_to_visibility_buffer(
     let skin = convert_skin(
         primitive,
         buffers,
-        vertex_attribute_index,
-        vertex_attribute_index_bytes,
+        custom_attribute_index,
+        custom_attribute_index_bytes,
         triangle_count,
         skin_joint_index_weight_bytes,
     )?;
 
     // Step 7: Build final MeshBufferInfo
     Ok(MeshBufferInfoWithOffset {
-        vertex: MeshBufferVertexInfoWithOffset {
+        geometry_kind: MeshBufferGeometryKind::Visibility,
+        geometry_vertex: MeshBufferVertexInfoWithOffset {
             offset: visability_vertex_offset,
             count: triangle_count * 3, // 3 vertices per triangle
         },
         triangles: MeshBufferTriangleInfoWithOffset {
             count: triangle_count,
-            vertex_attribute_indices: vertex_attribute_index.clone(),
+            vertex_attribute_indices: custom_attribute_index.clone(),
             vertex_attributes: attribute_data_by_kind
                 .keys()
                 .filter(|attr| attr.is_custom_attribute())
                 .cloned()
                 .collect(),
             vertex_attributes_offset: attribute_vertex_offset,
-            vertex_attributes_size: attribute_vertex_bytes.len() - attribute_vertex_offset,
+            vertex_attributes_size: custom_attribute_vertex_bytes.len() - attribute_vertex_offset,
             triangle_data: triangle_data_info,
         },
         geometry_morph,

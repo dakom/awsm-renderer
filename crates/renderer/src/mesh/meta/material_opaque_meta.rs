@@ -25,9 +25,9 @@ pub struct MaterialMeshMeta<'a> {
     pub mesh_key: MeshKey,
     pub material_key: MaterialKey,
     pub material_morph_key: Option<MaterialMorphKey>,
-    pub attribute_indices_offset: usize,
-    pub attribute_data_offset: usize,
-    pub visibility_data_offset: usize,
+    pub custom_attribute_indices_offset: usize,
+    pub custom_attribute_data_offset: usize,
+    pub geometry_data_offset: usize,
     pub transform_offset: usize,
     pub normal_matrix_offset: usize,
     pub buffer_info: &'a MeshBufferInfo,
@@ -99,9 +99,9 @@ impl<'a> MaterialMeshMeta<'a> {
             material_key,
             material_morph_key,
             buffer_info,
-            attribute_indices_offset,
-            attribute_data_offset,
-            visibility_data_offset,
+            custom_attribute_indices_offset,
+            custom_attribute_data_offset,
+            geometry_data_offset,
             transform_offset,
             normal_matrix_offset,
             materials,
@@ -165,8 +165,8 @@ impl<'a> MaterialMeshMeta<'a> {
         push_u32(normal_matrix_offset as u32);
 
         // Vertex attribute offsets (8 bytes)
-        push_u32(attribute_indices_offset as u32);
-        push_u32(attribute_data_offset as u32);
+        push_u32(custom_attribute_indices_offset as u32);
+        push_u32(custom_attribute_data_offset as u32);
 
         // Vertex attribute stride (4 bytes)
         push_u32(buffer_info.triangles.vertex_attribute_stride() as u32);
@@ -180,8 +180,8 @@ impl<'a> MaterialMeshMeta<'a> {
         push_u32(uv_set_count);
         push_u32(color_set_count);
 
-        // Visibility data offset (4 bytes)
-        push_u32(visibility_data_offset as u32);
+        // Geometry data offset (4 bytes)
+        push_u32(geometry_data_offset as u32);
 
         Ok(result)
     }

@@ -21,11 +21,14 @@ pub enum AwsmMeshError {
     #[error("[mesh] not found: {0:?}")]
     MeshNotFound(MeshKey),
 
-    #[error("[mesh] visibility buffer not found: {0:?}")]
-    VisibilityBufferNotFound(MeshKey),
+    #[error("[mesh] visibility geometry buffer not found: {0:?}")]
+    VisibilityGeometryBufferNotFound(MeshKey),
 
-    #[error("[mesh] attribute buffer not found: {0:?}")]
-    AttributeBufferNotFound(MeshKey),
+    #[error("[mesh] transparency geometry buffer not found: {0:?}")]
+    TransparencyGeometryBufferNotFound(MeshKey),
+
+    #[error("[mesh] custom attribute buffer not found: {0:?}")]
+    CustomAttributeBufferNotFound(MeshKey),
 
     #[error("[mesh] metadata not found: {0:?}")]
     MetaNotFound(MeshKey),

@@ -1,3 +1,6 @@
+- create non-exploded transparency geometry buffer
+  - avoid creating both transparency and visibility geometry buffers
+    - detect in buffer creation which materials it will use?
 - vertex buffer data from non-geometry attributes (what we use for storage in opaque)
 
 

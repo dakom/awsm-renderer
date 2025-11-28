@@ -12,7 +12,7 @@ use crate::buffer::dynamic_uniform::DynamicUniformBuffer;
 use crate::materials::Materials;
 use crate::mesh::meta::{MeshMeta, MESH_META_INITIAL_CAPACITY};
 use crate::mesh::skins::Skins;
-use crate::mesh::{MeshBufferInfo, MeshBufferInfos};
+use crate::mesh::{MeshBufferGeometryKind, MeshBufferInfo, MeshBufferInfos};
 use crate::transforms::{TransformKey, Transforms};
 use crate::AwsmRendererLogging;
 
@@ -23,22 +23,26 @@ use super::{Mesh, MeshBufferAttributeIndexInfo, MeshBufferVertexInfo};
 pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
     transform_to_meshes: SecondaryMap<TransformKey, Vec<MeshKey>>,
-    // visibility data buffers (position, triangle-id, barycentric)
-    visibility_data_buffers: DynamicStorageBuffer<MeshKey>,
-    visibility_data_gpu_buffer: web_sys::GpuBuffer,
-    visibility_data_dirty: bool,
-    // visibility index buffers (position, triangle-id, barycentric)
-    visibility_index_buffers: DynamicStorageBuffer<MeshKey>,
-    visibility_index_gpu_buffer: web_sys::GpuBuffer,
-    visibility_index_dirty: bool,
+    // visibility geometry data buffers (position, triangle-id, barycentric)
+    visibility_geometry_data_buffers: DynamicStorageBuffer<MeshKey>,
+    visibility_geometry_data_gpu_buffer: web_sys::GpuBuffer,
+    visibility_geometry_data_dirty: bool,
+    // visibility geometry index buffers (position, triangle-id, barycentric, etc.)
+    visibility_geometry_index_buffers: DynamicStorageBuffer<MeshKey>,
+    visibility_geometry_index_gpu_buffer: web_sys::GpuBuffer,
+    visibility_geometry_index_dirty: bool,
+    // transparency geometry data buffers (position, etc.)
+    transparency_geometry_data_buffers: DynamicStorageBuffer<MeshKey>,
+    transparency_geometry_data_gpu_buffer: web_sys::GpuBuffer,
+    transparency_geometry_data_dirty: bool,
     // attribute data buffers
-    attribute_data_buffers: DynamicStorageBuffer<MeshKey>,
-    attribute_data_gpu_buffer: web_sys::GpuBuffer,
-    attribute_data_dirty: bool,
+    custom_attribute_data_buffers: DynamicStorageBuffer<MeshKey>,
+    custom_attribute_data_gpu_buffer: web_sys::GpuBuffer,
+    custom_attribute_data_dirty: bool,
     // attribute index buffers (normals, uvs, colors, etc.)
-    attribute_index_buffers: DynamicStorageBuffer<MeshKey>,
-    attribute_index_gpu_buffer: web_sys::GpuBuffer,
-    attribute_index_dirty: bool,
+    custom_attribute_index_buffers: DynamicStorageBuffer<MeshKey>,
+    custom_attribute_index_gpu_buffer: web_sys::GpuBuffer,
+    custom_attribute_index_dirty: bool,
     // buffer infos
     pub buffer_infos: MeshBufferInfos,
     // meta
@@ -52,9 +56,11 @@ impl Meshes {
     // but this is just an allocation, can be divided many ways
     const INDICES_INITIAL_SIZE: usize = MESH_META_INITIAL_CAPACITY * 3 * 1000;
 
-    // Visibility buffer size uses MeshBufferVertexInfo::BYTE_SIZE (52 bytes per vertex)
-    const VISIBILITY_INITIAL_SIZE: usize =
-        Self::INDICES_INITIAL_SIZE * MeshBufferVertexInfo::BYTE_SIZE;
+    const VISIBILITY_GEOMETRY_INITIAL_SIZE: usize =
+        Self::INDICES_INITIAL_SIZE * MeshBufferVertexInfo::VISIBILITY_GEOMETRY_BYTE_SIZE;
+
+    const TRANSPARENCY_GEOMETRY_INITIAL_SIZE: usize =
+        Self::INDICES_INITIAL_SIZE * MeshBufferVertexInfo::TRANSPARENCY_GEOMETRY_BYTE_SIZE;
 
     // Attribute data is much smaller - only custom attributes (UVs, colors, joints, weights).
     // Estimate: 2 UV sets (8 bytes each) = 16 bytes per vertex as a reasonable starting point.
@@ -67,25 +73,25 @@ impl Meshes {
             transform_to_meshes: SecondaryMap::new(),
             buffer_infos: MeshBufferInfos::new(),
             // visibility data
-            visibility_data_buffers: DynamicStorageBuffer::new(
-                Self::VISIBILITY_INITIAL_SIZE,
+            visibility_geometry_data_buffers: DynamicStorageBuffer::new(
+                Self::VISIBILITY_GEOMETRY_INITIAL_SIZE,
                 Some("MeshVisibilityData".to_string()),
             ),
-            visibility_data_gpu_buffer: gpu.create_buffer(
+            visibility_geometry_data_gpu_buffer: gpu.create_buffer(
                 &BufferDescriptor::new(
                     Some("MeshVisibilityData"),
-                    Self::VISIBILITY_INITIAL_SIZE,
+                    Self::VISIBILITY_GEOMETRY_INITIAL_SIZE,
                     BufferUsage::new().with_copy_dst().with_vertex(),
                 )
                 .into(),
             )?,
-            visibility_data_dirty: true,
+            visibility_geometry_data_dirty: true,
             // visibility index
-            visibility_index_buffers: DynamicStorageBuffer::new(
+            visibility_geometry_index_buffers: DynamicStorageBuffer::new(
                 Self::INDICES_INITIAL_SIZE,
                 Some("MeshVisibilityIndex".to_string()),
             ),
-            visibility_index_gpu_buffer: gpu.create_buffer(
+            visibility_geometry_index_gpu_buffer: gpu.create_buffer(
                 &BufferDescriptor::new(
                     Some("MeshVisibilityIndex"),
                     Self::INDICES_INITIAL_SIZE,
@@ -93,13 +99,27 @@ impl Meshes {
                 )
                 .into(),
             )?,
-            visibility_index_dirty: true,
+            visibility_geometry_index_dirty: true,
+            // transparency geometry
+            transparency_geometry_data_buffers: DynamicStorageBuffer::new(
+                Self::TRANSPARENCY_GEOMETRY_INITIAL_SIZE,
+                Some("MeshTransparencyData".to_string()),
+            ),
+            transparency_geometry_data_gpu_buffer: gpu.create_buffer(
+                &BufferDescriptor::new(
+                    Some("MeshTransparencyData"),
+                    Self::TRANSPARENCY_GEOMETRY_INITIAL_SIZE,
+                    BufferUsage::new().with_copy_dst().with_vertex(),
+                )
+                .into(),
+            )?,
+            transparency_geometry_data_dirty: true,
             // attribute data
-            attribute_data_buffers: DynamicStorageBuffer::new(
+            custom_attribute_data_buffers: DynamicStorageBuffer::new(
                 Self::ATTRIBUTE_DATA_INITIAL_SIZE,
                 Some("MeshAttributeData".to_string()),
             ),
-            attribute_data_gpu_buffer: gpu.create_buffer(
+            custom_attribute_data_gpu_buffer: gpu.create_buffer(
                 &BufferDescriptor::new(
                     Some("MeshAttributeData"),
                     Self::ATTRIBUTE_DATA_INITIAL_SIZE,
@@ -110,13 +130,13 @@ impl Meshes {
                 )
                 .into(),
             )?,
-            attribute_data_dirty: true,
+            custom_attribute_data_dirty: true,
             // attribute index
-            attribute_index_buffers: DynamicStorageBuffer::new(
+            custom_attribute_index_buffers: DynamicStorageBuffer::new(
                 Self::INDICES_INITIAL_SIZE,
                 Some("MeshAttributeIndex".to_string()),
             ),
-            attribute_index_gpu_buffer: gpu.create_buffer(
+            custom_attribute_index_gpu_buffer: gpu.create_buffer(
                 &BufferDescriptor::new(
                     Some("MeshAttributeIndex"),
                     Self::INDICES_INITIAL_SIZE,
@@ -124,7 +144,7 @@ impl Meshes {
                 )
                 .into(),
             )?,
-            attribute_index_dirty: true,
+            custom_attribute_index_dirty: true,
             meta: MeshMeta::new(gpu)?,
             // attribute morphs and skins
             morphs: Morphs::new(gpu)?,
@@ -137,8 +157,7 @@ impl Meshes {
         mesh: Mesh,
         materials: &Materials,
         transforms: &Transforms,
-        visibility_data: &[u8],
-        // visibility index will be auto-generated
+        geometry_data: &[u8], // visibility index will be auto-generated
         attribute_data: &[u8],
         attribute_index: &[u8],
     ) -> Result<MeshKey> {
@@ -158,25 +177,45 @@ impl Meshes {
             .or_default()
             .push(key);
 
-        // visibility - index
-        let mut visibility_index = Vec::new();
-        for i in 0..buffer_info.vertex.count {
-            visibility_index.extend_from_slice(&(i as u32).to_le_bytes());
-        }
-        self.visibility_index_buffers.update(key, &visibility_index);
-        self.visibility_index_dirty = true;
+        // geometry
+        let geometry_data_offset = match buffer_info.geometry_kind {
+            MeshBufferGeometryKind::Visibility => {
+                // visibility geometry - index (auto-generated)
+                let mut geometry_index = Vec::new();
+                for i in 0..buffer_info.geometry_vertex.count {
+                    geometry_index.extend_from_slice(&(i as u32).to_le_bytes());
+                }
+                self.visibility_geometry_index_buffers
+                    .update(key, &geometry_index);
+                self.visibility_geometry_index_dirty = true;
 
-        // visibility - data
-        let visibility_data_offset = self.visibility_data_buffers.update(key, visibility_data);
-        self.visibility_data_dirty = true;
+                // visibility geometry - data
+                let geometry_data_offset = self
+                    .visibility_geometry_data_buffers
+                    .update(key, geometry_data);
+                self.visibility_geometry_data_dirty = true;
+                geometry_data_offset
+            }
+            MeshBufferGeometryKind::Transparency => {
+                let geometry_data_offset = self
+                    .transparency_geometry_data_buffers
+                    .update(key, geometry_data);
+                self.transparency_geometry_data_dirty = true;
+                geometry_data_offset
+            }
+        };
 
         // attributes - index
-        let attribute_indices_offset = self.attribute_index_buffers.update(key, attribute_index);
-        self.attribute_index_dirty = true;
+        let custom_attribute_indices_offset = self
+            .custom_attribute_index_buffers
+            .update(key, attribute_index);
+        self.custom_attribute_index_dirty = true;
 
         // attributes - data
-        let attribute_data_offset = self.attribute_data_buffers.update(key, attribute_data);
-        self.attribute_data_dirty = true;
+        let custom_attribute_data_offset = self
+            .custom_attribute_data_buffers
+            .update(key, attribute_data);
+        self.custom_attribute_data_dirty = true;
 
         // KEEP THIS AROUND FOR DEBUGGING
         // Very helpful - shows all the non-position vertex attributes and triangle indices
@@ -201,9 +240,9 @@ impl Meshes {
             key,
             &mesh,
             buffer_info,
-            attribute_indices_offset,
-            attribute_data_offset,
-            visibility_data_offset,
+            geometry_data_offset,
+            custom_attribute_indices_offset,
+            custom_attribute_data_offset,
             materials,
             transforms,
             &self.morphs,
@@ -237,40 +276,58 @@ impl Meshes {
         self.list.keys()
     }
 
-    pub fn visibility_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
-        &self.visibility_data_gpu_buffer
+    pub fn visibility_geometry_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.visibility_geometry_data_gpu_buffer
     }
-    pub fn visibility_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
-        self.visibility_data_buffers
+    pub fn visibility_geometry_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        self.visibility_geometry_data_buffers
             .offset(key)
-            .ok_or(AwsmMeshError::VisibilityBufferNotFound(key))
+            .ok_or(AwsmMeshError::VisibilityGeometryBufferNotFound(key))
     }
 
-    pub fn visibility_index_gpu_buffer(&self) -> &web_sys::GpuBuffer {
-        &self.visibility_index_gpu_buffer
+    pub fn visibility_geometry_index_gpu_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.visibility_geometry_index_gpu_buffer
     }
-    pub fn visibility_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
-        self.visibility_index_buffers
+    pub fn visibility_geometry_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        self.visibility_geometry_index_buffers
             .offset(key)
-            .ok_or(AwsmMeshError::VisibilityBufferNotFound(key))
+            .ok_or(AwsmMeshError::VisibilityGeometryBufferNotFound(key))
     }
 
-    pub fn attribute_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
-        &self.attribute_data_gpu_buffer
+    pub fn custom_attribute_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.custom_attribute_data_gpu_buffer
     }
-    pub fn attribute_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
-        self.attribute_data_buffers
+    pub fn custom_attribute_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        self.custom_attribute_data_buffers
             .offset(key)
-            .ok_or(AwsmMeshError::AttributeBufferNotFound(key))
+            .ok_or(AwsmMeshError::CustomAttributeBufferNotFound(key))
     }
 
-    pub fn attribute_index_gpu_buffer(&self) -> &web_sys::GpuBuffer {
-        &self.attribute_index_gpu_buffer
+    pub fn transparency_geometry_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.transparency_geometry_data_gpu_buffer
     }
-    pub fn attribute_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
-        self.attribute_index_buffers
+    pub fn transparency_geometry_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        self.transparency_geometry_data_buffers
             .offset(key)
-            .ok_or(AwsmMeshError::AttributeBufferNotFound(key))
+            .ok_or(AwsmMeshError::TransparencyGeometryBufferNotFound(key))
+    }
+    // re-use the custom attribute index methods
+    pub fn transparency_geometry_index_gpu_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.custom_attribute_index_gpu_buffer
+    }
+    pub fn transparency_geometry_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        self.custom_attribute_index_buffers
+            .offset(key)
+            .ok_or(AwsmMeshError::CustomAttributeBufferNotFound(key))
+    }
+
+    pub fn custom_attribute_index_gpu_buffer(&self) -> &web_sys::GpuBuffer {
+        &self.custom_attribute_index_gpu_buffer
+    }
+    pub fn custom_attribute_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        self.custom_attribute_index_buffers
+            .offset(key)
+            .ok_or(AwsmMeshError::CustomAttributeBufferNotFound(key))
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (MeshKey, &Mesh)> {
@@ -291,17 +348,19 @@ impl Meshes {
 
     pub fn remove(&mut self, mesh_key: MeshKey) -> Option<Mesh> {
         if let Some(mesh) = self.list.remove(mesh_key) {
-            self.visibility_data_buffers.remove(mesh_key);
-            self.visibility_index_buffers.remove(mesh_key);
-            self.attribute_data_buffers.remove(mesh_key);
-            self.attribute_index_buffers.remove(mesh_key);
+            self.visibility_geometry_data_buffers.remove(mesh_key);
+            self.visibility_geometry_index_buffers.remove(mesh_key);
+            self.transparency_geometry_data_buffers.remove(mesh_key);
+            self.custom_attribute_data_buffers.remove(mesh_key);
+            self.custom_attribute_index_buffers.remove(mesh_key);
             self.meta.remove(mesh_key);
 
             if self.buffer_infos.remove(mesh.buffer_info_key).is_some() {
-                self.visibility_data_dirty = true;
-                self.visibility_index_dirty = true;
-                self.attribute_data_dirty = true;
-                self.attribute_index_dirty = true;
+                self.visibility_geometry_data_dirty = true;
+                self.visibility_geometry_index_dirty = true;
+                self.transparency_geometry_data_dirty = true;
+                self.custom_attribute_data_dirty = true;
+                self.custom_attribute_index_dirty = true;
             }
 
             self.transform_to_meshes
@@ -340,41 +399,52 @@ impl Meshes {
     ) -> Result<()> {
         let to_check_dynamic = [
             (
-                self.visibility_data_dirty,
-                &mut self.visibility_data_buffers,
-                &mut self.visibility_data_gpu_buffer,
+                self.visibility_geometry_data_dirty,
+                &mut self.visibility_geometry_data_buffers,
+                &mut self.visibility_geometry_data_gpu_buffer,
                 BufferUsage::new()
                     .with_copy_dst()
                     .with_vertex()
                     .with_storage(),
-                "MeshVisibilityData",
+                "MeshVisibilityGeometryData",
                 None,
             ),
             (
-                self.visibility_index_dirty,
-                &mut self.visibility_index_buffers,
-                &mut self.visibility_index_gpu_buffer,
+                self.visibility_geometry_index_dirty,
+                &mut self.visibility_geometry_index_buffers,
+                &mut self.visibility_geometry_index_gpu_buffer,
                 BufferUsage::new().with_copy_dst().with_index(),
                 "MeshVisibilityIndex",
                 None,
             ),
             (
-                self.attribute_data_dirty,
-                &mut self.attribute_data_buffers,
-                &mut self.attribute_data_gpu_buffer,
+                self.transparency_geometry_data_dirty,
+                &mut self.transparency_geometry_data_buffers,
+                &mut self.transparency_geometry_data_gpu_buffer,
+                BufferUsage::new()
+                    .with_copy_dst()
+                    .with_vertex()
+                    .with_storage(),
+                "MeshTransparencyGeometryData",
+                None,
+            ),
+            (
+                self.custom_attribute_data_dirty,
+                &mut self.custom_attribute_data_buffers,
+                &mut self.custom_attribute_data_gpu_buffer,
                 BufferUsage::new()
                     .with_copy_dst()
                     .with_storage()
                     .with_vertex(),
-                "MeshAttributeData",
+                "MeshCustomAttributeData",
                 Some(BindGroupCreate::MeshAttributeDataResize),
             ),
             (
-                self.attribute_index_dirty,
-                &mut self.attribute_index_buffers,
-                &mut self.attribute_index_gpu_buffer,
+                self.custom_attribute_index_dirty,
+                &mut self.custom_attribute_index_buffers,
+                &mut self.custom_attribute_index_gpu_buffer,
                 BufferUsage::new().with_copy_dst().with_storage(),
-                "MeshAttributeIndex",
+                "MeshCustomAttributeIndex",
                 Some(BindGroupCreate::MeshAttributeIndexResize),
             ),
         ];
@@ -402,10 +472,11 @@ impl Meshes {
                 }
             }
 
-            self.visibility_data_dirty = false;
-            self.visibility_index_dirty = false;
-            self.attribute_data_dirty = false;
-            self.attribute_index_dirty = false;
+            self.visibility_geometry_data_dirty = false;
+            self.visibility_geometry_index_dirty = false;
+            self.transparency_geometry_data_dirty = false;
+            self.custom_attribute_data_dirty = false;
+            self.custom_attribute_index_dirty = false;
         }
 
         Ok(())
@@ -414,10 +485,11 @@ impl Meshes {
 
 impl Drop for Meshes {
     fn drop(&mut self) {
-        self.visibility_data_gpu_buffer.destroy();
-        self.visibility_index_gpu_buffer.destroy();
-        self.attribute_data_gpu_buffer.destroy();
-        self.attribute_index_gpu_buffer.destroy();
+        self.visibility_geometry_data_gpu_buffer.destroy();
+        self.visibility_geometry_index_gpu_buffer.destroy();
+        self.transparency_geometry_data_gpu_buffer.destroy();
+        self.custom_attribute_data_gpu_buffer.destroy();
+        self.custom_attribute_index_gpu_buffer.destroy();
     }
 }
 

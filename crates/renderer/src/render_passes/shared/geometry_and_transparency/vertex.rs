@@ -31,7 +31,7 @@ pub static VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY: LazyLock<VertexBuffer
         VertexBufferLayout {
             // this is the stride across all of the attributes
             // position (12) + triangle_index (4) + barycentric (8) + normal (12) + tangent (16) = 52 bytes
-            array_stride: MeshBufferVertexInfo::BYTE_SIZE as u64,
+            array_stride: MeshBufferVertexInfo::VISIBILITY_GEOMETRY_BYTE_SIZE as u64,
             step_mode: None,
             attributes: vec![
                 // Position (vec3<f32>) at offset 0

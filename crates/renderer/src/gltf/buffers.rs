@@ -3,11 +3,11 @@
 pub mod accessor;
 pub mod attributes;
 pub mod index;
+pub mod mesh;
 pub mod morph;
 pub mod normals;
 pub mod skin;
 pub mod triangle;
-pub mod visibility;
 
 use awsm_renderer_core::pipeline::primitive::{FrontFace, IndexFormat};
 use glam::{Mat4, Quat, Vec3};
@@ -17,10 +17,10 @@ use std::collections::HashMap;
 use crate::{
     gltf::buffers::{
         index::{generate_fresh_indices_from_primitive, GltfMeshBufferIndexInfo},
-        visibility::convert_to_visibility_buffer,
+        mesh::convert_to_mesh_buffer,
     },
     mesh::{
-        MeshBufferAttributeIndexInfo, MeshBufferCustomVertexAttributeInfo,
+        MeshBufferAttributeIndexInfo, MeshBufferCustomVertexAttributeInfo, MeshBufferGeometryKind,
         MeshBufferGeometryMorphInfo, MeshBufferInfo, MeshBufferMaterialMorphAttributes,
         MeshBufferMaterialMorphInfo, MeshBufferSkinInfo, MeshBufferTriangleDataInfo,
         MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
@@ -36,14 +36,17 @@ pub struct GltfBuffers {
     // just used in the pipeline for drawing
     pub index_bytes: Vec<u8>,
 
-    // Visibility vertex buffer (positions + triangle_index + barycentric)
-    pub visibility_vertex_bytes: Vec<u8>,
+    // Visibility geometry vertex buffer (positions + triangle_index + barycentric etc.)
+    pub visibility_geometry_vertex_bytes: Vec<u8>,
+
+    // Transparency geometry vertex buffer (positions etc.)
+    pub transparency_geometry_vertex_bytes: Vec<u8>,
 
     // Vertex attribute storage buffer (normals, UVs, colors, etc. per triangle)
     // these always follow the same interleaving pattern
     // although, not all primitives have all the same attributes
     // it's just that when they do, they follow the same order
-    pub attribute_vertex_bytes: Vec<u8>,
+    pub custom_attribute_vertex_bytes: Vec<u8>,
 
     // Triangle data buffer (vertex indices + material info per triangle)
     pub triangle_data_bytes: Vec<u8>,
@@ -65,8 +68,9 @@ impl GltfBuffers {
         Self {
             raw: self.raw.clone(),
             index_bytes: self.index_bytes.clone(),
-            visibility_vertex_bytes: self.visibility_vertex_bytes.clone(),
-            attribute_vertex_bytes: self.attribute_vertex_bytes.clone(),
+            visibility_geometry_vertex_bytes: self.visibility_geometry_vertex_bytes.clone(),
+            transparency_geometry_vertex_bytes: self.transparency_geometry_vertex_bytes.clone(),
+            custom_attribute_vertex_bytes: self.custom_attribute_vertex_bytes.clone(),
             triangle_data_bytes: self.triangle_data_bytes.clone(),
             geometry_morph_bytes: self.geometry_morph_bytes.clone(),
             material_morph_bytes: self.material_morph_bytes.clone(),
@@ -148,7 +152,8 @@ fn determine_front_face(
 
 #[derive(Clone, Debug)]
 pub struct MeshBufferInfoWithOffset {
-    pub vertex: MeshBufferVertexInfoWithOffset,
+    pub geometry_kind: MeshBufferGeometryKind,
+    pub geometry_vertex: MeshBufferVertexInfoWithOffset,
     pub triangles: MeshBufferTriangleInfoWithOffset,
     pub geometry_morph: Option<MeshBufferGeometryMorphInfoWithOffset>,
     pub material_morph: Option<MeshBufferMaterialMorphInfoWithOffset>,
@@ -158,7 +163,8 @@ pub struct MeshBufferInfoWithOffset {
 impl From<MeshBufferInfoWithOffset> for MeshBufferInfo {
     fn from(info: MeshBufferInfoWithOffset) -> Self {
         MeshBufferInfo {
-            vertex: info.vertex.into(),
+            geometry_kind: info.geometry_kind,
+            geometry_vertex: info.geometry_vertex.into(),
             triangles: info.triangles.into(),
             geometry_morph: info.geometry_morph.map(|m| m.into()),
             material_morph: info.material_morph.map(|m| m.into()),
@@ -182,6 +188,7 @@ impl From<MeshBufferVertexInfoWithOffset> for MeshBufferVertexInfo {
 #[derive(Clone, Debug)]
 pub struct MeshBufferTriangleInfoWithOffset {
     pub count: usize,
+    // custom attributes
     pub vertex_attribute_indices: MeshBufferAttributeIndexInfoWithOffset,
     pub vertex_attributes_offset: usize,
     pub vertex_attributes: Vec<MeshBufferVertexAttributeInfo>,
@@ -312,8 +319,9 @@ impl GltfBuffers {
         // with indices as a separate buffer
 
         let mut index_bytes: Vec<u8> = Vec::new();
-        let mut visibility_vertex_bytes: Vec<u8> = Vec::new();
-        let mut attribute_vertex_bytes: Vec<u8> = Vec::new();
+        let mut visibility_geometry_vertex_bytes: Vec<u8> = Vec::new();
+        let mut transparency_geometry_vertex_bytes: Vec<u8> = Vec::new();
+        let mut custom_attribute_vertex_bytes: Vec<u8> = Vec::new();
         let mut triangle_data_bytes: Vec<u8> = Vec::new();
         let mut geometry_morph_bytes: Vec<u8> = Vec::new();
         let mut material_morph_bytes: Vec<u8> = Vec::new();
@@ -337,22 +345,23 @@ impl GltfBuffers {
                         }
                     };
 
-                // Step 2: Convert to visibility buffer format
-                let visibility_buffer_info = convert_to_visibility_buffer(
+                // Step 2: Convert to mesh buffer format
+                let mesh_buffer_info = convert_to_mesh_buffer(
                     &primitive,
                     front_face,
                     &buffers,
                     &index,
                     &index_bytes,
-                    &mut visibility_vertex_bytes,
-                    &mut attribute_vertex_bytes,
+                    &mut visibility_geometry_vertex_bytes,
+                    &mut transparency_geometry_vertex_bytes,
+                    &mut custom_attribute_vertex_bytes,
                     &mut triangle_data_bytes,
                     &mut geometry_morph_bytes,
                     &mut material_morph_bytes,
                     &mut skin_joint_index_weight_bytes,
                 )?;
 
-                primitive_buffer_infos.push(visibility_buffer_info);
+                primitive_buffer_infos.push(mesh_buffer_info);
             }
 
             meshes.push(primitive_buffer_infos);
@@ -361,8 +370,9 @@ impl GltfBuffers {
         Ok(Self {
             raw: buffers,
             index_bytes,
-            visibility_vertex_bytes,
-            attribute_vertex_bytes,
+            visibility_geometry_vertex_bytes,
+            transparency_geometry_vertex_bytes,
+            custom_attribute_vertex_bytes,
             triangle_data_bytes,
             meshes,
             geometry_morph_bytes,

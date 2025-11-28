@@ -186,7 +186,9 @@ impl MaterialOpaqueBindGroups {
         // visibility data
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
-            BindGroupResource::Buffer(BufferBinding::new(&ctx.meshes.visibility_data_gpu_buffer())),
+            BindGroupResource::Buffer(BufferBinding::new(
+                &ctx.meshes.visibility_geometry_data_gpu_buffer(),
+            )),
         ));
         // Mesh Meta (for this pass, different than geometry pass)
         entries.push(BindGroupEntry::new(
@@ -203,12 +205,16 @@ impl MaterialOpaqueBindGroups {
         // Attribute index buffer
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
-            BindGroupResource::Buffer(BufferBinding::new(&ctx.meshes.attribute_index_gpu_buffer())),
+            BindGroupResource::Buffer(BufferBinding::new(
+                &ctx.meshes.custom_attribute_index_gpu_buffer(),
+            )),
         ));
         // Attribute data buffer
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
-            BindGroupResource::Buffer(BufferBinding::new(&ctx.meshes.attribute_data_gpu_buffer())),
+            BindGroupResource::Buffer(BufferBinding::new(
+                &ctx.meshes.custom_attribute_data_gpu_buffer(),
+            )),
         ));
         // transforms
         entries.push(BindGroupEntry::new(
