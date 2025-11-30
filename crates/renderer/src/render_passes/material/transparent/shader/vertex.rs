@@ -1,28 +1,14 @@
 use awsm_renderer_core::pipeline::vertex::{VertexAttribute, VertexBufferLayout, VertexFormat};
 
-use crate::{
-    mesh::{
-        Mesh, MeshBufferCustomVertexAttributeInfo, MeshBufferInfo, MeshBufferVertexAttributeInfo,
-    },
-    render_passes::shared::geometry_and_transparency::vertex::{
-        VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY,
-        VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY_INSTANCING,
-    },
+use crate::mesh::{
+    Mesh, MeshBufferCustomVertexAttributeInfo, MeshBufferInfo, MeshBufferVertexAttributeInfo,
 };
 
 pub fn vertex_buffer_layout(mesh: &Mesh, buffer_info: &MeshBufferInfo) -> VertexBufferLayout {
     let mut shader_location = match mesh.instanced {
-        true => {
-            VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY
-                .attributes
-                .len()
-                + VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY_INSTANCING
-                    .attributes
-                    .len()
-        }
-        false => VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY
-            .attributes
-            .len(),
+        // from VERTEX_BUFFER_LAYOUT attributes count
+        true => 7,
+        false => 3,
     } as u32;
 
     let mut attributes = vec![];

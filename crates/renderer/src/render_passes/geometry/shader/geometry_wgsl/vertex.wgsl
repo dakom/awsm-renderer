@@ -24,13 +24,11 @@ struct VertexInput {
 };
 
 struct VertexOutput {
-    @builtin(position) screen_position: vec4<f32>,
-    // same value as screen_position
-    @location(1) clip_position: vec4<f32>,
-    @location(2) @interpolate(flat) triangle_index: u32,
-    @location(3) barycentric: vec2<f32>,  // Full barycentric coordinates
-    @location(4) world_normal: vec3<f32>,     // Transformed world-space normal
-    @location(5) world_tangent: vec4<f32>,    // Transformed world-space tangent (w = handedness)
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) @interpolate(flat) triangle_index: u32,
+    @location(1) barycentric: vec2<f32>,  // Full barycentric coordinates
+    @location(2) world_normal: vec3<f32>,     // Transformed world-space normal
+    @location(3) world_tangent: vec4<f32>,    // Transformed world-space tangent (w = handedness)
 }
 
 @vertex
@@ -50,7 +48,6 @@ fn vert_main(input: VertexInput) -> VertexOutput {
         {% endif %}
     ));
 
-    out.screen_position = applied.clip_position;
     out.clip_position = applied.clip_position;
     out.world_normal = applied.world_normal;
     out.world_tangent = applied.world_tangent;

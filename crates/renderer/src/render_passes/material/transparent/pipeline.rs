@@ -1,12 +1,19 @@
+use std::sync::LazyLock;
+
 use awsm_renderer_core::pipeline::fragment::ColorTargetState;
 use awsm_renderer_core::pipeline::primitive::CullMode;
+use awsm_renderer_core::pipeline::vertex::{
+    VertexAttribute, VertexBufferLayout, VertexFormat, VertexStepMode,
+};
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use slotmap::SecondaryMap;
 
 use crate::anti_alias::AntiAliasing;
 use crate::error::Result;
 use crate::materials::{MaterialKey, Materials};
-use crate::mesh::{Mesh, MeshBufferInfoKey, MeshBufferInfos, MeshKey, Meshes};
+use crate::mesh::{
+    Mesh, MeshBufferInfoKey, MeshBufferInfos, MeshBufferVertexInfo, MeshKey, Meshes,
+};
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::render_pipeline::RenderPipelineKey;
 use crate::pipelines::Pipelines;
@@ -26,6 +33,58 @@ pub struct MaterialTransparentPipelines {
     singlesampled_pipeline_layout_key: PipelineLayoutKey,
     render_pipeline_keys: SecondaryMap<MeshKey, RenderPipelineKey>,
 }
+
+static VERTEX_BUFFER_LAYOUT: LazyLock<VertexBufferLayout> = LazyLock::new(|| {
+    VertexBufferLayout {
+        // this is the stride across all of the attributes
+        // position (12) + normal (12) + tangent (16) = 40 bytes
+        array_stride: MeshBufferVertexInfo::TRANSPARENCY_GEOMETRY_BYTE_SIZE as u64,
+        step_mode: None,
+        attributes: vec![
+            // Position (vec3<f32>)
+            VertexAttribute {
+                format: VertexFormat::Float32x3,
+                offset: 0,
+                shader_location: 0,
+            },
+            // Normal (vec3<f32>)
+            VertexAttribute {
+                format: VertexFormat::Float32x3,
+                offset: 12,
+                shader_location: 1,
+            },
+            // Tangent (vec4<f32>)
+            VertexAttribute {
+                format: VertexFormat::Float32x4,
+                offset: 24,
+                shader_location: 2,
+            },
+        ],
+    }
+});
+
+static VERTEX_BUFFER_LAYOUT_INSTANCING: LazyLock<VertexBufferLayout> = LazyLock::new(|| {
+    let mut vertex_buffer_layout_instancing = VertexBufferLayout {
+        // this is the stride across all of the attributes
+        array_stride: MeshBufferVertexInfo::INSTANCING_BYTE_SIZE as u64,
+        step_mode: Some(VertexStepMode::Instance),
+        attributes: Vec::new(),
+    };
+
+    let start_location = VERTEX_BUFFER_LAYOUT.attributes.len() as u32;
+
+    for i in 0..4 {
+        vertex_buffer_layout_instancing
+            .attributes
+            .push(VertexAttribute {
+                format: VertexFormat::Float32x4,
+                offset: i * 16,
+                shader_location: start_location + i as u32,
+            });
+    }
+
+    vertex_buffer_layout_instancing
+});
 
 impl MaterialTransparentPipelines {
     pub async fn new(
@@ -110,10 +169,17 @@ impl MaterialTransparentPipelines {
                 self.singlesampled_pipeline_layout_key
             },
             shader_key,
+            if mesh.instanced {
+                vec![
+                    VERTEX_BUFFER_LAYOUT.clone(),
+                    VERTEX_BUFFER_LAYOUT_INSTANCING.clone(),
+                ]
+            } else {
+                vec![VERTEX_BUFFER_LAYOUT.clone()]
+            },
             color_targets,
             false,
             anti_aliasing.msaa_sample_count,
-            mesh.instanced,
             if mesh.double_sided {
                 CullMode::None
             } else {

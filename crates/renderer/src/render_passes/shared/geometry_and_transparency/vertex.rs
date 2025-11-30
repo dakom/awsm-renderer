@@ -25,76 +25,6 @@ use crate::{
     shaders::ShaderKey,
 };
 
-// Locations 0-4
-pub static VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY: LazyLock<VertexBufferLayout> =
-    LazyLock::new(|| {
-        VertexBufferLayout {
-            // this is the stride across all of the attributes
-            // position (12) + triangle_index (4) + barycentric (8) + normal (12) + tangent (16) = 52 bytes
-            array_stride: MeshBufferVertexInfo::VISIBILITY_GEOMETRY_BYTE_SIZE as u64,
-            step_mode: None,
-            attributes: vec![
-                // Position (vec3<f32>) at offset 0
-                VertexAttribute {
-                    format: VertexFormat::Float32x3,
-                    offset: 0,
-                    shader_location: 0,
-                },
-                // Triangle ID (u32) at offset 12
-                VertexAttribute {
-                    format: VertexFormat::Uint32,
-                    offset: 12,
-                    shader_location: 1,
-                },
-                // Barycentric coordinates (vec2<f32>) at offset 16
-                VertexAttribute {
-                    format: VertexFormat::Float32x2,
-                    offset: 16,
-                    shader_location: 2,
-                },
-                // Normal (vec3<f32>) at offset 24
-                VertexAttribute {
-                    format: VertexFormat::Float32x3,
-                    offset: 24,
-                    shader_location: 3,
-                },
-                // Tangent (vec4<f32>) at offset 36
-                VertexAttribute {
-                    format: VertexFormat::Float32x4,
-                    offset: 36,
-                    shader_location: 4,
-                },
-            ],
-        }
-    });
-
-// Locations 5-8
-pub static VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY_INSTANCING: LazyLock<VertexBufferLayout> =
-    LazyLock::new(|| {
-        let mut vertex_buffer_layout_instancing = VertexBufferLayout {
-            // this is the stride across all of the attributes
-            array_stride: MeshBufferVertexInfo::BYTE_SIZE_INSTANCE as u64,
-            step_mode: Some(VertexStepMode::Instance),
-            attributes: Vec::new(),
-        };
-
-        let start_location = VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY
-            .attributes
-            .len() as u32;
-
-        for i in 0..4 {
-            vertex_buffer_layout_instancing
-                .attributes
-                .push(VertexAttribute {
-                    format: VertexFormat::Float32x4,
-                    offset: i * 16,
-                    shader_location: start_location + i as u32,
-                });
-        }
-
-        vertex_buffer_layout_instancing
-    });
-
 pub async fn geometry_and_transparency_render_pipeline_key(
     gpu: &AwsmRendererWebGpu,
     shaders: &mut Shaders,
@@ -103,10 +33,10 @@ pub async fn geometry_and_transparency_render_pipeline_key(
     depth_texture_format: TextureFormat,
     pipeline_layout_key: PipelineLayoutKey,
     shader_key: ShaderKey,
+    vertex_buffer_layouts: Vec<VertexBufferLayout>,
     color_targets: &[ColorTargetState],
     depth_write_enabled: bool,
     msaa_sample_count: Option<u32>,
-    instancing: bool,
     cull_mode: CullMode,
     transparency_buffer_layout: Option<VertexBufferLayout>,
 ) -> Result<RenderPipelineKey> {
@@ -121,13 +51,10 @@ pub async fn geometry_and_transparency_render_pipeline_key(
 
     let mut pipeline_cache_key = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
         .with_primitive(primitive_state.clone())
-        .with_push_vertex_buffer_layout(VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY.clone())
         .with_depth_stencil(depth_stencil.clone());
 
-    if instancing {
-        pipeline_cache_key = pipeline_cache_key.with_push_vertex_buffer_layout(
-            VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY_INSTANCING.clone(),
-        );
+    for layout in vertex_buffer_layouts {
+        pipeline_cache_key = pipeline_cache_key.with_push_vertex_buffer_layout(layout);
     }
 
     if let Some(buffer_layout) = transparency_buffer_layout {

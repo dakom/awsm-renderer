@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use awsm_renderer_core::compare::CompareFunction;
 use awsm_renderer_core::pipeline::depth_stencil::DepthStencilState;
 use awsm_renderer_core::pipeline::fragment::ColorTargetState;
@@ -19,10 +21,7 @@ use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKe
 use crate::pipelines::Pipelines;
 use crate::render_passes::geometry::shader::cache_key::ShaderCacheKeyGeometry;
 use crate::render_passes::material::opaque::bind_group::MaterialOpaqueBindGroups;
-use crate::render_passes::shared::geometry_and_transparency::vertex::{
-    geometry_and_transparency_render_pipeline_key, VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY,
-    VERTEX_BUFFER_LAYOUT_GEOMETRY_AND_TRANSPARENCY_INSTANCING,
-};
+use crate::render_passes::shared::geometry_and_transparency::vertex::geometry_and_transparency_render_pipeline_key;
 use crate::render_passes::{geometry::bind_group::GeometryBindGroups, RenderPassInitContext};
 use crate::render_textures::RenderTextureFormats;
 use crate::shaders::Shaders;
@@ -38,6 +37,70 @@ pub struct GeometryPipelines {
     msaa_4_anti_alias_back_cull_no_instancing_render_pipeline_key: RenderPipelineKey,
     msaa_4_anti_alias_back_cull_instancing_render_pipeline_key: RenderPipelineKey,
 }
+
+static VERTEX_BUFFER_LAYOUT: LazyLock<VertexBufferLayout> = LazyLock::new(|| {
+    VertexBufferLayout {
+        // this is the stride across all of the attributes
+        // position (12) + triangle_index (4) + barycentric (8) + normal (12) + tangent (16) = 52 bytes
+        array_stride: MeshBufferVertexInfo::VISIBILITY_GEOMETRY_BYTE_SIZE as u64,
+        step_mode: None,
+        attributes: vec![
+            // Position (vec3<f32>) at offset 0
+            VertexAttribute {
+                format: VertexFormat::Float32x3,
+                offset: 0,
+                shader_location: 0,
+            },
+            // Triangle ID (u32) at offset 12
+            VertexAttribute {
+                format: VertexFormat::Uint32,
+                offset: 12,
+                shader_location: 1,
+            },
+            // Barycentric coordinates (vec2<f32>) at offset 16
+            VertexAttribute {
+                format: VertexFormat::Float32x2,
+                offset: 16,
+                shader_location: 2,
+            },
+            // Normal (vec3<f32>) at offset 24
+            VertexAttribute {
+                format: VertexFormat::Float32x3,
+                offset: 24,
+                shader_location: 3,
+            },
+            // Tangent (vec4<f32>) at offset 36
+            VertexAttribute {
+                format: VertexFormat::Float32x4,
+                offset: 36,
+                shader_location: 4,
+            },
+        ],
+    }
+});
+
+static VERTEX_BUFFER_LAYOUT_INSTANCING: LazyLock<VertexBufferLayout> = LazyLock::new(|| {
+    let mut vertex_buffer_layout_instancing = VertexBufferLayout {
+        // this is the stride across all of the attributes
+        array_stride: MeshBufferVertexInfo::INSTANCING_BYTE_SIZE as u64,
+        step_mode: Some(VertexStepMode::Instance),
+        attributes: Vec::new(),
+    };
+
+    let start_location = VERTEX_BUFFER_LAYOUT.attributes.len() as u32;
+
+    for i in 0..4 {
+        vertex_buffer_layout_instancing
+            .attributes
+            .push(VertexAttribute {
+                format: VertexFormat::Float32x4,
+                offset: i * 16,
+                shader_location: start_location + i as u32,
+            });
+    }
+
+    vertex_buffer_layout_instancing
+});
 
 impl GeometryPipelines {
     pub async fn new(
@@ -62,6 +125,12 @@ impl GeometryPipelines {
             ColorTargetState::new(ctx.render_texture_formats.barycentric),
             ColorTargetState::new(ctx.render_texture_formats.normal_tangent),
             ColorTargetState::new(ctx.render_texture_formats.barycentric_derivatives),
+        ];
+
+        let vertex_buffer_layouts_no_instancing = vec![VERTEX_BUFFER_LAYOUT.clone()];
+        let vertex_buffer_layouts_instancing = vec![
+            VERTEX_BUFFER_LAYOUT.clone(),
+            VERTEX_BUFFER_LAYOUT_INSTANCING.clone(),
         ];
 
         let shader_key_no_anti_alias_no_instancing = ctx
@@ -115,10 +184,10 @@ impl GeometryPipelines {
                 ctx.render_texture_formats.depth,
                 pipeline_layout_key,
                 shader_key_no_anti_alias_no_instancing,
+                vertex_buffer_layouts_no_instancing.clone(),
                 color_targets,
                 true,
                 None,
-                false,
                 CullMode::None,
                 None,
             )
@@ -133,10 +202,10 @@ impl GeometryPipelines {
                 ctx.render_texture_formats.depth,
                 pipeline_layout_key,
                 shader_key_no_anti_alias_instancing,
+                vertex_buffer_layouts_instancing.clone(),
                 color_targets,
                 true,
                 None,
-                true,
                 CullMode::None,
                 None,
             )
@@ -151,10 +220,10 @@ impl GeometryPipelines {
                 ctx.render_texture_formats.depth,
                 pipeline_layout_key,
                 shader_key_no_anti_alias_no_instancing,
+                vertex_buffer_layouts_no_instancing.clone(),
                 color_targets,
                 true,
                 None,
-                false,
                 CullMode::Back,
                 None,
             )
@@ -169,10 +238,10 @@ impl GeometryPipelines {
                 ctx.render_texture_formats.depth,
                 pipeline_layout_key,
                 shader_key_no_anti_alias_instancing,
+                vertex_buffer_layouts_instancing.clone(),
                 color_targets,
                 true,
                 None,
-                true,
                 CullMode::Back,
                 None,
             )
@@ -187,10 +256,10 @@ impl GeometryPipelines {
                 ctx.render_texture_formats.depth,
                 pipeline_layout_key,
                 shader_key_msaa_4_anti_alias_no_instancing,
+                vertex_buffer_layouts_no_instancing.clone(),
                 color_targets,
                 true,
                 Some(4),
-                false,
                 CullMode::None,
                 None,
             )
@@ -205,10 +274,10 @@ impl GeometryPipelines {
                 ctx.render_texture_formats.depth,
                 pipeline_layout_key,
                 shader_key_msaa_4_anti_alias_instancing,
+                vertex_buffer_layouts_instancing.clone(),
                 color_targets,
                 true,
                 Some(4),
-                true,
                 CullMode::None,
                 None,
             )
@@ -223,10 +292,10 @@ impl GeometryPipelines {
                 ctx.render_texture_formats.depth,
                 pipeline_layout_key,
                 shader_key_msaa_4_anti_alias_no_instancing,
+                vertex_buffer_layouts_no_instancing.clone(),
                 color_targets,
                 true,
                 Some(4),
-                false,
                 CullMode::Back,
                 None,
             )
@@ -241,10 +310,10 @@ impl GeometryPipelines {
                 ctx.render_texture_formats.depth,
                 pipeline_layout_key,
                 shader_key_msaa_4_anti_alias_instancing,
+                vertex_buffer_layouts_instancing.clone(),
                 color_targets,
                 true,
                 Some(4),
-                true,
                 CullMode::Back,
                 None,
             )

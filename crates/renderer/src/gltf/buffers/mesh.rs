@@ -175,13 +175,13 @@ pub(super) fn convert_to_mesh_buffer(
         visibility_geometry_vertex: visability_vertex_offset.map(|offset| {
             MeshBufferVertexInfoWithOffset {
                 offset,
-                count: triangle_count * 3, // 3 vertices per triangle
+                count: triangle_count * 3, // 3 vertices per triangle (i.e. exploded)
             }
         }),
         transparency_geometry_vertex: transparency_vertex_offset.map(|offset| {
             MeshBufferVertexInfoWithOffset {
                 offset,
-                count: triangle_count * 3, // 3 vertices per triangle
+                count: vertex_count, // original vertex count
             }
         }),
         triangles: MeshBufferTriangleInfoWithOffset {

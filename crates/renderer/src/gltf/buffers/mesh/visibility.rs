@@ -15,6 +15,26 @@ use crate::{
     mesh::MeshBufferVertexAttributeInfo,
 };
 
+/// Creates EXPLODED visibility vertices for deferred/visibility buffer rendering.
+///
+/// This function performs "vertex explosion" - converting shared/indexed vertices into
+/// per-triangle-vertex data. This is necessary for deferred rendering because each vertex
+/// needs to carry per-triangle metadata (triangle_index and barycentric coordinates) that
+/// cannot be shared between triangles.
+///
+/// Example: A cube with 8 vertices and 12 triangles becomes 36 vertices (12 * 3).
+///
+/// Each output vertex contains:
+/// - Position (vec3<f32>): 12 bytes - copied from original GLTF vertex
+/// - Triangle Index (u32): 4 bytes - unique per triangle (why explosion is needed!)
+/// - Barycentric (vec2<f32>): 8 bytes - unique per corner (why explosion is needed!)
+/// - Normal (vec3<f32>): 12 bytes - copied from original GLTF vertex (preserves smooth/hard edges)
+/// - Tangent (vec4<f32>): 16 bytes - copied from original GLTF vertex
+/// - Total: 52 bytes per vertex
+///
+/// The explosion preserves GLTF's original normals:
+/// - Smooth edges: GLTF shared vertices with averaged normals → same normal copied to all 3 corners → smooth shading preserved
+/// - Hard edges: GLTF duplicated vertices with different normals → respective normals copied → hard edges preserved
 pub(super) fn create_visibility_vertices(
     attribute_data: &BTreeMap<MeshBufferVertexAttributeInfo, Cow<'_, [u8]>>,
     index: &MeshBufferAttributeIndexInfoWithOffset,
@@ -91,7 +111,8 @@ pub(super) fn create_visibility_vertices(
     // Extract all triangle indices at once
     let triangle_indices = extract_triangle_indices(index, index_bytes)?;
 
-    // Process each triangle
+    // VERTEX EXPLOSION: Process each triangle and create 3 separate vertices per triangle
+    // This is necessary because each vertex needs unique triangle_index and barycentric values
     for (triangle_index, triangle) in triangle_indices.iter().enumerate() {
         let vertex_indices = match front_face {
             FrontFace::Cw => [triangle[0], triangle[2], triangle[1]],
@@ -103,7 +124,8 @@ pub(super) fn create_visibility_vertices(
             _ => BARYCENTRICS,
         };
 
-        // Create 3 visibility vertices for this triangle
+        // Create 3 EXPLODED vertices for this triangle (one per corner)
+        // Each vertex gets unique triangle_index and barycentric, but copies position/normal/tangent from original
         for (bary, &vertex_index) in barycentrics.iter().zip(vertex_indices.iter()) {
             // Get position for this vertex
             let position = get_position_from_buffer(&positions, vertex_index)?;
