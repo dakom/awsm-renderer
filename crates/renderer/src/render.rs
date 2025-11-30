@@ -4,11 +4,12 @@ use awsm_renderer_core::command::render_pass::{
 };
 use awsm_renderer_core::command::{CommandEncoder, LoadOp, StoreOp};
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+use awsm_renderer_core::texture::blit::blit_tex_with_pipeline;
 use awsm_renderer_core::texture::TextureFormat;
 
 use crate::anti_alias::AntiAliasing;
 use crate::bind_groups::{BindGroupCreate, BindGroupRecreateContext, BindGroups};
-use crate::error::Result;
+use crate::error::{AwsmError, Result};
 use crate::instances::Instances;
 use crate::materials::Materials;
 use crate::mesh::skins::Skins;
@@ -125,12 +126,12 @@ impl AwsmRenderer {
 
         {
             let _maybe_span_guard = if self.logging.render_timings {
-                Some(tracing::span!(tracing::Level::INFO, "Clear opaque color").entered())
+                Some(tracing::span!(tracing::Level::INFO, "Clear opaque").entered())
             } else {
                 None
             };
 
-            self.render_textures.clear_opaque_color(&self.gpu)?;
+            self.render_textures.clear_opaque(&self.gpu)?;
         }
 
         {
@@ -143,6 +144,39 @@ impl AwsmRenderer {
             self.render_passes
                 .material_opaque
                 .render(&ctx, renderables.opaque)?;
+        }
+
+        {
+            let _maybe_span_guard = if self.logging.render_timings {
+                Some(
+                    tracing::span!(tracing::Level::INFO, "Blit Opaque before Transparent")
+                        .entered(),
+                )
+            } else {
+                None
+            };
+
+            blit_tex_with_pipeline(
+                &ctx.gpu,
+                match &ctx.anti_aliasing.msaa_sample_count {
+                    Some(sample_count) if *sample_count == 4 => {
+                        &self
+                            .render_textures
+                            .opaque_to_transparent_blit_pipeline_msaa_4
+                    }
+                    None => {
+                        &self
+                            .render_textures
+                            .opaque_to_transparent_blit_pipeline_no_anti_alias
+                    }
+                    Some(count) => {
+                        return Err(AwsmError::RenderUnregisteredMsaaCount(*count));
+                    }
+                },
+                &ctx.render_texture_views.opaque,
+                &ctx.render_texture_views.transparent,
+                &ctx.command_encoder,
+            )?;
         }
 
         {

@@ -2,7 +2,9 @@ use std::sync::LazyLock;
 
 use awsm_renderer_core::compare::CompareFunction;
 use awsm_renderer_core::pipeline::depth_stencil::DepthStencilState;
-use awsm_renderer_core::pipeline::fragment::ColorTargetState;
+use awsm_renderer_core::pipeline::fragment::{
+    BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState,
+};
 use awsm_renderer_core::pipeline::multisample::MultisampleState;
 use awsm_renderer_core::pipeline::primitive::{
     CullMode, FrontFace, PrimitiveState, PrimitiveTopology,
@@ -108,7 +110,17 @@ impl MaterialTransparentPipelines {
             )
             .await?;
 
-        let color_targets = &[ColorTargetState::new(render_texture_formats.oit_color)];
+        let color_targets = &[ColorTargetState::new(render_texture_formats.transparent)
+            .with_blend(BlendState::new(
+                BlendComponent::new()
+                    .with_src_factor(BlendFactor::SrcAlpha)
+                    .with_dst_factor(BlendFactor::OneMinusSrcAlpha)
+                    .with_operation(BlendOperation::Add),
+                BlendComponent::new()
+                    .with_src_factor(BlendFactor::One)
+                    .with_dst_factor(BlendFactor::OneMinusSrcAlpha)
+                    .with_operation(BlendOperation::Add),
+            ))];
 
         let render_pipeline_key = render_pipeline_key(
             gpu,
@@ -116,7 +128,7 @@ impl MaterialTransparentPipelines {
             pipelines,
             pipeline_layouts,
             render_texture_formats.depth,
-            if anti_aliasing.msaa_sample_count.unwrap_or_default() > 0 {
+            if anti_aliasing.msaa_sample_count.is_some() {
                 self.multisampled_pipeline_layout_key
             } else {
                 self.singlesampled_pipeline_layout_key

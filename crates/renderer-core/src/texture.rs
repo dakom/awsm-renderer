@@ -5,6 +5,7 @@ pub mod exporter;
 #[cfg(feature = "texture-pool")]
 pub mod texture_pool;
 
+pub mod blit;
 pub mod clear;
 pub mod convert_srgb;
 pub mod mipmap;

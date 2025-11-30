@@ -29,6 +29,48 @@ pub struct ColorTargetState {
 }
 
 impl ColorTargetState {
+    pub fn new(format: TextureFormat) -> Self {
+        Self {
+            blend: None,
+            format,
+            write_mask_all: true,
+            write_mask_alpha: false,
+            write_mask_red: false,
+            write_mask_green: false,
+            write_mask_blue: false,
+        }
+    }
+
+    pub fn with_blend(mut self, blend: BlendState) -> Self {
+        self.blend = Some(blend);
+        self
+    }
+
+    pub fn with_write_mask_all(mut self) -> Self {
+        self.write_mask_all = true;
+        self
+    }
+
+    pub fn with_write_mask_alpha(mut self) -> Self {
+        self.write_mask_alpha = true;
+        self
+    }
+
+    pub fn with_write_mask_red(mut self) -> Self {
+        self.write_mask_red = true;
+        self
+    }
+
+    pub fn with_write_mask_green(mut self) -> Self {
+        self.write_mask_green = true;
+        self
+    }
+
+    pub fn with_write_mask_blue(mut self) -> Self {
+        self.write_mask_blue = true;
+        self
+    }
+
     pub fn write_mask_u32(&self) -> u32 {
         let mut mask = 0;
         if self.write_mask_all {
@@ -169,20 +211,6 @@ impl From<FragmentState<'_>> for web_sys::GpuFragmentState {
         }
 
         state_js
-    }
-}
-
-impl ColorTargetState {
-    pub fn new(format: TextureFormat) -> Self {
-        Self {
-            blend: None,
-            format,
-            write_mask_all: true,
-            write_mask_alpha: false,
-            write_mask_red: false,
-            write_mask_green: false,
-            write_mask_blue: false,
-        }
     }
 }
 

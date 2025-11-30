@@ -6,6 +6,7 @@ use awsm_renderer_core::bind_groups::{
 };
 use awsm_renderer_core::texture::{TextureSampleType, TextureViewDimension};
 
+use crate::anti_alias::AntiAliasing;
 use crate::bind_group_layout::{
     BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey,
 };
@@ -23,8 +24,64 @@ pub struct CompositeBindGroups {
 
 impl CompositeBindGroups {
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
-        let multisampled_bind_group_layout_key = create_bind_group_layout_key(ctx, true).await?;
-        let singlesampled_bind_group_layout_key = create_bind_group_layout_key(ctx, false).await?;
+        let multisampled_bind_group_layout_cache_key = BindGroupLayoutCacheKey {
+            entries: vec![
+                BindGroupLayoutCacheKeyEntry {
+                    resource: BindGroupLayoutResource::Texture(
+                        TextureBindingLayout::new()
+                            .with_view_dimension(TextureViewDimension::N2d)
+                            .with_sample_type(TextureSampleType::UnfilterableFloat)
+                            .with_multisampled(true),
+                    ),
+                    visibility_vertex: false,
+                    visibility_fragment: false,
+                    visibility_compute: true,
+                },
+                BindGroupLayoutCacheKeyEntry {
+                    resource: BindGroupLayoutResource::StorageTexture(
+                        StorageTextureBindingLayout::new(ctx.render_texture_formats.composite)
+                            .with_view_dimension(TextureViewDimension::N2d)
+                            .with_access(StorageTextureAccess::WriteOnly),
+                    ),
+                    visibility_vertex: false,
+                    visibility_fragment: false,
+                    visibility_compute: true,
+                },
+            ],
+        };
+
+        let singlesampled_bind_group_layout_cache_key = BindGroupLayoutCacheKey {
+            entries: vec![
+                BindGroupLayoutCacheKeyEntry {
+                    resource: BindGroupLayoutResource::Texture(
+                        TextureBindingLayout::new()
+                            .with_view_dimension(TextureViewDimension::N2d)
+                            .with_sample_type(TextureSampleType::UnfilterableFloat),
+                    ),
+                    visibility_vertex: false,
+                    visibility_fragment: false,
+                    visibility_compute: true,
+                },
+                BindGroupLayoutCacheKeyEntry {
+                    resource: BindGroupLayoutResource::StorageTexture(
+                        StorageTextureBindingLayout::new(ctx.render_texture_formats.composite)
+                            .with_view_dimension(TextureViewDimension::N2d)
+                            .with_access(StorageTextureAccess::WriteOnly),
+                    ),
+                    visibility_vertex: false,
+                    visibility_fragment: false,
+                    visibility_compute: true,
+                },
+            ],
+        };
+
+        let multisampled_bind_group_layout_key = ctx
+            .bind_group_layouts
+            .get_key(&ctx.gpu, multisampled_bind_group_layout_cache_key)?;
+
+        let singlesampled_bind_group_layout_key = ctx
+            .bind_group_layouts
+            .get_key(&ctx.gpu, singlesampled_bind_group_layout_cache_key)?;
 
         Ok(Self {
             multisampled_bind_group_layout_key,
@@ -46,15 +103,11 @@ impl CompositeBindGroups {
             BindGroupEntry::new(
                 0,
                 BindGroupResource::TextureView(Cow::Borrowed(
-                    &ctx.render_texture_views.opaque_color,
+                    &ctx.render_texture_views.transparent,
                 )),
             ),
             BindGroupEntry::new(
                 1,
-                BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.oit_color)),
-            ),
-            BindGroupEntry::new(
-                2,
                 BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.composite)),
             ),
         ];
@@ -67,56 +120,11 @@ impl CompositeBindGroups {
                     self.singlesampled_bind_group_layout_key
                 })?,
             Some("Composite"),
-            entries,
+            entries.clone(),
         );
 
         self._bind_group = Some(ctx.gpu.create_bind_group(&descriptor.into()));
 
         Ok(())
     }
-}
-
-async fn create_bind_group_layout_key(
-    ctx: &mut RenderPassInitContext<'_>,
-    multisampled_geometry: bool,
-) -> Result<BindGroupLayoutKey> {
-    let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
-        entries: vec![
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new()
-                        .with_view_dimension(TextureViewDimension::N2d)
-                        .with_sample_type(TextureSampleType::UnfilterableFloat),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::Texture(
-                    TextureBindingLayout::new()
-                        .with_view_dimension(TextureViewDimension::N2d)
-                        .with_sample_type(TextureSampleType::UnfilterableFloat)
-                        .with_multisampled(multisampled_geometry),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-            BindGroupLayoutCacheKeyEntry {
-                resource: BindGroupLayoutResource::StorageTexture(
-                    StorageTextureBindingLayout::new(ctx.render_texture_formats.composite)
-                        .with_view_dimension(TextureViewDimension::N2d)
-                        .with_access(StorageTextureAccess::WriteOnly),
-                ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
-            },
-        ],
-    };
-
-    Ok(ctx
-        .bind_group_layouts
-        .get_key(&ctx.gpu, bind_group_layout_cache_key)?)
 }

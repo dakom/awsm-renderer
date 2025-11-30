@@ -1,6 +1,6 @@
 use crate::{
     error::Result,
-    pipeline_layouts::PipelineLayoutCacheKey,
+    pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey},
     pipelines::compute_pipeline::{ComputePipelineCacheKey, ComputePipelineKey},
     render_passes::{
         composite::{bind_group::CompositeBindGroups, shader::cache_key::ShaderCacheKeyComposite},
@@ -9,8 +9,10 @@ use crate::{
 };
 
 pub struct CompositePipelines {
-    pub multisampled_compute_pipeline_key: ComputePipelineKey,
     pub singlesampled_compute_pipeline_key: ComputePipelineKey,
+    pub multisampled_compute_pipeline_key: ComputePipelineKey,
+    _multisampled_pipeline_layout_key: PipelineLayoutKey,
+    _singlesampled_pipeline_layout_key: PipelineLayoutKey,
 }
 
 impl CompositePipelines {
@@ -31,6 +33,7 @@ impl CompositePipelines {
             &ctx.bind_group_layouts,
             multisampled_pipeline_layout_cache_key,
         )?;
+
         let singlesampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
             &ctx.gpu,
             &ctx.bind_group_layouts,
@@ -40,14 +43,15 @@ impl CompositePipelines {
         let multisampled_shader_cache_key = ShaderCacheKeyComposite {
             multisampled_geometry: true,
         };
+        let singlesampled_shader_cache_key = ShaderCacheKeyComposite {
+            multisampled_geometry: false,
+        };
+
         let multisampled_shader_key = ctx
             .shaders
             .get_key(&ctx.gpu, multisampled_shader_cache_key)
             .await?;
 
-        let singlesampled_shader_cache_key = ShaderCacheKeyComposite {
-            multisampled_geometry: false,
-        };
         let singlesampled_shader_key = ctx
             .shaders
             .get_key(&ctx.gpu, singlesampled_shader_cache_key)
@@ -84,6 +88,8 @@ impl CompositePipelines {
             .await?;
 
         Ok(Self {
+            _multisampled_pipeline_layout_key: multisampled_pipeline_layout_key,
+            _singlesampled_pipeline_layout_key: singlesampled_pipeline_layout_key,
             multisampled_compute_pipeline_key,
             singlesampled_compute_pipeline_key,
         })

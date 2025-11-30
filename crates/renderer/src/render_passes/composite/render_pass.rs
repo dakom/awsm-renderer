@@ -34,15 +34,14 @@ impl CompositeRenderPass {
         ));
 
         let bind_group = self.bind_groups.get_bind_group()?;
-        let compute_pipeline = if ctx.anti_aliasing.msaa_sample_count.is_some() {
+        let compute_pipeline =
             ctx.pipelines
                 .compute
-                .get(self.pipelines.multisampled_compute_pipeline_key)?
-        } else {
-            ctx.pipelines
-                .compute
-                .get(self.pipelines.singlesampled_compute_pipeline_key)?
-        };
+                .get(if ctx.anti_aliasing.msaa_sample_count.is_some() {
+                    self.pipelines.multisampled_compute_pipeline_key
+                } else {
+                    self.pipelines.singlesampled_compute_pipeline_key
+                })?;
 
         compute_pass.set_pipeline(&compute_pipeline);
         compute_pass.set_bind_group(0, &bind_group, None)?;

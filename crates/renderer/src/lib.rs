@@ -288,7 +288,7 @@ impl AwsmRendererBuilder {
         let render_passes = RenderPasses::new(&mut render_pass_init).await?;
 
         let bind_groups = BindGroups::new();
-        let render_textures = RenderTextures::new(render_texture_formats);
+        let render_textures = RenderTextures::new(&gpu, render_texture_formats).await?;
 
         #[cfg(feature = "gltf")]
         let gltf = gltf::cache::GltfCache::default();

@@ -49,8 +49,8 @@ impl MaterialTransparentRenderPass {
             &RenderPassDescriptor {
                 label: Some("Material Transparent Pass"),
                 color_attachments: vec![ColorAttachment::new(
-                    &ctx.render_texture_views.oit_color,
-                    LoadOp::Clear,
+                    &ctx.render_texture_views.transparent,
+                    LoadOp::Load,
                     StoreOp::Store,
                 )],
                 depth_stencil_attachment: Some(

@@ -1,7 +1,7 @@
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let coords = vec2<i32>(global_id.xy);
-    let dimensions = textureDimensions(opaque_tex);
+    let dimensions = textureDimensions(material_tex);
 
     // Bounds check
     if (coords.x >= i32(dimensions.x) || coords.y >= i32(dimensions.y)) {
@@ -9,14 +9,10 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
 
     // Read from input texture
-    let opaque = textureLoad(opaque_tex, coords, 0);
-    let oit_color = textureLoad(oit_color_tex, coords, 0);
+    let material_color = textureLoad(material_tex, coords, 0);
 
-    // Compose colors with alpha blending (OIT over opaque)
-    let final_rgb = oit_color.rgb * oit_color.a + opaque.rgb * (1.0 - oit_color.a);
-    let final_alpha = oit_color.a + opaque.a * (1.0 - oit_color.a);
-    let final_color = vec4<f32>(final_rgb, final_alpha);
+    // TODO - handle OIT
 
     // Write to output texture
-    textureStore(composite_tex, coords, final_color);
+    textureStore(composite_tex, coords, material_color);
 }

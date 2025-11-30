@@ -285,7 +285,7 @@ impl MaterialOpaqueBindGroups {
         // Opaque color render texture (storage texture for compute write)
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
-            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.opaque_color)),
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.opaque)),
         ));
 
         let descriptor = BindGroupDescriptor::new(
@@ -583,7 +583,7 @@ async fn create_main_bind_group_layout_key(
         // Opaque color render texture (storage texture for compute write)
         BindGroupLayoutCacheKeyEntry {
             resource: BindGroupLayoutResource::StorageTexture(
-                StorageTextureBindingLayout::new(ctx.render_texture_formats.opaque_color)
+                StorageTextureBindingLayout::new(ctx.render_texture_formats.opaque)
                     .with_view_dimension(TextureViewDimension::N2d)
                     .with_access(StorageTextureAccess::WriteOnly),
             ),

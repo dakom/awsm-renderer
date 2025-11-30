@@ -2,7 +2,7 @@ use askama::Template;
 
 use crate::{
     render_passes::composite::shader::cache_key::ShaderCacheKeyComposite,
-    shaders::{AwsmShaderError, Result},
+    shaders::{print_shader_source, AwsmShaderError, Result},
 };
 
 #[derive(Debug)]
@@ -27,15 +27,11 @@ impl ShaderTemplateCompositeBindGroups {
 
 #[derive(Template, Debug)]
 #[template(path = "composite_wgsl/compute.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateCompositeCompute {
-    pub multisampled_geometry: bool,
-}
+pub struct ShaderTemplateCompositeCompute {}
 
 impl ShaderTemplateCompositeCompute {
     pub fn new(cache_key: &ShaderCacheKeyComposite) -> Self {
-        Self {
-            multisampled_geometry: cache_key.multisampled_geometry,
-        }
+        Self {}
     }
 }
 
@@ -54,6 +50,13 @@ impl ShaderTemplateComposite {
     pub fn into_source(self) -> Result<String> {
         let bind_groups_source = self.bind_groups.render()?;
         let compute_source = self.compute.render()?;
+
+        //print_shader_source(&bind_groups_source, true);
+
+        // debug_unique_string(1, &compute_source, || {
+        //     print_shader_source(&vertex_source, false)
+        // });
+
         Ok(format!("{}\n{}", bind_groups_source, compute_source))
     }
 

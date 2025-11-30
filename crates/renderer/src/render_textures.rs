@@ -2,7 +2,12 @@ use awsm_renderer_core::{
     error::AwsmCoreError,
     pipeline::fragment::ColorTargetState,
     renderer::AwsmRendererWebGpu,
-    texture::{clear::TextureClearer, Extent3d, TextureDescriptor, TextureFormat, TextureUsage},
+    sampler::SamplerDescriptor,
+    texture::{
+        blit::{blit_get_pipeline, BlitPipeline},
+        clear::TextureClearer,
+        Extent3d, TextureDescriptor, TextureFormat, TextureUsage,
+    },
 };
 use thiserror::Error;
 
@@ -10,6 +15,8 @@ use crate::anti_alias::AntiAliasing;
 
 pub struct RenderTextures {
     pub formats: RenderTextureFormats,
+    pub opaque_to_transparent_blit_pipeline_msaa_4: BlitPipeline,
+    pub opaque_to_transparent_blit_pipeline_no_anti_alias: BlitPipeline,
     frame_count: u32,
     inner: Option<RenderTexturesInner>,
 }
@@ -23,17 +30,17 @@ pub struct RenderTextureFormats {
     pub barycentric_derivatives: TextureFormat,
 
     // Output from opaque shading pass
-    pub opaque_color: TextureFormat,
+    pub opaque: TextureFormat,
 
     // Output from transparent shading pass
-    pub oit_color: TextureFormat,
+    pub transparent: TextureFormat,
 
     // Output from composite pass
     pub composite: TextureFormat,
 
     // output from display pass is whatever current gpu texture format is
 
-    // For depth testing and OIT
+    // For depth testing and transparency
     pub depth: TextureFormat,
     // note - output from the composite pass will be whatever the gpu texture format is
 }
@@ -45,21 +52,33 @@ impl RenderTextureFormats {
             barycentric: TextureFormat::Rg16float,
             normal_tangent: TextureFormat::Rgba16float,
             barycentric_derivatives: TextureFormat::Rgba16float,
-            opaque_color: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
-            oit_color: TextureFormat::Rgba16float,    // HDR format for bloom/tonemapping
-            composite: TextureFormat::Rgba8unorm,     // Final composite output format
-            depth: TextureFormat::Depth24plus,        // Depth format for depth testing
+            opaque: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
+            transparent: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
+            composite: TextureFormat::Rgba16float, // Final composite output format
+            depth: TextureFormat::Depth24plus,  // Depth format for depth testing
         }
     }
 }
 
 impl RenderTextures {
-    pub fn new(formats: RenderTextureFormats) -> Self {
-        Self {
+    pub async fn new(gpu: &AwsmRendererWebGpu, formats: RenderTextureFormats) -> Result<Self> {
+        let opaque_to_transparent_blit_pipeline_no_anti_alias =
+            blit_get_pipeline(gpu, formats.transparent, None)
+                .await
+                .map_err(AwsmRenderTextureError::BlitPipeline)?;
+
+        let opaque_to_transparent_blit_pipeline_msaa_4 =
+            blit_get_pipeline(gpu, formats.transparent, Some(4))
+                .await
+                .map_err(AwsmRenderTextureError::BlitPipeline)?;
+
+        Ok(Self {
             formats,
             frame_count: 0,
             inner: None,
-        }
+            opaque_to_transparent_blit_pipeline_msaa_4,
+            opaque_to_transparent_blit_pipeline_no_anti_alias,
+        })
     }
 
     pub fn next_frame(&mut self) {
@@ -117,11 +136,11 @@ impl RenderTextures {
         ))
     }
 
-    pub fn clear_opaque_color(&self, gpu: &AwsmRendererWebGpu) -> Result<()> {
+    pub fn clear_opaque(&self, gpu: &AwsmRendererWebGpu) -> Result<()> {
         if let Some(inner) = self.inner.as_ref() {
             inner
-                .opaque_color_clearer
-                .clear(gpu, &inner.opaque_color)
+                .opaque_clearer
+                .clear(gpu, &inner.opaque)
                 .map_err(AwsmRenderTextureError::TextureClearerClear)
         } else {
             Ok(())
@@ -136,11 +155,11 @@ pub struct RenderTextureViews {
     pub normal_tangent: web_sys::GpuTextureView,
     pub barycentric_derivatives: web_sys::GpuTextureView,
 
-    // Output from opaque shading pass
-    pub opaque_color: web_sys::GpuTextureView,
+    // Output from opaque pass
+    pub opaque: web_sys::GpuTextureView,
 
-    // Output from transparent shading pass
-    pub oit_color: web_sys::GpuTextureView,
+    // Output from transparent pass
+    pub transparent: web_sys::GpuTextureView,
 
     // Output from composite pass
     pub composite: web_sys::GpuTextureView,
@@ -168,8 +187,8 @@ impl RenderTextureViews {
             barycentric: inner.barycentric_view.clone(),
             normal_tangent: inner.normal_tangent_view.clone(),
             barycentric_derivatives: inner.barycentric_derivatives_view.clone(),
-            opaque_color: inner.opaque_color_view.clone(),
-            oit_color: inner.oit_color_view.clone(),
+            opaque: inner.opaque_view.clone(),
+            transparent: inner.transparent_view.clone(),
             depth: inner.depth_view.clone(),
             composite: inner.composite_view.clone(),
             size_changed,
@@ -197,12 +216,12 @@ pub struct RenderTexturesInner {
     pub barycentric_derivatives: web_sys::GpuTexture,
     pub barycentric_derivatives_view: web_sys::GpuTextureView,
 
-    pub opaque_color: web_sys::GpuTexture,
-    pub opaque_color_clearer: TextureClearer,
-    pub opaque_color_view: web_sys::GpuTextureView,
+    pub opaque: web_sys::GpuTexture,
+    pub opaque_clearer: TextureClearer,
+    pub opaque_view: web_sys::GpuTextureView,
 
-    pub oit_color: web_sys::GpuTexture,
-    pub oit_color_view: web_sys::GpuTextureView,
+    pub transparent: web_sys::GpuTexture,
+    pub transparent_view: web_sys::GpuTextureView,
 
     pub depth: web_sys::GpuTexture,
     pub depth_view: web_sys::GpuTextureView,
@@ -296,24 +315,26 @@ impl RenderTexturesInner {
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let opaque_color = gpu
+        let opaque = gpu
             .create_texture(
                 &TextureDescriptor::new(
-                    render_texture_formats.opaque_color,
+                    render_texture_formats.opaque,
                     Extent3d::new(width, Some(height), Some(1)),
                     TextureUsage::new()
                         .with_storage_binding()
                         .with_texture_binding()
+                        .with_render_attachment()
                         .with_copy_dst(),
                 )
-                .with_label("Opaque Color")
+                .with_label("Opaque")
                 .into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        let oit_color = gpu
+        let transparent = gpu
             .create_texture(
-                &maybe_multisample_texture(render_texture_formats.oit_color, "OIT Color").into(),
+                &maybe_multisample_texture(render_texture_formats.transparent, "Transparent")
+                    .into(),
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
@@ -366,13 +387,13 @@ impl RenderTexturesInner {
             AwsmRenderTextureError::CreateTextureView(format!("barycentric: {e:?}"))
         })?;
 
-        let opaque_color_view = opaque_color.create_view().map_err(|e| {
-            AwsmRenderTextureError::CreateTextureView(format!("opaque_color: {e:?}"))
-        })?;
-
-        let oit_color_view = oit_color
+        let opaque_view = opaque
             .create_view()
-            .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("oit_color: {e:?}")))?;
+            .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("opaque: {e:?}")))?;
+
+        let transparent_view = transparent.create_view().map_err(|e| {
+            AwsmRenderTextureError::CreateTextureView(format!("transparent: {e:?}"))
+        })?;
 
         let depth_view = depth
             .create_view()
@@ -395,18 +416,13 @@ impl RenderTexturesInner {
             barycentric_derivatives,
             barycentric_derivatives_view,
 
-            opaque_color,
-            opaque_color_clearer: TextureClearer::new(
-                gpu,
-                render_texture_formats.opaque_color,
-                width,
-                height,
-            )
-            .map_err(AwsmRenderTextureError::CreateTextureClearer)?,
-            opaque_color_view,
+            opaque,
+            opaque_view,
+            opaque_clearer: TextureClearer::new(gpu, render_texture_formats.opaque, width, height)
+                .map_err(AwsmRenderTextureError::CreateTextureClearer)?,
 
-            oit_color,
-            oit_color_view,
+            transparent,
+            transparent_view,
 
             depth,
             depth_view,
@@ -429,8 +445,8 @@ impl RenderTexturesInner {
         // }
         self.normal_tangent.destroy();
         self.barycentric_derivatives.destroy();
-        self.opaque_color.destroy();
-        self.oit_color.destroy();
+        self.opaque.destroy();
+        self.transparent.destroy();
         self.depth.destroy();
         self.composite.destroy();
     }
@@ -456,4 +472,7 @@ pub enum AwsmRenderTextureError {
 
     #[error("[render_texture] Error clearing texture: {0:?}")]
     TextureClearerClear(AwsmCoreError),
+
+    #[error("[render_texture] Blit pipeline: {0:?}")]
+    BlitPipeline(AwsmCoreError),
 }

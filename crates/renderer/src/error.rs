@@ -70,6 +70,9 @@ pub enum AwsmError {
     #[error("{0}")]
     RenderTexture(#[from] AwsmRenderTextureError),
 
+    #[error("Unregistered Msaa count: {0}")]
+    RenderUnregisteredMsaaCount(u32),
+
     #[error("{0}")]
     Texture(#[from] AwsmTextureError),
 }
