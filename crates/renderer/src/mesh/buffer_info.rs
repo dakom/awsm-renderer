@@ -30,18 +30,12 @@ impl MeshBufferInfos {
 
 #[derive(Debug, Clone)]
 pub struct MeshBufferInfo {
-    pub geometry_kind: MeshBufferGeometryKind,
-    pub geometry_vertex: MeshBufferVertexInfo,
+    pub visibility_geometry_vertex: Option<MeshBufferVertexInfo>,
+    pub transparency_geometry_vertex: Option<MeshBufferVertexInfo>,
     pub triangles: MeshBufferTriangleInfo,
     pub geometry_morph: Option<MeshBufferGeometryMorphInfo>,
     pub material_morph: Option<MeshBufferMaterialMorphInfo>,
     pub skin: Option<MeshBufferSkinInfo>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MeshBufferGeometryKind {
-    Visibility,
-    Transparency,
 }
 
 #[derive(Debug, Clone)]

@@ -1,6 +1,8 @@
 - create non-exploded transparency geometry buffer
-  - avoid creating both transparency and visibility geometry buffers
-    - detect in buffer creation which materials it will use?
+  - gltf
+    - in buffers.rs: let geometry_kind = MeshBufferGeometryKind::Visibility;
+    - in mesh.rs: let transparency_vertex_offset = match geometry_kind {
+  - get rid of GeometryBufferKind enum? only needed for initial population, gltf thing?
 - vertex buffer data from non-geometry attributes (what we use for storage in opaque)
 
 

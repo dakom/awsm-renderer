@@ -135,15 +135,16 @@ impl Mesh {
             None,
         );
 
+        let vertex_count = match buffer_info.visibility_geometry_vertex {
+            Some(ref info) => info.count as u32,
+            None => return Err(AwsmMeshError::VisibilityGeometryBufferNotFound(mesh_key).into()),
+        };
         match ctx.instances.transform_instance_count(self.transform_key) {
             Some(instance_count) => {
-                render_pass.draw_indexed_with_instance_count(
-                    buffer_info.geometry_vertex.count as u32,
-                    instance_count as u32,
-                );
+                render_pass.draw_indexed_with_instance_count(vertex_count, instance_count as u32);
             }
             _ => {
-                render_pass.draw_indexed(buffer_info.geometry_vertex.count as u32);
+                render_pass.draw_indexed(vertex_count);
             }
         }
 
@@ -208,15 +209,16 @@ impl Mesh {
             None,
         );
 
+        let vertex_count = match buffer_info.transparency_geometry_vertex {
+            Some(ref info) => info.count as u32,
+            None => return Err(AwsmMeshError::VisibilityGeometryBufferNotFound(mesh_key).into()),
+        };
         match ctx.instances.transform_instance_count(self.transform_key) {
             Some(instance_count) => {
-                render_pass.draw_indexed_with_instance_count(
-                    buffer_info.geometry_vertex.count as u32,
-                    instance_count as u32,
-                );
+                render_pass.draw_indexed_with_instance_count(vertex_count, instance_count as u32);
             }
             _ => {
-                render_pass.draw_indexed(buffer_info.geometry_vertex.count as u32);
+                render_pass.draw_indexed(vertex_count);
             }
         }
 

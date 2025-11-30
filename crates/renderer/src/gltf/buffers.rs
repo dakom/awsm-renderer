@@ -17,10 +17,10 @@ use std::collections::HashMap;
 use crate::{
     gltf::buffers::{
         index::{generate_fresh_indices_from_primitive, GltfMeshBufferIndexInfo},
-        mesh::convert_to_mesh_buffer,
+        mesh::{convert_to_mesh_buffer, mesh_buffer_geometry_kind, GltfMeshBufferGeometryKind},
     },
     mesh::{
-        MeshBufferAttributeIndexInfo, MeshBufferCustomVertexAttributeInfo, MeshBufferGeometryKind,
+        MeshBufferAttributeIndexInfo, MeshBufferCustomVertexAttributeInfo,
         MeshBufferGeometryMorphInfo, MeshBufferInfo, MeshBufferMaterialMorphAttributes,
         MeshBufferMaterialMorphInfo, MeshBufferSkinInfo, MeshBufferTriangleDataInfo,
         MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
@@ -152,8 +152,8 @@ fn determine_front_face(
 
 #[derive(Clone, Debug)]
 pub struct MeshBufferInfoWithOffset {
-    pub geometry_kind: MeshBufferGeometryKind,
-    pub geometry_vertex: MeshBufferVertexInfoWithOffset,
+    pub visibility_geometry_vertex: Option<MeshBufferVertexInfoWithOffset>,
+    pub transparency_geometry_vertex: Option<MeshBufferVertexInfoWithOffset>,
     pub triangles: MeshBufferTriangleInfoWithOffset,
     pub geometry_morph: Option<MeshBufferGeometryMorphInfoWithOffset>,
     pub material_morph: Option<MeshBufferMaterialMorphInfoWithOffset>,
@@ -163,8 +163,8 @@ pub struct MeshBufferInfoWithOffset {
 impl From<MeshBufferInfoWithOffset> for MeshBufferInfo {
     fn from(info: MeshBufferInfoWithOffset) -> Self {
         MeshBufferInfo {
-            geometry_kind: info.geometry_kind,
-            geometry_vertex: info.geometry_vertex.into(),
+            visibility_geometry_vertex: info.visibility_geometry_vertex.map(|x| x.into()),
+            transparency_geometry_vertex: info.transparency_geometry_vertex.map(|x| x.into()),
             triangles: info.triangles.into(),
             geometry_morph: info.geometry_morph.map(|m| m.into()),
             material_morph: info.material_morph.map(|m| m.into()),
@@ -345,9 +345,13 @@ impl GltfBuffers {
                         }
                     };
 
+                // TODO - determine this
+                let geometry_kind = mesh_buffer_geometry_kind(&primitive);
+
                 // Step 2: Convert to mesh buffer format
                 let mesh_buffer_info = convert_to_mesh_buffer(
                     &primitive,
+                    geometry_kind,
                     front_face,
                     &buffers,
                     &index,

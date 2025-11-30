@@ -17,7 +17,7 @@ use crate::camera::AwsmCameraError;
 use crate::error::Result;
 use crate::materials::pbr::PbrMaterial;
 use crate::materials::MaterialBufferKind;
-use crate::mesh::meta::material_opaque_meta::MATERIAL_MESH_META_BYTE_ALIGNMENT;
+use crate::mesh::meta::material_meta::MATERIAL_MESH_META_BYTE_ALIGNMENT;
 use crate::render_passes::shared::opaque_and_transparency::bind_group::TexturePoolDeps;
 use crate::textures::SamplerKey;
 use crate::{bind_group_layout::BindGroupLayoutKey, render_passes::RenderPassInitContext};

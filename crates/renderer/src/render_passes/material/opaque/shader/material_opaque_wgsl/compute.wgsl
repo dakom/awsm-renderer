@@ -192,7 +192,7 @@ fn main(
                         let vertex_attribute_stride_{{s}} = mesh_meta_{{s}}.vertex_attribute_stride / 4;
                         let attribute_indices_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
                         let attribute_data_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
-                        let visibility_data_offset_{{s}} = mesh_meta_{{s}}.visibility_data_offset / 4;
+                        let visibility_geometry_data_offset_{{s}} = mesh_meta_{{s}}.visibility_geometry_data_offset / 4;
                         let uv_sets_index_{{s}} = mesh_meta_{{s}}.uv_sets_index;
 
                         let base_tri_idx_{{s}} = attribute_indices_offset_{{s}} + (tri_{{s}} * 3u);
@@ -208,7 +208,7 @@ fn main(
                         let packed_nt_{{s}} = textureLoad(normal_tangent_tex, coords, {{s}});
                         let tbn_{{s}} = unpack_normal_tangent(packed_nt_{{s}});
                         let normal_{{s}} = tbn_{{s}}.N;
-                        let os_verts_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_{{s}});
+                        let os_verts_{{s}} = get_object_space_vertices(visibility_geometry_data_offset_{{s}}, tri_{{s}});
                         let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
 
                         {% match mipmap %}
@@ -314,7 +314,7 @@ fn main(
     let vertex_attribute_stride = mesh_meta.vertex_attribute_stride / 4; // 4 bytes per float
     let attribute_indices_offset = mesh_meta.vertex_attribute_indices_offset / 4;
     let attribute_data_offset = mesh_meta.vertex_attribute_data_offset / 4;
-    let visibility_data_offset = mesh_meta.visibility_data_offset / 4;
+    let visibility_geometry_data_offset = mesh_meta.visibility_geometry_data_offset / 4;
     let uv_sets_index = mesh_meta.uv_sets_index;
 
     let base_triangle_index = attribute_indices_offset + (triangle_index * 3u);
@@ -333,7 +333,7 @@ fn main(
     let tbn = unpack_normal_tangent(packed_nt);
     let world_normal = tbn.N;
 
-    let os_vertices = get_object_space_vertices(visibility_data_offset, triangle_index);
+    let os_vertices = get_object_space_vertices(visibility_geometry_data_offset, triangle_index);
 
     let lights_info = get_lights_info();
 
@@ -447,7 +447,7 @@ fn main(
                         let vertex_attribute_stride_{{s}} = mesh_meta_{{s}}.vertex_attribute_stride / 4;
                     let attribute_indices_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
                     let attribute_data_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
-                    let visibility_data_offset_{{s}} = mesh_meta_{{s}}.visibility_data_offset / 4;
+                    let visibility_geometry_data_offset_{{s}} = mesh_meta_{{s}}.visibility_geometry_data_offset / 4;
                     let uv_sets_index_{{s}} = mesh_meta_{{s}}.uv_sets_index;
 
                     // Per-sample triangle indices
@@ -465,7 +465,7 @@ fn main(
                     let packed_nt_{{s}} = textureLoad(normal_tangent_tex, coords, {{s}});
                     let tbn_{{s}} = unpack_normal_tangent(packed_nt_{{s}});
                     let normal_{{s}} = tbn_{{s}}.N;
-                    let os_vertices_{{s}} = get_object_space_vertices(visibility_data_offset_{{s}}, tri_id_{{s}});
+                    let os_vertices_{{s}} = get_object_space_vertices(visibility_geometry_data_offset_{{s}}, tri_id_{{s}});
                     let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
 
                     // Calculate proper gradients for this MSAA sample to enable mipmapping

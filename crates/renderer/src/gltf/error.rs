@@ -8,7 +8,7 @@ use crate::{
     bind_groups::AwsmBindGroupError,
     error::AwsmError,
     materials::AwsmMaterialError,
-    mesh::{skins::AwsmSkinError, AwsmMeshError},
+    mesh::{skins::AwsmSkinError, AwsmMeshError, MeshBufferInfoKey},
     pipeline_layouts::AwsmPipelineLayoutError,
     pipelines::render_pipeline::AwsmRenderPipelineError,
     shaders::AwsmShaderError,
@@ -189,6 +189,12 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] Couldn't get material opaque compute pipeline key: {0:?}")]
     MaterialOpaqueComputePipelineKey(AwsmError),
+
+    #[error("[gltf] Visibility geometry requested but not supplied: {0:?}")]
+    VisibilityGeometryNotSupplied(MeshBufferInfoKey),
+
+    #[error("[gltf] Transparent geometry requested but not supplied: {0:?}")]
+    TransparencyGeometryNotSupplied(MeshBufferInfoKey),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

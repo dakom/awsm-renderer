@@ -1,5 +1,5 @@
 pub mod geometry_meta;
-pub mod material_opaque_meta;
+pub mod material_meta;
 
 use std::sync::LazyLock;
 
@@ -21,7 +21,7 @@ use crate::{
                 GeometryMeshMeta, GEOMETRY_BUFFER_USAGE, GEOMETRY_MESH_META_BYTE_ALIGNMENT,
                 GEOMETRY_MESH_META_BYTE_SIZE,
             },
-            material_opaque_meta::{
+            material_meta::{
                 MaterialMeshMeta, MATERIAL_BUFFER_USAGE, MATERIAL_MESH_META_BYTE_ALIGNMENT,
                 MATERIAL_MESH_META_BYTE_SIZE,
             },
@@ -87,7 +87,8 @@ impl MeshMeta {
         key: MeshKey,
         mesh: &Mesh,
         buffer_info: &MeshBufferInfo,
-        geometry_data_offset: usize,
+        visibility_geometry_data_offset: Option<usize>,
+        transparency_geometry_data_offset: Option<usize>,
         custom_attribute_indices_offset: usize,
         custom_attribute_data_offset: usize,
         materials: &Materials,
@@ -110,7 +111,8 @@ impl MeshMeta {
             buffer_info,
             custom_attribute_indices_offset,
             custom_attribute_data_offset,
-            geometry_data_offset,
+            visibility_geometry_data_offset,
+            transparency_geometry_data_offset,
             transform_offset,
             normal_matrix_offset,
             materials,

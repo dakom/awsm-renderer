@@ -27,6 +27,9 @@ pub enum AwsmMeshError {
     #[error("[mesh] transparency geometry buffer not found: {0:?}")]
     TransparencyGeometryBufferNotFound(MeshKey),
 
+    #[error("[mesh] transparency geometry buffer info not found: {0:?}")]
+    VisibilityGeometryBufferInfoNotFound(MeshBufferInfoKey),
+
     #[error("[mesh] custom attribute buffer not found: {0:?}")]
     CustomAttributeBufferNotFound(MeshKey),
 

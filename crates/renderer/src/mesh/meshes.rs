@@ -12,7 +12,7 @@ use crate::buffer::dynamic_uniform::DynamicUniformBuffer;
 use crate::materials::Materials;
 use crate::mesh::meta::{MeshMeta, MESH_META_INITIAL_CAPACITY};
 use crate::mesh::skins::Skins;
-use crate::mesh::{MeshBufferGeometryKind, MeshBufferInfo, MeshBufferInfos};
+use crate::mesh::{MeshBufferInfo, MeshBufferInfos};
 use crate::transforms::{TransformKey, Transforms};
 use crate::AwsmRendererLogging;
 
@@ -157,7 +157,8 @@ impl Meshes {
         mesh: Mesh,
         materials: &Materials,
         transforms: &Transforms,
-        geometry_data: &[u8], // visibility index will be auto-generated
+        visibility_geometry_data: Option<&[u8]>, // visibility index will be auto-generated
+        transparency_geometry_data: Option<&[u8]>, // visibility index will be auto-generated
         attribute_data: &[u8],
         attribute_index: &[u8],
     ) -> Result<MeshKey> {
@@ -178,31 +179,44 @@ impl Meshes {
             .push(key);
 
         // geometry
-        let geometry_data_offset = match buffer_info.geometry_kind {
-            MeshBufferGeometryKind::Visibility => {
-                // visibility geometry - index (auto-generated)
-                let mut geometry_index = Vec::new();
-                for i in 0..buffer_info.geometry_vertex.count {
-                    geometry_index.extend_from_slice(&(i as u32).to_le_bytes());
-                }
-                self.visibility_geometry_index_buffers
-                    .update(key, &geometry_index);
-                self.visibility_geometry_index_dirty = true;
 
-                // visibility geometry - data
-                let geometry_data_offset = self
+        let visibility_geometry_data_offset = match visibility_geometry_data {
+            Some(geometry_data) => {
+                // visibility geometry - index (auto-generated)
+                if let Some(vertex_info) = &buffer_info.visibility_geometry_vertex {
+                    let mut geometry_index = Vec::new();
+                    for i in 0..vertex_info.count {
+                        geometry_index.extend_from_slice(&(i as u32).to_le_bytes());
+                    }
+                    self.visibility_geometry_index_buffers
+                        .update(key, &geometry_index);
+                } else {
+                    return Err(AwsmMeshError::VisibilityGeometryBufferInfoNotFound(
+                        buffer_info_key,
+                    ));
+                }
+
+                self.visibility_geometry_index_dirty = true;
+                let offset = self
                     .visibility_geometry_data_buffers
                     .update(key, geometry_data);
                 self.visibility_geometry_data_dirty = true;
-                geometry_data_offset
+
+                Some(offset)
             }
-            MeshBufferGeometryKind::Transparency => {
-                let geometry_data_offset = self
+            None => None,
+        };
+
+        let transparency_geometry_data_offset = match transparency_geometry_data {
+            Some(geometry_data) => {
+                let offset = self
                     .transparency_geometry_data_buffers
                     .update(key, geometry_data);
                 self.transparency_geometry_data_dirty = true;
-                geometry_data_offset
+
+                Some(offset)
             }
+            None => None,
         };
 
         // attributes - index
@@ -240,7 +254,8 @@ impl Meshes {
             key,
             &mesh,
             buffer_info,
-            geometry_data_offset,
+            visibility_geometry_data_offset,
+            transparency_geometry_data_offset,
             custom_attribute_indices_offset,
             custom_attribute_data_offset,
             materials,
@@ -443,7 +458,10 @@ impl Meshes {
                 self.custom_attribute_index_dirty,
                 &mut self.custom_attribute_index_buffers,
                 &mut self.custom_attribute_index_gpu_buffer,
-                BufferUsage::new().with_copy_dst().with_storage(),
+                BufferUsage::new()
+                    .with_copy_dst()
+                    .with_storage()
+                    .with_index(),
                 "MeshCustomAttributeIndex",
                 Some(BindGroupCreate::MeshAttributeIndexResize),
             ),

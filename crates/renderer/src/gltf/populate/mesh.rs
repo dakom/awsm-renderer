@@ -7,7 +7,7 @@ use crate::{
         populate::material::GltfMaterialInfo,
     },
     materials::Material,
-    mesh::{skins::SkinKey, Mesh, MeshBufferGeometryKind, MeshBufferInfo, MeshBufferVertexInfo},
+    mesh::{skins::SkinKey, Mesh, MeshBufferInfo, MeshBufferVertexInfo},
     pipeline_layouts::PipelineLayoutCacheKey,
     pipelines::render_pipeline::RenderPipelineCacheKey,
     transforms::{Transform, TransformKey},
@@ -186,24 +186,33 @@ impl AwsmRenderer {
         }
 
         let _mesh_key = {
-            let geometry_data_start = primitive_buffer_info.geometry_vertex.offset;
+            let visibility_geometry_data =
+                match primitive_buffer_info.visibility_geometry_vertex.clone() {
+                    Some(info) => {
+                        let geometry_data_start = info.offset;
+                        let geometry_data_end = geometry_data_start
+                            + MeshBufferVertexInfo::from(info).visibility_geometry_size();
+                        Some(
+                            &ctx.data.buffers.visibility_geometry_vertex_bytes
+                                [geometry_data_start..geometry_data_end],
+                        )
+                    }
+                    None => None,
+                };
 
-            let geometry_data = match primitive_buffer_info.geometry_kind {
-                MeshBufferGeometryKind::Visibility => {
-                    let geometry_data_end = geometry_data_start
-                        + MeshBufferVertexInfo::from(primitive_buffer_info.geometry_vertex.clone())
-                            .visibility_geometry_size();
-                    &ctx.data.buffers.visibility_geometry_vertex_bytes
-                        [geometry_data_start..geometry_data_end]
-                }
-                MeshBufferGeometryKind::Transparency => {
-                    let geometry_data_end = geometry_data_start
-                        + MeshBufferVertexInfo::from(primitive_buffer_info.geometry_vertex.clone())
-                            .transparency_geometry_size();
-                    &ctx.data.buffers.transparency_geometry_vertex_bytes
-                        [geometry_data_start..geometry_data_end]
-                }
-            };
+            let transparency_geometry_data =
+                match primitive_buffer_info.transparency_geometry_vertex.clone() {
+                    Some(info) => {
+                        let geometry_data_start = info.offset;
+                        let geometry_data_end = geometry_data_start
+                            + MeshBufferVertexInfo::from(info).transparency_geometry_size();
+                        Some(
+                            &ctx.data.buffers.transparency_geometry_vertex_bytes
+                                [geometry_data_start..geometry_data_end],
+                        )
+                    }
+                    None => None,
+                };
 
             let custom_attribute_data_start =
                 primitive_buffer_info.triangles.vertex_attributes_offset;
@@ -228,7 +237,8 @@ impl AwsmRenderer {
                 mesh,
                 &self.materials,
                 &self.transforms,
-                geometry_data,
+                visibility_geometry_data,
+                transparency_geometry_data,
                 custom_attribute_data,
                 attribute_index,
             )?
