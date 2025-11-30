@@ -41,3 +41,7 @@
 /*************** START lights.wgsl ******************/
 {% include "opaque_and_transparency_wgsl/pbr/lighting/lights.wgsl" %}
 /*************** END lights.wgsl ******************/
+
+/*************** START texture_uvs.wgsl ******************/
+{% include "material_transparent_wgsl/helpers/texture_uvs.wgsl" %}
+/*************** END texture_uvs.wgsl ******************/

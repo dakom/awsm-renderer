@@ -18,8 +18,30 @@ pub struct TexturePoolDeps {
     pub sampler_keys: IndexSet<SamplerKey>,
 }
 
+pub enum TexturePoolVisibility {
+    Render,
+    Compute,
+}
+
+impl TexturePoolVisibility {
+    pub fn vertex(&self) -> bool {
+        matches!(self, TexturePoolVisibility::Render)
+    }
+
+    pub fn fragment(&self) -> bool {
+        matches!(self, TexturePoolVisibility::Render)
+    }
+
+    pub fn compute(&self) -> bool {
+        matches!(self, TexturePoolVisibility::Compute)
+    }
+}
+
 impl TexturePoolDeps {
-    pub fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
+    pub fn new(
+        ctx: &mut RenderPassInitContext<'_>,
+        visibility: TexturePoolVisibility,
+    ) -> Result<Self> {
         // textures
         let device_limits = ctx.gpu.device.limits();
         let texture_arrays_len = ctx.textures.pool.arrays_len();
@@ -41,9 +63,9 @@ impl TexturePoolDeps {
                         .with_view_dimension(TextureViewDimension::N2dArray)
                         .with_sample_type(TextureSampleType::Float),
                 ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
+                visibility_vertex: visibility.vertex(),
+                visibility_fragment: visibility.fragment(),
+                visibility_compute: visibility.compute(),
             });
 
             let layer_count = ctx
@@ -79,9 +101,9 @@ impl TexturePoolDeps {
                 resource: BindGroupLayoutResource::Sampler(
                     SamplerBindingLayout::new().with_binding_type(SamplerBindingType::Filtering),
                 ),
-                visibility_vertex: false,
-                visibility_fragment: false,
-                visibility_compute: true,
+                visibility_vertex: visibility.vertex(),
+                visibility_fragment: visibility.fragment(),
+                visibility_compute: visibility.compute(),
             });
         }
 

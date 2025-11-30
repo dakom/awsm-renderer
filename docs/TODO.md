@@ -1,10 +1,8 @@
-- create non-exploded transparency geometry buffer
-  - gltf
-    - in buffers.rs: let geometry_kind = MeshBufferGeometryKind::Visibility;
-    - in mesh.rs: let transparency_vertex_offset = match geometry_kind {
-  - get rid of GeometryBufferKind enum? only needed for initial population, gltf thing?
 - vertex buffer data from non-geometry attributes (what we use for storage in opaque)
 
+- strip out MeshBufferCustomVertexAttributeInfo::Joints and MeshBufferCustomVertexAttributeInfo::Weights 
+  - these only need to be in the storage buffer, we extract them in gltf/buffers/skin.rs and 
+  - also confirm that morphs are not in attributes
 
 # Transparent material pass
 - like opaque

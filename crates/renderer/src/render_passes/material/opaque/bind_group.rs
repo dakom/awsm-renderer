@@ -18,7 +18,9 @@ use crate::error::Result;
 use crate::materials::pbr::PbrMaterial;
 use crate::materials::MaterialBufferKind;
 use crate::mesh::meta::material_meta::MATERIAL_MESH_META_BYTE_ALIGNMENT;
-use crate::render_passes::shared::opaque_and_transparency::bind_group::TexturePoolDeps;
+use crate::render_passes::shared::opaque_and_transparency::bind_group::{
+    TexturePoolDeps, TexturePoolVisibility,
+};
 use crate::textures::SamplerKey;
 use crate::{bind_group_layout::BindGroupLayoutKey, render_passes::RenderPassInitContext};
 
@@ -80,7 +82,7 @@ impl MaterialOpaqueBindGroups {
             bind_group_layout_key: texture_pool_textures_bind_group_layout_key,
             arrays_len: texture_pool_arrays_len,
             sampler_keys: texture_pool_sampler_keys,
-        } = TexturePoolDeps::new(ctx)?;
+        } = TexturePoolDeps::new(ctx, TexturePoolVisibility::Compute)?;
 
         Ok(Self {
             singlesampled_main_bind_group_layout_key,
@@ -103,7 +105,7 @@ impl MaterialOpaqueBindGroups {
             bind_group_layout_key: texture_pool_textures_bind_group_layout_key,
             arrays_len: texture_pool_arrays_len,
             sampler_keys: texture_pool_sampler_keys,
-        } = TexturePoolDeps::new(ctx)?;
+        } = TexturePoolDeps::new(ctx, TexturePoolVisibility::Compute)?;
 
         let mut _self = Self {
             multisampled_main_bind_group_layout_key: self.multisampled_main_bind_group_layout_key,
