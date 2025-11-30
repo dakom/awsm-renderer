@@ -1,4 +1,13 @@
+use awsm_renderer_core::compare::CompareFunction;
+use awsm_renderer_core::pipeline::depth_stencil::DepthStencilState;
+use awsm_renderer_core::pipeline::fragment::ColorTargetState;
+use awsm_renderer_core::pipeline::multisample::MultisampleState;
+use awsm_renderer_core::pipeline::primitive::{
+    CullMode, FrontFace, PrimitiveState, PrimitiveTopology,
+};
+use awsm_renderer_core::pipeline::vertex::VertexBufferLayout;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+use awsm_renderer_core::texture::TextureFormat;
 use slotmap::SecondaryMap;
 
 use crate::anti_alias::AntiAliasing;
@@ -8,13 +17,14 @@ use crate::materials::MaterialKey;
 use crate::mesh::{Mesh, MeshBufferInfo, MeshBufferInfoKey, MeshBufferInfos, MeshKey};
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::compute_pipeline::{ComputePipelineCacheKey, ComputePipelineKey};
+use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
 use crate::pipelines::Pipelines;
 use crate::render_passes::material::cache_key::ShaderCacheKeyMaterial;
 use crate::render_passes::material::opaque::shader::cache_key::ShaderCacheKeyMaterialOpaque;
 use crate::render_passes::{
     material::opaque::bind_group::MaterialOpaqueBindGroups, RenderPassInitContext,
 };
-use crate::shaders::Shaders;
+use crate::shaders::{ShaderKey, Shaders};
 use crate::textures::{AwsmTextureError, Textures};
 
 pub struct MaterialOpaquePipelines {

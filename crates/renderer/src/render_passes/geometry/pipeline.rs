@@ -11,6 +11,7 @@ use awsm_renderer_core::pipeline::vertex::{
     VertexAttribute, VertexBufferLayout, VertexFormat, VertexStepMode,
 };
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+use awsm_renderer_core::texture::TextureFormat;
 use slotmap::{new_key_type, SlotMap};
 
 use crate::anti_alias::AntiAliasing;
@@ -21,10 +22,9 @@ use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKe
 use crate::pipelines::Pipelines;
 use crate::render_passes::geometry::shader::cache_key::ShaderCacheKeyGeometry;
 use crate::render_passes::material::opaque::bind_group::MaterialOpaqueBindGroups;
-use crate::render_passes::shared::geometry_and_transparency::vertex::geometry_and_transparency_render_pipeline_key;
 use crate::render_passes::{geometry::bind_group::GeometryBindGroups, RenderPassInitContext};
 use crate::render_textures::RenderTextureFormats;
-use crate::shaders::Shaders;
+use crate::shaders::{ShaderKey, Shaders};
 
 pub struct GeometryPipelines {
     pub pipeline_layout_key: PipelineLayoutKey,
@@ -175,149 +175,125 @@ impl GeometryPipelines {
             )
             .await?;
 
-        let no_anti_alias_no_cull_no_instancing_render_pipeline_key =
-            geometry_and_transparency_render_pipeline_key(
-                &ctx.gpu,
-                &mut ctx.shaders,
-                &mut ctx.pipelines,
-                &ctx.pipeline_layouts,
-                ctx.render_texture_formats.depth,
-                pipeline_layout_key,
-                shader_key_no_anti_alias_no_instancing,
-                vertex_buffer_layouts_no_instancing.clone(),
-                color_targets,
-                true,
-                None,
-                CullMode::None,
-                None,
-            )
-            .await?;
+        let no_anti_alias_no_cull_no_instancing_render_pipeline_key = render_pipeline_key(
+            &ctx.gpu,
+            &mut ctx.shaders,
+            &mut ctx.pipelines,
+            &ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_no_anti_alias_no_instancing,
+            vertex_buffer_layouts_no_instancing.clone(),
+            color_targets,
+            None,
+            CullMode::None,
+        )
+        .await?;
 
-        let no_anti_alias_no_cull_instancing_render_pipeline_key =
-            geometry_and_transparency_render_pipeline_key(
-                &ctx.gpu,
-                &mut ctx.shaders,
-                &mut ctx.pipelines,
-                &ctx.pipeline_layouts,
-                ctx.render_texture_formats.depth,
-                pipeline_layout_key,
-                shader_key_no_anti_alias_instancing,
-                vertex_buffer_layouts_instancing.clone(),
-                color_targets,
-                true,
-                None,
-                CullMode::None,
-                None,
-            )
-            .await?;
+        let no_anti_alias_no_cull_instancing_render_pipeline_key = render_pipeline_key(
+            &ctx.gpu,
+            &mut ctx.shaders,
+            &mut ctx.pipelines,
+            &ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_no_anti_alias_instancing,
+            vertex_buffer_layouts_instancing.clone(),
+            color_targets,
+            None,
+            CullMode::None,
+        )
+        .await?;
 
-        let no_anti_alias_back_cull_no_instancing_render_pipeline_key =
-            geometry_and_transparency_render_pipeline_key(
-                &ctx.gpu,
-                &mut ctx.shaders,
-                &mut ctx.pipelines,
-                &ctx.pipeline_layouts,
-                ctx.render_texture_formats.depth,
-                pipeline_layout_key,
-                shader_key_no_anti_alias_no_instancing,
-                vertex_buffer_layouts_no_instancing.clone(),
-                color_targets,
-                true,
-                None,
-                CullMode::Back,
-                None,
-            )
-            .await?;
+        let no_anti_alias_back_cull_no_instancing_render_pipeline_key = render_pipeline_key(
+            &ctx.gpu,
+            &mut ctx.shaders,
+            &mut ctx.pipelines,
+            &ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_no_anti_alias_no_instancing,
+            vertex_buffer_layouts_no_instancing.clone(),
+            color_targets,
+            None,
+            CullMode::Back,
+        )
+        .await?;
 
-        let no_anti_alias_back_cull_instancing_render_pipeline_key =
-            geometry_and_transparency_render_pipeline_key(
-                &ctx.gpu,
-                &mut ctx.shaders,
-                &mut ctx.pipelines,
-                &ctx.pipeline_layouts,
-                ctx.render_texture_formats.depth,
-                pipeline_layout_key,
-                shader_key_no_anti_alias_instancing,
-                vertex_buffer_layouts_instancing.clone(),
-                color_targets,
-                true,
-                None,
-                CullMode::Back,
-                None,
-            )
-            .await?;
+        let no_anti_alias_back_cull_instancing_render_pipeline_key = render_pipeline_key(
+            &ctx.gpu,
+            &mut ctx.shaders,
+            &mut ctx.pipelines,
+            &ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_no_anti_alias_instancing,
+            vertex_buffer_layouts_instancing.clone(),
+            color_targets,
+            None,
+            CullMode::Back,
+        )
+        .await?;
 
-        let msaa_4_anti_alias_no_cull_no_instancing_render_pipeline_key =
-            geometry_and_transparency_render_pipeline_key(
-                &ctx.gpu,
-                &mut ctx.shaders,
-                &mut ctx.pipelines,
-                &ctx.pipeline_layouts,
-                ctx.render_texture_formats.depth,
-                pipeline_layout_key,
-                shader_key_msaa_4_anti_alias_no_instancing,
-                vertex_buffer_layouts_no_instancing.clone(),
-                color_targets,
-                true,
-                Some(4),
-                CullMode::None,
-                None,
-            )
-            .await?;
+        let msaa_4_anti_alias_no_cull_no_instancing_render_pipeline_key = render_pipeline_key(
+            &ctx.gpu,
+            &mut ctx.shaders,
+            &mut ctx.pipelines,
+            &ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_msaa_4_anti_alias_no_instancing,
+            vertex_buffer_layouts_no_instancing.clone(),
+            color_targets,
+            Some(4),
+            CullMode::None,
+        )
+        .await?;
 
-        let msaa_4_anti_alias_no_cull_instancing_render_pipeline_key =
-            geometry_and_transparency_render_pipeline_key(
-                &ctx.gpu,
-                &mut ctx.shaders,
-                &mut ctx.pipelines,
-                &ctx.pipeline_layouts,
-                ctx.render_texture_formats.depth,
-                pipeline_layout_key,
-                shader_key_msaa_4_anti_alias_instancing,
-                vertex_buffer_layouts_instancing.clone(),
-                color_targets,
-                true,
-                Some(4),
-                CullMode::None,
-                None,
-            )
-            .await?;
+        let msaa_4_anti_alias_no_cull_instancing_render_pipeline_key = render_pipeline_key(
+            &ctx.gpu,
+            &mut ctx.shaders,
+            &mut ctx.pipelines,
+            &ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_msaa_4_anti_alias_instancing,
+            vertex_buffer_layouts_instancing.clone(),
+            color_targets,
+            Some(4),
+            CullMode::None,
+        )
+        .await?;
 
-        let msaa_4_anti_alias_back_cull_no_instancing_render_pipeline_key =
-            geometry_and_transparency_render_pipeline_key(
-                &ctx.gpu,
-                &mut ctx.shaders,
-                &mut ctx.pipelines,
-                &ctx.pipeline_layouts,
-                ctx.render_texture_formats.depth,
-                pipeline_layout_key,
-                shader_key_msaa_4_anti_alias_no_instancing,
-                vertex_buffer_layouts_no_instancing.clone(),
-                color_targets,
-                true,
-                Some(4),
-                CullMode::Back,
-                None,
-            )
-            .await?;
+        let msaa_4_anti_alias_back_cull_no_instancing_render_pipeline_key = render_pipeline_key(
+            &ctx.gpu,
+            &mut ctx.shaders,
+            &mut ctx.pipelines,
+            &ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_msaa_4_anti_alias_no_instancing,
+            vertex_buffer_layouts_no_instancing.clone(),
+            color_targets,
+            Some(4),
+            CullMode::Back,
+        )
+        .await?;
 
-        let msaa_4_anti_alias_back_cull_instancing_render_pipeline_key =
-            geometry_and_transparency_render_pipeline_key(
-                &ctx.gpu,
-                &mut ctx.shaders,
-                &mut ctx.pipelines,
-                &ctx.pipeline_layouts,
-                ctx.render_texture_formats.depth,
-                pipeline_layout_key,
-                shader_key_msaa_4_anti_alias_instancing,
-                vertex_buffer_layouts_instancing.clone(),
-                color_targets,
-                true,
-                Some(4),
-                CullMode::Back,
-                None,
-            )
-            .await?;
+        let msaa_4_anti_alias_back_cull_instancing_render_pipeline_key = render_pipeline_key(
+            &ctx.gpu,
+            &mut ctx.shaders,
+            &mut ctx.pipelines,
+            &ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_msaa_4_anti_alias_instancing,
+            vertex_buffer_layouts_instancing.clone(),
+            color_targets,
+            Some(4),
+            CullMode::Back,
+        )
+        .await?;
 
         Ok(Self {
             pipeline_layout_key,
@@ -357,4 +333,49 @@ impl GeometryPipelines {
             (true, true, true) => self.msaa_4_anti_alias_no_cull_instancing_render_pipeline_key,
         }
     }
+}
+
+async fn render_pipeline_key(
+    gpu: &AwsmRendererWebGpu,
+    shaders: &mut Shaders,
+    pipelines: &mut Pipelines,
+    pipeline_layouts: &PipelineLayouts,
+    depth_texture_format: TextureFormat,
+    pipeline_layout_key: PipelineLayoutKey,
+    shader_key: ShaderKey,
+    vertex_buffer_layouts: Vec<VertexBufferLayout>,
+    color_targets: &[ColorTargetState],
+    msaa_sample_count: Option<u32>,
+    cull_mode: CullMode,
+) -> Result<RenderPipelineKey> {
+    let primitive_state = PrimitiveState::new()
+        .with_topology(PrimitiveTopology::TriangleList)
+        .with_front_face(FrontFace::Ccw)
+        .with_cull_mode(cull_mode);
+
+    let depth_stencil = DepthStencilState::new(depth_texture_format)
+        .with_depth_write_enabled(true)
+        .with_depth_compare(CompareFunction::LessEqual);
+
+    let mut pipeline_cache_key = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
+        .with_primitive(primitive_state.clone())
+        .with_depth_stencil(depth_stencil.clone());
+
+    for layout in vertex_buffer_layouts {
+        pipeline_cache_key = pipeline_cache_key.with_push_vertex_buffer_layout(layout);
+    }
+
+    if let Some(sample_count) = msaa_sample_count {
+        pipeline_cache_key =
+            pipeline_cache_key.with_multisample(MultisampleState::new().with_count(sample_count));
+    }
+
+    for target in color_targets {
+        pipeline_cache_key = pipeline_cache_key.with_push_fragment_targets(vec![target.clone()]);
+    }
+
+    Ok(pipelines
+        .render
+        .get_key(&gpu, &shaders, &pipeline_layouts, pipeline_cache_key)
+        .await?)
 }

@@ -1,31 +1,36 @@
 use std::sync::LazyLock;
 
+use awsm_renderer_core::compare::CompareFunction;
+use awsm_renderer_core::pipeline::depth_stencil::DepthStencilState;
 use awsm_renderer_core::pipeline::fragment::ColorTargetState;
-use awsm_renderer_core::pipeline::primitive::CullMode;
+use awsm_renderer_core::pipeline::multisample::MultisampleState;
+use awsm_renderer_core::pipeline::primitive::{
+    CullMode, FrontFace, PrimitiveState, PrimitiveTopology,
+};
 use awsm_renderer_core::pipeline::vertex::{
     VertexAttribute, VertexBufferLayout, VertexFormat, VertexStepMode,
 };
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+use awsm_renderer_core::texture::TextureFormat;
 use slotmap::SecondaryMap;
 
 use crate::anti_alias::AntiAliasing;
 use crate::error::Result;
 use crate::materials::{MaterialKey, Materials};
 use crate::mesh::{
-    Mesh, MeshBufferInfoKey, MeshBufferInfos, MeshBufferVertexInfo, MeshKey, Meshes,
+    Mesh, MeshBufferInfo, MeshBufferInfoKey, MeshBufferInfos, MeshBufferVertexAttributeInfo,
+    MeshBufferVertexInfo, MeshKey, Meshes,
 };
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
-use crate::pipelines::render_pipeline::RenderPipelineKey;
+use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
 use crate::pipelines::Pipelines;
 use crate::render_passes::material::cache_key::ShaderCacheKeyMaterial;
 use crate::render_passes::material::transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent;
-use crate::render_passes::material::transparent::shader::vertex::vertex_buffer_layout;
-use crate::render_passes::shared::geometry_and_transparency::vertex::geometry_and_transparency_render_pipeline_key;
 use crate::render_passes::{
     material::transparent::bind_group::MaterialTransparentBindGroups, RenderPassInitContext,
 };
 use crate::render_textures::RenderTextureFormats;
-use crate::shaders::Shaders;
+use crate::shaders::{ShaderKey, Shaders};
 use crate::textures::Textures;
 
 pub struct MaterialTransparentPipelines {
@@ -33,58 +38,6 @@ pub struct MaterialTransparentPipelines {
     singlesampled_pipeline_layout_key: PipelineLayoutKey,
     render_pipeline_keys: SecondaryMap<MeshKey, RenderPipelineKey>,
 }
-
-static VERTEX_BUFFER_LAYOUT: LazyLock<VertexBufferLayout> = LazyLock::new(|| {
-    VertexBufferLayout {
-        // this is the stride across all of the attributes
-        // position (12) + normal (12) + tangent (16) = 40 bytes
-        array_stride: MeshBufferVertexInfo::TRANSPARENCY_GEOMETRY_BYTE_SIZE as u64,
-        step_mode: None,
-        attributes: vec![
-            // Position (vec3<f32>)
-            VertexAttribute {
-                format: VertexFormat::Float32x3,
-                offset: 0,
-                shader_location: 0,
-            },
-            // Normal (vec3<f32>)
-            VertexAttribute {
-                format: VertexFormat::Float32x3,
-                offset: 12,
-                shader_location: 1,
-            },
-            // Tangent (vec4<f32>)
-            VertexAttribute {
-                format: VertexFormat::Float32x4,
-                offset: 24,
-                shader_location: 2,
-            },
-        ],
-    }
-});
-
-static VERTEX_BUFFER_LAYOUT_INSTANCING: LazyLock<VertexBufferLayout> = LazyLock::new(|| {
-    let mut vertex_buffer_layout_instancing = VertexBufferLayout {
-        // this is the stride across all of the attributes
-        array_stride: MeshBufferVertexInfo::INSTANCING_BYTE_SIZE as u64,
-        step_mode: Some(VertexStepMode::Instance),
-        attributes: Vec::new(),
-    };
-
-    let start_location = VERTEX_BUFFER_LAYOUT.attributes.len() as u32;
-
-    for i in 0..4 {
-        vertex_buffer_layout_instancing
-            .attributes
-            .push(VertexAttribute {
-                format: VertexFormat::Float32x4,
-                offset: i * 16,
-                shader_location: start_location + i as u32,
-            });
-    }
-
-    vertex_buffer_layout_instancing
-});
 
 impl MaterialTransparentPipelines {
     pub async fn new(
@@ -157,7 +110,7 @@ impl MaterialTransparentPipelines {
 
         let color_targets = &[ColorTargetState::new(render_texture_formats.oit_color)];
 
-        let render_pipeline_key = geometry_and_transparency_render_pipeline_key(
+        let render_pipeline_key = render_pipeline_key(
             gpu,
             shaders,
             pipelines,
@@ -169,23 +122,14 @@ impl MaterialTransparentPipelines {
                 self.singlesampled_pipeline_layout_key
             },
             shader_key,
-            if mesh.instanced {
-                vec![
-                    VERTEX_BUFFER_LAYOUT.clone(),
-                    VERTEX_BUFFER_LAYOUT_INSTANCING.clone(),
-                ]
-            } else {
-                vec![VERTEX_BUFFER_LAYOUT.clone()]
-            },
+            vertex_buffer_layouts(&mesh, &mesh_buffer_info),
             color_targets,
-            false,
             anti_aliasing.msaa_sample_count,
             if mesh.double_sided {
                 CullMode::None
             } else {
                 CullMode::Back
             },
-            Some(vertex_buffer_layout(&mesh, &mesh_buffer_info)),
         )
         .await?;
 
@@ -198,4 +142,144 @@ impl MaterialTransparentPipelines {
     pub fn get_render_pipeline_key(&self, mesh_key: MeshKey) -> Option<RenderPipelineKey> {
         self.render_pipeline_keys.get(mesh_key).cloned()
     }
+}
+
+async fn render_pipeline_key(
+    gpu: &AwsmRendererWebGpu,
+    shaders: &mut Shaders,
+    pipelines: &mut Pipelines,
+    pipeline_layouts: &PipelineLayouts,
+    depth_texture_format: TextureFormat,
+    pipeline_layout_key: PipelineLayoutKey,
+    shader_key: ShaderKey,
+    vertex_buffer_layouts: Vec<VertexBufferLayout>,
+    color_targets: &[ColorTargetState],
+    msaa_sample_count: Option<u32>,
+    cull_mode: CullMode,
+) -> Result<RenderPipelineKey> {
+    let primitive_state = PrimitiveState::new()
+        .with_topology(PrimitiveTopology::TriangleList)
+        .with_front_face(FrontFace::Ccw)
+        .with_cull_mode(cull_mode);
+
+    let depth_stencil = DepthStencilState::new(depth_texture_format)
+        .with_depth_write_enabled(false)
+        .with_depth_compare(CompareFunction::LessEqual);
+
+    let mut pipeline_cache_key = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
+        .with_primitive(primitive_state.clone())
+        .with_depth_stencil(depth_stencil.clone());
+
+    for layout in vertex_buffer_layouts {
+        pipeline_cache_key = pipeline_cache_key.with_push_vertex_buffer_layout(layout);
+    }
+
+    if let Some(sample_count) = msaa_sample_count {
+        pipeline_cache_key =
+            pipeline_cache_key.with_multisample(MultisampleState::new().with_count(sample_count));
+    }
+
+    for target in color_targets {
+        pipeline_cache_key = pipeline_cache_key.with_push_fragment_targets(vec![target.clone()]);
+    }
+
+    Ok(pipelines
+        .render
+        .get_key(&gpu, &shaders, &pipeline_layouts, pipeline_cache_key)
+        .await?)
+}
+
+fn vertex_buffer_layouts(mesh: &Mesh, buffer_info: &MeshBufferInfo) -> Vec<VertexBufferLayout> {
+    let mut out = vec![VertexBufferLayout {
+        // this is the stride across all of the attributes
+        // position (12) + normal (12) + tangent (16) = 40 bytes
+        array_stride: MeshBufferVertexInfo::TRANSPARENCY_GEOMETRY_BYTE_SIZE as u64,
+        step_mode: None,
+        attributes: vec![
+            // Position (vec3<f32>)
+            VertexAttribute {
+                format: VertexFormat::Float32x3,
+                offset: 0,
+                shader_location: 0,
+            },
+            // Normal (vec3<f32>)
+            VertexAttribute {
+                format: VertexFormat::Float32x3,
+                offset: 12,
+                shader_location: 1,
+            },
+            // Tangent (vec4<f32>)
+            VertexAttribute {
+                format: VertexFormat::Float32x4,
+                offset: 24,
+                shader_location: 2,
+            },
+        ],
+    }];
+
+    if mesh.instanced {
+        let mut vertex_buffer_layout_instancing = VertexBufferLayout {
+            // this is the stride across all of the attributes
+            array_stride: MeshBufferVertexInfo::INSTANCING_BYTE_SIZE as u64,
+            step_mode: Some(VertexStepMode::Instance),
+            attributes: Vec::new(),
+        };
+
+        let start_location = out[0].attributes.len() as u32;
+
+        for i in 0..4 {
+            vertex_buffer_layout_instancing
+                .attributes
+                .push(VertexAttribute {
+                    format: VertexFormat::Float32x4,
+                    offset: i * 16,
+                    shader_location: start_location + i as u32,
+                });
+        }
+
+        out.push(vertex_buffer_layout_instancing);
+    }
+
+    let mut attributes = vec![];
+
+    let mut offset = 0;
+
+    let mut shader_location = out
+        .last()
+        .unwrap()
+        .attributes
+        .last()
+        .unwrap()
+        .shader_location as u32
+        + 1;
+
+    for attribute_info in buffer_info
+        .triangles
+        .vertex_attributes
+        .iter()
+        .filter(|x| x.is_custom_attribute())
+    {
+        let custom_attribute_info = match attribute_info {
+            MeshBufferVertexAttributeInfo::Custom(info) => info,
+            _ => unreachable!("Expected custom attribute info"),
+        };
+
+        attributes.push(VertexAttribute {
+            format: custom_attribute_info.vertex_format(),
+            offset,
+            shader_location,
+        });
+
+        shader_location += 1;
+
+        offset += attribute_info.vertex_size() as u64;
+    }
+
+    out.push(VertexBufferLayout {
+        array_stride: offset,
+        step_mode: None,
+        attributes,
+    });
+
+    out
 }
