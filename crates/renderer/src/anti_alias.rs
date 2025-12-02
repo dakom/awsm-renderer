@@ -13,7 +13,7 @@ impl Default for AntiAliasing {
         Self {
             msaa_sample_count: Some(4),
             //msaa_sample_count: None,
-            smaa: true,
+            smaa: false,
             mipmap: true,
         }
     }
