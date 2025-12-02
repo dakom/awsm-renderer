@@ -16,7 +16,7 @@ use crate::{
     lights::Lights,
     materials::{pbr::PbrMaterial, Materials},
     mesh::meta::geometry_meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT,
-    render_passes::{composite::bind_group, RenderPassInitContext},
+    render_passes::RenderPassInitContext,
     transforms::Transforms,
 };
 use crate::{error::Result, materials::MaterialBufferKind};

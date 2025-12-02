@@ -1,4 +1,3 @@
-pub mod composite;
 pub mod display;
 pub mod geometry;
 pub mod light_culling;
@@ -18,8 +17,7 @@ use crate::{
     pipeline_layouts::PipelineLayouts,
     pipelines::Pipelines,
     render_passes::{
-        composite::render_pass::CompositeRenderPass, display::render_pass::DisplayRenderPass,
-        geometry::render_pass::GeometryRenderPass,
+        display::render_pass::DisplayRenderPass, geometry::render_pass::GeometryRenderPass,
         light_culling::render_pass::LightCullingRenderPass,
         material_opaque::render_pass::MaterialOpaqueRenderPass,
         material_transparent::render_pass::MaterialTransparentRenderPass,
@@ -34,7 +32,6 @@ pub struct RenderPasses {
     pub light_culling: LightCullingRenderPass,
     pub material_opaque: MaterialOpaqueRenderPass,
     pub material_transparent: MaterialTransparentRenderPass,
-    pub composite: CompositeRenderPass,
     pub display: DisplayRenderPass,
 }
 
@@ -45,7 +42,6 @@ impl RenderPasses {
             light_culling: LightCullingRenderPass::new(ctx).await?,
             material_opaque: MaterialOpaqueRenderPass::new(ctx).await?,
             material_transparent: MaterialTransparentRenderPass::new(ctx).await?,
-            composite: CompositeRenderPass::new(ctx).await?,
             display: DisplayRenderPass::new(ctx).await?,
         })
     }

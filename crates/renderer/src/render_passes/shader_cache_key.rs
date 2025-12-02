@@ -1,5 +1,4 @@
 use crate::render_passes::{
-    composite::shader::cache_key::ShaderCacheKeyComposite,
     display::shader::cache_key::ShaderCacheKeyDisplay,
     geometry::shader::cache_key::ShaderCacheKeyGeometry,
     light_culling::shader::cache_key::ShaderCacheKeyLightCulling,
@@ -13,6 +12,5 @@ pub enum ShaderCacheKeyRenderPass {
     LightCulling(ShaderCacheKeyLightCulling),
     MaterialOpaque(ShaderCacheKeyMaterialOpaque),
     MaterialTransparent(ShaderCacheKeyMaterialTransparent),
-    Composite(ShaderCacheKeyComposite),
     Display(ShaderCacheKeyDisplay),
 }

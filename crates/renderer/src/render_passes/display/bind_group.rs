@@ -6,7 +6,7 @@ use crate::{
     },
     bind_groups::{AwsmBindGroupError, BindGroupRecreateContext},
     error::Result,
-    render_passes::{composite, RenderPassInitContext},
+    render_passes::RenderPassInitContext,
     textures::{SamplerCacheKey, SamplerKey},
 };
 use awsm_renderer_core::{

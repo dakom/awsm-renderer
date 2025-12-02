@@ -26,7 +26,6 @@ use crate::{
     },
     render::{self, RenderContext},
     render_passes::{
-        composite::bind_group,
         display::{
             bind_group::DisplayBindGroups, pipeline::DisplayPipelines,
             shader::cache_key::ShaderCacheKeyDisplay,

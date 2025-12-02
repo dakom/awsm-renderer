@@ -45,14 +45,21 @@ impl MaterialTransparentRenderPass {
     }
 
     pub fn render(&self, ctx: &RenderContext, renderables: Vec<Renderable>) -> Result<()> {
+        let mut color_attachment = ColorAttachment::new(
+            &ctx.render_texture_views.transparent,
+            LoadOp::Load,
+            StoreOp::Store,
+        );
+
+        if ctx.anti_aliasing.msaa_sample_count.is_some() {
+            color_attachment =
+                color_attachment.with_resolve_target(&ctx.render_texture_views.composite);
+        }
+
         let render_pass = ctx.command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 label: Some("Material Transparent Pass"),
-                color_attachments: vec![ColorAttachment::new(
-                    &ctx.render_texture_views.transparent,
-                    LoadOp::Load,
-                    StoreOp::Store,
-                )],
+                color_attachments: vec![color_attachment],
                 depth_stencil_attachment: Some(
                     DepthStencilAttachment::new(&ctx.render_texture_views.depth)
                         .with_depth_load_op(LoadOp::Load)

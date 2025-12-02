@@ -1,6 +1,5 @@
 use crate::{
     render_passes::{
-        composite::shader::template::ShaderTemplateComposite,
         display::shader::template::ShaderTemplateDisplay,
         geometry::shader::template::ShaderTemplateGeometry,
         light_culling::shader::template::ShaderTemplateLightCulling,
@@ -21,7 +20,6 @@ pub enum ShaderTemplateRenderPass {
     LightCulling(ShaderTemplateLightCulling),
     MaterialOpaque(ShaderTemplateMaterialOpaque),
     MaterialTransparent(ShaderTemplateMaterialTransparent),
-    Composite(ShaderTemplateComposite),
     Display(ShaderTemplateDisplay),
 }
 
@@ -42,9 +40,6 @@ impl TryFrom<&ShaderCacheKeyRenderPass> for ShaderTemplateRenderPass {
             ShaderCacheKeyRenderPass::MaterialTransparent(cache_key) => Ok(
                 ShaderTemplateRenderPass::MaterialTransparent(cache_key.try_into()?),
             ),
-            ShaderCacheKeyRenderPass::Composite(cache_key) => {
-                Ok(ShaderTemplateRenderPass::Composite(cache_key.try_into()?))
-            }
             ShaderCacheKeyRenderPass::Display(cache_key) => {
                 Ok(ShaderTemplateRenderPass::Display(cache_key.try_into()?))
             }
@@ -59,7 +54,6 @@ impl ShaderTemplateRenderPass {
             ShaderTemplateRenderPass::LightCulling(tmpl) => tmpl.into_source(),
             ShaderTemplateRenderPass::MaterialOpaque(tmpl) => tmpl.into_source(),
             ShaderTemplateRenderPass::MaterialTransparent(tmpl) => tmpl.into_source(),
-            ShaderTemplateRenderPass::Composite(tmpl) => tmpl.into_source(),
             ShaderTemplateRenderPass::Display(tmpl) => tmpl.into_source(),
         }
     }
@@ -71,7 +65,6 @@ impl ShaderTemplateRenderPass {
             ShaderTemplateRenderPass::LightCulling(tmpl) => tmpl.debug_label(),
             ShaderTemplateRenderPass::MaterialOpaque(tmpl) => tmpl.debug_label(),
             ShaderTemplateRenderPass::MaterialTransparent(tmpl) => tmpl.debug_label(),
-            ShaderTemplateRenderPass::Composite(tmpl) => tmpl.debug_label(),
             ShaderTemplateRenderPass::Display(tmpl) => tmpl.debug_label(),
         }
     }

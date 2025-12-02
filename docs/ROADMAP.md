@@ -25,9 +25,6 @@
   - use FooPacked (or FooRaw) and members should be vec4
   - e.g. MeshMeta, Lights, etc. (some may already be done)
 
-- get rid of 256 byte alignment for mesh meta?
-  - maybe only necessary for uniforms?
-
 - make it easier to configure initial sizes for dynamic buffers
   - derive from scanning gltf?
 

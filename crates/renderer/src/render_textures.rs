@@ -17,6 +17,7 @@ pub struct RenderTextures {
     pub formats: RenderTextureFormats,
     pub opaque_to_transparent_blit_pipeline_msaa_4: BlitPipeline,
     pub opaque_to_transparent_blit_pipeline_no_anti_alias: BlitPipeline,
+    pub transparent_to_composite_blit_pipeline_no_anti_alias: BlitPipeline,
     frame_count: u32,
     inner: Option<RenderTexturesInner>,
 }
@@ -29,14 +30,8 @@ pub struct RenderTextureFormats {
     pub normal_tangent: TextureFormat, // Packed: octahedral normal + tangent angle + handedness
     pub barycentric_derivatives: TextureFormat,
 
-    // Output from opaque shading pass
-    pub opaque: TextureFormat,
-
-    // Output from transparent shading pass
-    pub transparent: TextureFormat,
-
-    // Output from composite pass
-    pub composite: TextureFormat,
+    // Output from coloring passes (opaque + transparent)
+    pub color: TextureFormat,
 
     // output from display pass is whatever current gpu texture format is
 
@@ -52,10 +47,8 @@ impl RenderTextureFormats {
             barycentric: TextureFormat::Rg16float,
             normal_tangent: TextureFormat::Rgba16float,
             barycentric_derivatives: TextureFormat::Rgba16float,
-            opaque: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
-            transparent: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
-            composite: TextureFormat::Rgba16float, // Final composite output format
-            depth: TextureFormat::Depth24plus,  // Depth format for depth testing
+            color: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
+            depth: TextureFormat::Depth24plus, // Depth format for depth testing
         }
     }
 }
@@ -63,12 +56,17 @@ impl RenderTextureFormats {
 impl RenderTextures {
     pub async fn new(gpu: &AwsmRendererWebGpu, formats: RenderTextureFormats) -> Result<Self> {
         let opaque_to_transparent_blit_pipeline_no_anti_alias =
-            blit_get_pipeline(gpu, formats.transparent, None)
+            blit_get_pipeline(gpu, formats.color, None)
                 .await
                 .map_err(AwsmRenderTextureError::BlitPipeline)?;
 
         let opaque_to_transparent_blit_pipeline_msaa_4 =
-            blit_get_pipeline(gpu, formats.transparent, Some(4))
+            blit_get_pipeline(gpu, formats.color, Some(4))
+                .await
+                .map_err(AwsmRenderTextureError::BlitPipeline)?;
+
+        let transparent_to_composite_blit_pipeline_no_anti_alias =
+            blit_get_pipeline(gpu, formats.color, None)
                 .await
                 .map_err(AwsmRenderTextureError::BlitPipeline)?;
 
@@ -78,6 +76,7 @@ impl RenderTextures {
             inner: None,
             opaque_to_transparent_blit_pipeline_msaa_4,
             opaque_to_transparent_blit_pipeline_no_anti_alias,
+            transparent_to_composite_blit_pipeline_no_anti_alias,
         })
     }
 
@@ -122,6 +121,7 @@ impl RenderTextures {
                 self.formats.clone(),
                 &self.opaque_to_transparent_blit_pipeline_msaa_4,
                 &self.opaque_to_transparent_blit_pipeline_no_anti_alias,
+                &self.transparent_to_composite_blit_pipeline_no_anti_alias,
                 current_size.0,
                 current_size.1,
                 anti_aliasing,
@@ -167,6 +167,7 @@ pub struct RenderTextureViews {
 
     // Output from composite pass
     pub composite: web_sys::GpuTextureView,
+    pub transparent_to_composite_blit_bind_group_no_anti_alias: Option<web_sys::GpuBindGroup>,
 
     pub depth: web_sys::GpuTextureView,
     pub size_changed: bool,
@@ -197,6 +198,9 @@ impl RenderTextureViews {
                 .clone(),
             opaque_to_transparent_blit_bind_group_no_anti_alias: inner
                 .opaque_to_transparent_blit_bind_group_no_anti_alias
+                .clone(),
+            transparent_to_composite_blit_bind_group_no_anti_alias: inner
+                .transparent_to_composite_blit_bind_group_no_anti_alias
                 .clone(),
             transparent: inner.transparent_view.clone(),
             depth: inner.depth_view.clone(),
@@ -240,6 +244,7 @@ pub struct RenderTexturesInner {
 
     pub composite: web_sys::GpuTexture,
     pub composite_view: web_sys::GpuTextureView,
+    pub transparent_to_composite_blit_bind_group_no_anti_alias: Option<web_sys::GpuBindGroup>,
 
     pub width: u32,
     pub height: u32,
@@ -253,6 +258,7 @@ impl RenderTexturesInner {
         render_texture_formats: RenderTextureFormats,
         opaque_to_transparent_blit_pipeline_msaa_4: &BlitPipeline,
         opaque_to_transparent_blit_pipeline_no_anti_alias: &BlitPipeline,
+        transparent_to_composite_blit_pipeline_no_anti_alias: &BlitPipeline,
         width: u32,
         height: u32,
         anti_aliasing: AntiAliasing,
@@ -293,25 +299,6 @@ impl RenderTexturesInner {
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
-        // let taa_clip_positions = [
-        //     gpu.create_texture(
-        //         &geometry_texture(
-        //             render_texture_formats.taa_clip_position,
-        //             "TAA Clip Position (0)",
-        //         )
-        //         .into(),
-        //     )
-        //     .map_err(AwsmRenderTextureError::CreateTexture)?,
-        //     gpu.create_texture(
-        //         &geometry_texture(
-        //             render_texture_formats.taa_clip_position,
-        //             "TAA Clip Position (1)",
-        //         )
-        //         .into(),
-        //     )
-        //     .map_err(AwsmRenderTextureError::CreateTexture)?,
-        // ];
-
         let normal_tangent = gpu
             .create_texture(
                 &maybe_multisample_texture(render_texture_formats.normal_tangent, "Normal Tangent")
@@ -332,7 +319,7 @@ impl RenderTexturesInner {
         let opaque = gpu
             .create_texture(
                 &TextureDescriptor::new(
-                    render_texture_formats.opaque,
+                    render_texture_formats.color,
                     Extent3d::new(width, Some(height), Some(1)),
                     TextureUsage::new()
                         .with_storage_binding()
@@ -347,7 +334,7 @@ impl RenderTexturesInner {
 
         let transparent = {
             let mut descriptor = TextureDescriptor::new(
-                render_texture_formats.transparent,
+                render_texture_formats.color,
                 Extent3d::new(width, Some(height), Some(1)),
                 TextureUsage::new()
                     .with_render_attachment()
@@ -372,14 +359,16 @@ impl RenderTexturesInner {
             // sample it directly for world-position reconstruction.
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
+        // NEVER multisampled, that's the point
         let composite = gpu
             .create_texture(
                 &TextureDescriptor::new(
-                    render_texture_formats.composite,
+                    render_texture_formats.color,
                     Extent3d::new(width, Some(height), Some(1)),
                     TextureUsage::new()
                         .with_storage_binding()
-                        .with_texture_binding(),
+                        .with_texture_binding()
+                        .with_render_attachment(),
                 )
                 .with_label("Composite")
                 .into(),
@@ -440,6 +429,17 @@ impl RenderTexturesInner {
             opaque_to_transparent_blit_pipeline_no_anti_alias,
             &opaque_view,
         );
+
+        let transparent_to_composite_blit_bind_group_no_anti_alias =
+            if anti_aliasing.msaa_sample_count.is_none() {
+                Some(blit_get_bind_group(
+                    gpu,
+                    transparent_to_composite_blit_pipeline_no_anti_alias,
+                    &transparent_view,
+                ))
+            } else {
+                None
+            };
         Ok(Self {
             visibility_data,
             visibility_data_view,
@@ -455,7 +455,7 @@ impl RenderTexturesInner {
 
             opaque,
             opaque_view,
-            opaque_clearer: TextureClearer::new(gpu, render_texture_formats.opaque, width, height)
+            opaque_clearer: TextureClearer::new(gpu, render_texture_formats.color, width, height)
                 .map_err(AwsmRenderTextureError::CreateTextureClearer)?,
             opaque_to_transparent_blit_bind_group_msaa_4,
             opaque_to_transparent_blit_bind_group_no_anti_alias,
@@ -468,6 +468,7 @@ impl RenderTexturesInner {
 
             composite,
             composite_view,
+            transparent_to_composite_blit_bind_group_no_anti_alias,
 
             width,
             height,

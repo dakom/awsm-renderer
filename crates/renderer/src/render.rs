@@ -150,10 +150,7 @@ impl AwsmRenderer {
 
         {
             let _maybe_span_guard = if ctx.logging.render_timings {
-                Some(
-                    tracing::span!(tracing::Level::INFO, "Blit Opaque before Transparent")
-                        .entered(),
-                )
+                Some(tracing::span!(tracing::Level::INFO, "Opaque to Transparent Blit").entered())
             } else {
                 None
             };
@@ -205,14 +202,26 @@ impl AwsmRenderer {
                 .render(&ctx, renderables.transparent)?;
         }
 
+        // if None, it's handled by MSAA resolve in transparent pass
+        if let Some(bind_group) = &ctx
+            .render_texture_views
+            .transparent_to_composite_blit_bind_group_no_anti_alias
         {
             let _maybe_span_guard = if self.logging.render_timings {
-                Some(tracing::span!(tracing::Level::INFO, "Composite RenderPass").entered())
+                Some(
+                    tracing::span!(tracing::Level::INFO, "Non-antialised composite blit").entered(),
+                )
             } else {
                 None
             };
 
-            self.render_passes.composite.render(&ctx)?;
+            blit_tex(
+                &ctx.render_textures
+                    .transparent_to_composite_blit_pipeline_no_anti_alias,
+                bind_group,
+                &ctx.render_texture_views.composite,
+                &ctx.command_encoder,
+            )?;
         }
 
         {

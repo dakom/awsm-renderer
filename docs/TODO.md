@@ -1,35 +1,12 @@
-- properly resolve MSAA in composite pass (from transparent pass)
-  - composite should be a vertex+fragment pass that resolves MSAA input texture
-  - maybe bindless
+# Transparency Pass
+
 - template-feature-gate transprency pass (shader gen shouldn't try to load uvs, for example)
   - easy to see in ambient occlusion compare 
 
 - vertex buffer data from non-geometry attributes (what we use for storage in opaque)
-
-- strip out MeshBufferCustomVertexAttributeInfo::Joints and MeshBufferCustomVertexAttributeInfo::Weights 
-  - these only need to be in the storage buffer, we extract them in gltf/buffers/skin.rs and 
-  - also confirm that morphs are not in attributes
-
-# Transparent material pass
-- like opaque
-- cutoff
-- complete getting alpha blend mode working again
--MAYBE: 
-  - One draw call per material-kind (pbr, unlit, etc.) 
-  - Fetch the material data from a the same material uniform buffer (bound w/ dynamic offset)
-  - Uses Weighted Blended Order-Independent Transparency (OIT)
-  - Uses the Depth buffer from (1) to discard occluded fragments w/ depth testing (but writes are off)
-  - Outputs to multiple textures:
-    - `oit_rgb_texture`: accumulated weighted sum of colors
-    - `oit_alpha_texture`: accumulated weighted product of transparencies
-
-### 5. Composition (Compute Shader)
-- Single fullscreen compute dispatch
-- Resolve OIT: Read from `oit_rgb_texture` and `oit_alpha_texture` and calculate the final transparent color.
-- Composite: Blend the resolved transparent color over the `opaque_color_texture`.
-- Apply TAA: Use `motion_vector_texture` to blend the current, composited frame with the previous frame's history buffer.
-- Tonemapping, gamma-correction, etc.
-- Outputs final resolved frame to `composite_texture`
+  - strip out MeshBufferCustomVertexAttributeInfo::Joints and MeshBufferCustomVertexAttributeInfo::Weights 
+    - these only need to be in the storage buffer, we extract them in gltf/buffers/skin.rs and 
+    - also confirm that morphs are not in attributes
 
 ------
 

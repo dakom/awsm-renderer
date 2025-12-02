@@ -93,8 +93,8 @@ impl MaterialTransparentPipelines {
 
         let shader_key = shaders.get_key(gpu, shader_cache_key).await?;
 
-        let color_targets = &[ColorTargetState::new(render_texture_formats.transparent)
-            .with_blend(BlendState::new(
+        let color_targets = &[
+            ColorTargetState::new(render_texture_formats.color).with_blend(BlendState::new(
                 BlendComponent::new()
                     .with_src_factor(BlendFactor::One)
                     .with_dst_factor(BlendFactor::OneMinusSrcAlpha)
@@ -103,7 +103,8 @@ impl MaterialTransparentPipelines {
                     .with_src_factor(BlendFactor::One)
                     .with_dst_factor(BlendFactor::OneMinusSrcAlpha)
                     .with_operation(BlendOperation::Add),
-            ))];
+            )),
+        ];
 
         let render_pipeline_key = render_pipeline_key(
             gpu,

@@ -583,7 +583,7 @@ async fn create_main_bind_group_layout_key(
         // Opaque color render texture (storage texture for compute write)
         BindGroupLayoutCacheKeyEntry {
             resource: BindGroupLayoutResource::StorageTexture(
-                StorageTextureBindingLayout::new(ctx.render_texture_formats.opaque)
+                StorageTextureBindingLayout::new(ctx.render_texture_formats.color)
                     .with_view_dimension(TextureViewDimension::N2d)
                     .with_access(StorageTextureAccess::WriteOnly),
             ),

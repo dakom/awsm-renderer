@@ -107,7 +107,6 @@ impl BindGroups {
             TransparentLights,
             TransparentTextures,
             LightCulling,
-            Composite,
             Display,
         }
 
@@ -149,7 +148,6 @@ impl BindGroups {
                 }
                 BindGroupCreate::TextureViewResize => {
                     functions_to_call.insert(FunctionToCall::LightCulling);
-                    functions_to_call.insert(FunctionToCall::Composite);
                     functions_to_call.insert(FunctionToCall::Display);
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
                     functions_to_call.insert(FunctionToCall::TransparentMain);
@@ -270,9 +268,6 @@ impl BindGroups {
                 }
                 FunctionToCall::LightCulling => {
                     render_passes.light_culling.bind_groups.recreate(&ctx)?;
-                }
-                FunctionToCall::Composite => {
-                    render_passes.composite.bind_groups.recreate(&ctx)?;
                 }
                 FunctionToCall::Display => {
                     render_passes.display.bind_groups.recreate(&ctx)?;
