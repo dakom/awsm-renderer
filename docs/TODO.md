@@ -1,8 +1,8 @@
-- fix premultiplied alpha in transparent pass
-
-- properly resolve MSAA in transparency pass
-  - but make sure we can do this with multiple passes _before_ resolving to draw all meshes 
-  - composite pass should then just get a non-MSAA texture
+- properly resolve MSAA in composite pass (from transparent pass)
+  - composite should be a vertex+fragment pass that resolves MSAA input texture
+  - maybe bindless
+- template-feature-gate transprency pass (shader gen shouldn't try to load uvs, for example)
+  - easy to see in ambient occlusion compare 
 
 - vertex buffer data from non-geometry attributes (what we use for storage in opaque)
 

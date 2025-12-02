@@ -11,7 +11,7 @@
 /*************** END math.wgsl ******************/
 
 /*************** START mesh_meta.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/mesh_meta.wgsl" %}
+{% include "opaque_and_transparency_wgsl/material_mesh_meta.wgsl" %}
 /*************** END mesh_meta.wgsl ******************/
 
 /*************** START projection.wgsl ******************/

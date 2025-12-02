@@ -23,8 +23,7 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
 
     // FIXME
     // 1. Get material from mesh_meta
-    let material_offset = 0u;
-    let material = pbr_get_material(material_offset);
+    let material = pbr_get_material(material_mesh_meta.material_offset);
 
 
     var tex_color = vec4<f32>(1.0);

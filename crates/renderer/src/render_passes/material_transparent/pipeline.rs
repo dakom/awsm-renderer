@@ -38,8 +38,7 @@ use crate::shaders::{ShaderKey, Shaders};
 use crate::textures::Textures;
 
 pub struct MaterialTransparentPipelines {
-    multisampled_pipeline_layout_key: PipelineLayoutKey,
-    singlesampled_pipeline_layout_key: PipelineLayoutKey,
+    pipeline_layout_key: PipelineLayoutKey,
     render_pipeline_keys: SecondaryMap<MeshKey, RenderPipelineKey>,
 }
 
@@ -48,34 +47,21 @@ impl MaterialTransparentPipelines {
         ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &MaterialTransparentBindGroups,
     ) -> Result<Self> {
-        let multisampled_pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
-            bind_groups.multisampled_main_bind_group_layout_key,
+        let pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
+            bind_groups.main_bind_group_layout_key,
             bind_groups.lights_bind_group_layout_key,
             bind_groups.texture_pool_textures_bind_group_layout_key,
-            bind_groups.mesh_meta_bind_group_layout_key,
+            bind_groups.mesh_material_bind_group_layout_key,
         ]);
 
-        let multisampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
+        let pipeline_layout_key = ctx.pipeline_layouts.get_key(
             &ctx.gpu,
             &ctx.bind_group_layouts,
-            multisampled_pipeline_layout_cache_key,
-        )?;
-
-        let singlesampled_pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
-            bind_groups.singlesampled_main_bind_group_layout_key,
-            bind_groups.lights_bind_group_layout_key,
-            bind_groups.texture_pool_textures_bind_group_layout_key,
-            bind_groups.mesh_meta_bind_group_layout_key,
-        ]);
-        let singlesampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
-            &ctx.gpu,
-            &ctx.bind_group_layouts,
-            singlesampled_pipeline_layout_cache_key,
+            pipeline_layout_cache_key,
         )?;
 
         Ok(Self {
-            multisampled_pipeline_layout_key,
-            singlesampled_pipeline_layout_key,
+            pipeline_layout_key,
             render_pipeline_keys: SecondaryMap::new(),
         })
     }
@@ -125,11 +111,7 @@ impl MaterialTransparentPipelines {
             pipelines,
             pipeline_layouts,
             render_texture_formats.depth,
-            if anti_aliasing.msaa_sample_count.is_some() {
-                self.multisampled_pipeline_layout_key
-            } else {
-                self.singlesampled_pipeline_layout_key
-            },
+            self.pipeline_layout_key,
             shader_key,
             vertex_buffer_layouts(&mesh, &mesh_buffer_info),
             color_targets,

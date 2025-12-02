@@ -3,7 +3,7 @@
 /*************** END math.wgsl ******************/
 
 /*************** START meta.wgsl ******************/
-{% include "geometry_and_transparency_wgsl/vertex/meta.wgsl" %}
+{% include "geometry_and_transparency_wgsl/vertex/geometry_mesh_meta.wgsl" %}
 /*************** END meta.wgsl ******************/
 
 /*************** START camera.wgsl ******************/
@@ -37,6 +37,10 @@
 /*************** START material.wgsl ******************/
 {% include "opaque_and_transparency_wgsl/pbr/material.wgsl" %}
 /*************** END material.wgsl ******************/
+
+/*************** START mesh_meta.wgsl ******************/
+{% include "opaque_and_transparency_wgsl/material_mesh_meta.wgsl" %}
+/*************** END mesh_meta.wgsl ******************/
 
 /*************** START lights.wgsl ******************/
 {% include "opaque_and_transparency_wgsl/pbr/lighting/lights.wgsl" %}

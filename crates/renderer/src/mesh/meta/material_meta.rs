@@ -14,11 +14,15 @@ use crate::{
 
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_NORMAL: u32 = 1;
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_TANGENT: u32 = 1 << 1;
-pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 68;
-pub const MATERIAL_MESH_META_BYTE_ALIGNMENT: usize = MATERIAL_MESH_META_BYTE_SIZE; // storage buffer is less strict
+pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 64;
+pub const MATERIAL_MESH_META_BYTE_ALIGNMENT: usize = 256;
 
-pub static MATERIAL_BUFFER_USAGE: LazyLock<BufferUsage> =
-    LazyLock::new(|| BufferUsage::new().with_copy_dst().with_storage());
+pub static MATERIAL_BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| {
+    BufferUsage::new()
+        .with_copy_dst()
+        .with_storage()
+        .with_uniform()
+});
 
 // See meta.wgsl for the corresponding struct
 pub struct MaterialMeshMeta<'a> {
@@ -28,7 +32,6 @@ pub struct MaterialMeshMeta<'a> {
     pub custom_attribute_indices_offset: usize,
     pub custom_attribute_data_offset: usize,
     pub visibility_geometry_data_offset: Option<usize>,
-    pub transparency_geometry_data_offset: Option<usize>,
     pub transform_offset: usize,
     pub normal_matrix_offset: usize,
     pub buffer_info: &'a MeshBufferInfo,
@@ -103,7 +106,6 @@ impl<'a> MaterialMeshMeta<'a> {
             custom_attribute_indices_offset,
             custom_attribute_data_offset,
             visibility_geometry_data_offset,
-            transparency_geometry_data_offset,
             transform_offset,
             normal_matrix_offset,
             materials,
@@ -182,9 +184,8 @@ impl<'a> MaterialMeshMeta<'a> {
         push_u32(uv_set_count);
         push_u32(color_set_count);
 
-        // Geometry data offset (8 bytes)
+        // Geometry data offset (4 bytes)
         push_u32(visibility_geometry_data_offset.unwrap_or_default() as u32);
-        push_u32(transparency_geometry_data_offset.unwrap_or_default() as u32);
 
         Ok(result)
     }

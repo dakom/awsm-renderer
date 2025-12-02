@@ -199,14 +199,14 @@ impl Renderable<'_> {
         &self,
         ctx: &RenderContext,
         render_pass: &RenderPassEncoder,
-        mesh_meta_bind_group: &web_sys::GpuBindGroup,
+        mesh_material_bind_group: &web_sys::GpuBindGroup,
     ) -> Result<()> {
         match self {
             Self::Mesh { mesh, key, .. } => mesh.push_material_transparent_pass_commands(
                 ctx,
                 *key,
                 render_pass,
-                mesh_meta_bind_group,
+                mesh_material_bind_group,
             ),
         }
     }

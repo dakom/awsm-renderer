@@ -21,3 +21,4 @@
 {% endfor %}
 
 @group(3) @binding(0) var<uniform> geometry_mesh_meta: GeometryMeshMeta;
+@group(3) @binding(1) var<uniform> material_mesh_meta: MaterialMeshMeta;

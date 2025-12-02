@@ -12,6 +12,7 @@ use crate::bind_groups::{AwsmBindGroupError, BindGroupRecreateContext};
 use crate::error::Result;
 use crate::materials::MaterialBufferKind;
 use crate::mesh::meta::geometry_meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT;
+use crate::mesh::meta::material_meta::MATERIAL_MESH_META_BYTE_ALIGNMENT;
 use crate::render_passes::shared::opaque_and_transparency::bind_group::{
     TexturePoolDeps, TexturePoolVisibility,
 };
@@ -19,16 +20,15 @@ use crate::textures::SamplerKey;
 use crate::{bind_group_layout::BindGroupLayoutKey, render_passes::RenderPassInitContext};
 
 pub struct MaterialTransparentBindGroups {
-    pub multisampled_main_bind_group_layout_key: BindGroupLayoutKey,
-    pub singlesampled_main_bind_group_layout_key: BindGroupLayoutKey,
-    pub mesh_meta_bind_group_layout_key: BindGroupLayoutKey,
+    pub main_bind_group_layout_key: BindGroupLayoutKey,
+    pub mesh_material_bind_group_layout_key: BindGroupLayoutKey,
     pub lights_bind_group_layout_key: BindGroupLayoutKey,
     pub texture_pool_textures_bind_group_layout_key: BindGroupLayoutKey,
     pub texture_pool_arrays_len: u32,
     pub texture_pool_sampler_keys: IndexSet<SamplerKey>,
 
     _main_bind_group: Option<web_sys::GpuBindGroup>,
-    _mesh_meta_bind_group: Option<web_sys::GpuBindGroup>,
+    _mesh_material_bind_group: Option<web_sys::GpuBindGroup>,
     _lights_bind_group: Option<web_sys::GpuBindGroup>,
     _texture_bind_group: Option<web_sys::GpuBindGroup>,
 }
@@ -41,25 +41,120 @@ impl MaterialTransparentBindGroups {
             sampler_keys: texture_pool_sampler_keys,
         } = TexturePoolDeps::new(ctx, TexturePoolVisibility::Render)?;
 
-        let multisampled_main_bind_group_layout_key =
-            create_main_bind_group_layout_key(ctx, true).await?;
-        let singlesampled_main_bind_group_layout_key =
-            create_main_bind_group_layout_key(ctx, false).await?;
+        let entries = vec![
+            // Camera
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
+                ),
+                visibility_vertex: true,
+                visibility_fragment: true,
+                visibility_compute: false,
+            },
+            // Transform
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                ),
+                visibility_vertex: true,
+                visibility_fragment: true,
+                visibility_compute: false,
+            },
+            // Materials
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                ),
+                visibility_vertex: true,
+                visibility_fragment: true,
+                visibility_compute: false,
+            },
+            // Morph weights
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                ),
+                visibility_vertex: true,
+                visibility_fragment: true,
+                visibility_compute: false,
+            },
+            // Morph values
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                ),
+                visibility_vertex: true,
+                visibility_fragment: true,
+                visibility_compute: false,
+            },
+            // Skin matrices
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                ),
+                visibility_vertex: true,
+                visibility_fragment: true,
+                visibility_compute: false,
+            },
+            // Skin weights
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                ),
+                visibility_vertex: true,
+                visibility_fragment: true,
+                visibility_compute: false,
+            },
+            // Texture transforms
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new()
+                        .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                ),
+                visibility_vertex: true,
+                visibility_fragment: true,
+                visibility_compute: false,
+            },
+        ];
+
+        let main_bind_group_layout_key = ctx
+            .bind_group_layouts
+            .get_key(&ctx.gpu, BindGroupLayoutCacheKey { entries })?;
 
         // Mesh meta
-        let mesh_meta_bind_group_layout_key = ctx.bind_group_layouts.get_key(
+        let mesh_material_bind_group_layout_key = ctx.bind_group_layouts.get_key(
             &ctx.gpu,
             BindGroupLayoutCacheKey {
-                entries: vec![BindGroupLayoutCacheKeyEntry {
-                    resource: BindGroupLayoutResource::Buffer(
-                        BufferBindingLayout::new()
-                            .with_binding_type(BufferBindingType::Uniform)
-                            .with_dynamic_offset(true),
-                    ),
-                    visibility_vertex: true,
-                    visibility_fragment: true,
-                    visibility_compute: false,
-                }],
+                entries: vec![
+                    // GeometryMeshMeta
+                    BindGroupLayoutCacheKeyEntry {
+                        resource: BindGroupLayoutResource::Buffer(
+                            BufferBindingLayout::new()
+                                .with_binding_type(BufferBindingType::Uniform)
+                                .with_dynamic_offset(true),
+                        ),
+                        visibility_vertex: true,
+                        visibility_fragment: true,
+                        visibility_compute: false,
+                    },
+                    // MaterialMeshMeta
+                    BindGroupLayoutCacheKeyEntry {
+                        resource: BindGroupLayoutResource::Buffer(
+                            BufferBindingLayout::new()
+                                .with_binding_type(BufferBindingType::Uniform)
+                                .with_dynamic_offset(true),
+                        ),
+                        visibility_vertex: true,
+                        visibility_fragment: true,
+                        visibility_compute: false,
+                    },
+                ],
             },
         )?;
 
@@ -96,9 +191,8 @@ impl MaterialTransparentBindGroups {
         // Texture Pool
 
         Ok(Self {
-            singlesampled_main_bind_group_layout_key,
-            multisampled_main_bind_group_layout_key,
-            mesh_meta_bind_group_layout_key,
+            main_bind_group_layout_key,
+            mesh_material_bind_group_layout_key,
             lights_bind_group_layout_key,
 
             texture_pool_textures_bind_group_layout_key,
@@ -106,7 +200,7 @@ impl MaterialTransparentBindGroups {
             texture_pool_sampler_keys,
 
             _main_bind_group: None,
-            _mesh_meta_bind_group: None,
+            _mesh_material_bind_group: None,
             _lights_bind_group: None,
             _texture_bind_group: None,
         })
@@ -123,15 +217,14 @@ impl MaterialTransparentBindGroups {
         } = TexturePoolDeps::new(ctx, TexturePoolVisibility::Render)?;
 
         let mut _self = Self {
-            multisampled_main_bind_group_layout_key: self.multisampled_main_bind_group_layout_key,
-            singlesampled_main_bind_group_layout_key: self.singlesampled_main_bind_group_layout_key,
-            mesh_meta_bind_group_layout_key: self.mesh_meta_bind_group_layout_key,
+            main_bind_group_layout_key: self.main_bind_group_layout_key,
+            mesh_material_bind_group_layout_key: self.mesh_material_bind_group_layout_key,
             lights_bind_group_layout_key: self.lights_bind_group_layout_key,
             texture_pool_textures_bind_group_layout_key,
             texture_pool_arrays_len,
             texture_pool_sampler_keys,
             _main_bind_group: self._main_bind_group.clone(),
-            _mesh_meta_bind_group: self._mesh_meta_bind_group.clone(),
+            _mesh_material_bind_group: self._mesh_material_bind_group.clone(),
             _lights_bind_group: self._lights_bind_group.clone(),
             _texture_bind_group: None,
         };
@@ -152,18 +245,18 @@ impl MaterialTransparentBindGroups {
     > {
         match (
             &self._main_bind_group,
-            &self._mesh_meta_bind_group,
+            &self._mesh_material_bind_group,
             &self._lights_bind_group,
             &self._texture_bind_group,
         ) {
             (
                 Some(main_bind_group),
-                Some(mesh_meta_bind_group),
+                Some(mesh_material_bind_group),
                 Some(lights_bind_group),
                 Some(texture_bind_group),
             ) => Ok((
                 main_bind_group,
-                mesh_meta_bind_group,
+                mesh_material_bind_group,
                 lights_bind_group,
                 texture_bind_group,
             )),
@@ -171,7 +264,7 @@ impl MaterialTransparentBindGroups {
                 "Material Transparent - Main".to_string(),
             )),
             (_, None, _, _) => Err(AwsmBindGroupError::NotFound(
-                "Material Transparent - Mesh Meta".to_string(),
+                "Material Transparent - Mesh Material".to_string(),
             )),
             (_, _, None, _) => Err(AwsmBindGroupError::NotFound(
                 "Material Transparent - Lights".to_string(),
@@ -244,11 +337,7 @@ impl MaterialTransparentBindGroups {
 
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts
-                .get(if ctx.anti_aliasing.msaa_sample_count.is_some() {
-                    self.multisampled_main_bind_group_layout_key
-                } else {
-                    self.singlesampled_main_bind_group_layout_key
-                })?,
+                .get(self.main_bind_group_layout_key)?,
             Some("Material Transparent - Main"),
             entries,
         );
@@ -258,10 +347,10 @@ impl MaterialTransparentBindGroups {
         Ok(())
     }
 
-    pub fn recreate_mesh_meta(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
+    pub fn recreate_mesh_material(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let mut entries = Vec::new();
 
-        // meta
+        // geometry meta
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(
@@ -270,14 +359,23 @@ impl MaterialTransparentBindGroups {
             ),
         ));
 
+        // material meta
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Buffer(
+                BufferBinding::new(&ctx.meshes.meta.material_gpu_buffer())
+                    .with_size(MATERIAL_MESH_META_BYTE_ALIGNMENT),
+            ),
+        ));
+
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts
-                .get(self.mesh_meta_bind_group_layout_key)?,
-            Some("Material Transparent - Mesh Meta"),
+                .get(self.mesh_material_bind_group_layout_key)?,
+            Some("Material Transparent - Mesh Material"),
             entries,
         );
 
-        self._mesh_meta_bind_group = Some(ctx.gpu.create_bind_group(&descriptor.into()));
+        self._mesh_material_bind_group = Some(ctx.gpu.create_bind_group(&descriptor.into()));
 
         Ok(())
     }
@@ -338,88 +436,4 @@ impl MaterialTransparentBindGroups {
 
         Ok(())
     }
-}
-
-async fn create_main_bind_group_layout_key(
-    ctx: &mut RenderPassInitContext<'_>,
-    multisampled_geometry: bool,
-) -> Result<BindGroupLayoutKey> {
-    let entries = vec![
-        // Camera
-        BindGroupLayoutCacheKeyEntry {
-            resource: BindGroupLayoutResource::Buffer(
-                BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
-            ),
-            visibility_vertex: true,
-            visibility_fragment: true,
-            visibility_compute: false,
-        },
-        // Transform
-        BindGroupLayoutCacheKeyEntry {
-            resource: BindGroupLayoutResource::Buffer(
-                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
-            ),
-            visibility_vertex: true,
-            visibility_fragment: true,
-            visibility_compute: false,
-        },
-        // Materials
-        BindGroupLayoutCacheKeyEntry {
-            resource: BindGroupLayoutResource::Buffer(
-                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
-            ),
-            visibility_vertex: true,
-            visibility_fragment: true,
-            visibility_compute: false,
-        },
-        // Morph weights
-        BindGroupLayoutCacheKeyEntry {
-            resource: BindGroupLayoutResource::Buffer(
-                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
-            ),
-            visibility_vertex: true,
-            visibility_fragment: true,
-            visibility_compute: false,
-        },
-        // Morph values
-        BindGroupLayoutCacheKeyEntry {
-            resource: BindGroupLayoutResource::Buffer(
-                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
-            ),
-            visibility_vertex: true,
-            visibility_fragment: true,
-            visibility_compute: false,
-        },
-        // Skin matrices
-        BindGroupLayoutCacheKeyEntry {
-            resource: BindGroupLayoutResource::Buffer(
-                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
-            ),
-            visibility_vertex: true,
-            visibility_fragment: true,
-            visibility_compute: false,
-        },
-        // Skin weights
-        BindGroupLayoutCacheKeyEntry {
-            resource: BindGroupLayoutResource::Buffer(
-                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
-            ),
-            visibility_vertex: true,
-            visibility_fragment: true,
-            visibility_compute: false,
-        },
-        // Texture transforms
-        BindGroupLayoutCacheKeyEntry {
-            resource: BindGroupLayoutResource::Buffer(
-                BufferBindingLayout::new().with_binding_type(BufferBindingType::ReadOnlyStorage),
-            ),
-            visibility_vertex: true,
-            visibility_fragment: true,
-            visibility_compute: false,
-        },
-    ];
-
-    Ok(ctx
-        .bind_group_layouts
-        .get_key(&ctx.gpu, BindGroupLayoutCacheKey { entries })?)
 }

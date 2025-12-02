@@ -154,12 +154,17 @@ impl Mesh {
         ctx: &RenderContext,
         mesh_key: MeshKey,
         render_pass: &RenderPassEncoder,
-        mesh_meta_bind_group: &web_sys::GpuBindGroup,
+        mesh_material_bind_group: &web_sys::GpuBindGroup,
     ) -> Result<()> {
-        let meta_offset = ctx.meshes.meta.geometry_buffer_offset(mesh_key)? as u32;
+        let geometry_meta_offset = ctx.meshes.meta.geometry_buffer_offset(mesh_key)? as u32;
+        let material_meta_offset = ctx.meshes.meta.material_buffer_offset(mesh_key)? as u32;
         let buffer_info = ctx.meshes.buffer_infos.get(self.buffer_info_key)?;
 
-        render_pass.set_bind_group(3, mesh_meta_bind_group, Some(&[meta_offset]))?;
+        render_pass.set_bind_group(
+            3,
+            mesh_material_bind_group,
+            Some(&[geometry_meta_offset, material_meta_offset]),
+        )?;
 
         // Geometry stuff Slot 0 (locations 0-4)
         render_pass.set_vertex_buffer(

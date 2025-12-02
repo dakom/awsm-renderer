@@ -63,7 +63,7 @@ impl MaterialTransparentRenderPass {
             .into(),
         )?;
 
-        let (main_bind_group, mesh_meta_bind_group, lights_bind_group, texture_bind_group) =
+        let (main_bind_group, mesh_material_bind_group, lights_bind_group, texture_bind_group) =
             self.bind_groups.get_bind_groups()?;
 
         // set later with dynamic offsets
@@ -84,7 +84,7 @@ impl MaterialTransparentRenderPass {
                 renderable.push_material_transparent_pass_commands(
                     ctx,
                     &render_pass,
-                    &mesh_meta_bind_group,
+                    &mesh_material_bind_group,
                 )?;
             }
         }

@@ -112,7 +112,6 @@ impl MeshMeta {
             custom_attribute_indices_offset,
             custom_attribute_data_offset,
             visibility_geometry_data_offset,
-            transparency_geometry_data_offset,
             transform_offset,
             normal_matrix_offset,
             materials,

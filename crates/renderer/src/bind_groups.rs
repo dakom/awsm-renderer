@@ -103,7 +103,7 @@ impl BindGroups {
             OpaqueLights,
             OpaqueTextures,
             TransparentMain,
-            TransparentMeshMeta,
+            TransparentMeshMaterial,
             TransparentLights,
             TransparentTextures,
             LightCulling,
@@ -130,14 +130,15 @@ impl BindGroups {
                 BindGroupCreate::TransformsResize => {
                     functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
                     functions_to_call.insert(FunctionToCall::TransparentMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
                 }
                 BindGroupCreate::PbrMaterialResize => {
                     functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
-                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
                 }
                 BindGroupCreate::MeshMetaResize => {
                     functions_to_call.insert(FunctionToCall::GeometryMeta);
-                    functions_to_call.insert(FunctionToCall::TransparentMeshMeta);
+                    functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
                 }
                 BindGroupCreate::GeometryMorphTargetWeightsResize
                 | BindGroupCreate::GeometryMorphTargetValuesResize
@@ -249,11 +250,11 @@ impl BindGroups {
                         .bind_groups
                         .recreate_main(&ctx)?;
                 }
-                FunctionToCall::TransparentMeshMeta => {
+                FunctionToCall::TransparentMeshMaterial => {
                     render_passes
                         .material_transparent
                         .bind_groups
-                        .recreate_mesh_meta(&ctx)?;
+                        .recreate_mesh_material(&ctx)?;
                 }
                 FunctionToCall::TransparentLights => {
                     render_passes
