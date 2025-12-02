@@ -1,6 +1,6 @@
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
 @group(1) @binding(0) var<storage, read> model_transforms : array<mat4x4<f32>>;
-@group(2) @binding(0) var<uniform> mesh_meta: GeometryMeshMeta;
+@group(2) @binding(0) var<uniform> geometry_mesh_meta: GeometryMeshMeta;
 @group(3) @binding(0) var<storage, read> geometry_morph_weights: array<f32>;
 @group(3) @binding(1) var<storage, read> geometry_morph_values: array<f32>;
 @group(3) @binding(2) var<storage, read> skin_joint_matrices: array<mat4x4<f32>>;

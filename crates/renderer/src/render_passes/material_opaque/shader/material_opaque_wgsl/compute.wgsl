@@ -181,19 +181,19 @@ fn main(
                     alpha_sum += skybox_col.a;
                 } else {
                     // Full per-sample geometry shading
-                    let mesh_meta_{{s}} = mesh_metas[mat_meta_{{s}} / META_SIZE_IN_BYTES];
+                    let material_mesh_meta_{{s}} = material_mesh_metas[mat_meta_{{s}} / META_SIZE_IN_BYTES];
 
                     // Check if this shader variant matches this sample's mesh attributes
-                    if (mesh_matches_variant(mesh_meta_{{s}})) {
+                    if (mesh_matches_variant(material_mesh_meta_{{s}})) {
                         valid_samples++;
-                        let material_offset_{{s}} = mesh_meta_{{s}}.material_offset;
+                        let material_offset_{{s}} = material_mesh_meta_{{s}}.material_offset;
                         let pbr_material_{{s}} = pbr_get_material(material_offset_{{s}});
 
-                        let vertex_attribute_stride_{{s}} = mesh_meta_{{s}}.vertex_attribute_stride / 4;
-                        let attribute_indices_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
-                        let attribute_data_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
-                        let visibility_geometry_data_offset_{{s}} = mesh_meta_{{s}}.visibility_geometry_data_offset / 4;
-                        let uv_sets_index_{{s}} = mesh_meta_{{s}}.uv_sets_index;
+                        let vertex_attribute_stride_{{s}} = material_mesh_meta_{{s}}.vertex_attribute_stride / 4;
+                        let attribute_indices_offset_{{s}} = material_mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
+                        let attribute_data_offset_{{s}} = material_mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
+                        let visibility_geometry_data_offset_{{s}} = material_mesh_meta_{{s}}.visibility_geometry_data_offset / 4;
+                        let uv_sets_index_{{s}} = material_mesh_meta_{{s}}.uv_sets_index;
 
                         let base_tri_idx_{{s}} = attribute_indices_offset_{{s}} + (tri_{{s}} * 3u);
                         let tri_indices_{{s}} = vec3<u32>(
@@ -209,7 +209,7 @@ fn main(
                         let tbn_{{s}} = unpack_normal_tangent(packed_nt_{{s}});
                         let normal_{{s}} = tbn_{{s}}.N;
                         let os_verts_{{s}} = get_object_space_vertices(visibility_geometry_data_offset_{{s}}, tri_{{s}});
-                        let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
+                        let transforms_{{s}} = get_transforms(material_mesh_meta_{{s}});
 
                         {% match mipmap %}
                             {% when MipmapMode::Gradient %}
@@ -301,21 +301,21 @@ fn main(
     let barycentric = vec3<f32>(barycentric_data.x, barycentric_data.y, 1.0 - barycentric_data.x - barycentric_data.y);
 
 
-    let mesh_meta = mesh_metas[material_meta_offset / META_SIZE_IN_BYTES];
+    let material_mesh_meta = material_mesh_metas[material_meta_offset / META_SIZE_IN_BYTES];
 
     // Early exit if this shader variant doesn't match this mesh's attributes
-    if (!mesh_matches_variant(mesh_meta)) {
+    if (!mesh_matches_variant(material_mesh_meta)) {
         return;
     }
 
-    let material_offset = mesh_meta.material_offset;
+    let material_offset = material_mesh_meta.material_offset;
     let pbr_material = pbr_get_material(material_offset);
 
-    let vertex_attribute_stride = mesh_meta.vertex_attribute_stride / 4; // 4 bytes per float
-    let attribute_indices_offset = mesh_meta.vertex_attribute_indices_offset / 4;
-    let attribute_data_offset = mesh_meta.vertex_attribute_data_offset / 4;
-    let visibility_geometry_data_offset = mesh_meta.visibility_geometry_data_offset / 4;
-    let uv_sets_index = mesh_meta.uv_sets_index;
+    let vertex_attribute_stride = material_mesh_meta.vertex_attribute_stride / 4; // 4 bytes per float
+    let attribute_indices_offset = material_mesh_meta.vertex_attribute_indices_offset / 4;
+    let attribute_data_offset = material_mesh_meta.vertex_attribute_data_offset / 4;
+    let visibility_geometry_data_offset = material_mesh_meta.visibility_geometry_data_offset / 4;
+    let uv_sets_index = material_mesh_meta.uv_sets_index;
 
     let base_triangle_index = attribute_indices_offset + (triangle_index * 3u);
     let triangle_indices = vec3<u32>(
@@ -324,7 +324,7 @@ fn main(
         attribute_indices[base_triangle_index + 2]
     );
 
-    let transforms = get_transforms(mesh_meta);
+    let transforms = get_transforms(material_mesh_meta);
 
     let standard_coordinates = get_standard_coordinates(coords, screen_dims);
 
@@ -435,20 +435,20 @@ fn main(
                     alpha_sum += skybox_color.a;
                 } else {
                     // Each sample needs its own mesh/material data
-                    let mesh_meta_{{s}} = mesh_metas[material_meta_offset_{{s}} / META_SIZE_IN_BYTES];
+                    let material_mesh_meta_{{s}} = material_mesh_metas[material_meta_offset_{{s}} / META_SIZE_IN_BYTES];
 
                     // Check if this shader variant matches this sample's mesh attributes
-                    if (mesh_matches_variant(mesh_meta_{{s}})) {
+                    if (mesh_matches_variant(material_mesh_meta_{{s}})) {
                         valid_samples++;
-                        let material_offset_{{s}} = mesh_meta_{{s}}.material_offset;
+                        let material_offset_{{s}} = material_mesh_meta_{{s}}.material_offset;
                         let pbr_material_{{s}} = pbr_get_material(material_offset_{{s}});
 
                         // Per-sample mesh data
-                        let vertex_attribute_stride_{{s}} = mesh_meta_{{s}}.vertex_attribute_stride / 4;
-                    let attribute_indices_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
-                    let attribute_data_offset_{{s}} = mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
-                    let visibility_geometry_data_offset_{{s}} = mesh_meta_{{s}}.visibility_geometry_data_offset / 4;
-                    let uv_sets_index_{{s}} = mesh_meta_{{s}}.uv_sets_index;
+                        let vertex_attribute_stride_{{s}} = material_mesh_meta_{{s}}.vertex_attribute_stride / 4;
+                    let attribute_indices_offset_{{s}} = material_mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
+                    let attribute_data_offset_{{s}} = material_mesh_meta_{{s}}.vertex_attribute_data_offset / 4;
+                    let visibility_geometry_data_offset_{{s}} = material_mesh_meta_{{s}}.visibility_geometry_data_offset / 4;
+                    let uv_sets_index_{{s}} = material_mesh_meta_{{s}}.uv_sets_index;
 
                     // Per-sample triangle indices
                     let base_triangle_index_{{s}} = attribute_indices_offset_{{s}} + (tri_id_{{s}} * 3u);
@@ -466,7 +466,7 @@ fn main(
                     let tbn_{{s}} = unpack_normal_tangent(packed_nt_{{s}});
                     let normal_{{s}} = tbn_{{s}}.N;
                     let os_vertices_{{s}} = get_object_space_vertices(visibility_geometry_data_offset_{{s}}, tri_id_{{s}});
-                    let transforms_{{s}} = get_transforms(mesh_meta_{{s}});
+                    let transforms_{{s}} = get_transforms(material_mesh_meta_{{s}});
 
                     // Calculate proper gradients for this MSAA sample to enable mipmapping
                     {% match mipmap %}
@@ -560,15 +560,15 @@ fn main(
 // Check if a mesh's attributes match what this shader variant was compiled for.
 // Each variant is compiled for specific uv_sets/color_sets counts.
 // In the future, this will also check material type (pbr, toon, etc).
-fn mesh_matches_variant(mesh_meta: MeshMeta) -> bool {
+fn mesh_matches_variant(material_mesh_meta: MaterialMeshMeta) -> bool {
     // Check UV set count
     {%- match uv_sets %}
         {% when Some with (variant_uv_sets) %}
-            if (mesh_meta.uv_set_count != {{ variant_uv_sets }}u) {
+            if (material_mesh_meta.uv_set_count != {{ variant_uv_sets }}u) {
                 return false;
             }
         {% when None %}
-            if (mesh_meta.uv_set_count != 0u) {
+            if (material_mesh_meta.uv_set_count != 0u) {
                 return false;
             }
     {% endmatch %}
@@ -576,11 +576,11 @@ fn mesh_matches_variant(mesh_meta: MeshMeta) -> bool {
     // Check color set count
     {%- match color_sets %}
         {% when Some with (variant_color_sets) %}
-            if (mesh_meta.color_set_count != {{ variant_color_sets }}u) {
+            if (material_mesh_meta.color_set_count != {{ variant_color_sets }}u) {
                 return false;
             }
         {% when None %}
-            if (mesh_meta.color_set_count != 0u) {
+            if (material_mesh_meta.color_set_count != 0u) {
                 return false;
             }
     {% endmatch %}

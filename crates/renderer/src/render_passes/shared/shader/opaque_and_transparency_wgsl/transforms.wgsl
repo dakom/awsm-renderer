@@ -4,10 +4,10 @@ struct Transforms {
     world_normal: mat3x3<f32>,
 }
 
-fn get_transforms(mesh_meta: MeshMeta) -> Transforms {
-    let world_model = model_transforms[mesh_meta.transform_offset / 64u]; // 64 bytes per mat4x4<f32>
+fn get_transforms(material_mesh_meta: MaterialMeshMeta) -> Transforms {
+    let world_model = model_transforms[material_mesh_meta.transform_offset / 64u]; // 64 bytes per mat4x4<f32>
 
-    let normal_matrix_offset = mesh_meta.normal_matrix_offset / 4u; // 4 bytes per float
+    let normal_matrix_offset = material_mesh_meta.normal_matrix_offset / 4u; // 4 bytes per float
     let world_normal = mat3x3<f32>(
         vec3<f32>(
             normal_matrices[normal_matrix_offset + 0u],

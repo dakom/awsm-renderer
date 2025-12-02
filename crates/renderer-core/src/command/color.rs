@@ -9,6 +9,12 @@ pub struct Color {
 }
 
 impl Color {
+    pub const ZERO: Self = Self {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 0.0,
+    };
     pub const BLACK: Self = Self {
         r: 0.0,
         g: 0.0,

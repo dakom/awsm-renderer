@@ -2,7 +2,7 @@ use crate::{
     error::Result,
     render::{self, RenderContext},
     render_passes::{
-        material::opaque::{
+        material_opaque::{
             bind_group::MaterialOpaqueBindGroups, pipeline::MaterialOpaquePipelines,
         },
         RenderPassInitContext,

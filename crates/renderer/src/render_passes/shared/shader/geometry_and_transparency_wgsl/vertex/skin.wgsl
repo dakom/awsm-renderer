@@ -7,14 +7,14 @@ const floats_per_set = 8u;
 fn apply_position_skin(input: ApplyVertexInput) -> ApplyVertexInput {
     var output = input;
 
-    let skin_sets_count = mesh_meta.skin_sets_len;
+    let skin_sets_count = geometry_mesh_meta.skin_sets_len;
 
     let original_position = vec4<f32>(input.position, 1.0);
 
     // Calculate base offset for this exploded vertex's skin data
-    let base_offset = (mesh_meta.skin_index_weights_offset / 4) + input.vertex_index * skin_sets_count * floats_per_set;
+    let base_offset = (geometry_mesh_meta.skin_index_weights_offset / 4) + input.vertex_index * skin_sets_count * floats_per_set;
 
-    let matrix_offset = mesh_meta.skin_matrices_offset / 64; // mat4x4<f32> is 64 bytes
+    let matrix_offset = geometry_mesh_meta.skin_matrices_offset / 64; // mat4x4<f32> is 64 bytes
 
     var skin_matrix: mat4x4<f32>;
 
@@ -82,11 +82,11 @@ fn apply_position_skin(input: ApplyVertexInput) -> ApplyVertexInput {
 
 /// Applies skeletal skinning to normals and tangents (same weights as positions)
 fn apply_normal_skin(input: ApplyVertexInput, normal: vec3<f32>) -> vec3<f32> {
-    let skin_sets_count = mesh_meta.skin_sets_len;
+    let skin_sets_count = geometry_mesh_meta.skin_sets_len;
 
     // Calculate base offset for this exploded vertex's skin data
-    let base_offset = (mesh_meta.skin_index_weights_offset / 4) + input.vertex_index * skin_sets_count * floats_per_set;
-    let matrix_offset = mesh_meta.skin_matrices_offset / 64; // mat4x4<f32> is 64 bytes
+    let base_offset = (geometry_mesh_meta.skin_index_weights_offset / 4) + input.vertex_index * skin_sets_count * floats_per_set;
+    let matrix_offset = geometry_mesh_meta.skin_matrices_offset / 64; // mat4x4<f32> is 64 bytes
 
     var skin_matrix: mat4x4<f32>;
 

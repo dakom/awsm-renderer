@@ -5,9 +5,6 @@ use crate::{
     render_passes::{
         display::shader::cache_key::ShaderCacheKeyDisplay,
         geometry::shader::cache_key::ShaderCacheKeyGeometry,
-        material::template::{
-            ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment,
-        },
     },
     shaders::{print_shader_source, AwsmShaderError, Result},
 };

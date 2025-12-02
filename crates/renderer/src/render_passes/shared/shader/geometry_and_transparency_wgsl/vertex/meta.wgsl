@@ -11,5 +11,5 @@ struct GeometryMeshMeta {
     transform_offset: u32,
     // this is not the offset of the material
     // it's the offset of the mesh_meta data in the material *pass*
-    material_offset: u32,
+    material_mesh_meta_offset: u32
 }

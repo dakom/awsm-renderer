@@ -2,7 +2,8 @@ pub mod composite;
 pub mod display;
 pub mod geometry;
 pub mod light_culling;
-pub mod material;
+pub mod material_opaque;
+pub mod material_transparent;
 pub mod shader_cache_key;
 pub mod shader_template;
 pub mod shared;
@@ -17,14 +18,11 @@ use crate::{
     pipeline_layouts::PipelineLayouts,
     pipelines::Pipelines,
     render_passes::{
-        composite::render_pass::CompositeRenderPass,
-        display::render_pass::DisplayRenderPass,
+        composite::render_pass::CompositeRenderPass, display::render_pass::DisplayRenderPass,
         geometry::render_pass::GeometryRenderPass,
         light_culling::render_pass::LightCullingRenderPass,
-        material::{
-            opaque::render_pass::MaterialOpaqueRenderPass,
-            transparent::render_pass::MaterialTransparentRenderPass,
-        },
+        material_opaque::render_pass::MaterialOpaqueRenderPass,
+        material_transparent::render_pass::MaterialTransparentRenderPass,
     },
     render_textures::{RenderTextureFormats, RenderTextureViews},
     shaders::Shaders,

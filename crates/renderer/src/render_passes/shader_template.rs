@@ -4,7 +4,14 @@ use crate::{
         display::shader::template::ShaderTemplateDisplay,
         geometry::shader::template::ShaderTemplateGeometry,
         light_culling::shader::template::ShaderTemplateLightCulling,
-        material::template::ShaderTemplateMaterial, shader_cache_key::ShaderCacheKeyRenderPass,
+        material_opaque::shader::{
+            cache_key::ShaderCacheKeyMaterialOpaque, template::ShaderTemplateMaterialOpaque,
+        },
+        material_transparent::shader::{
+            cache_key::ShaderCacheKeyMaterialTransparent,
+            template::ShaderTemplateMaterialTransparent,
+        },
+        shader_cache_key::ShaderCacheKeyRenderPass,
     },
     shaders::AwsmShaderError,
 };
@@ -12,7 +19,8 @@ use crate::{
 pub enum ShaderTemplateRenderPass {
     Geometry(ShaderTemplateGeometry),
     LightCulling(ShaderTemplateLightCulling),
-    Material(ShaderTemplateMaterial),
+    MaterialOpaque(ShaderTemplateMaterialOpaque),
+    MaterialTransparent(ShaderTemplateMaterialTransparent),
     Composite(ShaderTemplateComposite),
     Display(ShaderTemplateDisplay),
 }
@@ -28,9 +36,12 @@ impl TryFrom<&ShaderCacheKeyRenderPass> for ShaderTemplateRenderPass {
             ShaderCacheKeyRenderPass::LightCulling(cache_key) => Ok(
                 ShaderTemplateRenderPass::LightCulling(cache_key.try_into()?),
             ),
-            ShaderCacheKeyRenderPass::Material(cache_key) => {
-                Ok(ShaderTemplateRenderPass::Material(cache_key.try_into()?))
-            }
+            ShaderCacheKeyRenderPass::MaterialOpaque(cache_key) => Ok(
+                ShaderTemplateRenderPass::MaterialOpaque(cache_key.try_into()?),
+            ),
+            ShaderCacheKeyRenderPass::MaterialTransparent(cache_key) => Ok(
+                ShaderTemplateRenderPass::MaterialTransparent(cache_key.try_into()?),
+            ),
             ShaderCacheKeyRenderPass::Composite(cache_key) => {
                 Ok(ShaderTemplateRenderPass::Composite(cache_key.try_into()?))
             }
@@ -46,7 +57,8 @@ impl ShaderTemplateRenderPass {
         match self {
             ShaderTemplateRenderPass::Geometry(tmpl) => tmpl.into_source(),
             ShaderTemplateRenderPass::LightCulling(tmpl) => tmpl.into_source(),
-            ShaderTemplateRenderPass::Material(tmpl) => tmpl.into_source(),
+            ShaderTemplateRenderPass::MaterialOpaque(tmpl) => tmpl.into_source(),
+            ShaderTemplateRenderPass::MaterialTransparent(tmpl) => tmpl.into_source(),
             ShaderTemplateRenderPass::Composite(tmpl) => tmpl.into_source(),
             ShaderTemplateRenderPass::Display(tmpl) => tmpl.into_source(),
         }
@@ -57,7 +69,8 @@ impl ShaderTemplateRenderPass {
         match self {
             ShaderTemplateRenderPass::Geometry(tmpl) => tmpl.debug_label(),
             ShaderTemplateRenderPass::LightCulling(tmpl) => tmpl.debug_label(),
-            ShaderTemplateRenderPass::Material(tmpl) => tmpl.debug_label(),
+            ShaderTemplateRenderPass::MaterialOpaque(tmpl) => tmpl.debug_label(),
+            ShaderTemplateRenderPass::MaterialTransparent(tmpl) => tmpl.debug_label(),
             ShaderTemplateRenderPass::Composite(tmpl) => tmpl.debug_label(),
             ShaderTemplateRenderPass::Display(tmpl) => tmpl.debug_label(),
         }

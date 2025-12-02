@@ -4,7 +4,7 @@ use awsm_renderer_core::command::render_pass::{
 };
 use awsm_renderer_core::command::{CommandEncoder, LoadOp, StoreOp};
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
-use awsm_renderer_core::texture::blit::blit_tex_with_pipeline;
+use awsm_renderer_core::texture::blit::blit_tex;
 use awsm_renderer_core::texture::TextureFormat;
 
 use crate::anti_alias::AntiAliasing;
@@ -16,7 +16,7 @@ use crate::mesh::skins::Skins;
 use crate::mesh::Meshes;
 use crate::pipelines::Pipelines;
 use crate::render_passes::RenderPasses;
-use crate::render_textures::{RenderTextureFormats, RenderTextureViews};
+use crate::render_textures::{RenderTextureFormats, RenderTextureViews, RenderTextures};
 use crate::renderable::Renderable;
 use crate::transforms::Transforms;
 use crate::{AwsmRenderer, AwsmRendererLogging};
@@ -90,6 +90,8 @@ impl AwsmRenderer {
             gpu: &self.gpu,
             command_encoder: self.gpu.create_command_encoder(Some("Rendering")),
             render_texture_views,
+            logging: &self.logging,
+            render_textures: &self.render_textures,
             transforms: &self.transforms,
             meshes: &self.meshes,
             materials: &self.materials,
@@ -147,7 +149,7 @@ impl AwsmRenderer {
         }
 
         {
-            let _maybe_span_guard = if self.logging.render_timings {
+            let _maybe_span_guard = if ctx.logging.render_timings {
                 Some(
                     tracing::span!(tracing::Level::INFO, "Blit Opaque before Transparent")
                         .entered(),
@@ -156,24 +158,33 @@ impl AwsmRenderer {
                 None
             };
 
-            blit_tex_with_pipeline(
-                &ctx.gpu,
+            blit_tex(
                 match &ctx.anti_aliasing.msaa_sample_count {
                     Some(sample_count) if *sample_count == 4 => {
-                        &self
-                            .render_textures
+                        &ctx.render_textures
                             .opaque_to_transparent_blit_pipeline_msaa_4
                     }
                     None => {
-                        &self
-                            .render_textures
+                        &ctx.render_textures
                             .opaque_to_transparent_blit_pipeline_no_anti_alias
                     }
                     Some(count) => {
                         return Err(AwsmError::RenderUnregisteredMsaaCount(*count));
                     }
                 },
-                &ctx.render_texture_views.opaque,
+                match &ctx.anti_aliasing.msaa_sample_count {
+                    Some(sample_count) if *sample_count == 4 => {
+                        &ctx.render_texture_views
+                            .opaque_to_transparent_blit_bind_group_msaa_4
+                    }
+                    None => {
+                        &ctx.render_texture_views
+                            .opaque_to_transparent_blit_bind_group_no_anti_alias
+                    }
+                    Some(count) => {
+                        return Err(AwsmError::RenderUnregisteredMsaaCount(*count));
+                    }
+                },
                 &ctx.render_texture_views.transparent,
                 &ctx.command_encoder,
             )?;
@@ -224,6 +235,8 @@ pub struct RenderContext<'a> {
     pub gpu: &'a AwsmRendererWebGpu,
     pub command_encoder: CommandEncoder,
     pub render_texture_views: RenderTextureViews,
+    pub logging: &'a AwsmRendererLogging,
+    pub render_textures: &'a RenderTextures,
     pub transforms: &'a Transforms,
     pub meshes: &'a Meshes,
     pub pipelines: &'a Pipelines,

@@ -28,7 +28,7 @@ use crate::{
     buffer::dynamic_uniform::DynamicUniformBuffer,
     error::AwsmError,
     render_passes::{
-        material::opaque::render_pass::MaterialOpaqueRenderPass, RenderPassInitContext,
+        material_opaque::render_pass::MaterialOpaqueRenderPass, RenderPassInitContext,
     },
     AwsmRenderer, AwsmRendererLogging,
 };

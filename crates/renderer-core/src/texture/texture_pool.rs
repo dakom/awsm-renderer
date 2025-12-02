@@ -43,10 +43,12 @@ pub struct TexturePoolEntryInfo<ID> {
     pub color: TextureColorInfo,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Ord, PartialOrd)]
 pub struct TextureColorInfo {
     pub mipmap_kind: MipmapTextureKind,
-    pub srgb_encoded: bool,
+    pub srgb_to_linear: bool,
+    // If None, use image's premultiplied alpha setting
+    pub premultiplied_alpha: Option<bool>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Ord, PartialOrd)]
@@ -232,7 +234,11 @@ impl<ID> TexturePoolArray<ID> {
             let source = image.source_info(None, None)?;
             let staging_dest = CopyExternalImageDestInfo::new(&staging_src)
                 .with_mip_level(0)
-                .with_premultiplied_alpha(image.premultiplied_alpha());
+                .with_premultiplied_alpha(
+                    color
+                        .premultiplied_alpha
+                        .unwrap_or(image.premultiplied_alpha()),
+                );
 
             gpu.copy_external_image_to_texture(
                 &source.into(),
@@ -244,7 +250,7 @@ impl<ID> TexturePoolArray<ID> {
             let layer_encoder = gpu.create_command_encoder(Some("Texture Pool Layer Upload"));
 
             // Convert sRGB to linear if needed
-            let final_staging = if color.srgb_encoded {
+            let final_staging = if color.srgb_to_linear {
                 convert_srgb_to_linear(
                     gpu,
                     &layer_encoder,

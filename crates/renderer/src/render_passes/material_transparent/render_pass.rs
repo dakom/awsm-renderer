@@ -1,8 +1,8 @@
 use crate::{
-    error::Result,
+    error::{AwsmError, Result},
     render::RenderContext,
     render_passes::{
-        material::transparent::{
+        material_transparent::{
             bind_group::MaterialTransparentBindGroups, pipeline::MaterialTransparentPipelines,
         },
         RenderPassInitContext,

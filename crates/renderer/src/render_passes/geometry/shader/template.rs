@@ -3,12 +3,7 @@ use std::collections::HashSet;
 use askama::Template;
 
 use crate::{
-    render_passes::{
-        geometry::shader::cache_key::ShaderCacheKeyGeometry,
-        material::template::{
-            ShaderTemplateVertexLocation, ShaderTemplateVertexToFragmentAssignment,
-        },
-    },
+    render_passes::geometry::shader::cache_key::ShaderCacheKeyGeometry,
     shaders::{print_shader_source, AwsmShaderError, Result},
 };
 

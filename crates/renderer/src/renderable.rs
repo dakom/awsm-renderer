@@ -11,10 +11,8 @@ use crate::{
     render::RenderContext,
     render_passes::{
         geometry::bind_group::GeometryBindGroups,
-        material::{
-            opaque::bind_group::MaterialOpaqueBindGroups,
-            transparent::bind_group::MaterialTransparentBindGroups,
-        },
+        material_opaque::bind_group::MaterialOpaqueBindGroups,
+        material_transparent::bind_group::MaterialTransparentBindGroups,
     },
     transforms::TransformKey,
     AwsmRenderer,

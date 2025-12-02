@@ -21,7 +21,6 @@ use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, Pipelin
 use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
 use crate::pipelines::Pipelines;
 use crate::render_passes::geometry::shader::cache_key::ShaderCacheKeyGeometry;
-use crate::render_passes::material::opaque::bind_group::MaterialOpaqueBindGroups;
 use crate::render_passes::{geometry::bind_group::GeometryBindGroups, RenderPassInitContext};
 use crate::render_textures::RenderTextureFormats;
 use crate::shaders::{ShaderKey, Shaders};

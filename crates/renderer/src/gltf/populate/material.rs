@@ -8,16 +8,13 @@ use crate::{
     gltf::{
         buffers::MeshBufferInfoWithOffset,
         error::{AwsmGltfError, Result},
+        populate::GltfTextureKey,
     },
     materials::{
         pbr::{PbrMaterial, VertexColorInfo},
         MaterialAlphaMode,
     },
     mesh::{MeshBufferCustomVertexAttributeInfo, MeshBufferInfo, MeshBufferVertexAttributeInfo},
-    render_passes::material::{
-        cache_key::ShaderCacheKeyMaterial,
-        transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent,
-    },
     textures::{SamplerCacheKey, SamplerKey, TextureKey, TextureTransform, TextureTransformKey},
     AwsmRenderer,
 };
@@ -35,12 +32,15 @@ impl GltfMaterialInfo {
         primitive_buffer_info: &MeshBufferInfoWithOffset,
         gltf_material: gltf::Material<'_>,
     ) -> Result<Self> {
-        let alpha_mode = match gltf_material.alpha_mode() {
-            gltf::material::AlphaMode::Opaque => MaterialAlphaMode::Opaque,
-            gltf::material::AlphaMode::Mask => MaterialAlphaMode::Mask {
-                cutoff: gltf_material.alpha_cutoff().unwrap_or(0.5),
-            },
-            gltf::material::AlphaMode::Blend => MaterialAlphaMode::Blend,
+        let (alpha_mode, premultiplied_alpha) = match gltf_material.alpha_mode() {
+            gltf::material::AlphaMode::Opaque => (MaterialAlphaMode::Opaque, None),
+            gltf::material::AlphaMode::Mask => (
+                MaterialAlphaMode::Mask {
+                    cutoff: gltf_material.alpha_cutoff().unwrap_or(0.5),
+                },
+                Some(true),
+            ),
+            gltf::material::AlphaMode::Blend => (MaterialAlphaMode::Blend, Some(true)),
         };
         let mut material = PbrMaterial::new(alpha_mode, gltf_material.double_sided());
 
@@ -52,7 +52,18 @@ impl GltfMaterialInfo {
                 texture_key,
                 sampler_key,
                 texture_transform_key,
-            } = tex.create_material_cache_key(renderer, ctx).await?;
+            } = tex
+                .create_material_cache_key(
+                    renderer,
+                    ctx,
+                    TextureColorInfo {
+                        mipmap_kind: MipmapTextureKind::Albedo,
+                        srgb_to_linear: true,
+                        premultiplied_alpha,
+                    },
+                )
+                .await?;
+
             material.base_color_tex = Some(texture_key);
             material.base_color_sampler = Some(sampler_key);
             material.base_color_uv_index = Some(uv_index as u32);
@@ -65,7 +76,17 @@ impl GltfMaterialInfo {
                 texture_key,
                 sampler_key,
                 texture_transform_key,
-            } = tex.create_material_cache_key(renderer, ctx).await?;
+            } = tex
+                .create_material_cache_key(
+                    renderer,
+                    ctx,
+                    TextureColorInfo {
+                        mipmap_kind: MipmapTextureKind::MetallicRoughness,
+                        srgb_to_linear: false,
+                        premultiplied_alpha,
+                    },
+                )
+                .await?;
             material.metallic_roughness_tex = Some(texture_key);
             material.metallic_roughness_sampler = Some(sampler_key);
             material.metallic_roughness_uv_index = Some(uv_index as u32);
@@ -78,7 +99,17 @@ impl GltfMaterialInfo {
                 texture_key,
                 sampler_key,
                 texture_transform_key,
-            } = tex.create_material_cache_key(renderer, ctx).await?;
+            } = tex
+                .create_material_cache_key(
+                    renderer,
+                    ctx,
+                    TextureColorInfo {
+                        mipmap_kind: MipmapTextureKind::Normal,
+                        srgb_to_linear: false,
+                        premultiplied_alpha,
+                    },
+                )
+                .await?;
 
             material.normal_tex = Some(texture_key);
             material.normal_sampler = Some(sampler_key);
@@ -92,7 +123,17 @@ impl GltfMaterialInfo {
                 texture_key,
                 sampler_key,
                 texture_transform_key,
-            } = tex.create_material_cache_key(renderer, ctx).await?;
+            } = tex
+                .create_material_cache_key(
+                    renderer,
+                    ctx,
+                    TextureColorInfo {
+                        mipmap_kind: MipmapTextureKind::Occlusion,
+                        srgb_to_linear: false,
+                        premultiplied_alpha,
+                    },
+                )
+                .await?;
 
             material.occlusion_tex = Some(texture_key);
             material.occlusion_sampler = Some(sampler_key);
@@ -106,7 +147,17 @@ impl GltfMaterialInfo {
                 texture_key,
                 sampler_key,
                 texture_transform_key,
-            } = tex.create_material_cache_key(renderer, ctx).await?;
+            } = tex
+                .create_material_cache_key(
+                    renderer,
+                    ctx,
+                    TextureColorInfo {
+                        mipmap_kind: MipmapTextureKind::Emissive,
+                        srgb_to_linear: true,
+                        premultiplied_alpha,
+                    },
+                )
+                .await?;
 
             material.emissive_tex = Some(texture_key);
             material.emissive_sampler = Some(sampler_key);
@@ -335,13 +386,19 @@ impl GltfTextureInfo {
         &self,
         renderer: &mut AwsmRenderer,
         ctx: &GltfPopulateContext,
+        color: TextureColorInfo,
     ) -> Result<GLtfMaterialCacheKey> {
-        let texture_key = {
-            let textures = ctx.textures.lock().unwrap();
-            textures.get(&self.index).cloned()
+        let lookup_key = GltfTextureKey {
+            index: self.index,
+            color,
         };
 
         let sampler_key = self.create_sampler_key(renderer, ctx)?;
+
+        let texture_key = {
+            let textures = ctx.textures.lock().unwrap();
+            textures.get(&lookup_key).cloned()
+        };
 
         let texture_key = match texture_key {
             Some(texture_key) => texture_key,
@@ -359,71 +416,14 @@ impl GltfTextureInfo {
                     .get(texture_index)
                     .ok_or(AwsmGltfError::MissingTextureIndex(texture_index))?;
 
-                let color_info = {
-                    // for BaseColor and Emissive, use sRGB
-                    // for everything else, use linear
-
-                    let mut srgb_encoded = false;
-                    for material in ctx.data.doc.materials() {
-                        let pbr = material.pbr_metallic_roughness();
-                        if let Some(tex) = pbr.base_color_texture() {
-                            if tex.texture().index() == self.index {
-                                srgb_encoded = true;
-                                break;
-                            }
-                        }
-                        if let Some(tex) = material.emissive_texture() {
-                            if tex.texture().index() == self.index {
-                                srgb_encoded = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    let mut mipmap_kind = MipmapTextureKind::Albedo;
-
-                    for material in ctx.data.doc.materials() {
-                        let pbr = material.pbr_metallic_roughness();
-                        if let Some(tex) = pbr.metallic_roughness_texture() {
-                            if tex.texture().index() == self.index {
-                                mipmap_kind = MipmapTextureKind::MetallicRoughness;
-                                break;
-                            }
-                        }
-                        if let Some(tex) = material.normal_texture() {
-                            if tex.texture().index() == self.index {
-                                mipmap_kind = MipmapTextureKind::Normal;
-                                break;
-                            }
-                        }
-                        if let Some(tex) = material.occlusion_texture() {
-                            if tex.texture().index() == self.index {
-                                mipmap_kind = MipmapTextureKind::Occlusion;
-                                break;
-                            }
-                        }
-                        if let Some(tex) = material.emissive_texture() {
-                            if tex.texture().index() == self.index {
-                                mipmap_kind = MipmapTextureKind::Emissive;
-                                break;
-                            }
-                        }
-                    }
-
-                    TextureColorInfo {
-                        srgb_encoded,
-                        mipmap_kind,
-                    }
-                };
-
                 let texture_key = renderer.textures.add_image(
                     image_data.clone(),
                     image_data.format(),
                     sampler_key,
-                    color_info,
+                    color,
                 )?;
 
-                ctx.textures.lock().unwrap().insert(self.index, texture_key);
+                ctx.textures.lock().unwrap().insert(lookup_key, texture_key);
 
                 texture_key
             }

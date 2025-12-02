@@ -26,10 +26,12 @@ use crate::mesh::{
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
 use crate::pipelines::Pipelines;
-use crate::render_passes::material::cache_key::ShaderCacheKeyMaterial;
-use crate::render_passes::material::transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent;
 use crate::render_passes::{
-    material::transparent::bind_group::MaterialTransparentBindGroups, RenderPassInitContext,
+    material_transparent::{
+        bind_group::MaterialTransparentBindGroups,
+        shader::cache_key::ShaderCacheKeyMaterialTransparent,
+    },
+    RenderPassInitContext,
 };
 use crate::render_textures::RenderTextureFormats;
 use crate::shaders::{ShaderKey, Shaders};
@@ -103,17 +105,12 @@ impl MaterialTransparentPipelines {
             instancing_transforms: mesh.instanced,
         };
 
-        let shader_key = shaders
-            .get_key(
-                gpu,
-                ShaderCacheKeyMaterial::Transparent(shader_cache_key.clone()),
-            )
-            .await?;
+        let shader_key = shaders.get_key(gpu, shader_cache_key).await?;
 
         let color_targets = &[ColorTargetState::new(render_texture_formats.transparent)
             .with_blend(BlendState::new(
                 BlendComponent::new()
-                    .with_src_factor(BlendFactor::SrcAlpha)
+                    .with_src_factor(BlendFactor::One)
                     .with_dst_factor(BlendFactor::OneMinusSrcAlpha)
                     .with_operation(BlendOperation::Add),
                 BlendComponent::new()

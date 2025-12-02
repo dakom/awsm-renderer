@@ -1,11 +1,14 @@
 use std::{borrow::Cow, cell::RefCell, collections::HashMap};
 
+use web_sys::GpuTextureView;
+
 use crate::{
     bind_groups::{
         BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
         BindGroupLayoutResource, BindGroupResource, TextureBindingLayout,
     },
     command::{
+        color::Color,
         render_pass::{ColorAttachment, RenderPassDescriptor},
         LoadOp, StoreOp,
     },
@@ -77,7 +80,7 @@ static SHADER_SOURCE: &'static str = r#"
     }
 "#;
 
-pub async fn blit_tex(
+pub async fn blit_tex_simple(
     gpu: &AwsmRendererWebGpu,
     src_view: &web_sys::GpuTextureView,
     dst_view: &web_sys::GpuTextureView,
@@ -86,41 +89,25 @@ pub async fn blit_tex(
     command_encoder: &crate::command::CommandEncoder,
 ) -> Result<()> {
     let pipeline = blit_get_pipeline(gpu, dst_format, dst_sample_count).await?;
-    blit_tex_with_pipeline(gpu, &pipeline, src_view, dst_view, command_encoder)?;
+    let bind_group = blit_get_bind_group(gpu, &pipeline, src_view);
+    blit_tex(&pipeline, &bind_group, dst_view, command_encoder)?;
 
     Ok(())
 }
-pub fn blit_tex_with_pipeline(
-    gpu: &AwsmRendererWebGpu,
+
+pub fn blit_tex(
     pipeline: &BlitPipeline,
-    src_view: &web_sys::GpuTextureView,
+    bind_group: &web_sys::GpuBindGroup,
     dst_view: &web_sys::GpuTextureView,
     command_encoder: &crate::command::CommandEncoder,
 ) -> Result<()> {
-    let BlitPipeline {
-        render_pipeline,
-        bind_group_layout,
-    } = pipeline;
-    // Create bind group
-    let bind_group = gpu.create_bind_group(&<web_sys::GpuBindGroupDescriptor>::from(
-        BindGroupDescriptor::new(
-            &bind_group_layout,
-            Some("Blit Bind Group"),
-            vec![BindGroupEntry::new(
-                0,
-                BindGroupResource::TextureView(Cow::Borrowed(&src_view)),
-            )],
-        ),
-    ));
-
     let render_pass = command_encoder.begin_render_pass(
         &RenderPassDescriptor {
             label: Some("Blit Render Pass"),
-            color_attachments: vec![ColorAttachment::new(
-                &dst_view,
-                LoadOp::Clear,
-                StoreOp::Store,
-            )],
+            color_attachments: vec![
+                ColorAttachment::new(&dst_view, LoadOp::Clear, StoreOp::Store)
+                    .with_clear_color(Color::ZERO),
+            ],
             depth_stencil_attachment: None,
             ..Default::default()
         }
@@ -128,13 +115,31 @@ pub fn blit_tex_with_pipeline(
     )?;
 
     render_pass.set_bind_group(0, &bind_group, None)?;
-    render_pass.set_pipeline(&render_pipeline);
+    render_pass.set_pipeline(&pipeline.render_pipeline);
 
     render_pass.draw(3);
 
     render_pass.end();
 
     Ok(())
+}
+
+pub fn blit_get_bind_group(
+    gpu: &AwsmRendererWebGpu,
+    pipeline: &BlitPipeline,
+    src_view: &GpuTextureView,
+) -> web_sys::GpuBindGroup {
+    gpu.create_bind_group(
+        &BindGroupDescriptor::new(
+            &pipeline.bind_group_layout,
+            Some("Blit Bind Group"),
+            vec![BindGroupEntry::new(
+                0,
+                BindGroupResource::TextureView(Cow::Borrowed(src_view)),
+            )],
+        )
+        .into(),
+    )
 }
 
 pub async fn blit_get_pipeline(

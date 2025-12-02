@@ -25,7 +25,7 @@ pub enum ImageData {
 }
 
 // If we don't set premultiply, the browser will use the default, which may be to apply it - or NOT!
-// Recommendation here is to set it explicitly to none rather than relying on defaults.
+// Recommendation here is to set it explicitly rather than relying on defaults.
 // However, for color space conversion, we want the browser to optimally try to load the image in the best color space it can.
 // Since we don't have full control over the image loading process, we might as well let the browser handle it
 // and then we at least *more* safely assume it's srgb, which is the most common color space for web images.
@@ -140,7 +140,9 @@ impl ImageData {
         &self,
         gpu: &AwsmRendererWebGpu,
         source_info: Option<CopyExternalImageSourceInfo<'_>>,
-        generate_mipmap: bool,
+        mipmap_kind: Option<MipmapTextureKind>,
+        // if None, will try to determine from source image options
+        premultiply_alpha: Option<bool>,
     ) -> Result<web_sys::GpuTexture> {
         let mut usage = TextureUsage::new()
             .with_texture_binding()
@@ -148,7 +150,7 @@ impl ImageData {
             .with_render_attachment()
             .with_copy_dst();
 
-        if generate_mipmap {
+        if mipmap_kind.is_some() {
             usage = usage.with_storage_binding();
         }
 
@@ -162,36 +164,30 @@ impl ImageData {
         };
 
         let mut descriptor = TextureDescriptor::new(self.format(), self.extent_3d(), usage);
-        let mipmap_levels = if generate_mipmap {
+        let mipmap_levels = if mipmap_kind.is_some() {
             let (width, height) = self.size();
 
             let mipmap_levels = mipmap::calculate_mipmap_levels(width, height);
 
             descriptor = descriptor.with_mip_level_count(mipmap_levels);
 
-            Some(mipmap_levels)
+            mipmap_levels
         } else {
-            None
+            0
         };
 
         let texture = gpu.create_texture(&descriptor.into())?;
 
         let mut dest = CopyExternalImageDestInfo::new(&texture)
-            .with_premultiplied_alpha(self.premultiplied_alpha());
+            .with_premultiplied_alpha(premultiply_alpha.unwrap_or(self.premultiplied_alpha()));
 
-        if generate_mipmap {
+        if mipmap_kind.is_some() {
             dest = dest.with_mip_level(0);
         }
         gpu.copy_external_image_to_texture(&source.into(), &dest.into(), &self.extent_3d().into())?;
 
-        if let Some(mipmap_levels) = mipmap_levels {
-            generate_mipmaps(
-                gpu,
-                &texture,
-                &[MipmapTextureKind::Albedo], // assuming albedo for now
-                mipmap_levels,
-            )
-            .await?;
+        if let Some(mipmap_kind) = mipmap_kind {
+            generate_mipmaps(gpu, &texture, &[mipmap_kind], mipmap_levels).await?;
         }
 
         Ok(texture)

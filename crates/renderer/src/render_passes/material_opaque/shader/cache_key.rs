@@ -1,7 +1,7 @@
 use crate::{
     mesh::{MeshBufferInfo, MeshBufferVertexAttributeInfo},
     render_passes::{
-        material::cache_key::ShaderCacheKeyMaterial, shader_cache_key::ShaderCacheKeyRenderPass,
+        shader_cache_key::ShaderCacheKeyRenderPass,
         shared::opaque_and_transparency::cache_key::ShaderMaterialVertexAttributes,
     },
     shaders::ShaderCacheKey,
@@ -18,8 +18,6 @@ pub struct ShaderCacheKeyMaterialOpaque {
 
 impl From<ShaderCacheKeyMaterialOpaque> for ShaderCacheKey {
     fn from(key: ShaderCacheKeyMaterialOpaque) -> Self {
-        ShaderCacheKey::RenderPass(ShaderCacheKeyRenderPass::Material(
-            ShaderCacheKeyMaterial::Opaque(key),
-        ))
+        ShaderCacheKey::RenderPass(ShaderCacheKeyRenderPass::MaterialOpaque(key))
     }
 }

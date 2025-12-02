@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+use awsm_renderer_core::{renderer::AwsmRendererWebGpu, texture::texture_pool::TextureColorInfo};
 use glam::Mat4;
 
 use crate::{
@@ -24,13 +24,19 @@ pub(super) mod transforms;
 
 pub(crate) struct GltfPopulateContext {
     pub data: Arc<GltfData>,
-    pub textures: Mutex<HashMap<GltfIndex, TextureKey>>,
+    pub textures: Mutex<HashMap<GltfTextureKey, TextureKey>>,
     pub node_to_transform: Mutex<HashMap<GltfIndex, TransformKey>>,
     pub node_to_skin_transform:
         Mutex<HashMap<GltfIndex, (Vec<TransformKey>, Vec<SkinInverseBindMatrix>)>>,
     pub transform_is_joint: Mutex<HashSet<TransformKey>>,
     pub transform_is_instanced: Mutex<HashSet<TransformKey>>,
     pub generate_mipmaps: bool,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct GltfTextureKey {
+    pub index: GltfIndex,
+    pub color: TextureColorInfo,
 }
 
 type SkinInverseBindMatrix = Mat4;

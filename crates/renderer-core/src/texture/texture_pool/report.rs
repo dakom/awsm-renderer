@@ -25,7 +25,8 @@ pub struct TexturePoolArrayReport<ID> {
 pub struct TexturePoolEntryReport<ID> {
     pub id: ID,
     pub mipmap_kind: String,
-    pub srgb_encoded: bool,
+    pub srgb_to_linear: bool,
+    pub premultiplied_alpha: Option<bool>,
 }
 
 impl<ID> super::TexturePool<ID> {
@@ -42,7 +43,8 @@ impl<ID> super::TexturePool<ID> {
                 entries_report.push(TexturePoolEntryReport {
                     id: id.clone(),
                     mipmap_kind: format!("{:?}", color_info.mipmap_kind),
-                    srgb_encoded: color_info.srgb_encoded,
+                    srgb_to_linear: color_info.srgb_to_linear,
+                    premultiplied_alpha: color_info.premultiplied_alpha,
                 });
             }
 

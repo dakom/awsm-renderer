@@ -14,25 +14,27 @@ struct FragmentInput {
 
 struct FragmentOutput {
     // Rgba16float
-    @location(0) oit_color: vec4<f32>,
+    @location(0) color: vec4<f32>,
 }
 
 @fragment
 fn fs_main(input: FragmentInput) -> FragmentOutput {
     var out: FragmentOutput;
 
+    // FIXME
     // 1. Get material from mesh_meta
-    let material_offset = mesh_meta.material_offset;
+    let material_offset = 0u;
     let material = pbr_get_material(material_offset);
 
-    // 2. For now, just sample the base color texture if it exists
-    var base_color = material.base_color_factor;
+
+    var tex_color = vec4<f32>(1.0);
     if (material.has_base_color_texture) {
-        let tex_color = texture_pool_sample(material.base_color_tex_info, input.uv_0);
-        base_color *= tex_color;
+        tex_color = texture_pool_sample(material.base_color_tex_info, input.uv_0);
     }
 
-    out.oit_color = vec4<f32>(base_color.rgb, base_color.a);
+    out.color = tex_color;
+    // Premultiply alpha
+    //out.color = vec4<f32>(tex_color.rgb * tex_color.a, tex_color.a);
 
     return out;
 }

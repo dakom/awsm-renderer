@@ -2,7 +2,7 @@
 // make sure this matches MATERIAL_MESH_META_BYTE_ALIGNMENT in material_opaque_meta.rs
 const META_SIZE_IN_BYTES = 68u;
 
-struct MeshMeta {
+struct MaterialMeshMeta {
     mesh_key_high: u32,
     mesh_key_low: u32,
     morph_material_target_len: u32,

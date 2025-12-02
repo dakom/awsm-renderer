@@ -1,6 +1,6 @@
 use crate::{
     render_passes::{
-        material::cache_key::ShaderCacheKeyMaterial, shader_cache_key::ShaderCacheKeyRenderPass,
+        shader_cache_key::ShaderCacheKeyRenderPass,
         shared::opaque_and_transparency::cache_key::ShaderMaterialVertexAttributes,
     },
     shaders::ShaderCacheKey,
@@ -18,8 +18,6 @@ pub struct ShaderCacheKeyMaterialTransparent {
 
 impl From<ShaderCacheKeyMaterialTransparent> for ShaderCacheKey {
     fn from(key: ShaderCacheKeyMaterialTransparent) -> Self {
-        ShaderCacheKey::RenderPass(ShaderCacheKeyRenderPass::Material(
-            ShaderCacheKeyMaterial::Transparent(key),
-        ))
+        ShaderCacheKey::RenderPass(ShaderCacheKeyRenderPass::MaterialTransparent(key))
     }
 }

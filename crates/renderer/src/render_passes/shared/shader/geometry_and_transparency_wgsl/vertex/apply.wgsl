@@ -28,7 +28,7 @@ fn apply_vertex(vertex_orig: ApplyVertexInput) -> ApplyVertexOutput {
     var tangent = vertex_orig.tangent;
 
     // Apply morphs to position, normal, and tangent
-    if mesh_meta.morph_geometry_target_len != 0 {
+    if geometry_mesh_meta.morph_geometry_target_len != 0 {
         vertex = apply_position_morphs(vertex);
 
         // Apply morphed normals (correct behavior)
@@ -37,7 +37,7 @@ fn apply_vertex(vertex_orig: ApplyVertexInput) -> ApplyVertexOutput {
     }
 
     // Apply skinning to position, normal, and tangent
-    if mesh_meta.skin_sets_len != 0 {
+    if geometry_mesh_meta.skin_sets_len != 0 {
         vertex = apply_position_skin(vertex);
         normal = apply_normal_skin(vertex_orig, normal);
         tangent = vec4<f32>(apply_normal_skin(vertex_orig, tangent.xyz), tangent.w);
@@ -52,9 +52,9 @@ fn apply_vertex(vertex_orig: ApplyVertexInput) -> ApplyVertexOutput {
             vertex.instance_transform_row_3,
         );
 
-        let model_transform = get_model_transform(mesh_meta.transform_offset) * instance_transform;
+        let model_transform = get_model_transform(geometry_mesh_meta.transform_offset) * instance_transform;
     {% else %}
-        let model_transform = get_model_transform(mesh_meta.transform_offset);
+        let model_transform = get_model_transform(geometry_mesh_meta.transform_offset);
     {% endif %}
 
     let pos = model_transform * vec4<f32>(vertex.position, 1.0);

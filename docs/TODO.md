@@ -1,3 +1,9 @@
+- fix premultiplied alpha in transparent pass
+
+- properly resolve MSAA in transparency pass
+  - but make sure we can do this with multiple passes _before_ resolving to draw all meshes 
+  - composite pass should then just get a non-MSAA texture
+
 - vertex buffer data from non-geometry attributes (what we use for storage in opaque)
 
 - strip out MeshBufferCustomVertexAttributeInfo::Joints and MeshBufferCustomVertexAttributeInfo::Weights 

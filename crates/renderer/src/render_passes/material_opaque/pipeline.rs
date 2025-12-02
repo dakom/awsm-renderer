@@ -19,10 +19,11 @@ use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, Pipelin
 use crate::pipelines::compute_pipeline::{ComputePipelineCacheKey, ComputePipelineKey};
 use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
 use crate::pipelines::Pipelines;
-use crate::render_passes::material::cache_key::ShaderCacheKeyMaterial;
-use crate::render_passes::material::opaque::shader::cache_key::ShaderCacheKeyMaterialOpaque;
 use crate::render_passes::{
-    material::opaque::bind_group::MaterialOpaqueBindGroups, RenderPassInitContext,
+    material_opaque::{
+        bind_group::MaterialOpaqueBindGroups, shader::cache_key::ShaderCacheKeyMaterialOpaque,
+    },
+    RenderPassInitContext,
 };
 use crate::shaders::{ShaderKey, Shaders};
 use crate::textures::{AwsmTextureError, Textures};
@@ -94,12 +95,7 @@ impl MaterialOpaquePipelines {
             mipmaps: anti_aliasing.mipmap,
         };
 
-        let shader_key = shaders
-            .get_key(
-                gpu,
-                ShaderCacheKeyMaterial::Opaque(shader_cache_key.clone()),
-            )
-            .await?;
+        let shader_key = shaders.get_key(gpu, shader_cache_key).await?;
 
         let compute_pipeline_cache_key = ComputePipelineCacheKey::new(
             shader_key,

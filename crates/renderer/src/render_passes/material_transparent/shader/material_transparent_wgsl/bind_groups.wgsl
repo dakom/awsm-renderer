@@ -20,4 +20,4 @@
     @group(2) @binding({{ texture_pool_arrays_len + i }}u) var pool_sampler_{{ i }}: sampler;
 {% endfor %}
 
-@group(3) @binding(0) var<uniform> mesh_meta: GeometryMeshMeta;
+@group(3) @binding(0) var<uniform> geometry_mesh_meta: GeometryMeshMeta;
