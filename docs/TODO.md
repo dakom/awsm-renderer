@@ -1,3 +1,5 @@
+# Fix recursive skeleton bug
+
 # Transparency Pass
 
 - vertex buffer data from non-geometry attributes (what we use for storage in opaque)

@@ -1,3 +1,16 @@
+// Get the UV coordinates for a given texture based on its UV set index
+// UVs are already interpolated by hardware and available in FragmentInput
+fn texture_uv(tex_info: TextureInfo, fragment_input: FragmentInput) -> vec2<f32> {
+    // Select the appropriate UV set based on tex_info.uv_set_index
+    {% for i in 0..uv_sets %}
+        if tex_info.uv_set_index == {{ i }}u {
+            return fragment_input.uv_{{ i }};
+        }
+    {% endfor %}
+    // No UV sets available
+    return vec2<f32>(0.0);
+}
+
 fn texture_pool_sample(info: TextureInfo, uv: vec2<f32>) -> vec4<f32> {
       // Apply texture transform
       let transformed_uv = texture_transform_uvs(uv, info);

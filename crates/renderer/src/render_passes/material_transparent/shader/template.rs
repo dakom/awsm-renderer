@@ -26,6 +26,7 @@ pub struct ShaderTemplateTransparentMaterialIncludes {
     pub texture_pool_arrays_len: u32,
     pub texture_pool_samplers_len: u32,
     pub color_sets: Option<u32>,
+    pub uv_sets: u32,
     pub debug: ShaderTemplateMaterialTransparentDebug,
 }
 impl ShaderTemplateTransparentMaterialIncludes {
@@ -37,6 +38,7 @@ impl ShaderTemplateTransparentMaterialIncludes {
             texture_pool_arrays_len: cache_key.texture_pool_arrays_len,
             texture_pool_samplers_len: cache_key.texture_pool_samplers_len,
             color_sets: cache_key.attributes.color_sets,
+            uv_sets: cache_key.attributes.uv_sets.unwrap_or_default(),
             debug: ShaderTemplateMaterialTransparentDebug::new(),
         }
     }

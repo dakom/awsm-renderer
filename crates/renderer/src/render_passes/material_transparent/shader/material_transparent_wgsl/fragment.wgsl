@@ -28,7 +28,6 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
     // Sample all PBR material textures and compute material properties
     let material_color = pbr_get_material_color(
         material,
-        input.uv_0,
         input.world_normal,
         input.world_tangent,
         input

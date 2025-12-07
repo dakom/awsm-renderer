@@ -473,6 +473,16 @@ fn main(
         }
     {% endif %}
 
+
+    {% if debug.normals %}
+        // Debug visualization: encode normal as color
+        textureStore(opaque_tex, coords, vec4<f32>(debug_normals(world_normal), 1.0));
+        return;
+    {% else if debug.base_color %}
+        textureStore(opaque_tex, coords, material_color.base);
+        return;
+    {% endif %}
+
     // Write to output texture in the case of no MSAA or non-edge pixel
     textureStore(opaque_tex, coords, vec4<f32>(color, material_color.base.a));
 }

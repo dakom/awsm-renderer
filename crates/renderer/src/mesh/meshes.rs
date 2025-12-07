@@ -250,6 +250,22 @@ impl Meshes {
         //     );
         // }
 
+        // for attr in buffer_info.triangles.vertex_attributes.iter() {
+        //     match attr {
+        //         crate::mesh::MeshBufferVertexAttributeInfo::Custom(
+        //             crate::mesh::MeshBufferCustomVertexAttributeInfo::Colors { .. },
+        //         ) => {
+        //             tracing::info!(
+        //                 "attribute data {:?}: {:?}",
+        //                 attr,
+        //                 buffer_info
+        //                     .triangles
+        //                     .debug_get_attribute_vec_f32(attr, attribute_data)
+        //             );
+        //         }
+        //         _ => {}
+        //     }
+        // }
         self.meta.insert(
             key,
             &mesh,

@@ -130,11 +130,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
         };
         let multisampled_geometry = value.msaa_sample_count.is_some();
         let msaa_sample_count = value.msaa_sample_count.unwrap_or_default();
-        let debug = ShaderTemplateMaterialOpaqueDebug {
-            mips: false,
-            msaa_detect_edges: false,
-            ..Default::default()
-        };
+        let debug = ShaderTemplateMaterialOpaqueDebug::new();
 
         let _self = Self {
             bind_groups: ShaderTemplateMaterialOpaqueBindGroups {
@@ -182,7 +178,7 @@ struct ShaderTemplateMaterialOpaqueDebug {
     mips: bool,
     n_dot_v: bool,
     normals: bool,
-    solid_color: bool,
+    base_color: bool,
     view_direction: bool,
     irradiance_sample: bool,
     msaa_detect_edges: bool,
@@ -190,11 +186,14 @@ struct ShaderTemplateMaterialOpaqueDebug {
 }
 
 impl ShaderTemplateMaterialOpaqueDebug {
+    pub fn new() -> Self {
+        Self { ..Self::default() }
+    }
     pub fn any(&self) -> bool {
         self.mips
             || self.n_dot_v
             || self.normals
-            || self.solid_color
+            || self.base_color
             || self.view_direction
             || self.irradiance_sample
             || self.msaa_detect_edges

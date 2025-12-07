@@ -6,12 +6,11 @@
 // Returns PbrMaterialColor with perturbed normal (use material_color.normal for lighting!)
 fn pbr_get_material_color(
     material: PbrMaterial,
-    uv: vec2<f32>,
     world_normal: vec3<f32>,
     world_tangent: vec4<f32>,
     fragment_input: FragmentInput
 ) -> PbrMaterialColor {
-    var base = pbr_material_base_color(material, uv);
+    var base = pbr_material_base_color(material, fragment_input);
 
     // Multiply base color by vertex color if material has color info
     {%- if color_sets.is_some() %}
@@ -29,10 +28,10 @@ fn pbr_get_material_color(
         }
     }
 
-    let metallic_roughness = pbr_material_metallic_roughness(material, uv);
-    let normal = pbr_normal(material, uv, world_normal, world_tangent);
-    let occlusion = pbr_occlusion(material, uv);
-    let emissive = pbr_emissive(material, uv);
+    let metallic_roughness = pbr_material_metallic_roughness(material, fragment_input);
+    let normal = pbr_normal(material, world_normal, world_tangent, fragment_input);
+    let occlusion = pbr_occlusion(material, fragment_input);
+    let emissive = pbr_emissive(material, fragment_input);
 
     return PbrMaterialColor(
         base,
@@ -46,10 +45,11 @@ fn pbr_get_material_color(
 // Sample base color texture and apply material factor
 fn pbr_material_base_color(
     material: PbrMaterial,
-    uv: vec2<f32>
+    fragment_input: FragmentInput
 ) -> vec4<f32> {
     var color = material.base_color_factor;
     if material.has_base_color_texture {
+        let uv = texture_uv(material.base_color_tex_info, fragment_input);
         color *= texture_pool_sample(material.base_color_tex_info, uv);
     }
     return color;
@@ -59,10 +59,11 @@ fn pbr_material_base_color(
 // glTF uses B channel for metallic, G channel for roughness
 fn pbr_material_metallic_roughness(
     material: PbrMaterial,
-    uv: vec2<f32>
+    fragment_input: FragmentInput
 ) -> vec2<f32> {
     var color = vec2<f32>(material.metallic_factor, material.roughness_factor);
     if material.has_metallic_roughness_texture {
+        let uv = texture_uv(material.metallic_roughness_tex_info, fragment_input);
         let tex = texture_pool_sample(material.metallic_roughness_tex_info, uv);
         color *= vec2<f32>(tex.b, tex.g);
     }
@@ -73,15 +74,16 @@ fn pbr_material_metallic_roughness(
 // Much simpler than compute version - relies on vertex shader providing correct tangents
 fn pbr_normal(
     material: PbrMaterial,
-    uv: vec2<f32>,
     world_normal: vec3<f32>,
-    world_tangent: vec4<f32>  // w = handedness (+1 or -1)
+    world_tangent: vec4<f32>,  // w = handedness (+1 or -1)
+    fragment_input: FragmentInput
 ) -> vec3<f32> {
     if !material.has_normal_texture {
         return normalize(world_normal);
     }
 
     // Sample normal map and unpack from [0,1] to [-1,1] range
+    let uv = texture_uv(material.normal_tex_info, fragment_input);
     let tex = texture_pool_sample(material.normal_tex_info, uv);
     let tangent_normal = vec3<f32>(
         (tex.r * 2.0 - 1.0) * material.normal_scale,
@@ -102,10 +104,11 @@ fn pbr_normal(
 // Sample occlusion texture and apply strength factor
 fn pbr_occlusion(
     material: PbrMaterial,
-    uv: vec2<f32>
+    fragment_input: FragmentInput
 ) -> f32 {
     var occlusion = 1.0;
     if material.has_occlusion_texture {
+        let uv = texture_uv(material.occlusion_tex_info, fragment_input);
         let tex = texture_pool_sample(material.occlusion_tex_info, uv);
         occlusion = mix(1.0, tex.r, material.occlusion_strength);
     }
@@ -115,10 +118,11 @@ fn pbr_occlusion(
 // Sample emissive texture and apply factors
 fn pbr_emissive(
     material: PbrMaterial,
-    uv: vec2<f32>
+    fragment_input: FragmentInput
 ) -> vec3<f32> {
     var color = material.emissive_factor;
     if material.has_emissive_texture {
+        let uv = texture_uv(material.emissive_tex_info, fragment_input);
         color *= texture_pool_sample(material.emissive_tex_info, uv).rgb;
     }
     color *= material.emissive_strength;
