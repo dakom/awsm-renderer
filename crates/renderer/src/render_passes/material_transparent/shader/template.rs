@@ -25,6 +25,8 @@ pub struct ShaderTemplateTransparentMaterialIncludes {
     pub instancing_transforms: bool,
     pub texture_pool_arrays_len: u32,
     pub texture_pool_samplers_len: u32,
+    pub color_sets: Option<u32>,
+    pub debug: ShaderTemplateMaterialTransparentDebug,
 }
 impl ShaderTemplateTransparentMaterialIncludes {
     pub fn new(cache_key: &ShaderCacheKeyMaterialTransparent) -> Self {
@@ -34,6 +36,24 @@ impl ShaderTemplateTransparentMaterialIncludes {
             instancing_transforms: cache_key.instancing_transforms,
             texture_pool_arrays_len: cache_key.texture_pool_arrays_len,
             texture_pool_samplers_len: cache_key.texture_pool_samplers_len,
+            color_sets: cache_key.attributes.color_sets,
+            debug: ShaderTemplateMaterialTransparentDebug::new(),
+        }
+    }
+
+    pub fn has_lighting_ibl(&self) -> bool {
+        match self.debug.lighting {
+            ShaderTemplateMaterialTransparentDebugLighting::None => true,
+            ShaderTemplateMaterialTransparentDebugLighting::IblOnly => true,
+            ShaderTemplateMaterialTransparentDebugLighting::PunctualOnly => false,
+        }
+    }
+
+    pub fn has_lighting_punctual(&self) -> bool {
+        match self.debug.lighting {
+            ShaderTemplateMaterialTransparentDebugLighting::None => true,
+            ShaderTemplateMaterialTransparentDebugLighting::IblOnly => false,
+            ShaderTemplateMaterialTransparentDebugLighting::PunctualOnly => true,
         }
     }
 }
@@ -88,7 +108,7 @@ impl ShaderTemplateTransparentMaterialVertex {
 
         let in_uv_set_start = in_color_set_start + color_sets;
 
-        let out_color_set_start = 2; // after world_tanget
+        let out_color_set_start = 3; // after world_tanget
         let out_uv_set_start = out_color_set_start + color_sets;
 
         Self {
@@ -121,7 +141,7 @@ impl ShaderTemplateTransparentMaterialFragment {
     pub fn new(cache_key: &ShaderCacheKeyMaterialTransparent) -> Self {
         let uv_sets = cache_key.attributes.uv_sets.unwrap_or_default();
         let color_sets = cache_key.attributes.color_sets.unwrap_or_default();
-        let in_color_set_start = 2; // after world_tangent
+        let in_color_set_start = 3; // after world_tangent
         let in_uv_set_start = in_color_set_start + color_sets;
 
         Self {
@@ -148,6 +168,33 @@ impl TryFrom<&ShaderCacheKeyMaterialTransparent> for ShaderTemplateMaterialTrans
     }
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct ShaderTemplateMaterialTransparentDebug {
+    lighting: ShaderTemplateMaterialTransparentDebugLighting,
+}
+
+impl ShaderTemplateMaterialTransparentDebug {
+    pub fn new() -> Self {
+        Self {
+            ..Default::default()
+        }
+    }
+    pub fn any(&self) -> bool {
+        !matches!(
+            self.lighting,
+            ShaderTemplateMaterialTransparentDebugLighting::None
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+enum ShaderTemplateMaterialTransparentDebugLighting {
+    #[default]
+    None,
+    IblOnly,
+    PunctualOnly,
+}
+
 impl ShaderTemplateMaterialTransparent {
     pub fn into_source(self) -> Result<String> {
         let includes_source = self.includes.render()?;
@@ -155,7 +202,7 @@ impl ShaderTemplateMaterialTransparent {
         let vertex_source = self.vertex.render()?;
         let fragment_source = self.fragment.render()?;
 
-        //print_shader_source(&vertex_source, true);
+        // print_shader_source(&includes_source, true);
 
         // debug_unique_string(1, &vertex_source, || {
         //     print_shader_source(&vertex_source, false)

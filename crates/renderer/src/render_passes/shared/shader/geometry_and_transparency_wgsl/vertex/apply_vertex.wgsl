@@ -18,6 +18,7 @@ struct ApplyVertexOutput {
     clip_position: vec4<f32>,
     world_normal: vec3<f32>,     // Transformed world-space normal
     world_tangent: vec4<f32>,    // Transformed world-space tangent (w = handedness)
+    world_position: vec3<f32>,   // Transformed world-space position
 }
 
 fn apply_vertex(vertex_orig: ApplyVertexInput) -> ApplyVertexOutput {
@@ -57,8 +58,8 @@ fn apply_vertex(vertex_orig: ApplyVertexInput) -> ApplyVertexOutput {
         let model_transform = get_model_transform(geometry_mesh_meta.transform_offset);
     {% endif %}
 
-    let pos = model_transform * vec4<f32>(vertex.position, 1.0);
-    out.clip_position = camera.view_proj * pos;
+    let world_pos = model_transform * vec4<f32>(vertex.position, 1.0);
+    out.clip_position = camera.view_proj * world_pos;
 
 
     // Transform normal to world space (use mat3 to ignore translation)
@@ -70,6 +71,8 @@ fn apply_vertex(vertex_orig: ApplyVertexInput) -> ApplyVertexOutput {
     out.world_normal = normalize(normal_matrix * normal);
 
     out.world_tangent = vec4<f32>(normalize(normal_matrix * tangent.xyz), tangent.w);
+
+    out.world_position = world_pos.xyz;
 
     return out;
 }

@@ -13,7 +13,7 @@ struct VertexInput {
     {% endif %}
 
     {% for i in 0..color_sets %}
-        @location({{ in_color_set_start + i }}) color_{{ i }}: vec2<f32>,
+        @location({{ in_color_set_start + i }}) color_{{ i }}: vec4<f32>,
     {% endfor %}
 
     {% for i in 0..uv_sets %}
@@ -23,11 +23,12 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) world_normal: vec3<f32>,     // Transformed world-space normal
-    @location(1) world_tangent: vec4<f32>,    // Transformed world-space tangent (w = handedness)
+    @location(0) world_position: vec3<f32>,     // Transformed world position
+    @location(1) world_normal: vec3<f32>,     // Transformed world-space normal
+    @location(2) world_tangent: vec4<f32>,    // Transformed world-space tangent (w = handedness)
 
     {% for i in 0..color_sets %}
-        @location({{ out_color_set_start + i }}) color_{{ i }}: vec2<f32>,
+        @location({{ out_color_set_start + i }}) color_{{ i }}: vec4<f32>,
     {% endfor %}
 
     {% for i in 0..uv_sets %}
@@ -53,6 +54,7 @@ fn vert_main(input: VertexInput) -> VertexOutput {
     ));
 
     out.clip_position = applied.clip_position;
+    out.world_position = applied.world_position;
     out.world_normal = applied.world_normal;
     out.world_tangent = applied.world_tangent;
 

@@ -3,7 +3,7 @@
 {% include "geometry_and_transparency_wgsl/vertex/transform.wgsl" %}
 {% include "geometry_and_transparency_wgsl/vertex/morph.wgsl" %}
 {% include "geometry_and_transparency_wgsl/vertex/skin.wgsl" %}
-{% include "geometry_and_transparency_wgsl/vertex/apply.wgsl" %}
+{% include "geometry_and_transparency_wgsl/vertex/apply_vertex.wgsl" %}
 
 
 //***** MAIN *****

@@ -2,9 +2,11 @@ use std::borrow::Cow;
 
 use awsm_renderer_core::bind_groups::{
     BindGroupDescriptor, BindGroupEntry, BindGroupLayoutResource, BindGroupResource,
-    BufferBindingLayout, BufferBindingType,
+    BufferBindingLayout, BufferBindingType, SamplerBindingLayout, SamplerBindingType,
+    TextureBindingLayout,
 };
 use awsm_renderer_core::buffers::BufferBinding;
+use awsm_renderer_core::texture::TextureViewDimension;
 use indexmap::IndexSet;
 
 use crate::bind_group_layout::{BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry};
@@ -179,6 +181,66 @@ impl MaterialTransparentBindGroups {
                         resource: BindGroupLayoutResource::Buffer(
                             BufferBindingLayout::new()
                                 .with_binding_type(BufferBindingType::ReadOnlyStorage),
+                        ),
+                        visibility_vertex: true,
+                        visibility_fragment: true,
+                        visibility_compute: false,
+                    },
+                    // IBL prefiltered env texture
+                    BindGroupLayoutCacheKeyEntry {
+                        resource: BindGroupLayoutResource::Texture(
+                            TextureBindingLayout::new()
+                                .with_view_dimension(TextureViewDimension::Cube),
+                        ),
+                        visibility_vertex: true,
+                        visibility_fragment: true,
+                        visibility_compute: false,
+                    },
+                    // IBL prefiltered env sampler
+                    BindGroupLayoutCacheKeyEntry {
+                        resource: BindGroupLayoutResource::Sampler(
+                            SamplerBindingLayout::new()
+                                .with_binding_type(SamplerBindingType::Filtering),
+                        ),
+                        visibility_vertex: true,
+                        visibility_fragment: true,
+                        visibility_compute: false,
+                    },
+                    // IBL irradiance env texture
+                    BindGroupLayoutCacheKeyEntry {
+                        resource: BindGroupLayoutResource::Texture(
+                            TextureBindingLayout::new()
+                                .with_view_dimension(TextureViewDimension::Cube),
+                        ),
+                        visibility_vertex: true,
+                        visibility_fragment: true,
+                        visibility_compute: false,
+                    },
+                    // IBL irradiance env sampler
+                    BindGroupLayoutCacheKeyEntry {
+                        resource: BindGroupLayoutResource::Sampler(
+                            SamplerBindingLayout::new()
+                                .with_binding_type(SamplerBindingType::Filtering),
+                        ),
+                        visibility_vertex: true,
+                        visibility_fragment: true,
+                        visibility_compute: false,
+                    },
+                    // Brdf lut texture
+                    BindGroupLayoutCacheKeyEntry {
+                        resource: BindGroupLayoutResource::Texture(
+                            TextureBindingLayout::new()
+                                .with_view_dimension(TextureViewDimension::N2d),
+                        ),
+                        visibility_vertex: true,
+                        visibility_fragment: true,
+                        visibility_compute: false,
+                    },
+                    // Brdf lut sampler
+                    BindGroupLayoutCacheKeyEntry {
+                        resource: BindGroupLayoutResource::Sampler(
+                            SamplerBindingLayout::new()
+                                .with_binding_type(SamplerBindingType::Filtering),
                         ),
                         visibility_vertex: true,
                         visibility_fragment: true,
@@ -392,6 +454,38 @@ impl MaterialTransparentBindGroups {
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(BufferBinding::new(&ctx.lights.gpu_punctual_buffer)),
+        ));
+
+        // IBL filtered env
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(
+                &ctx.lights.ibl.prefiltered_env.texture_view,
+            )),
+        ));
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Sampler(&ctx.lights.ibl.prefiltered_env.sampler),
+        ));
+
+        // IBL irradiance
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.lights.ibl.irradiance.texture_view)),
+        ));
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Sampler(&ctx.lights.ibl.irradiance.sampler),
+        ));
+
+        // BRDF lut
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.lights.brdf_lut.view)),
+        ));
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Sampler(&ctx.lights.brdf_lut.sampler),
         ));
 
         let descriptor = BindGroupDescriptor::new(

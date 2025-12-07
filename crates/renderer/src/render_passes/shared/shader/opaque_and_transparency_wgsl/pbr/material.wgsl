@@ -1,5 +1,10 @@
 const material_alignment = 512u; // must match `Materials::MAX_SIZE`
 
+// must match MaterialAlphaMode::variant_as_u32
+const ALPHA_MODE_OPAQUE: u32 = 0u;
+const ALPHA_MODE_MASK: u32 = 1u;
+const ALPHA_MODE_BLEND: u32 = 2u;
+
 // This must match PbrMaterial in Rust
 // and the size is PbrMaterial::BYTE_SIZE
 struct PbrMaterialRaw {

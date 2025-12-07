@@ -1,10 +1,11 @@
 // Fragment input from vertex shader
 struct FragmentInput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) world_normal: vec3<f32>,     // Transformed world-space normal
-    @location(1) world_tangent: vec4<f32>,    // Transformed world-space tangent (w = handedness)
+    @location(0) world_position: vec3<f32>,     // World position
+    @location(1) world_normal: vec3<f32>,     // Transformed world-space normal
+    @location(2) world_tangent: vec4<f32>,    // Transformed world-space tangent (w = handedness)
     {% for i in 0..color_sets %}
-        @location({{ in_color_set_start + i }}) color_{{ i }}: vec2<f32>,
+        @location({{ in_color_set_start + i }}) color_{{ i }}: vec4<f32>,
     {% endfor %}
 
     {% for i in 0..uv_sets %}
@@ -21,19 +22,33 @@ struct FragmentOutput {
 fn fs_main(input: FragmentInput) -> FragmentOutput {
     var out: FragmentOutput;
 
-    // FIXME
-    // 1. Get material from mesh_meta
+    // Get material from mesh metadata
     let material = pbr_get_material(material_mesh_meta.material_offset);
 
+    // Sample all PBR material textures and compute material properties
+    let material_color = pbr_get_material_color(
+        material,
+        input.uv_0,
+        input.world_normal,
+        input.world_tangent,
+        input
+    );
 
-    var tex_color = vec4<f32>(1.0);
-    if (material.has_base_color_texture) {
-        tex_color = texture_pool_sample(material.base_color_tex_info, input.uv_0);
-    }
+    // Calculate surface to camera vector for lighting
+    let surface_to_camera = normalize(camera.position - input.world_position);
 
-    out.color = tex_color;
-    // Premultiply alpha
-    //out.color = vec4<f32>(tex_color.rgb * tex_color.a, tex_color.a);
+    // Get lighting info and apply all enabled lights
+    let lights_info = get_lights_info();
+    let lit_color = apply_lighting(
+        material_color,
+        surface_to_camera,
+        input.world_position,
+        lights_info
+    );
+
+    // Output final color with alpha
+    let premult_rgb = lit_color * material_color.base.a;
+    out.color = vec4<f32>(premult_rgb, material_color.base.a);
 
     return out;
 }

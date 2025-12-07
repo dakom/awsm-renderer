@@ -38,9 +38,9 @@ impl GltfMaterialInfo {
                 MaterialAlphaMode::Mask {
                     cutoff: gltf_material.alpha_cutoff().unwrap_or(0.5),
                 },
-                Some(true),
+                Some(false),
             ),
-            gltf::material::AlphaMode::Blend => (MaterialAlphaMode::Blend, Some(true)),
+            gltf::material::AlphaMode::Blend => (MaterialAlphaMode::Blend, Some(false)),
         };
         let mut material = PbrMaterial::new(alpha_mode, gltf_material.double_sided());
 

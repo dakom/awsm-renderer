@@ -14,10 +14,6 @@
 {% include "opaque_and_transparency_wgsl/material_mesh_meta.wgsl" %}
 /*************** END mesh_meta.wgsl ******************/
 
-/*************** START projection.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/projection.wgsl" %}
-/*************** END projection.wgsl ******************/
-
 /*************** START textures.wgsl ******************/
 {% include "opaque_and_transparency_wgsl/textures.wgsl" %}
 /*************** END textures.wgsl ******************/
@@ -34,9 +30,6 @@
 {% include "opaque_and_transparency_wgsl/transforms.wgsl" %}
 /*************** END transforms.wgsl ******************/
 
-/*************** START positions.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/positions.wgsl" %}
-/*************** END positions.wgsl ******************/
 
 /*************** START lights.wgsl ******************/
 {% include "opaque_and_transparency_wgsl/pbr/lighting/lights.wgsl" %}
@@ -54,9 +47,9 @@
 {% include "opaque_and_transparency_wgsl/pbr/material.wgsl" %}
 /*************** END material.wgsl ******************/
 
-/*************** START material_color.wgsl ******************/
+/*************** START material.wgsl ******************/
 {% include "opaque_and_transparency_wgsl/pbr/material_color.wgsl" %}
-/*************** END material_color.wgsl ******************/
+/*************** END material.wgsl ******************/
 
 {% match mipmap %}
     {% when MipmapMode::Gradient %}
@@ -74,9 +67,17 @@
 {% include "material_opaque_wgsl/helpers/standard.wgsl" %}
 /*************** END standard.wgsl ******************/
 
+/*************** START material_color.wgsl ******************/
+{% include "material_opaque_wgsl/helpers/material_color_calc.wgsl" %}
+/*************** END material_color.wgsl ******************/
+
 /*************** START material_shading.wgsl ******************/
 {% include "material_opaque_wgsl/helpers/material_shading.wgsl" %}
 /*************** END material_shading.wgsl ******************/
+
+/*************** START positions.wgsl ******************/
+{% include "material_opaque_wgsl/helpers/positions.wgsl" %}
+/*************** END positions.wgsl ******************/
 
 /*************** START skybox.wgsl ******************/
 {% include "material_opaque_wgsl/helpers/skybox.wgsl" %}
