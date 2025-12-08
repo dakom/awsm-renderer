@@ -164,7 +164,7 @@ impl AwsmRendererWebGpu {
         // The buffer must have MAP_READ usage to allow reading its data on the CPU.
         // WebGPU requires bytes_per_row to be a multiple of 256 for copy_texture_to_buffer
         let unpadded_bytes_per_row = width * format_info.bytes_per_pixel;
-        let padded_bytes_per_row = ((unpadded_bytes_per_row + 255) / 256) * 256;
+        let padded_bytes_per_row = unpadded_bytes_per_row.div_ceil(256) * 256;
         let buffer_size = padded_bytes_per_row * height;
 
         let buffer_descriptor = BufferDescriptor::new(

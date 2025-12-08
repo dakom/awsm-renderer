@@ -132,21 +132,21 @@ impl ColorBackground {
         });
 
         match self {
-            Self::SidebarSelected => &*SIDEBAR_SELECTED,
-            Self::Sidebar => &*SIDEBAR,
-            Self::UnderlinePrimary => &*UNDERLINE_PRIMARY,
-            Self::UnderlineSecondary => &*UNDERLINE_SECONDARY,
-            Self::ModalContent => &*MODAL_CONTENT,
-            Self::ButtonPrimary => &*BUTTON_PRIMARY,
-            Self::ButtonPrimaryHover => &*BUTTON_PRIMARY_HOVER,
-            Self::ButtonDisabled => &*BUTTON_DISABLED,
-            Self::ButtonRed => &*BUTTON_RED,
-            Self::ButtonRedHover => &*BUTTON_RED_HOVER,
-            Self::Dropdown => &*DROPDOWN,
-            Self::Initial => &*INITIAL,
-            Self::GltfContent => &*GLTF_CONTENT,
-            Self::CheckboxDark => &*CHECKBOX_DARK,
-            Self::CheckboxLight => &*CHECKBOX_LIGHT,
+            Self::SidebarSelected => &SIDEBAR_SELECTED,
+            Self::Sidebar => &SIDEBAR,
+            Self::UnderlinePrimary => &UNDERLINE_PRIMARY,
+            Self::UnderlineSecondary => &UNDERLINE_SECONDARY,
+            Self::ModalContent => &MODAL_CONTENT,
+            Self::ButtonPrimary => &BUTTON_PRIMARY,
+            Self::ButtonPrimaryHover => &BUTTON_PRIMARY_HOVER,
+            Self::ButtonDisabled => &BUTTON_DISABLED,
+            Self::ButtonRed => &BUTTON_RED,
+            Self::ButtonRedHover => &BUTTON_RED_HOVER,
+            Self::Dropdown => &DROPDOWN,
+            Self::Initial => &INITIAL,
+            Self::GltfContent => &GLTF_CONTENT,
+            Self::CheckboxDark => &CHECKBOX_DARK,
+            Self::CheckboxLight => &CHECKBOX_LIGHT,
         }
     }
 }
@@ -314,25 +314,25 @@ impl ColorText {
         });
 
         match self {
-            Self::GltfContent => &*GLTF_CONTENT,
-            Self::ButtonPrimary => &*BUTTON_PRIMARY,
-            Self::Header => &*HEADER,
-            Self::SidebarHeader => &*SIDEBAR_HEADER,
-            Self::Byline => &*BYLINE,
-            Self::Paragraph => &*PARAGRAPH,
-            Self::Input => &*INPUT,
-            Self::InputPlaceholder => &*INPUT_PLACEHOLDER,
-            Self::Error => &*ERROR,
-            Self::Success => &*SUCCESS,
-            Self::Label => &*LABEL,
-            Self::LabelHover => &*LABEL_HOVER,
-            Self::ButtonOutlinePrimary => &*BUTTON_OUTLINE_PRIMARY,
-            Self::ButtonOutlinePrimaryHover => &*BUTTON_OUTLINE_PRIMARY_HOVER,
-            Self::ButtonOutlineRed => &*BUTTON_OUTLINE_RED,
-            Self::ButtonOutlineRedHover => &*BUTTON_OUTLINE_RED_HOVER,
-            Self::Link => &*LINK,
-            Self::CheckboxDark => &*CHECKBOX_DARK,
-            Self::CheckboxLight => &*CHECKBOX_LIGHT,
+            Self::GltfContent => &GLTF_CONTENT,
+            Self::ButtonPrimary => &BUTTON_PRIMARY,
+            Self::Header => &HEADER,
+            Self::SidebarHeader => &SIDEBAR_HEADER,
+            Self::Byline => &BYLINE,
+            Self::Paragraph => &PARAGRAPH,
+            Self::Input => &INPUT,
+            Self::InputPlaceholder => &INPUT_PLACEHOLDER,
+            Self::Error => &ERROR,
+            Self::Success => &SUCCESS,
+            Self::Label => &LABEL,
+            Self::LabelHover => &LABEL_HOVER,
+            Self::ButtonOutlinePrimary => &BUTTON_OUTLINE_PRIMARY,
+            Self::ButtonOutlinePrimaryHover => &BUTTON_OUTLINE_PRIMARY_HOVER,
+            Self::ButtonOutlineRed => &BUTTON_OUTLINE_RED,
+            Self::ButtonOutlineRedHover => &BUTTON_OUTLINE_RED_HOVER,
+            Self::Link => &LINK,
+            Self::CheckboxDark => &CHECKBOX_DARK,
+            Self::CheckboxLight => &CHECKBOX_LIGHT,
         }
     }
 }
@@ -357,7 +357,7 @@ impl ColorLabel {
         });
 
         match self {
-            Self::Input => &*INPUT,
+            Self::Input => &INPUT,
         }
     }
 }
@@ -485,20 +485,20 @@ impl ColorBorder {
         });
 
         match self {
-            Self::Input => &*INPUT,
-            Self::Warning => &*WARNING,
-            Self::Error => &*ERROR,
-            Self::Focus => &*FOCUS,
-            Self::UnderlinePrimary => &*UNDERLINE_PRIMARY,
-            Self::UnderlineSecondary => &*UNDERLINE_SECONDARY,
-            Self::ButtonDisabled => &*BUTTON_DISABLED,
-            Self::Initial => &*INITIAL,
-            Self::ButtonOutlinePrimary => &*BUTTON_OUTLINE_PRIMARY,
-            Self::ButtonOutlinePrimaryHover => &*BUTTON_OUTLINE_PRIMARY_HOVER,
-            Self::ButtonOutlineRed => &*BUTTON_OUTLINE_RED,
-            Self::ButtonOutlineRedHover => &*BUTTON_OUTLINE_RED_HOVER,
-            Self::CheckboxDark => &*CHECKBOX_DARK,
-            Self::CheckboxLight => &*CHECKBOX_LIGHT,
+            Self::Input => &INPUT,
+            Self::Warning => &WARNING,
+            Self::Error => &ERROR,
+            Self::Focus => &FOCUS,
+            Self::UnderlinePrimary => &UNDERLINE_PRIMARY,
+            Self::UnderlineSecondary => &UNDERLINE_SECONDARY,
+            Self::ButtonDisabled => &BUTTON_DISABLED,
+            Self::Initial => &INITIAL,
+            Self::ButtonOutlinePrimary => &BUTTON_OUTLINE_PRIMARY,
+            Self::ButtonOutlinePrimaryHover => &BUTTON_OUTLINE_PRIMARY_HOVER,
+            Self::ButtonOutlineRed => &BUTTON_OUTLINE_RED,
+            Self::ButtonOutlineRedHover => &BUTTON_OUTLINE_RED_HOVER,
+            Self::CheckboxDark => &CHECKBOX_DARK,
+            Self::CheckboxLight => &CHECKBOX_LIGHT,
         }
     }
 }
@@ -522,7 +522,7 @@ impl ColorLogo {
         });
 
         match self {
-            Self::Primary => &*PRIMARY,
+            Self::Primary => &PRIMARY,
         }
     }
 }

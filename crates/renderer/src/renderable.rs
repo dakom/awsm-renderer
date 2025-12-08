@@ -1,6 +1,4 @@
-use awsm_renderer_core::command::{
-    compute_pass::ComputePassEncoder, render_pass::RenderPassEncoder,
-};
+use awsm_renderer_core::command::render_pass::RenderPassEncoder;
 use glam::Mat4;
 
 use crate::{
@@ -9,12 +7,7 @@ use crate::{
     mesh::{Mesh, MeshKey},
     pipelines::{compute_pipeline::ComputePipelineKey, render_pipeline::RenderPipelineKey},
     render::RenderContext,
-    render_passes::{
-        geometry::bind_group::GeometryBindGroups,
-        material_opaque::bind_group::MaterialOpaqueBindGroups,
-        material_transparent::bind_group::MaterialTransparentBindGroups,
-    },
-    transforms::TransformKey,
+    render_passes::geometry::bind_group::GeometryBindGroups,
     AwsmRenderer,
 };
 
@@ -24,7 +17,7 @@ pub struct Renderables<'a> {
 }
 
 impl AwsmRenderer {
-    pub fn collect_renderables(&self, ctx: &RenderContext) -> Result<Renderables> {
+    pub fn collect_renderables<'a>(&'a self, ctx: &RenderContext) -> Result<Renderables<'a>> {
         let _maybe_span_guard = if self.logging.render_timings {
             Some(tracing::span!(tracing::Level::INFO, "Collect renderables").entered())
         } else {
@@ -36,7 +29,7 @@ impl AwsmRenderer {
 
         for (mesh_key, mesh) in self.meshes.iter() {
             // TODO - frustum cull here
-            if let Some(world_aabb) = &mesh.world_aabb {
+            if let Some(_world_aabb) = &mesh.world_aabb {
                 // if !self.camera.frustum.intersects_aabb(&world_aabb) {
                 //     continue; // skip meshes not in the camera frustum
                 // }
@@ -68,8 +61,8 @@ impl AwsmRenderer {
 
         if let Some(camera_matrices) = self.camera.last_matrices.as_ref() {
             let view_proj = camera_matrices.view_projection();
-            opaque.sort_by(|a, b| geometry_sort_renderable(&ctx, a, b, &view_proj, false));
-            transparent.sort_by(|a, b| geometry_sort_renderable(&ctx, a, b, &view_proj, true));
+            opaque.sort_by(|a, b| geometry_sort_renderable(ctx, a, b, &view_proj, false));
+            transparent.sort_by(|a, b| geometry_sort_renderable(ctx, a, b, &view_proj, true));
         }
 
         Ok(Renderables {
@@ -160,7 +153,7 @@ impl Renderable<'_> {
 
     pub fn material_transparent_render_pipeline_key(
         &self,
-        ctx: &RenderContext,
+        _ctx: &RenderContext,
     ) -> Option<RenderPipelineKey> {
         match self {
             Self::Mesh {

@@ -1,40 +1,17 @@
 use std::vec;
 
-use awsm_renderer_core::{
-    bind_groups::{
-        BindGroupLayoutResource, SamplerBindingLayout, SamplerBindingType, TextureBindingLayout,
-    },
-    command::{
-        render_pass::{ColorAttachment, RenderPassDescriptor},
-        LoadOp, StoreOp,
-    },
-    pipeline::{fragment::ColorTargetState, primitive::PrimitiveState},
-    renderer::AwsmRendererWebGpu,
-    texture::{TextureSampleType, TextureViewDimension},
+use awsm_renderer_core::command::{
+    render_pass::{ColorAttachment, RenderPassDescriptor},
+    LoadOp, StoreOp,
 };
 
 use crate::{
-    bind_group_layout::{
-        BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey, BindGroupLayouts,
-    },
-    bind_groups::BindGroups,
     error::Result,
-    pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts},
-    pipelines::{
-        render_pipeline::{self, RenderPipelineCacheKey, RenderPipelineKey},
-        Pipelines,
-    },
-    render::{self, RenderContext},
+    render::RenderContext,
     render_passes::{
-        display::{
-            bind_group::DisplayBindGroups, pipeline::DisplayPipelines,
-            shader::cache_key::ShaderCacheKeyDisplay,
-        },
+        display::{bind_group::DisplayBindGroups, pipeline::DisplayPipelines},
         RenderPassInitContext,
     },
-    render_textures::RenderTextureViews,
-    shaders::Shaders,
-    AwsmRenderer,
 };
 
 pub struct DisplayRenderPass {

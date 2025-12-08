@@ -1,35 +1,27 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::LazyLock,
-};
+use std::{collections::HashMap, sync::LazyLock};
 
 use awsm_renderer_core::{
     buffers::{BufferDescriptor, BufferUsage},
     compare::CompareFunction,
-    cubemap::CubemapImage,
     error::AwsmCoreError,
     image::ImageData,
     renderer::AwsmRendererWebGpu,
     sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor},
     texture::{
-        mipmap::MipmapTextureKind,
         texture_pool::{TextureColorInfo, TexturePool, TexturePoolEntryInfo},
-        TextureFormat, TextureViewDescriptor,
+        TextureFormat,
     },
 };
 use indexmap::IndexSet;
 use ordered_float::OrderedFloat;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use thiserror::Error;
-use web_sys::{GpuMipmapFilterMode, GpuSupportedLimits};
 
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
     buffer::dynamic_uniform::DynamicUniformBuffer,
     error::AwsmError,
-    render_passes::{
-        material_opaque::render_pass::MaterialOpaqueRenderPass, RenderPassInitContext,
-    },
+    render_passes::RenderPassInitContext,
     AwsmRenderer, AwsmRendererLogging,
 };
 
@@ -95,7 +87,7 @@ impl AwsmRenderer {
                     .pipelines
                     .set_compute_pipeline_key(
                         &self.gpu,
-                        &mesh,
+                        mesh,
                         key,
                         &mut self.shaders,
                         &mut self.pipelines,
@@ -112,7 +104,7 @@ impl AwsmRenderer {
                     .pipelines
                     .set_render_pipeline_key(
                         &self.gpu,
-                        &mesh,
+                        mesh,
                         key,
                         &mut self.shaders,
                         &mut self.pipelines,
@@ -246,9 +238,9 @@ impl TextureTransform {
 
 impl Textures {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let mut samplers = SlotMap::with_key();
-        let mut sampler_cache = HashMap::new();
-        let mut sampler_address_modes = SecondaryMap::new();
+        let samplers = SlotMap::with_key();
+        let sampler_cache = HashMap::new();
+        let sampler_address_modes = SecondaryMap::new();
 
         let texture_transforms_gpu_buffer = gpu.create_buffer(
             &BufferDescriptor::new(

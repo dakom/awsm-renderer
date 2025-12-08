@@ -4,35 +4,27 @@ mod skybox;
 
 use std::cell::Cell;
 use std::collections::HashMap;
-use std::ops::Deref;
 
 use awsm_renderer::bounds::Aabb;
 use awsm_renderer::core::command::color::Color;
 use awsm_renderer::core::cubemap::images::CubemapBitmapColors;
 use awsm_renderer::core::cubemap::CubemapImage;
-use awsm_renderer::core::renderer;
-use awsm_renderer::core::texture::TextureFormat;
 use awsm_renderer::environment::Skybox;
 use awsm_renderer::gltf::data::GltfData;
 use awsm_renderer::gltf::loader::GltfLoader;
 use awsm_renderer::lights::ibl::IblTexture;
 use awsm_renderer::lights::{ibl::Ibl, Light};
-use awsm_renderer::mesh::MeshKey;
-use awsm_renderer::{AwsmRenderer, AwsmRendererBuilder};
+use awsm_renderer::AwsmRenderer;
 use awsm_web::dom::resize::ResizeObserver;
 use camera::{Camera, CameraId};
-use glam::Vec3;
 use gloo_events::EventListener;
-use serde::de;
-use wasm_bindgen_futures::{spawn_local, JsFuture};
+use wasm_bindgen_futures::spawn_local;
 
 use crate::models::collections::GltfId;
 use crate::pages::app::context::{IblId, SkyboxId};
-use crate::pages::app::sidebar::current_model_signal;
 use crate::pages::app::sidebar::material::FragmentShaderKind;
 use crate::prelude::*;
 
-use super::canvas;
 use super::context::AppContext;
 
 pub struct AppScene {
@@ -75,7 +67,7 @@ impl AppScene {
 
         let resize_observer = ResizeObserver::new(
             clone!(canvas, state => move |entries| {
-                if let Some(entry) = entries.get(0) {
+                if let Some(entry) = entries.first() {
                     let width = entry.content_box_sizes[0].inline_size;
                     let height = entry.content_box_sizes[0].block_size;
                     canvas.set_width(width);
@@ -95,7 +87,7 @@ impl AppScene {
             EventListener::new(
                 &canvas,
                 "pointerdown",
-                clone!(state => move |event| {
+                clone!(state => move |_event| {
                     if let Some(camera) = state.camera.lock().unwrap().as_mut() {
                         camera.on_pointer_down();
                     }
@@ -114,7 +106,7 @@ impl AppScene {
             EventListener::new(
                 &web_sys::window().unwrap(),
                 "pointerup",
-                clone!(state => move |event| {
+                clone!(state => move |_event| {
                     if let Some(camera) = state.camera.lock().unwrap().as_mut() {
                         camera.on_pointer_up();
                     }
@@ -206,7 +198,9 @@ impl AppScene {
         if let Err(err) = renderer.remove_all().await {
             tracing::error!("Failed to clear renderer: {:?}", err);
         }
-        renderer.render();
+        if let Err(err) = renderer.render() {
+            tracing::error!("Failed to render after clearing: {:?}", err);
+        }
     }
 
     pub async fn load_gltf(self: &Arc<Self>, gltf_id: GltfId) -> Result<GltfLoader> {
@@ -264,14 +258,14 @@ impl AppScene {
 
                             let skybox = {
                                 let (texture, view, mip_count) = {
-                                    let mut renderer = &mut *self.renderer.lock().await;
+                                    let renderer = &mut *self.renderer.lock().await;
                                     skybox_cubemap
                                         .create_texture_and_view(&renderer.gpu, Some("Skybox"))
                                         .await?
                                 };
 
                                 {
-                                    let mut renderer = &mut *self.renderer.lock().await;
+                                    let renderer = &mut *self.renderer.lock().await;
                                     let key = renderer.textures.insert_cubemap(texture);
 
                                     let sampler_key = renderer.textures.get_sampler_key(
@@ -402,7 +396,7 @@ impl AppScene {
         }
     }
 
-    pub async fn upload_data(self: &Arc<Self>, gltf_id: GltfId, loader: GltfLoader) -> Result<()> {
+    pub async fn upload_data(self: &Arc<Self>, _gltf_id: GltfId, loader: GltfLoader) -> Result<()> {
         let data = loader.into_data()?;
 
         *self.latest_gltf_data.lock().unwrap() = Some(data);
@@ -411,39 +405,40 @@ impl AppScene {
     }
 
     pub async fn populate(self: &Arc<Self>) -> Result<()> {
-        let data = self.latest_gltf_data.lock().unwrap();
-        let data = data
-            .as_ref()
-            .expect("No GLTF data to populate")
-            .heavy_clone();
+        let data = {
+            let data = self.latest_gltf_data.lock().unwrap();
+            data.as_ref()
+                .expect("No GLTF data to populate")
+                .heavy_clone()
+        };
 
         let mut renderer = self.renderer.lock().await;
 
-        renderer
-            .populate_gltf(data, None, self.ctx.generate_mipmaps.get())
-            .await?;
+        renderer.populate_gltf(data, None).await?;
 
         renderer.lights.insert(Light::Directional {
             color: [1.0, 0.97, 0.92],
             intensity: 1.4,
             direction: [0.1, -0.35, -1.0],
-        });
+        })?;
 
         renderer.lights.insert(Light::Directional {
             color: [0.9, 0.95, 1.0],
             intensity: 0.6,
             direction: [0.0, -0.2, -1.0],
-        });
+        })?;
+
         renderer.lights.insert(Light::Directional {
             color: [0.8, 0.9, 1.0],
             intensity: 0.7,
             direction: [-0.05, -0.25, 1.0],
-        });
+        })?;
+
         renderer.lights.insert(Light::Directional {
             color: [1.0, 0.96, 0.9],
             intensity: 0.5,
             direction: [-1.0, -0.2, 0.2],
-        });
+        })?;
 
         if let Some(ibl) = self
             .ibl_cache
@@ -498,7 +493,7 @@ impl AppScene {
         for (_, mesh) in renderer.meshes.iter() {
             if let Some(mut mesh_aabb) = mesh.aabb.clone() {
                 if let Ok(world_transform) = renderer.transforms.get_world(mesh.transform_key) {
-                    mesh_aabb.transform(&*world_transform);
+                    mesh_aabb.transform(world_transform);
                 }
                 if let Some(current_scene_aabb) = &mut scene_aabb {
                     current_scene_aabb.extend(&mesh_aabb);
@@ -535,9 +530,8 @@ impl AppScene {
     }
 
     pub async fn update_all(self: &Arc<Self>, global_time_delta: f64) -> Result<()> {
-        let state = self;
-
-        if let Some(camera) = self.camera.lock().unwrap().clone() {
+        let camera = { self.camera.lock().unwrap().clone() };
+        if let Some(camera) = camera {
             self.renderer
                 .lock()
                 .await

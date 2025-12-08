@@ -9,21 +9,20 @@ pub mod normals;
 pub mod skin;
 pub mod triangle;
 
-use awsm_renderer_core::pipeline::primitive::{FrontFace, IndexFormat};
+use awsm_renderer_core::pipeline::primitive::FrontFace;
 use glam::{Mat4, Quat, Vec3};
-use gltf::Mesh;
 use std::collections::HashMap;
 
 use crate::{
     gltf::buffers::{
         index::{generate_fresh_indices_from_primitive, GltfMeshBufferIndexInfo},
-        mesh::{convert_to_mesh_buffer, mesh_buffer_geometry_kind, GltfMeshBufferGeometryKind},
+        mesh::{convert_to_mesh_buffer, mesh_buffer_geometry_kind},
     },
     mesh::{
-        MeshBufferAttributeIndexInfo, MeshBufferCustomVertexAttributeInfo,
-        MeshBufferGeometryMorphInfo, MeshBufferInfo, MeshBufferMaterialMorphAttributes,
-        MeshBufferMaterialMorphInfo, MeshBufferSkinInfo, MeshBufferTriangleDataInfo,
-        MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
+        MeshBufferAttributeIndexInfo, MeshBufferGeometryMorphInfo, MeshBufferInfo,
+        MeshBufferMaterialMorphAttributes, MeshBufferMaterialMorphInfo, MeshBufferSkinInfo,
+        MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo,
+        MeshBufferVertexInfo,
     },
 };
 
@@ -201,11 +200,7 @@ impl From<MeshBufferTriangleInfoWithOffset> for MeshBufferTriangleInfo {
         MeshBufferTriangleInfo {
             count: info.count,
             vertex_attribute_indices: info.vertex_attribute_indices.into(),
-            vertex_attributes: info
-                .vertex_attributes
-                .into_iter()
-                .map(|v| v.into())
-                .collect(),
+            vertex_attributes: info.vertex_attributes.into_iter().collect(),
             vertex_attributes_size: info.vertex_attributes_size,
             triangle_data: info.triangle_data.into(),
         }
@@ -228,12 +223,6 @@ impl From<MeshBufferAttributeIndexInfoWithOffset> for MeshBufferAttributeIndexIn
     fn from(info: MeshBufferAttributeIndexInfoWithOffset) -> Self {
         MeshBufferAttributeIndexInfo { count: info.count }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct MeshBufferVertexAttributeInfosWithOffset {
-    pub info: Vec<MeshBufferVertexAttributeInfo>,
-    pub offset: usize,
 }
 
 /// Information about geometry morphs (positions, normals, tangents - indexed per vertex)

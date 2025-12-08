@@ -58,6 +58,12 @@ struct TexturePoolArrayKey {
     pub format: TextureFormatKey,
 }
 
+impl<ID: Eq + Hash + Clone> Default for TexturePool<ID> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<ID: Eq + Hash + Clone> TexturePool<ID> {
     pub fn new() -> Self {
         Self {
@@ -82,7 +88,7 @@ impl<ID: Eq + Hash + Clone> TexturePool<ID> {
         };
 
         self.arrays
-            .entry(array_key.clone())
+            .entry(array_key)
             .or_insert_with(|| TexturePoolArray::new(format, width, height))
             .insert(id.clone(), image, color);
 

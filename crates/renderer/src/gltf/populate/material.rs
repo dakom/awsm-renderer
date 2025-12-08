@@ -1,6 +1,6 @@
 use awsm_renderer_core::{
-    sampler::{AddressMode, FilterMode, MipmapFilterMode, SamplerDescriptor},
-    texture::{mipmap::MipmapTextureKind, texture_pool::TextureColorInfo, TextureFormat},
+    sampler::{AddressMode, FilterMode, MipmapFilterMode},
+    texture::{mipmap::MipmapTextureKind, texture_pool::TextureColorInfo},
 };
 use ordered_float::OrderedFloat;
 
@@ -14,7 +14,7 @@ use crate::{
         pbr::{PbrMaterial, VertexColorInfo},
         MaterialAlphaMode,
     },
-    mesh::{MeshBufferCustomVertexAttributeInfo, MeshBufferInfo, MeshBufferVertexAttributeInfo},
+    mesh::{MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo},
     textures::{SamplerCacheKey, SamplerKey, TextureKey, TextureTransform, TextureTransformKey},
     AwsmRenderer,
 };
@@ -237,14 +237,14 @@ impl<'a> From<gltf::material::NormalTexture<'a>> for GltfTextureInfo {
     fn from(info: gltf::material::NormalTexture<'a>) -> Self {
         // Extract KHR_texture_transform from extensions if present
         let texture_transform = info.extensions().and_then(|ext| {
-            ext.get("KHR_texture_transform").and_then(|transform_json| {
+            ext.get("KHR_texture_transform").map(|transform_json| {
                 // Parse the extension manually
                 let offset = transform_json
                     .get("offset")
                     .and_then(|v| v.as_array())
                     .map(|arr| {
                         [
-                            arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                            arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
                             arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
                         ]
                     })
@@ -260,13 +260,13 @@ impl<'a> From<gltf::material::NormalTexture<'a>> for GltfTextureInfo {
                     .and_then(|v| v.as_array())
                     .map(|arr| {
                         [
-                            arr.get(0).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                            arr.first().and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
                             arr.get(1).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
                         ]
                     })
                     .unwrap_or([1.0, 1.0]);
 
-                Some(GltfTextureTransform {
+                GltfTextureTransform {
                     offset: [
                         ordered_float::OrderedFloat(offset[0]),
                         ordered_float::OrderedFloat(offset[1]),
@@ -276,7 +276,7 @@ impl<'a> From<gltf::material::NormalTexture<'a>> for GltfTextureInfo {
                         ordered_float::OrderedFloat(scale[0]),
                         ordered_float::OrderedFloat(scale[1]),
                     ],
-                })
+                }
             })
         });
 
@@ -299,14 +299,14 @@ impl<'a> From<gltf::material::OcclusionTexture<'a>> for GltfTextureInfo {
     fn from(info: gltf::material::OcclusionTexture<'a>) -> Self {
         // Extract KHR_texture_transform from extensions if present
         let texture_transform = info.extensions().and_then(|ext| {
-            ext.get("KHR_texture_transform").and_then(|transform_json| {
+            ext.get("KHR_texture_transform").map(|transform_json| {
                 // Parse the extension manually
                 let offset = transform_json
                     .get("offset")
                     .and_then(|v| v.as_array())
                     .map(|arr| {
                         [
-                            arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                            arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
                             arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
                         ]
                     })
@@ -322,13 +322,13 @@ impl<'a> From<gltf::material::OcclusionTexture<'a>> for GltfTextureInfo {
                     .and_then(|v| v.as_array())
                     .map(|arr| {
                         [
-                            arr.get(0).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                            arr.first().and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
                             arr.get(1).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
                         ]
                     })
                     .unwrap_or([1.0, 1.0]);
 
-                Some(GltfTextureTransform {
+                GltfTextureTransform {
                     offset: [
                         ordered_float::OrderedFloat(offset[0]),
                         ordered_float::OrderedFloat(offset[1]),
@@ -338,7 +338,7 @@ impl<'a> From<gltf::material::OcclusionTexture<'a>> for GltfTextureInfo {
                         ordered_float::OrderedFloat(scale[0]),
                         ordered_float::OrderedFloat(scale[1]),
                     ],
-                })
+                }
             })
         });
 
@@ -372,8 +372,6 @@ impl<'a> From<gltf::texture::TextureTransform<'a>> for GltfTextureTransform {
         }
     }
 }
-
-type UvIndex = usize;
 
 pub struct GLtfMaterialCacheKey {
     pub uv_index: usize,

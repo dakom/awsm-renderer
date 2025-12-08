@@ -51,7 +51,7 @@ impl Morphs {
     }
 }
 
-trait MorphInfo: Clone {
+pub trait MorphInfo: Clone {
     fn targets_len(&self) -> usize;
 }
 
@@ -124,12 +124,10 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
         weights: &[f32],
         values: &[f32],
     ) -> Result<Key> {
-        let weights_u8 = unsafe {
-            std::slice::from_raw_parts(weights.as_ptr() as *const u8, (weights.len() * 4))
-        };
-        let values_u8 = unsafe {
-            std::slice::from_raw_parts(weights.as_ptr() as *const u8, (values.len() * 4))
-        };
+        let weights_u8 =
+            unsafe { std::slice::from_raw_parts(weights.as_ptr() as *const u8, weights.len() * 4) };
+        let values_u8 =
+            unsafe { std::slice::from_raw_parts(weights.as_ptr() as *const u8, values.len() * 4) };
 
         self.insert_raw(morph_buffer_info, weights_u8, values_u8)
     }

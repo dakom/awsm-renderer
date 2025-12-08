@@ -5,10 +5,9 @@ pub mod sidebar;
 
 use canvas::AppCanvas;
 use context::AppContext;
-use scene::{camera::CameraId, AppScene};
 use sidebar::AppSidebar;
 
-use crate::{models::collections::GltfId, prelude::*};
+use crate::prelude::*;
 
 pub struct AppUi {
     pub context: AppContext,

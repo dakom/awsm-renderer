@@ -144,7 +144,7 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
 
     // make sure no ids are in multiple sets
     let mut all_ids = std::collections::HashSet::new();
-    for (set_id, ids) in &h {
+    for ids in h.values() {
         for id in ids {
             if !all_ids.insert(id) {
                 panic!("[{:?}] is in multiple sets!", id);
@@ -224,7 +224,7 @@ impl TryFrom<&str> for GltfId {
     type Error = String;
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        let list: Vec<&GltfId> = GLTF_SETS.iter().map(|x| x.1).flatten().collect();
+        let list: Vec<&GltfId> = GLTF_SETS.iter().flat_map(|x| x.1).collect();
 
         for id in list {
             let id_str = id.to_string();
@@ -244,11 +244,6 @@ impl std::fmt::Display for GltfId {
 }
 
 impl GltfId {
-    pub fn find_set(&self) -> GltfSetId {
-        let res = GLTF_SETS.iter().find(|x| x.1.contains(self));
-        *res.unwrap().0
-    }
-
     pub fn filepath(&self) -> &'static str {
         match self {
             Self::BrainStem => "BrainStem/glTF/BrainStem.gltf",

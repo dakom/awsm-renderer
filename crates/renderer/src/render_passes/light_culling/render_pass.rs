@@ -1,5 +1,3 @@
-use awsm_renderer_core::renderer::AwsmRendererWebGpu;
-
 use crate::{
     error::Result,
     render::RenderContext,
@@ -7,7 +5,6 @@ use crate::{
         light_culling::{bind_group::LightCullingBindGroups, pipeline::LightCullingPipelines},
         RenderPassInitContext,
     },
-    AwsmRenderer,
 };
 
 pub struct LightCullingRenderPass {
@@ -25,7 +22,7 @@ impl LightCullingRenderPass {
         })
     }
 
-    pub fn render(&self, ctx: &RenderContext) -> Result<()> {
+    pub fn render(&self, _ctx: &RenderContext) -> Result<()> {
         // TODO!
 
         Ok(())

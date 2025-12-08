@@ -1,16 +1,12 @@
 use std::sync::LazyLock;
 
-use awsm_renderer_core::{
-    command::{
-        color::Color,
-        render_pass::{ColorAttachment, DepthStencilAttachment, RenderPassDescriptor},
-        LoadOp, StoreOp,
-    },
-    renderer::AwsmRendererWebGpu,
+use awsm_renderer_core::command::{
+    color::Color,
+    render_pass::{ColorAttachment, DepthStencilAttachment, RenderPassDescriptor},
+    LoadOp, StoreOp,
 };
 
 use crate::{
-    bind_group_layout::BindGroupLayoutCacheKey,
     error::Result,
     render::RenderContext,
     render_passes::{
@@ -18,7 +14,6 @@ use crate::{
         RenderPassInitContext,
     },
     renderable::Renderable,
-    AwsmRenderer,
 };
 
 static VISIBILITY_CLEAR_COLOR: LazyLock<Color> = LazyLock::new(|| {
@@ -97,7 +92,7 @@ impl GeometryRenderPass {
 
         let mut last_render_pipeline_key = None;
         for renderable in renderables {
-            let render_pipeline_key = renderable.geometry_render_pipeline_key(&ctx);
+            let render_pipeline_key = renderable.geometry_render_pipeline_key(ctx);
             if last_render_pipeline_key != Some(render_pipeline_key) {
                 render_pass.set_pipeline(ctx.pipelines.render.get(render_pipeline_key)?);
                 last_render_pipeline_key = Some(render_pipeline_key);

@@ -282,7 +282,7 @@ pub async fn generate_mipmaps(
             // Build uniform buffer data
             let params_data: Vec<u32> = vec![
                 texture_kinds_per_layer[target_layer_index as usize] as u32,
-                target_layer_index as u32,
+                target_layer_index,
                 dst_width,
                 dst_height,
             ];
@@ -357,7 +357,7 @@ async fn get_pipeline(
         return Ok(pipeline);
     }
 
-    let shader_source = shader_source(format.clone(), is_array)?;
+    let shader_source = shader_source(format, is_array)?;
     let shader_module = gpu
         .compile_shader(&ShaderModuleDescriptor::new(&shader_source, Some("Mipmap Shader")).into());
 

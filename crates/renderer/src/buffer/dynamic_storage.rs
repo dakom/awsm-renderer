@@ -4,27 +4,27 @@ use slotmap::{Key, SecondaryMap};
 ///
 /// This buffer supports allocations of arbitrary sizes, automatically rounded to
 /// power-of-two for efficient buddy allocation. Ideal for heterogeneous data.
-
-//-------------------------------- PERFORMANCE SUMMARY ------------------------//
-//
-// • insert/update/remove:   O(log N) (amortized, ignoring rare growth)
-// • GPU write (per frame):  uploads entire buffer each time
-// • Resize strategy:        doubles capacity when needed; rebuilds tree
-//                           (infrequent pauses)
-// • External fragmentation: none (buddy blocks always coalesce)
-// • Internal fragmentation: ≤ 50% per allocation (due to power-of-two rounding)
-// • Memory overhead:        raw_data.len() rounded up + buddy tree (~2× leaves)
-//
-// • Ideal usage:
-//    Mixed-size uniform/storage buffer items where predictable performance
-//    matters more than perfect memory efficiency, like:
-//      - Heterogeneous UBO/SBO payloads (i.e. not all items are the same size)
-//      - Variable-sized dynamic allocations (i.e. varying number of items per draw call)
-//
-// For example, vertex data that changes per-mesh
-//
-//----------------------------------------------------------------------------//
-
+///
+///-------------------------------- PERFORMANCE SUMMARY ------------------------//
+///
+/// • insert/update/remove:   O(log N) (amortized, ignoring rare growth)
+/// • GPU write (per frame):  uploads entire buffer each time
+/// • Resize strategy:        doubles capacity when needed; rebuilds tree
+///                           (infrequent pauses)
+/// • External fragmentation: none (buddy blocks always coalesce)
+/// • Internal fragmentation: ≤ 50% per allocation (due to power-of-two rounding)
+/// • Memory overhead:        raw_data.len() rounded up + buddy tree (~2× leaves)
+///
+/// • Ideal usage:
+///    Mixed-size uniform/storage buffer items where predictable performance
+///    matters more than perfect memory efficiency, like:
+///      - Heterogeneous UBO/SBO payloads (i.e. not all items are the same size)
+///      - Variable-sized dynamic allocations (i.e. varying number of items per draw call)
+///
+/// For example, vertex data that changes per-mesh
+///
+///----------------------------------------------------------------------------//
+///
 /// Minimum alloc unit – choose 256 B so every buddy is WebGPU‑aligned.
 /// Must be power‑of‑two.
 const MIN_BLOCK: usize = 256;
@@ -526,7 +526,7 @@ mod test {
     #[test]
     fn test_buddy_allocation_reuse() {
         let mut buffer = create_test_buffer();
-        let (mut key_map, key1, key2, key3) = create_keys();
+        let (_key_map, key1, key2, key3) = create_keys();
 
         // Allocate and free to test buddy system
         let data = vec![1u8; 100];
@@ -585,7 +585,7 @@ mod test {
         let (_, key1, key2, _) = create_keys();
 
         // Initially no resize needed (unless initial size was adjusted)
-        let initial_flag = buffer.take_gpu_needs_resize();
+        let _initial_flag = buffer.take_gpu_needs_resize();
 
         // Small allocations shouldn't trigger resize
         buffer.update(key1, b"small");

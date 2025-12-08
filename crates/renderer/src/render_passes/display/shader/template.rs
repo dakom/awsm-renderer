@@ -1,12 +1,8 @@
 use askama::Template;
-use std::collections::HashSet;
 
 use crate::{
-    render_passes::{
-        display::shader::cache_key::ShaderCacheKeyDisplay,
-        geometry::shader::cache_key::ShaderCacheKeyGeometry,
-    },
-    shaders::{print_shader_source, AwsmShaderError, Result},
+    render_passes::display::shader::cache_key::ShaderCacheKeyDisplay,
+    shaders::{AwsmShaderError, Result},
 };
 
 #[derive(Debug)]
@@ -100,9 +96,6 @@ pub struct ShaderTemplateDisplayDebug {
 
 impl ShaderTemplateDisplayDebug {
     pub fn new() -> Self {
-        Self {
-            smaa_edges: false,
-            ..Default::default()
-        }
+        Self { smaa_edges: false }
     }
 }

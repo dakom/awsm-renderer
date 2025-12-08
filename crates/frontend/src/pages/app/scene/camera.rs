@@ -3,7 +3,7 @@ mod view;
 
 use awsm_renderer::bounds::Aabb;
 use awsm_renderer::camera::CameraMatrices;
-use glam::{Mat4, Quat, Vec2, Vec3};
+use glam::{Mat4, Vec3};
 use projection::orthographic::OrthographicCamera;
 use projection::perspective::PerspectiveCamera;
 use view::orbit::OrbitCamera;
@@ -167,8 +167,8 @@ impl Camera {
     }
 
     pub fn on_wheel(&mut self, delta: f64) {
-        if let CameraView::Orbit(orbit_view) = &mut self.view {
-            orbit_view.on_wheel(delta as f32);
+        match &mut self.view {
+            CameraView::Orbit(orbit_view) => orbit_view.on_wheel(delta as f32),
         }
 
         match &mut self.projection {

@@ -32,8 +32,8 @@ impl ButtonSize {
         });
 
         match self {
-            Self::Sm => &*SM_CLASS,
-            _ => &*DEFAULT_CLASS,
+            Self::Sm => &SM_CLASS,
+            _ => &DEFAULT_CLASS,
         }
     }
 }

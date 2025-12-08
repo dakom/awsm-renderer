@@ -24,7 +24,6 @@ impl Route {
         let paths = url.pathname();
         let paths = paths
             .split('/')
-            .into_iter()
             // skip all the roots (1 for the domain, 1 for each part of root path)
             .skip(CONFIG.root_path.chars().filter(|c| *c == '/').count() + 1)
             .collect::<Vec<_>>();
@@ -51,7 +50,7 @@ impl Route {
     }
 
     pub fn link(&self) -> String {
-        let s = format!("{}/{}", CONFIG.root_path, self.to_string());
+        let s = format!("{}/{}", CONFIG.root_path, self);
         let s = s.trim_end_matches(r#"//"#).to_string();
 
         s
@@ -75,7 +74,7 @@ impl Route {
     }
 
     pub fn get() -> Route {
-        Route::from_url(&*dominator::routing::url().lock_ref())
+        Route::from_url(&dominator::routing::url().lock_ref())
     }
 }
 

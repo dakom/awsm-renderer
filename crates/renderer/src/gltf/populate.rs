@@ -3,15 +3,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use awsm_renderer_core::{renderer::AwsmRendererWebGpu, texture::texture_pool::TextureColorInfo};
+use awsm_renderer_core::texture::texture_pool::TextureColorInfo;
 use glam::Mat4;
 
-use crate::{
-    mesh::skins::SkinKey,
-    textures::{SamplerKey, TextureKey},
-    transforms::TransformKey,
-    AwsmRenderer,
-};
+use crate::{textures::TextureKey, transforms::TransformKey, AwsmRenderer};
 
 use super::{data::GltfData, error::AwsmGltfError};
 
@@ -27,10 +22,9 @@ pub(crate) struct GltfPopulateContext {
     pub textures: Mutex<HashMap<GltfTextureKey, TextureKey>>,
     pub node_to_transform: Mutex<HashMap<GltfIndex, TransformKey>>,
     pub node_to_skin_transform:
-        Mutex<HashMap<GltfIndex, (Vec<TransformKey>, Vec<SkinInverseBindMatrix>)>>,
+        Mutex<HashMap<GltfIndex, Arc<(Vec<TransformKey>, Vec<SkinInverseBindMatrix>)>>>,
     pub transform_is_joint: Mutex<HashSet<TransformKey>>,
     pub transform_is_instanced: Mutex<HashSet<TransformKey>>,
-    pub generate_mipmaps: bool,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -48,7 +42,6 @@ impl AwsmRenderer {
         &mut self,
         gltf_data: GltfData,
         scene: Option<usize>,
-        generate_mipmaps: bool,
     ) -> anyhow::Result<()> {
         #[allow(clippy::arc_with_non_send_sync)]
         let gltf_data = Arc::new(gltf_data);
@@ -61,7 +54,6 @@ impl AwsmRenderer {
             node_to_skin_transform: Mutex::new(HashMap::new()),
             transform_is_joint: Mutex::new(HashSet::new()),
             transform_is_instanced: Mutex::new(HashSet::new()),
-            generate_mipmaps,
         };
 
         let scene = match scene {

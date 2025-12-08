@@ -10,7 +10,7 @@ use gltf::SidebarGltf;
 use material::SidebarMaterial;
 
 use crate::{
-    models::collections::{GltfId, GLTF_SETS},
+    models::collections::GltfId,
     pages::app::sidebar::{
         lighting::SidebarLighting, post_processing::SidebarPostProcessing,
         textures::SidebarTextures,
@@ -45,8 +45,6 @@ impl AppSidebar {
     }
 
     pub fn render(self: &Arc<Self>) -> Dom {
-        let state = self;
-
         static SIDEBAR: LazyLock<String> = LazyLock::new(|| {
             class! {
 

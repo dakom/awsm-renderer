@@ -1,5 +1,4 @@
 use crate::{
-    mesh::{MeshBufferInfo, MeshBufferVertexAttributeInfo},
     render_passes::{
         shader_cache_key::ShaderCacheKeyRenderPass,
         shared::opaque_and_transparency::cache_key::ShaderMaterialVertexAttributes,

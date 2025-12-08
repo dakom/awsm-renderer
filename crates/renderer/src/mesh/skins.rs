@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::LazyLock,
-};
+use std::{collections::HashMap, sync::LazyLock};
 
 use awsm_renderer_core::{
     buffers::{BufferDescriptor, BufferUsage},
@@ -15,8 +12,8 @@ use thiserror::Error;
 use crate::{
     bind_groups::{AwsmBindGroupError, BindGroupCreate, BindGroups},
     buffer::dynamic_storage::DynamicStorageBuffer,
-    transforms::{TransformKey, Transforms},
-    AwsmRenderer, AwsmRendererLogging,
+    transforms::TransformKey,
+    AwsmRendererLogging,
 };
 
 pub struct Skins {
@@ -159,7 +156,7 @@ impl Skins {
                     let world_matrix = match self.inverse_bind_matrices.get(*transform_key).cloned()
                     {
                         Some(inverse_bind_matrix) => *world_mat * inverse_bind_matrix,
-                        None => *world_mat.clone(),
+                        None => **world_mat,
                     };
 
                     // just overwrite this one matrix

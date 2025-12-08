@@ -1,14 +1,13 @@
 use std::sync::LazyLock;
 
-use awsm_renderer_core::buffers::{BufferDescriptor, BufferUsage};
 use awsm_renderer_core::cubemap::images::CubemapBitmapColors;
 use awsm_renderer_core::cubemap::CubemapImage;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use awsm_renderer_core::sampler::{AddressMode, FilterMode, MipmapFilterMode};
 
 use crate::bind_groups::BindGroupCreate;
-use crate::error::{AwsmError, Result};
-use crate::textures::{CubemapTextureKey, SamplerCacheKey, SamplerKey, Textures};
+use crate::error::Result;
+use crate::textures::{CubemapTextureKey, SamplerCacheKey, Textures};
 use crate::AwsmRenderer;
 
 impl AwsmRenderer {

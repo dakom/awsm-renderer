@@ -1,24 +1,22 @@
 use std::collections::HashMap;
 
 use awsm_renderer_core::buffers::{BufferDescriptor, BufferUsage};
-use awsm_renderer_core::pipeline::primitive::IndexFormat;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::Mat4;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
 use crate::bind_groups::{BindGroupCreate, BindGroups};
 use crate::buffer::dynamic_storage::DynamicStorageBuffer;
-use crate::buffer::dynamic_uniform::DynamicUniformBuffer;
 use crate::materials::Materials;
 use crate::mesh::meta::{MeshMeta, MESH_META_INITIAL_CAPACITY};
 use crate::mesh::skins::Skins;
-use crate::mesh::{MeshBufferInfo, MeshBufferInfos};
+use crate::mesh::MeshBufferInfos;
 use crate::transforms::{TransformKey, Transforms};
 use crate::AwsmRendererLogging;
 
 use super::error::{AwsmMeshError, Result};
 use super::morphs::Morphs;
-use super::{Mesh, MeshBufferAttributeIndexInfo, MeshBufferVertexInfo};
+use super::{Mesh, MeshBufferVertexInfo};
 
 pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
@@ -163,11 +161,7 @@ impl Meshes {
         attribute_index: &[u8],
     ) -> Result<MeshKey> {
         let transform_key = mesh.transform_key;
-        let geometry_morph_key = mesh.geometry_morph_key;
-        let material_morph_key = mesh.material_morph_key;
         let buffer_info_key = mesh.buffer_info_key;
-        let skin_key = mesh.skin_key;
-        let material_key = mesh.material_key;
         let key = self.list.insert(mesh.clone());
 
         let buffer_info = self.buffer_infos.get(buffer_info_key)?;
@@ -394,9 +388,9 @@ impl Meshes {
                 self.custom_attribute_index_dirty = true;
             }
 
-            self.transform_to_meshes
-                .get_mut(mesh.transform_key)
-                .map(|meshes| meshes.retain(|&key| key != mesh_key));
+            if let Some(meshes) = self.transform_to_meshes.get_mut(mesh.transform_key) {
+                meshes.retain(|&key| key != mesh_key)
+            }
 
             let last_transform = if self.transform_to_meshes.contains_key(mesh.transform_key) {
                 None
@@ -502,7 +496,7 @@ impl Meshes {
                             bind_groups.mark_create(create);
                         }
                     }
-                    gpu.write_buffer(&gpu_buffer, None, buffer.raw_slice(), None, None)?;
+                    gpu.write_buffer(gpu_buffer, None, buffer.raw_slice(), None, None)?;
                 }
             }
 

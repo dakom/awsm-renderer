@@ -1,23 +1,18 @@
 use std::borrow::Cow;
 
 use awsm_renderer_core::bind_groups::{
-    self, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutResource, BindGroupResource,
+    BindGroupDescriptor, BindGroupEntry, BindGroupLayoutResource, BindGroupResource,
     BufferBindingLayout, BufferBindingType, SamplerBindingLayout, SamplerBindingType,
     StorageTextureAccess, StorageTextureBindingLayout, TextureBindingLayout,
 };
 use awsm_renderer_core::buffers::BufferBinding;
-use awsm_renderer_core::error::AwsmCoreError;
-use awsm_renderer_core::renderer::AwsmRendererWebGpu;
-use awsm_renderer_core::texture::{self, TextureSampleType, TextureViewDimension};
+use awsm_renderer_core::texture::{TextureSampleType, TextureViewDimension};
 use indexmap::IndexSet;
 
 use crate::bind_group_layout::{BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry};
 use crate::bind_groups::{AwsmBindGroupError, BindGroupRecreateContext};
-use crate::camera::AwsmCameraError;
 use crate::error::Result;
-use crate::materials::pbr::PbrMaterial;
 use crate::materials::MaterialBufferKind;
-use crate::mesh::meta::material_meta::MATERIAL_MESH_META_BYTE_ALIGNMENT;
 use crate::render_passes::shared::opaque_and_transparency::bind_group::{
     TexturePoolDeps, TexturePoolVisibility,
 };
@@ -71,7 +66,7 @@ impl MaterialOpaqueBindGroups {
         ];
 
         let lights_bind_group_layout_key = ctx.bind_group_layouts.get_key(
-            &ctx.gpu,
+            ctx.gpu,
             BindGroupLayoutCacheKey {
                 entries: light_entries,
             },
@@ -149,7 +144,6 @@ impl MaterialOpaqueBindGroups {
             (_, _, None) => Err(AwsmBindGroupError::NotFound(
                 "Material Opaque - Texture Pool".to_string(),
             )),
-            _ => Err(AwsmBindGroupError::NotFound("Material Opaque".to_string())),
         }
     }
 
@@ -189,33 +183,33 @@ impl MaterialOpaqueBindGroups {
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(BufferBinding::new(
-                &ctx.meshes.visibility_geometry_data_gpu_buffer(),
+                ctx.meshes.visibility_geometry_data_gpu_buffer(),
             )),
         ));
         // Mesh Meta (for this pass, different than geometry pass)
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
-            BindGroupResource::Buffer(BufferBinding::new(&ctx.meshes.meta.material_gpu_buffer())),
+            BindGroupResource::Buffer(BufferBinding::new(ctx.meshes.meta.material_gpu_buffer())),
         ));
         // Material data buffer
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(BufferBinding::new(
-                &ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
+                ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
             )),
         ));
         // Attribute index buffer
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(BufferBinding::new(
-                &ctx.meshes.custom_attribute_index_gpu_buffer(),
+                ctx.meshes.custom_attribute_index_gpu_buffer(),
             )),
         ));
         // Attribute data buffer
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(BufferBinding::new(
-                &ctx.meshes.custom_attribute_data_gpu_buffer(),
+                ctx.meshes.custom_attribute_data_gpu_buffer(),
             )),
         ));
         // transforms
@@ -336,7 +330,7 @@ impl MaterialOpaqueBindGroups {
         for view in ctx.textures.pool.texture_views() {
             entries.push(BindGroupEntry::new(
                 entries.len() as u32,
-                BindGroupResource::TextureView(Cow::Borrowed(&view)),
+                BindGroupResource::TextureView(Cow::Borrowed(view)),
             ));
         }
 
@@ -595,5 +589,5 @@ async fn create_main_bind_group_layout_key(
 
     Ok(ctx
         .bind_group_layouts
-        .get_key(&ctx.gpu, BindGroupLayoutCacheKey { entries })?)
+        .get_key(ctx.gpu, BindGroupLayoutCacheKey { entries })?)
 }

@@ -1,7 +1,4 @@
-use crate::{
-    anti_alias::AntiAliasing, render_passes::shader_cache_key::ShaderCacheKeyRenderPass,
-    shaders::ShaderCacheKey,
-};
+use crate::{render_passes::shader_cache_key::ShaderCacheKeyRenderPass, shaders::ShaderCacheKey};
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyGeometry {

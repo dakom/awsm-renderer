@@ -30,32 +30,32 @@ impl DisplayPipelines {
         bind_groups: &DisplayBindGroups,
     ) -> Result<Self> {
         let pipeline_layout_cache_key =
-            PipelineLayoutCacheKey::new(vec![bind_groups.bind_group_layout_key.clone()]);
+            PipelineLayoutCacheKey::new(vec![bind_groups.bind_group_layout_key]);
         let pipeline_layout_key = ctx.pipeline_layouts.get_key(
-            &ctx.gpu,
-            &ctx.bind_group_layouts,
+            ctx.gpu,
+            ctx.bind_group_layouts,
             pipeline_layout_cache_key,
         )?;
 
         let smaa_render_pipeline_key = init_pipeline_key(
-            pipeline_layout_key.clone(),
+            pipeline_layout_key,
             true,
-            &ctx.gpu,
-            &mut ctx.shaders,
-            &mut ctx.pipelines,
-            &ctx.pipeline_layouts,
-            &ctx.render_texture_formats,
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
+            ctx.render_texture_formats,
         )
         .await?;
 
         let no_anti_alias_render_pipeline_key = init_pipeline_key(
-            pipeline_layout_key.clone(),
+            pipeline_layout_key,
             false,
-            &ctx.gpu,
-            &mut ctx.shaders,
-            &mut ctx.pipelines,
-            &ctx.pipeline_layouts,
-            &ctx.render_texture_formats,
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
+            ctx.render_texture_formats,
         )
         .await?;
 
@@ -74,10 +74,10 @@ async fn init_pipeline_key(
     shaders: &mut Shaders,
     pipelines: &mut Pipelines,
     pipeline_layouts: &PipelineLayouts,
-    render_texture_formats: &RenderTextureFormats,
+    _render_texture_formats: &RenderTextureFormats,
 ) -> Result<RenderPipelineKey> {
     let shader_cache_key = ShaderCacheKeyDisplay { smaa_anti_alias };
-    let shader_key = shaders.get_key(&gpu, shader_cache_key).await?;
+    let shader_key = shaders.get_key(gpu, shader_cache_key).await?;
 
     let render_pipeline_cache_key = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
         .with_push_fragment_target(ColorTargetState::new(gpu.current_context_format()))
@@ -90,6 +90,6 @@ async fn init_pipeline_key(
 
     Ok(pipelines
         .render
-        .get_key(&gpu, &shaders, &pipeline_layouts, render_pipeline_cache_key)
+        .get_key(gpu, shaders, pipeline_layouts, render_pipeline_cache_key)
         .await?)
 }

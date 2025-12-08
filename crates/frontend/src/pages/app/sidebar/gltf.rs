@@ -43,12 +43,10 @@ impl SidebarGltf {
         set_id: GltfSetId,
         initial_selected: Option<GltfId>,
     ) -> Dom {
-        let state = self;
-
         let options = GLTF_SETS
             .get(&set_id)
             .unwrap_throw()
-            .into_iter()
+            .iter()
             .map(|gltf_id| (gltf_id.label().to_string(), *gltf_id))
             .collect::<Vec<_>>();
 
@@ -67,9 +65,9 @@ impl SidebarGltf {
             Dropdown::new()
                 .with_intial_selected(initial_selected)
                 .with_bg_color(ColorBackground::Dropdown)
-                .with_on_change(clone!(state => move |id| {
+                .with_on_change(|id| {
                     Route::App(AppRoute::Model(*id)).go_to_url();
-                }))
+                })
                 .with_options(options)
                 .render(),
         )

@@ -5,7 +5,6 @@ use std::sync::LazyLock;
 use awsm_renderer_core::{
     brdf_lut::generate::BrdfLut,
     buffers::{BufferDescriptor, BufferUsage},
-    cubemap::CubemapImage,
     error::AwsmCoreError,
     renderer::AwsmRendererWebGpu,
 };
@@ -14,9 +13,7 @@ use thiserror::Error;
 
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
-    buffer::dynamic_uniform::DynamicUniformBuffer,
     lights::ibl::Ibl,
-    textures::CubemapTextureKey,
     AwsmRenderer, AwsmRendererLogging,
 };
 

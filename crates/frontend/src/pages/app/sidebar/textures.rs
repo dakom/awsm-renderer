@@ -1,17 +1,9 @@
 use std::cell::Cell;
 
-use awsm_renderer::{
-    core::texture::{texture_pool::report::TexturePoolReport, TextureFormat},
-    textures::TextureKey,
-};
+use awsm_renderer::{core::texture::texture_pool::report::TexturePoolReport, textures::TextureKey};
 use awsm_web::file::save::save_file;
-use dominator_helpers::futures::{spawn_future, AsyncLoader};
 
-use crate::{
-    models::collections::{GltfId, GLTF_SETS},
-    pages::app::{context::AppContext, scene::camera::CameraId, sidebar::current_model_signal},
-    prelude::*,
-};
+use crate::{pages::app::context::AppContext, prelude::*};
 
 use super::render_dropdown_label;
 
@@ -90,7 +82,7 @@ impl SidebarTextures {
 
         let finished = Mutable::new(false);
 
-        let (array_index, layer_index, mip_levels) = state.to_export.lock_ref().unwrap().clone();
+        let (array_index, layer_index, _mip_levels) = state.to_export.lock_ref().unwrap();
         let mipmap_level = state.mipmap_level.get();
 
         html!("div", {
@@ -223,12 +215,12 @@ impl SidebarTextures {
             .arrays
             .iter()
             .enumerate()
-            .map(|(array_index, array)| {
+            .flat_map(|(array_index, array)| {
                 array
                     .entries
                     .iter()
                     .enumerate()
-                    .map(move |(layer_index, layer)| {
+                    .map(move |(layer_index, _layer)| {
                         let label = format!(
                             "Texture Pool {} - Layer {}",
                             array_index + 1,
@@ -237,7 +229,6 @@ impl SidebarTextures {
                         (label, (array_index, layer_index, array.mip_levels))
                     })
             })
-            .flatten()
             .collect();
 
         render_dropdown_label(

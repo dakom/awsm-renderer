@@ -1,5 +1,3 @@
-use std::sync::LazyLock;
-
 use awsm_renderer_core::compare::CompareFunction;
 use awsm_renderer_core::pipeline::depth_stencil::DepthStencilState;
 use awsm_renderer_core::pipeline::fragment::{
@@ -18,10 +16,9 @@ use slotmap::SecondaryMap;
 
 use crate::anti_alias::AntiAliasing;
 use crate::error::Result;
-use crate::materials::{MaterialKey, Materials};
 use crate::mesh::{
-    Mesh, MeshBufferInfo, MeshBufferInfoKey, MeshBufferInfos, MeshBufferVertexAttributeInfo,
-    MeshBufferVertexInfo, MeshKey, Meshes,
+    Mesh, MeshBufferInfo, MeshBufferInfos, MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
+    MeshKey,
 };
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
@@ -55,8 +52,8 @@ impl MaterialTransparentPipelines {
         ]);
 
         let pipeline_layout_key = ctx.pipeline_layouts.get_key(
-            &ctx.gpu,
-            &ctx.bind_group_layouts,
+            ctx.gpu,
+            ctx.bind_group_layouts,
             pipeline_layout_cache_key,
         )?;
 
@@ -77,7 +74,7 @@ impl MaterialTransparentPipelines {
         pipeline_layouts: &PipelineLayouts,
         mesh_buffer_infos: &MeshBufferInfos,
         anti_aliasing: &AntiAliasing,
-        textures: &Textures,
+        _textures: &Textures,
         render_texture_formats: &RenderTextureFormats,
     ) -> Result<RenderPipelineKey> {
         let mesh_buffer_info = mesh_buffer_infos.get(mesh.buffer_info_key)?;
@@ -114,7 +111,7 @@ impl MaterialTransparentPipelines {
             render_texture_formats.depth,
             self.pipeline_layout_key,
             shader_key,
-            vertex_buffer_layouts(&mesh, &mesh_buffer_info),
+            vertex_buffer_layouts(mesh, mesh_buffer_info),
             color_targets,
             anti_aliasing.msaa_sample_count,
             if mesh.double_sided {
@@ -126,7 +123,7 @@ impl MaterialTransparentPipelines {
         .await?;
 
         self.render_pipeline_keys
-            .insert(mesh_key, render_pipeline_key.clone());
+            .insert(mesh_key, render_pipeline_key);
 
         Ok(render_pipeline_key)
     }
@@ -177,7 +174,7 @@ async fn render_pipeline_key(
 
     Ok(pipelines
         .render
-        .get_key(&gpu, &shaders, &pipeline_layouts, pipeline_cache_key)
+        .get_key(gpu, shaders, pipeline_layouts, pipeline_cache_key)
         .await?)
 }
 

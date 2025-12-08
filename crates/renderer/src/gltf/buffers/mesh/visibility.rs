@@ -40,7 +40,7 @@ pub(super) fn create_visibility_vertices(
     attribute_data: &BTreeMap<MeshBufferVertexAttributeInfo, Cow<'_, [u8]>>,
     index: &MeshBufferAttributeIndexInfoWithOffset,
     index_bytes: &[u8],
-    triangle_count: usize,
+    _triangle_count: usize,
     front_face: FrontFace,
     visibility_vertex_bytes: &mut Vec<u8>,
 ) -> Result<()> {
@@ -129,10 +129,10 @@ pub(super) fn create_visibility_vertices(
         // Each vertex gets unique triangle_index and barycentric, but copies position/normal/tangent from original
         for (bary, &vertex_index) in barycentrics.iter().zip(vertex_indices.iter()) {
             // Get position for this vertex
-            let position = get_position_from_buffer(&positions, vertex_index)?;
+            let position = get_position_from_buffer(positions, vertex_index)?;
 
             // Get normal for this vertex
-            let normal = get_vec3_from_buffer(&normals, vertex_index, "normal")?;
+            let normal = get_vec3_from_buffer(normals, vertex_index, "normal")?;
 
             // Get tangent for this vertex (or default to [0, 0, 0, 1])
             let tangent = if let Some(tangents) = tangents {

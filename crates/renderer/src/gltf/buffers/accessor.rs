@@ -415,7 +415,7 @@ pub enum AccessorVec {
     Mat4F32(Vec<[[f32; 4]; 4]>),
 }
 
-pub(super) fn accessor_vertex_format(
+pub(super) fn _accessor_vertex_format(
     data_type: DataType,
     dimensions: Dimensions,
     normalized: bool,

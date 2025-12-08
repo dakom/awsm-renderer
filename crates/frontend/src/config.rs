@@ -1,8 +1,5 @@
 #![allow(dead_code)]
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::{Arc, LazyLock, Mutex},
-};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use crate::{
     pages::app::{
@@ -11,12 +8,6 @@ use crate::{
     },
     route::{AppRoute, Route},
 };
-use anyhow::{Context, Result};
-use dominator::clone;
-use futures_signals::signal::Mutable;
-use serde::Deserialize;
-use wasm_bindgen::UnwrapThrowExt;
-use wasm_bindgen_futures::spawn_local;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -34,7 +25,7 @@ pub struct Config {
 }
 
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
-    let config = Config {
+    Config {
         root_path: if cfg!(debug_assertions) {
             ""
         } else {
@@ -42,7 +33,7 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         },
         debug: if cfg!(debug_assertions) {
             //ConfigDebug::release_mode()
-            ConfigDebug::dev_mode(true)
+            ConfigDebug::dev_mode()
         } else {
             ConfigDebug::release_mode()
         },
@@ -69,10 +60,8 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         post_processing_enabled: true,
         initial_ibl: IblId::default(),
         initial_skybox: SkyboxId::default(),
-        cache_buster: if cfg!(debug_assertions) { true } else { false },
-    };
-
-    config
+        cache_buster: cfg!(debug_assertions),
+    }
 });
 
 #[derive(Debug, Clone)]
@@ -81,7 +70,7 @@ pub struct ConfigDebug {
 }
 
 impl ConfigDebug {
-    fn dev_mode(autoconnect: bool) -> Self {
+    fn dev_mode() -> Self {
         Self {
             start_route: Arc::new(Mutex::new(Some(Route::App(AppRoute::Init)))),
         }

@@ -211,7 +211,7 @@ impl DeviceRequestLimits {
             js_sys::Reflect::set(
                 &obj,
                 &"maxStorageBufferBindingSize".into(),
-                &JsValue::from_f64(limits.max_storage_buffer_binding_size() as f64),
+                &JsValue::from_f64(limits.max_storage_buffer_binding_size()),
             )
             .unwrap();
         }

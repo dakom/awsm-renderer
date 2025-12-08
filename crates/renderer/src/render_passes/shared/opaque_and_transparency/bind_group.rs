@@ -86,7 +86,7 @@ impl TexturePoolDeps {
         }
 
         // samplers
-        let mut sampler_keys = ctx.textures.pool_sampler_set.clone();
+        let sampler_keys = ctx.textures.pool_sampler_set.clone();
 
         if sampler_keys.len() > device_limits.max_samplers_per_shader_stage() as usize {
             return Err(AwsmCoreError::TexturePoolTooManySamplers {
@@ -109,7 +109,7 @@ impl TexturePoolDeps {
 
         let bind_group_layout_key = ctx
             .bind_group_layouts
-            .get_key(&ctx.gpu, BindGroupLayoutCacheKey { entries })?;
+            .get_key(ctx.gpu, BindGroupLayoutCacheKey { entries })?;
 
         Ok(Self {
             arrays_len: texture_arrays_len as u32,

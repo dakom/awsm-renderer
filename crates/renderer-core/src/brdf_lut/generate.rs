@@ -14,8 +14,8 @@ use crate::shaders::{ShaderModuleDescriptor, ShaderModuleExt};
 use crate::texture::{Extent3d, TextureDescriptor, TextureFormat, TextureUsage};
 
 thread_local! {
-    static BRDF_LUT_PIPELINE: RefCell<Option<web_sys::GpuRenderPipeline>> = RefCell::new(None);
-    static BRDF_SAMPLER: RefCell<Option<web_sys::GpuSampler>> = RefCell::new(None);
+    static BRDF_LUT_PIPELINE: RefCell<Option<web_sys::GpuRenderPipeline>> = const { RefCell::new(None) };
+    static BRDF_SAMPLER: RefCell<Option<web_sys::GpuSampler>> = const { RefCell::new(None) };
 }
 
 pub struct BrdfLut {
@@ -107,7 +107,7 @@ async fn get_pipeline(gpu: &AwsmRendererWebGpu) -> Result<web_sys::GpuRenderPipe
 
     let shader_source = include_str!("./shader.wgsl");
     let shader_module = gpu.compile_shader(
-        &ShaderModuleDescriptor::new(&shader_source, Some("BRDF Lut Shader")).into(),
+        &ShaderModuleDescriptor::new(shader_source, Some("BRDF Lut Shader")).into(),
     );
 
     shader_module.validate_shader().await?;

@@ -154,8 +154,9 @@ pub async fn convert_srgb_to_linear(
     let workgroup_size_y = height.div_ceil(8);
 
     // Dispatch compute shader
-    let compute_pass =
-        command_encoder.begin_compute_pass(Some(&ComputePassDescriptor::new(Some("sRGB Conversion Pass")).into()));
+    let compute_pass = command_encoder.begin_compute_pass(Some(
+        &ComputePassDescriptor::new(Some("sRGB Conversion Pass")).into(),
+    ));
     compute_pass.set_pipeline(&compute_pipeline);
     compute_pass.set_bind_group(0, &bind_group, None)?;
     compute_pass.dispatch_workgroups(workgroup_size_x, Some(workgroup_size_y), None);
@@ -164,7 +165,10 @@ pub async fn convert_srgb_to_linear(
     Ok(())
 }
 
-async fn get_pipeline(gpu: &AwsmRendererWebGpu, format: TextureFormat) -> Result<ConvertSrgbPipeline> {
+async fn get_pipeline(
+    gpu: &AwsmRendererWebGpu,
+    format: TextureFormat,
+) -> Result<ConvertSrgbPipeline> {
     let key: TextureFormatKey = format.into();
 
     if let Some(pipeline) =
@@ -173,7 +177,7 @@ async fn get_pipeline(gpu: &AwsmRendererWebGpu, format: TextureFormat) -> Result
         return Ok(pipeline);
     }
 
-    let shader_source = shader_source(format.clone())?;
+    let shader_source = shader_source(format)?;
     let shader_module = gpu.compile_shader(
         &ShaderModuleDescriptor::new(&shader_source, Some("sRGB Conversion Shader")).into(),
     );

@@ -41,7 +41,7 @@ thread_local! {
     static BLIT_PIPELINE: RefCell<HashMap<BlitPipelineCacheKey, BlitPipeline>> = RefCell::new(HashMap::new());
 }
 
-static SHADER_SOURCE: &'static str = r#"
+static SHADER_SOURCE: &str = r#"
     @group(0) @binding(0) var src_tex: texture_2d<f32>;
 
     @vertex
@@ -105,7 +105,7 @@ pub fn blit_tex(
         &RenderPassDescriptor {
             label: Some("Blit Render Pass"),
             color_attachments: vec![
-                ColorAttachment::new(&dst_view, LoadOp::Clear, StoreOp::Store)
+                ColorAttachment::new(dst_view, LoadOp::Clear, StoreOp::Store)
                     .with_clear_color(Color::ZERO),
             ],
             depth_stencil_attachment: None,
@@ -114,7 +114,7 @@ pub fn blit_tex(
         .into(),
     )?;
 
-    render_pass.set_bind_group(0, &bind_group, None)?;
+    render_pass.set_bind_group(0, bind_group, None)?;
     render_pass.set_pipeline(&pipeline.render_pipeline);
 
     render_pass.draw(3);

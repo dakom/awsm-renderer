@@ -4,7 +4,6 @@ use awsm_renderer_core::buffers::BufferUsage;
 use slotmap::Key;
 
 use crate::{
-    buffer::dynamic_storage::DynamicStorageBuffer,
     materials::{MaterialKey, Materials},
     mesh::{
         morphs::{MaterialMorphKey, Morphs},
@@ -48,8 +47,8 @@ fn calculate_uv_sets_index(buffer_info: &MeshBufferInfo) -> u32 {
 
     let mut offset_floats = 0;
     for attr in &buffer_info.triangles.vertex_attributes {
-        match attr {
-            MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
+        if let MeshBufferVertexAttributeInfo::Custom(custom) = attr {
+            match custom {
                 MeshBufferCustomVertexAttributeInfo::Colors { .. } => {
                     // vertex_size() returns bytes, divide by 4 to get float count
                     offset_floats += attr.vertex_size() / 4;
@@ -58,9 +57,7 @@ fn calculate_uv_sets_index(buffer_info: &MeshBufferInfo) -> u32 {
                     // Found TexCoords, stop counting
                     break;
                 }
-                _ => {}
-            },
-            _ => {}
+            }
         }
     }
     offset_floats as u32
@@ -77,17 +74,15 @@ fn calculate_attribute_counts(buffer_info: &MeshBufferInfo) -> (u32, u32) {
     let mut color_set_count = 0u32;
 
     for attr in &buffer_info.triangles.vertex_attributes {
-        match attr {
-            MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
+        if let MeshBufferVertexAttributeInfo::Custom(custom) = attr {
+            match custom {
                 MeshBufferCustomVertexAttributeInfo::TexCoords { index, .. } => {
                     uv_set_count = uv_set_count.max(*index + 1);
                 }
                 MeshBufferCustomVertexAttributeInfo::Colors { index, .. } => {
                     color_set_count = color_set_count.max(*index + 1);
                 }
-                _ => {}
-            },
-            _ => {}
+            }
         }
     }
 
@@ -120,14 +115,6 @@ impl<'a> MaterialMeshMeta<'a> {
 
             offset += 4;
         };
-
-        fn bool_as_u32(value: bool) -> u32 {
-            if value {
-                1
-            } else {
-                0
-            }
-        }
 
         let mesh_key_u64 = mesh_key.data().as_ffi();
         let (mesh_key_u32_high, mesh_key_u32_low) = (

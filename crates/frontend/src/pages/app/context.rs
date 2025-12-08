@@ -1,4 +1,4 @@
-use crate::{pages::app::sidebar::material::FragmentShaderKind, prelude::*};
+use crate::prelude::*;
 
 use super::scene::{camera::CameraId, AppScene};
 
@@ -6,7 +6,6 @@ use super::scene::{camera::CameraId, AppScene};
 pub struct AppContext {
     pub camera_id: Mutable<CameraId>,
     pub scene: Mutable<Option<Arc<AppScene>>>,
-    pub generate_mipmaps: Mutable<bool>,
     pub material: MutableMaterial,
     pub ibl_id: Mutable<IblId>,
     pub skybox_id: Mutable<SkyboxId>,
@@ -19,10 +18,10 @@ pub struct MutableMaterial {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Hash)]
 pub enum IblId {
-    PhotoStudio,
-    AllWhite,
     #[default]
+    PhotoStudio,
     SimpleSky,
+    AllWhite,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -38,12 +37,11 @@ impl Default for AppContext {
         Self {
             camera_id: Mutable::new(CameraId::default()),
             scene: Mutable::new(None),
-            generate_mipmaps: Mutable::new(CONFIG.generate_mipmaps),
             material: MutableMaterial {
                 debug_normals: Mutable::new(false),
             },
-            ibl_id: Mutable::new(CONFIG.initial_ibl.clone()),
-            skybox_id: Mutable::new(CONFIG.initial_skybox.clone()),
+            ibl_id: Mutable::new(CONFIG.initial_ibl),
+            skybox_id: Mutable::new(CONFIG.initial_skybox),
         }
     }
 }

@@ -1,15 +1,4 @@
-use crate::{
-    atoms::checkbox::{Checkbox, CheckboxStyle},
-    models::collections::{GltfId, GLTF_SETS},
-    pages::app::{
-        context::AppContext,
-        scene::camera::CameraId,
-        sidebar::{current_model_signal, render_checkbox_label},
-    },
-    prelude::*,
-};
-
-use super::render_dropdown_label;
+use crate::{pages::app::context::AppContext, prelude::*};
 
 pub struct SidebarPostProcessing {
     ctx: AppContext,
@@ -21,7 +10,6 @@ impl SidebarPostProcessing {
     }
 
     pub fn render(self: &Arc<Self>) -> Dom {
-        let state = self;
         static CONTAINER: LazyLock<String> = LazyLock::new(|| {
             class! {
                 .style("display", "flex")

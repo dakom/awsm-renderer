@@ -37,7 +37,7 @@ impl TextureClearer {
             .min(height)
             .max(1);
 
-        let chunks = (height + chunk_height - 1) / chunk_height;
+        let chunks = height.div_ceil(chunk_height);
 
         let buffer_size = (aligned_row_bytes * chunk_height) as usize;
         let buffer = gpu.create_buffer(
@@ -83,7 +83,7 @@ impl TextureClearer {
                     texture,
                     aspect: None,
                     mip_level: None,
-                    origin: Some(Origin3d::new().with_y(y).into()),
+                    origin: Some(Origin3d::new().with_y(y)),
                 }
                 .into(),
                 &Extent3d {

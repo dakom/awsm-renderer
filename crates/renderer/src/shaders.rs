@@ -8,11 +8,8 @@ use thiserror::Error;
 
 use awsm_renderer_core::shaders::ShaderModuleExt;
 
-use crate::{
-    render_passes::{
-        shader_cache_key::ShaderCacheKeyRenderPass, shader_template::ShaderTemplateRenderPass,
-    },
-    AwsmRenderer,
+use crate::render_passes::{
+    shader_cache_key::ShaderCacheKeyRenderPass, shader_template::ShaderTemplateRenderPass,
 };
 
 pub struct Shaders {
@@ -34,7 +31,7 @@ impl Shaders {
     ) -> Result<ShaderKey> {
         let cache_key: ShaderCacheKey = cache_key.into();
         if let Some(shader_key) = self.cache.get(&cache_key) {
-            return Ok(shader_key.clone());
+            return Ok(*shader_key);
         }
 
         let shader_module =

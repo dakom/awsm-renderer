@@ -1,24 +1,17 @@
-use std::{collections::HashMap, sync::LazyLock};
+use std::sync::LazyLock;
 
 use awsm_renderer_core::{
-    bind_groups::{
-        BindGroupLayoutResource, SamplerBindingLayout, SamplerBindingType, TextureBindingLayout,
-    },
     buffers::{BufferDescriptor, BufferUsage},
     renderer::AwsmRendererWebGpu,
-    texture::{TextureSampleType, TextureViewDimension},
 };
 
-use crate::materials::{pbr::PbrMaterial, AwsmMaterialError, Materials, Result};
+use crate::materials::{pbr::PbrMaterial, Materials, Result};
 use crate::{
-    bind_group_layout::{
-        BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey,
-    },
     bind_groups::{BindGroupCreate, BindGroups},
     buffer::dynamic_uniform::DynamicUniformBuffer,
-    materials::{MaterialAlphaMode, MaterialKey},
-    textures::{SamplerKey, TextureKey, Textures},
-    AwsmRenderer, AwsmRendererLogging,
+    materials::MaterialKey,
+    textures::Textures,
+    AwsmRendererLogging,
 };
 
 // copy_src is just for debugging

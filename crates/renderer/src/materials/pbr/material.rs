@@ -1,28 +1,11 @@
-use std::{collections::HashMap, sync::LazyLock};
-
 use awsm_renderer_core::{
-    bind_groups::{
-        BindGroupLayoutResource, SamplerBindingLayout, SamplerBindingType, TextureBindingLayout,
-    },
-    buffers::{BufferDescriptor, BufferUsage},
-    renderer::AwsmRendererWebGpu,
     sampler::AddressMode,
-    texture::{
-        mipmap::MipmapTextureKind,
-        texture_pool::{TexturePoolArray, TexturePoolEntryInfo},
-        TextureSampleType, TextureViewDimension,
-    },
+    texture::texture_pool::{TexturePoolArray, TexturePoolEntryInfo},
 };
 
 use crate::{
-    bind_group_layout::{
-        BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey,
-    },
-    bind_groups::{BindGroupCreate, BindGroups},
-    buffer::dynamic_uniform::DynamicUniformBuffer,
-    materials::{MaterialAlphaMode, MaterialKey},
+    materials::MaterialAlphaMode,
     textures::{SamplerKey, TextureKey, Textures},
-    AwsmRenderer, AwsmRendererLogging,
 };
 use crate::{
     materials::{AwsmMaterialError, Result},

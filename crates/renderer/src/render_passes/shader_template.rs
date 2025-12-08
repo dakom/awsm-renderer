@@ -3,13 +3,8 @@ use crate::{
         display::shader::template::ShaderTemplateDisplay,
         geometry::shader::template::ShaderTemplateGeometry,
         light_culling::shader::template::ShaderTemplateLightCulling,
-        material_opaque::shader::{
-            cache_key::ShaderCacheKeyMaterialOpaque, template::ShaderTemplateMaterialOpaque,
-        },
-        material_transparent::shader::{
-            cache_key::ShaderCacheKeyMaterialTransparent,
-            template::ShaderTemplateMaterialTransparent,
-        },
+        material_opaque::shader::template::ShaderTemplateMaterialOpaque,
+        material_transparent::shader::template::ShaderTemplateMaterialTransparent,
         shader_cache_key::ShaderCacheKeyRenderPass,
     },
     shaders::AwsmShaderError,

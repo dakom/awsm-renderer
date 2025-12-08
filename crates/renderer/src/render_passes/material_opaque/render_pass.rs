@@ -1,6 +1,6 @@
 use crate::{
     error::Result,
-    render::{self, RenderContext},
+    render::RenderContext,
     render_passes::{
         material_opaque::{
             bind_group::MaterialOpaqueBindGroups, pipeline::MaterialOpaquePipelines,
@@ -8,11 +8,8 @@ use crate::{
         RenderPassInitContext,
     },
     renderable::Renderable,
-    AwsmRenderer,
 };
-use awsm_renderer_core::{
-    command::compute_pass::ComputePassDescriptor, renderer::AwsmRendererWebGpu,
-};
+use awsm_renderer_core::command::compute_pass::ComputePassDescriptor;
 use slotmap::SecondaryMap;
 
 pub struct MaterialOpaqueRenderPass {
@@ -41,7 +38,7 @@ impl MaterialOpaqueRenderPass {
         Ok(())
     }
 
-    pub fn render(&self, ctx: &RenderContext, mut renderables: Vec<Renderable>) -> Result<()> {
+    pub fn render(&self, ctx: &RenderContext, renderables: Vec<Renderable>) -> Result<()> {
         let compute_pass = ctx.command_encoder.begin_compute_pass(Some(
             &ComputePassDescriptor::new(Some("Material Opaque Pass")).into(),
         ));
@@ -49,9 +46,9 @@ impl MaterialOpaqueRenderPass {
         let (main_bind_group, lights_bind_group, texture_bind_group) =
             self.bind_groups.get_bind_groups()?;
 
-        compute_pass.set_bind_group(0u32, &main_bind_group, None)?;
-        compute_pass.set_bind_group(1u32, &lights_bind_group, None)?;
-        compute_pass.set_bind_group(2u32, &texture_bind_group, None)?;
+        compute_pass.set_bind_group(0u32, main_bind_group, None)?;
+        compute_pass.set_bind_group(1u32, lights_bind_group, None)?;
+        compute_pass.set_bind_group(2u32, texture_bind_group, None)?;
 
         let workgroup_size = (
             ctx.render_texture_views.width.div_ceil(8),

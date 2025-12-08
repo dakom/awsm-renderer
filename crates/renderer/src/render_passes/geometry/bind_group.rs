@@ -1,23 +1,18 @@
 use awsm_renderer_core::{
     bind_groups::{
-        BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, BindGroupLayoutResource,
-        BindGroupResource, BufferBindingLayout, BufferBindingType,
+        BindGroupDescriptor, BindGroupEntry, BindGroupLayoutResource, BindGroupResource,
+        BufferBindingLayout, BufferBindingType,
     },
     buffers::BufferBinding,
-    renderer::AwsmRendererWebGpu,
 };
 
 use crate::{
     bind_group_layout::{
-        BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey, BindGroupLayouts,
+        BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey,
     },
     bind_groups::{AwsmBindGroupError, BindGroupRecreateContext},
-    camera::CameraBuffer,
-    lights::Lights,
-    materials::{pbr::PbrMaterial, Materials},
     mesh::meta::geometry_meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT,
     render_passes::RenderPassInitContext,
-    transforms::Transforms,
 };
 use crate::{error::Result, materials::MaterialBufferKind};
 
@@ -67,7 +62,7 @@ impl GeometryBindGroupCamera {
 
         let bind_group_layout_key = ctx
             .bind_group_layouts
-            .get_key(&ctx.gpu, bind_group_layout_cache_key)?;
+            .get_key(ctx.gpu, bind_group_layout_cache_key)?;
 
         Ok(Self {
             bind_group_layout_key,
@@ -135,7 +130,7 @@ impl GeometryBindGroupTransformMaterials {
 
         let bind_group_layout_key = ctx
             .bind_group_layouts
-            .get_key(&ctx.gpu, bind_group_layout_cache_key)?;
+            .get_key(ctx.gpu, bind_group_layout_cache_key)?;
 
         Ok(Self {
             bind_group_layout_key,
@@ -155,7 +150,7 @@ impl GeometryBindGroupTransformMaterials {
                 BindGroupEntry::new(
                     1,
                     BindGroupResource::Buffer(BufferBinding::new(
-                        &ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
+                        ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
                     )),
                 ),
             ],
@@ -200,7 +195,7 @@ impl GeometryBindGroupMeta {
 
         let bind_group_layout_key = ctx
             .bind_group_layouts
-            .get_key(&ctx.gpu, bind_group_layout_cache_key)?;
+            .get_key(ctx.gpu, bind_group_layout_cache_key)?;
 
         Ok(Self {
             bind_group_layout_key,
@@ -215,7 +210,7 @@ impl GeometryBindGroupMeta {
             vec![BindGroupEntry::new(
                 0,
                 BindGroupResource::Buffer(
-                    BufferBinding::new(&ctx.meshes.meta.geometry_gpu_buffer())
+                    BufferBinding::new(ctx.meshes.meta.geometry_gpu_buffer())
                         .with_size(GEOMETRY_MESH_META_BYTE_ALIGNMENT),
                 ),
             )],
@@ -288,7 +283,7 @@ impl GeometryBindGroupAnimation {
 
         let bind_group_layout_key = ctx
             .bind_group_layouts
-            .get_key(&ctx.gpu, bind_group_layout_cache_key)?;
+            .get_key(ctx.gpu, bind_group_layout_cache_key)?;
 
         Ok(Self {
             bind_group_layout_key,

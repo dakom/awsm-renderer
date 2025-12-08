@@ -12,17 +12,15 @@ use awsm_renderer_core::pipeline::vertex::{
 };
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use awsm_renderer_core::texture::TextureFormat;
-use slotmap::{new_key_type, SlotMap};
 
 use crate::anti_alias::AntiAliasing;
 use crate::error::Result;
-use crate::mesh::{MeshBufferInfos, MeshBufferVertexInfo};
+use crate::mesh::MeshBufferVertexInfo;
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
 use crate::pipelines::Pipelines;
 use crate::render_passes::geometry::shader::cache_key::ShaderCacheKeyGeometry;
 use crate::render_passes::{geometry::bind_group::GeometryBindGroups, RenderPassInitContext};
-use crate::render_textures::RenderTextureFormats;
 use crate::shaders::{ShaderKey, Shaders};
 
 pub struct GeometryPipelines {
@@ -120,8 +118,8 @@ impl GeometryPipelines {
         ]);
 
         let pipeline_layout_key = ctx.pipeline_layouts.get_key(
-            &ctx.gpu,
-            &ctx.bind_group_layouts,
+            ctx.gpu,
+            ctx.bind_group_layouts,
             pipeline_layout_cache_key,
         )?;
 
@@ -141,7 +139,7 @@ impl GeometryPipelines {
         let shader_key_no_anti_alias_no_instancing = ctx
             .shaders
             .get_key(
-                &ctx.gpu,
+                ctx.gpu,
                 ShaderCacheKeyGeometry {
                     instancing_transforms: false,
                     msaa_samples: None,
@@ -151,7 +149,7 @@ impl GeometryPipelines {
         let shader_key_no_anti_alias_instancing = ctx
             .shaders
             .get_key(
-                &ctx.gpu,
+                ctx.gpu,
                 ShaderCacheKeyGeometry {
                     instancing_transforms: true,
                     msaa_samples: None,
@@ -162,7 +160,7 @@ impl GeometryPipelines {
         let shader_key_msaa_4_anti_alias_no_instancing = ctx
             .shaders
             .get_key(
-                &ctx.gpu,
+                ctx.gpu,
                 ShaderCacheKeyGeometry {
                     instancing_transforms: false,
                     msaa_samples: Some(4),
@@ -172,7 +170,7 @@ impl GeometryPipelines {
         let shader_key_msaa_4_anti_alias_instancing = ctx
             .shaders
             .get_key(
-                &ctx.gpu,
+                ctx.gpu,
                 ShaderCacheKeyGeometry {
                     instancing_transforms: true,
                     msaa_samples: Some(4),
@@ -181,10 +179,10 @@ impl GeometryPipelines {
             .await?;
 
         let no_anti_alias_no_cull_no_instancing_render_pipeline_key = render_pipeline_key(
-            &ctx.gpu,
-            &mut ctx.shaders,
-            &mut ctx.pipelines,
-            &ctx.pipeline_layouts,
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
             ctx.render_texture_formats.depth,
             pipeline_layout_key,
             shader_key_no_anti_alias_no_instancing,
@@ -196,10 +194,10 @@ impl GeometryPipelines {
         .await?;
 
         let no_anti_alias_no_cull_instancing_render_pipeline_key = render_pipeline_key(
-            &ctx.gpu,
-            &mut ctx.shaders,
-            &mut ctx.pipelines,
-            &ctx.pipeline_layouts,
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
             ctx.render_texture_formats.depth,
             pipeline_layout_key,
             shader_key_no_anti_alias_instancing,
@@ -211,10 +209,10 @@ impl GeometryPipelines {
         .await?;
 
         let no_anti_alias_back_cull_no_instancing_render_pipeline_key = render_pipeline_key(
-            &ctx.gpu,
-            &mut ctx.shaders,
-            &mut ctx.pipelines,
-            &ctx.pipeline_layouts,
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
             ctx.render_texture_formats.depth,
             pipeline_layout_key,
             shader_key_no_anti_alias_no_instancing,
@@ -226,10 +224,10 @@ impl GeometryPipelines {
         .await?;
 
         let no_anti_alias_back_cull_instancing_render_pipeline_key = render_pipeline_key(
-            &ctx.gpu,
-            &mut ctx.shaders,
-            &mut ctx.pipelines,
-            &ctx.pipeline_layouts,
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
             ctx.render_texture_formats.depth,
             pipeline_layout_key,
             shader_key_no_anti_alias_instancing,
@@ -241,10 +239,10 @@ impl GeometryPipelines {
         .await?;
 
         let msaa_4_anti_alias_no_cull_no_instancing_render_pipeline_key = render_pipeline_key(
-            &ctx.gpu,
-            &mut ctx.shaders,
-            &mut ctx.pipelines,
-            &ctx.pipeline_layouts,
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
             ctx.render_texture_formats.depth,
             pipeline_layout_key,
             shader_key_msaa_4_anti_alias_no_instancing,
@@ -256,10 +254,10 @@ impl GeometryPipelines {
         .await?;
 
         let msaa_4_anti_alias_no_cull_instancing_render_pipeline_key = render_pipeline_key(
-            &ctx.gpu,
-            &mut ctx.shaders,
-            &mut ctx.pipelines,
-            &ctx.pipeline_layouts,
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
             ctx.render_texture_formats.depth,
             pipeline_layout_key,
             shader_key_msaa_4_anti_alias_instancing,
@@ -271,10 +269,10 @@ impl GeometryPipelines {
         .await?;
 
         let msaa_4_anti_alias_back_cull_no_instancing_render_pipeline_key = render_pipeline_key(
-            &ctx.gpu,
-            &mut ctx.shaders,
-            &mut ctx.pipelines,
-            &ctx.pipeline_layouts,
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
             ctx.render_texture_formats.depth,
             pipeline_layout_key,
             shader_key_msaa_4_anti_alias_no_instancing,
@@ -286,10 +284,10 @@ impl GeometryPipelines {
         .await?;
 
         let msaa_4_anti_alias_back_cull_instancing_render_pipeline_key = render_pipeline_key(
-            &ctx.gpu,
-            &mut ctx.shaders,
-            &mut ctx.pipelines,
-            &ctx.pipeline_layouts,
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
             ctx.render_texture_formats.depth,
             pipeline_layout_key,
             shader_key_msaa_4_anti_alias_instancing,
@@ -381,6 +379,6 @@ async fn render_pipeline_key(
 
     Ok(pipelines
         .render
-        .get_key(&gpu, &shaders, &pipeline_layouts, pipeline_cache_key)
+        .get_key(gpu, shaders, pipeline_layouts, pipeline_cache_key)
         .await?)
 }

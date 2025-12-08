@@ -1,23 +1,11 @@
-use awsm_renderer_core::compare::CompareFunction;
-use awsm_renderer_core::pipeline::depth_stencil::DepthStencilState;
-use awsm_renderer_core::pipeline::fragment::ColorTargetState;
-use awsm_renderer_core::pipeline::multisample::MultisampleState;
-use awsm_renderer_core::pipeline::primitive::{
-    CullMode, FrontFace, PrimitiveState, PrimitiveTopology,
-};
-use awsm_renderer_core::pipeline::vertex::VertexBufferLayout;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
-use awsm_renderer_core::texture::TextureFormat;
 use slotmap::SecondaryMap;
 
 use crate::anti_alias::AntiAliasing;
-use crate::bind_groups::BindGroups;
 use crate::error::Result;
-use crate::materials::MaterialKey;
-use crate::mesh::{Mesh, MeshBufferInfo, MeshBufferInfoKey, MeshBufferInfos, MeshKey};
+use crate::mesh::{Mesh, MeshBufferInfos, MeshKey};
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::compute_pipeline::{ComputePipelineCacheKey, ComputePipelineKey};
-use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
 use crate::pipelines::Pipelines;
 use crate::render_passes::{
     material_opaque::{
@@ -25,8 +13,8 @@ use crate::render_passes::{
     },
     RenderPassInitContext,
 };
-use crate::shaders::{ShaderKey, Shaders};
-use crate::textures::{AwsmTextureError, Textures};
+use crate::shaders::Shaders;
+use crate::textures::Textures;
 
 pub struct MaterialOpaquePipelines {
     multisampled_pipeline_layout_key: PipelineLayoutKey,
@@ -45,8 +33,8 @@ impl MaterialOpaquePipelines {
             bind_groups.texture_pool_textures_bind_group_layout_key,
         ]);
         let multisampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
-            &ctx.gpu,
-            &ctx.bind_group_layouts,
+            ctx.gpu,
+            ctx.bind_group_layouts,
             multisampled_pipeline_layout_cache_key,
         )?;
 
@@ -56,8 +44,8 @@ impl MaterialOpaquePipelines {
             bind_groups.texture_pool_textures_bind_group_layout_key,
         ]);
         let singlesampled_pipeline_layout_key = ctx.pipeline_layouts.get_key(
-            &ctx.gpu,
-            &ctx.bind_group_layouts,
+            ctx.gpu,
+            ctx.bind_group_layouts,
             singlesampled_pipeline_layout_cache_key,
         )?;
 
@@ -83,7 +71,7 @@ impl MaterialOpaquePipelines {
         pipeline_layouts: &PipelineLayouts,
         mesh_buffer_infos: &MeshBufferInfos,
         anti_aliasing: &AntiAliasing,
-        textures: &Textures,
+        _textures: &Textures,
     ) -> Result<ComputePipelineKey> {
         let mesh_buffer_info = mesh_buffer_infos.get(mesh.buffer_info_key)?;
 
@@ -109,9 +97,9 @@ impl MaterialOpaquePipelines {
         let compute_pipeline_key = pipelines
             .compute
             .get_key(
-                &gpu,
-                &shaders,
-                &pipeline_layouts,
+                gpu,
+                shaders,
+                pipeline_layouts,
                 compute_pipeline_cache_key.clone(),
             )
             .await?;

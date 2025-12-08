@@ -4,7 +4,7 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::{Mat4, Vec2, Vec3, Vec4};
 use thiserror::Error;
 
-use crate::bind_groups::{AwsmBindGroupError, BindGroups};
+use crate::bind_groups::BindGroups;
 use crate::render_textures::RenderTextures;
 use crate::{AwsmRenderer, AwsmRendererLogging};
 
@@ -93,8 +93,8 @@ impl CameraBuffer {
     ) -> Result<()> {
         let mut camera_matrices = camera_matrices_orig.clone();
 
-        self.camera_moved = match (&self.last_matrices) {
-            (Some(last_matrices)) => {
+        self.camera_moved = match &self.last_matrices {
+            Some(last_matrices) => {
                 fn matrices_equal(a: Mat4, b: Mat4, epsilon: f32) -> bool {
                     for i in 0..16 {
                         if (a.to_cols_array()[i] - b.to_cols_array()[i]).abs() > epsilon {
@@ -177,7 +177,7 @@ impl CameraBuffer {
         &mut self,
         logging: &AwsmRendererLogging,
         gpu: &AwsmRendererWebGpu,
-        bind_groups: &BindGroups,
+        _bind_groups: &BindGroups,
     ) -> Result<()> {
         if self.gpu_dirty {
             let _maybe_span_guard = if logging.render_timings {
@@ -236,7 +236,7 @@ fn compute_view_frustum_rays(inv_projection: Mat4) -> [Vec4; 4] {
 fn write_f32_slice(buffer: &mut [u8], offset: &mut usize, values: &[f32]) {
     // All matrices/vectors in the camera buffer are tightly packed f32 arrays. Writing them this
     // way keeps the CPU-side layout authoritative and avoids duplicating offset math.
-    let byte_len = values.len() * std::mem::size_of::<f32>();
+    let byte_len = std::mem::size_of_val(values);
     let bytes = unsafe { std::slice::from_raw_parts(values.as_ptr() as *const u8, byte_len) };
     buffer[*offset..*offset + byte_len].copy_from_slice(bytes);
     *offset += byte_len;

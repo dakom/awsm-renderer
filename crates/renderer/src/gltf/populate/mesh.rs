@@ -1,4 +1,4 @@
-use std::{future::Future, pin::Pin};
+use std::{future::Future, pin::Pin, sync::Arc};
 
 use crate::{
     bounds::Aabb,
@@ -7,20 +7,9 @@ use crate::{
         populate::material::GltfMaterialInfo,
     },
     materials::Material,
-    mesh::{skins::SkinKey, Mesh, MeshBufferInfo, MeshBufferVertexInfo},
-    pipeline_layouts::PipelineLayoutCacheKey,
-    pipelines::render_pipeline::RenderPipelineCacheKey,
+    mesh::{Mesh, MeshBufferInfo, MeshBufferVertexInfo},
     transforms::{Transform, TransformKey},
     AwsmRenderer,
-};
-use awsm_renderer_core::{
-    compare::CompareFunction,
-    pipeline::{
-        self,
-        depth_stencil::DepthStencilState,
-        fragment::{BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState},
-        primitive::{CullMode, FrontFace, PrimitiveState, PrimitiveTopology},
-    },
 };
 use glam::{Mat4, Vec3};
 
@@ -57,8 +46,10 @@ impl AwsmRenderer {
                 // We use the same matrices across the primitives
                 // but the skin as a whole is defined on the mesh
                 // from the spec: "When defined, mesh MUST also be defined."
-                let mesh_skin_transform = ctx.node_to_skin_transform.lock().unwrap();
-                let mesh_skin_transform = mesh_skin_transform.get(&gltf_node.index());
+                let mesh_skin_transform = {
+                    let mesh_skin_transform = ctx.node_to_skin_transform.lock().unwrap();
+                    mesh_skin_transform.get(&gltf_node.index()).cloned()
+                };
 
                 for gltf_primitive in gltf_mesh.primitives() {
                     self.populate_gltf_primitive(
@@ -67,7 +58,7 @@ impl AwsmRenderer {
                         &gltf_mesh,
                         gltf_primitive,
                         mesh_transform_key,
-                        mesh_skin_transform,
+                        mesh_skin_transform.clone(),
                     )
                     .await?;
                 }
@@ -87,7 +78,7 @@ impl AwsmRenderer {
         gltf_mesh: &gltf::Mesh<'_>,
         gltf_primitive: gltf::Primitive<'_>,
         transform_key: TransformKey,
-        skin_transform: Option<&(Vec<TransformKey>, Vec<Mat4>)>,
+        skin_transform: Option<Arc<(Vec<TransformKey>, Vec<Mat4>)>>,
     ) -> Result<()> {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
@@ -109,7 +100,7 @@ impl AwsmRenderer {
                 // this is generally verified in the insert() call too
                 let weights = gltf_mesh.weights().unwrap();
                 let weights_u8 = unsafe {
-                    std::slice::from_raw_parts(weights.as_ptr() as *const u8, (weights.len() * 4))
+                    std::slice::from_raw_parts(weights.as_ptr() as *const u8, weights.len() * 4)
                 };
 
                 Some(self.meshes.morphs.geometry.insert_raw(
@@ -135,7 +126,9 @@ impl AwsmRenderer {
                     "Got buffers but no transform".to_string(),
                 ));
             }
-            (Some((joints, inverse_bind_matrices)), Some(info)) => {
+            (Some(data), Some(info)) => {
+                let joints = &data.0;
+                let inverse_bind_matrices = &data.1;
                 let index_weights = &ctx.data.buffers.skin_joint_index_weight_bytes;
                 let index_weights = &index_weights[info.index_weights_offset
                     ..info.index_weights_offset + info.index_weights_size];

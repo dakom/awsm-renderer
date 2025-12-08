@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 
-use crate::buffer::helpers::{
-    slice_zeroes, u8_to_f32_iter, u8_to_u16_iter, u8_to_u16_vec, u8_to_u32_iter,
-};
+use crate::buffer::helpers::{u8_to_f32_iter, u8_to_u16_iter, u8_to_u32_iter};
 use crate::gltf::buffers::accessor::accessor_to_bytes;
 use crate::gltf::buffers::MeshBufferSkinInfoWithOffset;
 use crate::gltf::error::{AwsmGltfError, Result};

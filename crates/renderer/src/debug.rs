@@ -40,7 +40,7 @@ pub fn debug_n(id: u32, n: u64, f: impl FnOnce()) {
 }
 
 pub fn debug_unique_string(id: u32, input: &str, f: impl FnOnce()) {
-    let transaction_count = bump_transaction_count(id);
+    bump_transaction_count(id);
 
     let mut lock = DEBUG_UNIQUE_STRING.lock().unwrap();
     if let Some(value) = lock.get(&id) {
@@ -49,6 +49,6 @@ pub fn debug_unique_string(id: u32, input: &str, f: impl FnOnce()) {
         }
     }
 
-    let value = f();
+    f();
     lock.insert(id, input.to_string());
 }

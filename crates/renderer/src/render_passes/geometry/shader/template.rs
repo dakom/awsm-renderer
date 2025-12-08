@@ -1,10 +1,8 @@
-use std::collections::HashSet;
-
 use askama::Template;
 
 use crate::{
     render_passes::geometry::shader::cache_key::ShaderCacheKeyGeometry,
-    shaders::{print_shader_source, AwsmShaderError, Result},
+    shaders::{AwsmShaderError, Result},
 };
 
 #[derive(Debug)]
@@ -16,19 +14,11 @@ pub struct ShaderTemplateGeometry {
 
 #[derive(Template, Debug)]
 #[template(path = "geometry_wgsl/bind_groups.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateGeometryBindGroups {
-    max_morph_unroll: u32,
-    max_skin_unroll: u32,
-    instancing_transforms: bool,
-}
+pub struct ShaderTemplateGeometryBindGroups {}
 
 impl ShaderTemplateGeometryBindGroups {
-    pub fn new(cache_key: &ShaderCacheKeyGeometry) -> Self {
-        Self {
-            max_morph_unroll: 2,
-            max_skin_unroll: 2,
-            instancing_transforms: cache_key.instancing_transforms,
-        }
+    pub fn new(_cache_key: &ShaderCacheKeyGeometry) -> Self {
+        Self {}
     }
 }
 
@@ -55,7 +45,7 @@ impl ShaderTemplateGeometryVertex {
 pub struct ShaderTemplateGeometryFragment {}
 
 impl ShaderTemplateGeometryFragment {
-    pub fn new(cache_key: &ShaderCacheKeyGeometry) -> Self {
+    pub fn new(_cache_key: &ShaderCacheKeyGeometry) -> Self {
         Self {}
     }
 }

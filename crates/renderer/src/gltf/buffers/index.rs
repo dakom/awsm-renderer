@@ -1,7 +1,5 @@
-use awsm_renderer_core::pipeline::primitive::IndexFormat;
-
 use crate::{
-    buffer::helpers::{u8_to_f32_vec, u8_to_i16_vec, u8_to_i8_vec, u8_to_u16_vec, u8_to_u32_vec},
+    buffer::helpers::{u8_to_f32_vec, u8_to_i16_vec, u8_to_u16_vec},
     gltf::buffers::MeshBufferAttributeIndexInfoWithOffset,
 };
 
@@ -83,7 +81,7 @@ impl GltfMeshBufferIndexInfo {
                         let f32_values = u8_to_f32_vec(&accessor_bytes);
                         for value in f32_values {
                             let value = value as u32;
-                            index_bytes.extend_from_slice(&u32::from(value).to_le_bytes());
+                            index_bytes.extend_from_slice(&value.to_le_bytes());
                         }
                     }
                 }
@@ -116,8 +114,6 @@ pub fn generate_fresh_indices_from_primitive(
     if vertex_count == 0 {
         return Ok(MeshBufferAttributeIndexInfoWithOffset { offset, count: 0 });
     }
-
-    let start_offset = index_bytes.len();
 
     // Generate sequential indices based on primitive mode
     match primitive.mode() {
@@ -218,10 +214,9 @@ pub(super) fn extract_triangle_indices(
 
     for i in 0..num_triangles {
         let mut triangle = [0usize; 3];
-        let mut triangle = [0usize; 3];
 
         // Read the 3 vertex indices that form this triangle
-        for j in 0..3 {
+        for (j, triangle_vertex) in triangle.iter_mut().enumerate() {
             // Calculate byte offset for this specific index
             // i = triangle number, j = vertex within triangle (0, 1, or 2)
             let index_offset = (i * 3 + j) * 4; // 4 bytes per u32 index
@@ -244,7 +239,7 @@ pub(super) fn extract_triangle_indices(
             let vertex_idx = u32::from_le_bytes(index_slice.try_into().unwrap()) as usize;
 
             // Store the ORIGINAL vertex index (references attribute arrays)
-            triangle[j] = vertex_idx;
+            *triangle_vertex = vertex_idx;
         }
 
         // Add this triangle to our collection

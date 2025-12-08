@@ -1,18 +1,12 @@
 use std::collections::HashMap;
 
 use awsm_renderer_core::{
-    bind_groups::{
-        BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindGroupLayoutResource,
-        BufferBindingLayout, SamplerBindingLayout, StorageTextureBindingLayout,
-        TextureBindingLayout,
-    },
+    bind_groups::{BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindGroupLayoutResource},
     error::AwsmCoreError,
     renderer::AwsmRendererWebGpu,
 };
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
-
-use crate::AwsmRenderer;
 
 pub struct BindGroupLayouts {
     lookup: SlotMap<BindGroupLayoutKey, web_sys::GpuBindGroupLayout>,

@@ -171,40 +171,40 @@ pub(super) fn convert_attribute_kind(
         Semantic::Positions => Some(MeshBufferVertexAttributeInfo::Visibility(
             MeshBufferVisibilityVertexAttributeInfo::Positions {
                 data_size: accessor.data_type().size(),
-                component_len: accessor.dimensions().multiplicity() as usize,
+                component_len: accessor.dimensions().multiplicity(),
             },
         )),
         Semantic::Normals => Some(MeshBufferVertexAttributeInfo::Visibility(
             MeshBufferVisibilityVertexAttributeInfo::Normals {
                 data_size: accessor.data_type().size(),
-                component_len: accessor.dimensions().multiplicity() as usize,
+                component_len: accessor.dimensions().multiplicity(),
             },
         )),
         Semantic::Tangents => Some(MeshBufferVertexAttributeInfo::Visibility(
             MeshBufferVisibilityVertexAttributeInfo::Tangents {
                 data_size: accessor.data_type().size(),
-                component_len: accessor.dimensions().multiplicity() as usize,
+                component_len: accessor.dimensions().multiplicity(),
             },
         )),
         Semantic::Colors(index) => Some(MeshBufferVertexAttributeInfo::Custom(
             MeshBufferCustomVertexAttributeInfo::Colors {
                 data_size: accessor.data_type().size(),
-                component_len: accessor.dimensions().multiplicity() as usize,
+                component_len: accessor.dimensions().multiplicity(),
                 index: *index,
             },
         )),
         Semantic::TexCoords(index) => Some(MeshBufferVertexAttributeInfo::Custom(
             MeshBufferCustomVertexAttributeInfo::TexCoords {
                 data_size: accessor.data_type().size(),
-                component_len: accessor.dimensions().multiplicity() as usize,
+                component_len: accessor.dimensions().multiplicity(),
                 index: *index,
             },
         )),
-        Semantic::Joints(index) => {
+        Semantic::Joints(_) => {
             //extracted into storage buffer
             None
         }
-        Semantic::Weights(index) => {
+        Semantic::Weights(_) => {
             // extracted into storage buffer
             None
         }

@@ -2,41 +2,28 @@ mod transparency;
 mod visibility;
 
 use awsm_renderer_core::pipeline::primitive::FrontFace;
-use awsm_renderer_core::pipeline::vertex::VertexFormat;
-use gltf::accessor::{DataType, Dimensions};
 use gltf::material::AlphaMode;
-use gltf::Semantic;
-use std::borrow::Cow;
-use std::collections::{BTreeMap, HashMap};
 
-use crate::buffer::helpers::{
-    i16_to_i32_vec, slice_zeroes, u16_to_u32_vec, u8_to_i16_vec, u8_to_u16_vec,
-};
 use crate::gltf::buffers::attributes::{load_attribute_data_by_kind, pack_vertex_attributes};
-use crate::gltf::buffers::index::extract_triangle_indices;
 use crate::gltf::buffers::mesh::transparency::create_transparency_vertices;
 use crate::gltf::buffers::mesh::visibility::create_visibility_vertices;
 use crate::gltf::buffers::morph::convert_morph_targets;
-use crate::gltf::buffers::normals::{compute_normals, ensure_normals};
+use crate::gltf::buffers::normals::ensure_normals;
 use crate::gltf::buffers::skin::convert_skin;
 use crate::gltf::buffers::triangle::pack_triangle_data;
 use crate::gltf::buffers::{
     MeshBufferAttributeIndexInfoWithOffset, MeshBufferInfoWithOffset,
-    MeshBufferTriangleDataInfoWithOffset, MeshBufferTriangleInfoWithOffset,
-    MeshBufferVertexInfoWithOffset,
+    MeshBufferTriangleInfoWithOffset, MeshBufferVertexInfoWithOffset,
 };
 use crate::gltf::error::AwsmGltfError;
-use crate::mesh::{
-    MeshBufferAttributeIndexInfo, MeshBufferInfo, MeshBufferTriangleDataInfo,
-    MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
-};
+use crate::mesh::MeshBufferVertexAttributeInfo;
 
-use super::accessor::accessor_to_bytes;
 use super::Result;
 
 pub(super) enum GltfMeshBufferGeometryKind {
     Visibility,
     Transparency,
+    #[allow(dead_code)]
     Both,
 }
 
@@ -65,7 +52,7 @@ pub(super) fn convert_to_mesh_buffer(
     skin_joint_index_weight_bytes: &mut Vec<u8>,
 ) -> Result<MeshBufferInfoWithOffset> {
     // Step 1: Load all GLTF attributes
-    let mut gltf_attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> = primitive
+    let gltf_attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> = primitive
         .attributes()
         .filter(|(semantic, _)| {
             // Joints and Weights are NOT vertex attributes - they're skinning data

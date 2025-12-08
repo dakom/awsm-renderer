@@ -1,5 +1,7 @@
-#![allow(warnings)]
-
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::match_like_matches_macro)]
+#![allow(clippy::vec_init_then_push)]
 pub mod anti_alias;
 pub mod bind_group_layout;
 pub mod bind_groups;
@@ -44,7 +46,6 @@ use camera::CameraBuffer;
 use instances::Instances;
 use lights::Lights;
 use materials::Materials;
-use mesh::skins::Skins;
 use mesh::Meshes;
 use pipelines::Pipelines;
 use shaders::Shaders;
@@ -58,9 +59,7 @@ use crate::{
     environment::{Environment, Skybox},
     lights::ibl::{Ibl, IblTexture},
     pipeline_layouts::PipelineLayouts,
-    render_passes::{
-        geometry::bind_group::GeometryBindGroups, RenderPassInitContext, RenderPasses,
-    },
+    render_passes::{RenderPassInitContext, RenderPasses},
     render_textures::{RenderTextureFormats, RenderTextures},
 };
 
@@ -258,8 +257,8 @@ impl AwsmRendererBuilder {
         let mut shaders = Shaders::new();
 
         let mut textures = Textures::new(&gpu)?;
-        let mut camera = camera::CameraBuffer::new(&gpu)?;
-        let mut lights = Lights::new(
+        let camera = camera::CameraBuffer::new(&gpu)?;
+        let lights = Lights::new(
             &gpu,
             Ibl::new(
                 IblTexture::new_colors(&gpu, &mut textures, ibl_filtered_env_colors).await?,
@@ -267,11 +266,11 @@ impl AwsmRendererBuilder {
             ),
             BrdfLut::new(&gpu, brdf_lut_options).await?,
         )?;
-        let mut meshes = Meshes::new(&gpu)?;
-        let mut transforms = Transforms::new(&gpu)?;
-        let mut instances = Instances::new(&gpu)?;
-        let mut materials = Materials::new(&gpu)?;
-        let mut environment =
+        let meshes = Meshes::new(&gpu)?;
+        let transforms = Transforms::new(&gpu)?;
+        let instances = Instances::new(&gpu)?;
+        let materials = Materials::new(&gpu)?;
+        let environment =
             Environment::new(Skybox::new_colors(&gpu, &mut textures, skybox_colors).await?);
 
         // temporarily push into an init struct for creating render passes

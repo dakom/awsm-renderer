@@ -1,9 +1,8 @@
 use askama::Template;
 
 use crate::{
-    debug::{debug_once, debug_unique_string},
     render_passes::material_opaque::shader::cache_key::ShaderCacheKeyMaterialOpaque,
-    shaders::{print_shader_source, AwsmShaderError, Result},
+    shaders::{AwsmShaderError, Result},
 };
 
 #[derive(Debug)]
@@ -109,12 +108,12 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
         //
 
         // color sets always starts at 0;
-        let mut color_sets_index = 0;
+        let color_sets_index = 0;
 
         // uv sets might start at 0 if there's no colors
         // otherwise, it's pushed off by however many color sets there are
         let mut uv_sets_index = 0;
-        uv_sets_index += (value.attributes.color_sets.unwrap_or(0) * 4) as u32; // colors use 4 floats each
+        uv_sets_index += value.attributes.color_sets.unwrap_or(0) * 4; // colors use 4 floats each
 
         // for easy copy/paste
         let texture_pool_arrays_len = value.texture_pool_arrays_len;
@@ -168,13 +167,13 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum MipmapMode {
+pub enum MipmapMode {
     None,
     Gradient,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-struct ShaderTemplateMaterialOpaqueDebug {
+pub struct ShaderTemplateMaterialOpaqueDebug {
     mips: bool,
     n_dot_v: bool,
     normals: bool,
@@ -205,7 +204,7 @@ impl ShaderTemplateMaterialOpaqueDebug {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-enum ShaderTemplateMaterialOpaqueDebugLighting {
+pub enum ShaderTemplateMaterialOpaqueDebugLighting {
     #[default]
     None,
     IblOnly,

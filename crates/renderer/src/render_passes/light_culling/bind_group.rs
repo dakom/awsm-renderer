@@ -1,6 +1,6 @@
 use crate::bind_groups::{AwsmBindGroupError, BindGroupRecreateContext};
 use crate::error::Result;
-use crate::{bind_group_layout::BindGroupLayoutKey, render_passes::RenderPassInitContext};
+use crate::render_passes::RenderPassInitContext;
 
 pub struct LightCullingBindGroups {
     //pub bind_group_layout_key: BindGroupLayoutKey,
@@ -9,7 +9,7 @@ pub struct LightCullingBindGroups {
 }
 
 impl LightCullingBindGroups {
-    pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
+    pub async fn new(_ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         Ok(Self {
             //bind_group_layout_key,
             _bind_group: None,
@@ -24,7 +24,7 @@ impl LightCullingBindGroups {
             .ok_or_else(|| AwsmBindGroupError::NotFound("Light Culling".to_string()))
     }
 
-    pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
+    pub fn recreate(&mut self, _ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         //self._bind_group = Some(ctx.gpu.create_bind_group(&descriptor.into()));
 
         Ok(())

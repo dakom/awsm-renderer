@@ -1,19 +1,13 @@
 pub mod geometry_meta;
 pub mod material_meta;
 
-use std::sync::LazyLock;
-
-use awsm_renderer_core::{
-    buffers::{BufferDescriptor, BufferUsage},
-    renderer::AwsmRendererWebGpu,
-};
-use slotmap::Key;
+use awsm_renderer_core::{buffers::BufferDescriptor, renderer::AwsmRendererWebGpu};
 
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
-    buffer::{dynamic_storage::DynamicStorageBuffer, dynamic_uniform::DynamicUniformBuffer},
+    buffer::dynamic_uniform::DynamicUniformBuffer,
     debug::AwsmRendererLogging,
-    materials::{MaterialKey, Materials},
+    materials::Materials,
     mesh::{
         error::{AwsmMeshError, Result},
         meta::{
@@ -26,11 +20,11 @@ use crate::{
                 MATERIAL_MESH_META_BYTE_SIZE,
             },
         },
-        morphs::{GeometryMorphKey, MaterialMorphKey, Morphs},
-        skins::{SkinKey, Skins},
+        morphs::Morphs,
+        skins::Skins,
         Mesh, MeshBufferInfo, MeshKey,
     },
-    transforms::{TransformKey, Transforms},
+    transforms::Transforms,
 };
 
 // Reduced from 1024 to stay under 128MB default storage buffer limit.
@@ -88,7 +82,7 @@ impl MeshMeta {
         mesh: &Mesh,
         buffer_info: &MeshBufferInfo,
         visibility_geometry_data_offset: Option<usize>,
-        transparency_geometry_data_offset: Option<usize>,
+        _transparency_geometry_data_offset: Option<usize>,
         custom_attribute_indices_offset: usize,
         custom_attribute_data_offset: usize,
         materials: &Materials,
@@ -171,7 +165,7 @@ impl MeshMeta {
 
     pub fn write_gpu(
         &mut self,
-        logging: &AwsmRendererLogging,
+        _logging: &AwsmRendererLogging,
         gpu: &AwsmRendererWebGpu,
         bind_groups: &mut BindGroups,
     ) -> Result<()> {

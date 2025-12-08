@@ -5,24 +5,24 @@ use slotmap::{Key, SecondaryMap};
 /// This buffer is optimized for managing many items of identical size,
 /// automatically handling slot allocation, reuse, and buffer growth.
 /// All items must be the same size (specified at creation time).
-
-//-------------------------------- PERFORMANCE SUMMARY ------------------------//
-//
-// • insert/update/remove:   O(1)  (amortized, ignoring rare growth)
-// • GPU write (per frame):  uploads entire buffer each time
-// • Resize strategy:        doubles capacity when needed (infrequent pauses)
-// • External fragmentation: none (fixed-size slots)
-// • Internal fragmentation: none
-// • Memory overhead:        exactly `capacity × ALIGNED_SLICE_SIZE`
-//
-// • Ideal usage:
-//    Thousands of items with identical sizes, like:
-//      - Transforms
-//      - Lights
-//      - PBR Materials
-//
-//----------------------------------------------------------------------------//
-
+///
+///-------------------------------- PERFORMANCE SUMMARY ------------------------//
+///
+/// • insert/update/remove:   O(1)  (amortized, ignoring rare growth)
+/// • GPU write (per frame):  uploads entire buffer each time
+/// • Resize strategy:        doubles capacity when needed (infrequent pauses)
+/// • External fragmentation: none (fixed-size slots)
+/// • Internal fragmentation: none
+/// • Memory overhead:        exactly `capacity × ALIGNED_SLICE_SIZE`
+///
+/// • Ideal usage:
+///    Thousands of items with identical sizes, like:
+///      - Transforms
+///      - Lights
+///      - PBR Materials
+///
+///----------------------------------------------------------------------------//
+///
 /// This gives us a generic helper for dynamic buffers of a fixed alignment size
 /// It internally manages free slots for re‑use, and reallocates (grows) the underlying buffer only when needed.
 ///
@@ -192,7 +192,7 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         self.slot_indices.get(key).copied()
     }
 
-    pub fn keys(&self) -> slotmap::secondary::Keys<K, usize> {
+    pub fn keys<'a>(&'a self) -> slotmap::secondary::Keys<'a, K, usize> {
         self.slot_indices.keys()
     }
 
@@ -510,7 +510,7 @@ mod test {
     #[test]
     fn test_keys_iterator() {
         let mut buffer = create_test_buffer();
-        let (_, key1, key2, key3) = create_keys();
+        let (_, key1, key2, _key3) = create_keys();
 
         // Initially no keys
         assert_eq!(buffer.keys().count(), 0);

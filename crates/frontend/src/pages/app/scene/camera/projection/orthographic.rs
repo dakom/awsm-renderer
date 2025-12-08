@@ -1,5 +1,5 @@
 use awsm_renderer::bounds::Aabb;
-use glam::{Mat4, Vec3, Vec4};
+use glam::Mat4;
 
 use crate::pages::app::scene::camera::CameraView;
 
@@ -41,7 +41,7 @@ impl OrthographicCamera {
     }
 
     pub fn on_wheel(&mut self, view: &CameraView, aabb: &Aabb, margin: f32, delta: f32) {
-        self.zoom(1.0 + delta as f32 * 0.001);
+        self.zoom(1.0 + delta * 0.001);
         self.update_near_far(view, aabb, margin);
     }
 
@@ -65,7 +65,6 @@ impl OrthographicCamera {
     pub fn on_resize(&mut self, view: &CameraView, aabb: &Aabb, margin: f32, aspect: f32) {
         // current centre of the frustum
         let cx = (self.left + self.right) * 0.5;
-        let cy = (self.bottom + self.top) * 0.5;
 
         // keep vertical span, change horizontal to match aspect
         let half_h = (self.top - self.bottom) * 0.5;
@@ -103,5 +102,5 @@ impl OrthographicCamera {
         self.top = cy + half_h;
     }
 
-    pub fn setup_from_gltf(&mut self, doc: &gltf::Document) {}
+    pub fn setup_from_gltf(&mut self, _doc: &gltf::Document) {}
 }

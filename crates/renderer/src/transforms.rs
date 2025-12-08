@@ -15,7 +15,7 @@ use awsm_renderer_core::{
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::{
-    bind_groups::{AwsmBindGroupError, BindGroupCreate, BindGroups},
+    bind_groups::{BindGroupCreate, BindGroups},
     buffer::dynamic_uniform::DynamicUniformBuffer,
     mesh::skins::AwsmSkinError,
     AwsmRenderer, AwsmRendererLogging,

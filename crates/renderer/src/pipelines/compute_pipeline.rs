@@ -4,12 +4,8 @@ use awsm_renderer_core::{
     error::AwsmCoreError,
     pipeline::{
         constants::{ConstantOverrideKey, ConstantOverrideValue},
-        depth_stencil::DepthStencilState,
-        fragment::{ColorTargetState, FragmentState},
         layout::PipelineLayoutKind,
-        primitive::PrimitiveState,
-        vertex::{VertexBufferLayout, VertexState},
-        ComputePipelineDescriptor, ProgrammableStage, RenderPipelineDescriptor,
+        ComputePipelineDescriptor, ProgrammableStage,
     },
     renderer::AwsmRendererWebGpu,
 };
@@ -60,7 +56,7 @@ impl ComputePipelines {
         let mut programmable_stage = ProgrammableStage::new(shader_module, None);
         programmable_stage.constant_overrides = cache_key.constant_overrides;
 
-        let mut descriptor = ComputePipelineDescriptor::new(
+        let descriptor = ComputePipelineDescriptor::new(
             programmable_stage,
             PipelineLayoutKind::Custom(layout),
             None,

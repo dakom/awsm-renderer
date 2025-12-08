@@ -1,8 +1,6 @@
 use awsm_renderer_core::{
     error::AwsmCoreError,
-    pipeline::fragment::ColorTargetState,
     renderer::AwsmRendererWebGpu,
-    sampler::SamplerDescriptor,
     texture::{
         blit::{blit_get_bind_group, blit_get_pipeline, BlitPipeline},
         clear::TextureClearer,
@@ -41,7 +39,7 @@ pub struct RenderTextureFormats {
 }
 
 impl RenderTextureFormats {
-    pub async fn new(device: &web_sys::GpuDevice) -> Self {
+    pub async fn new(_device: &web_sys::GpuDevice) -> Self {
         Self {
             visiblity_data: TextureFormat::Rgba16uint,
             barycentric: TextureFormat::Rg16float,
@@ -111,7 +109,7 @@ impl RenderTextures {
             None => false,
         };
 
-        if size_changed {
+        if size_changed || anti_aliasing_changed {
             if let Some(inner) = self.inner.take() {
                 inner.destroy();
             }

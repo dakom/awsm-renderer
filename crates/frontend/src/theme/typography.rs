@@ -29,8 +29,8 @@ impl TextDirection {
         });
 
         match self {
-            Self::Ltr => &*LTR,
-            Self::Rtl => &*RTL,
+            Self::Ltr => &LTR,
+            Self::Rtl => &RTL,
         }
     }
 }
@@ -107,13 +107,13 @@ impl FontSize {
         });
 
         match self {
-            Self::H1 => &*H1,
-            Self::H2 => &*H2,
-            Self::H3 => &*H3,
-            Self::Lg => &*LG,
-            Self::Md => &*MD,
-            Self::Sm => &*SM,
-            Self::Xlg => &*XLG,
+            Self::H1 => &H1,
+            Self::H2 => &H2,
+            Self::H3 => &H3,
+            Self::Lg => &LG,
+            Self::Md => &MD,
+            Self::Sm => &SM,
+            Self::Xlg => &XLG,
         }
     }
 }
@@ -139,8 +139,8 @@ impl FontWeight {
         });
 
         match self {
-            Self::SemiBold => &*SEMI_BOLD,
-            Self::Bold => &*BOLD,
+            Self::SemiBold => &SEMI_BOLD,
+            Self::Bold => &BOLD,
         }
     }
 }

@@ -41,10 +41,10 @@ impl<'a> GeometryMeshMeta<'a> {
         let Self {
             mesh_key,
             transform_key,
-            material_key,
+            material_key: _,
             geometry_morph_key,
             skin_key,
-            materials,
+            materials: _,
             transforms,
             morphs,
             skins,
@@ -59,14 +59,6 @@ impl<'a> GeometryMeshMeta<'a> {
 
             offset += 4;
         };
-
-        fn bool_as_u32(value: bool) -> u32 {
-            if value {
-                1
-            } else {
-                0
-            }
-        }
 
         let mesh_key_u64 = mesh_key.data().as_ffi();
         let (mesh_key_u32_high, mesh_key_u32_low) = (

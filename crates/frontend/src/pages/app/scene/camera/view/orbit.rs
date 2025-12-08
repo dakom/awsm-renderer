@@ -1,5 +1,5 @@
 use awsm_renderer::bounds::Aabb;
-use glam::{Mat4, Quat, Vec3};
+use glam::{Mat4, Vec3};
 
 #[derive(Debug, Clone)]
 pub struct OrbitCamera {
@@ -86,7 +86,7 @@ impl OrbitCamera {
         self.radius = (self.radius * zoom_factor).max(0.1);
     }
 
-    pub fn setup_from_gltf(&mut self, doc: &gltf::Document) {
+    pub fn setup_from_gltf(&mut self, _doc: &gltf::Document) {
         // TODO: Implement proper camera orientation detection based on glTF scene data
         // For now, use consistent defaults and let users rotate manually
     }

@@ -1,5 +1,5 @@
 use crate::{
-    error::{AwsmError, Result},
+    error::Result,
     render::RenderContext,
     render_passes::{
         material_transparent::{
@@ -7,15 +7,11 @@ use crate::{
         },
         RenderPassInitContext,
     },
-    renderable::{self, Renderable},
-    AwsmRenderer,
+    renderable::Renderable,
 };
-use awsm_renderer_core::{
-    command::{
-        render_pass::{ColorAttachment, DepthStencilAttachment, RenderPassDescriptor},
-        LoadOp, StoreOp,
-    },
-    renderer::AwsmRendererWebGpu,
+use awsm_renderer_core::command::{
+    render_pass::{ColorAttachment, DepthStencilAttachment, RenderPassDescriptor},
+    LoadOp, StoreOp,
 };
 
 pub struct MaterialTransparentRenderPass {
@@ -74,14 +70,14 @@ impl MaterialTransparentRenderPass {
             self.bind_groups.get_bind_groups()?;
 
         // set later with dynamic offsets
-        render_pass.set_bind_group(0u32, &main_bind_group, None)?;
-        render_pass.set_bind_group(1u32, &lights_bind_group, None)?;
-        render_pass.set_bind_group(2u32, &texture_bind_group, None)?;
+        render_pass.set_bind_group(0u32, main_bind_group, None)?;
+        render_pass.set_bind_group(1u32, lights_bind_group, None)?;
+        render_pass.set_bind_group(2u32, texture_bind_group, None)?;
 
         let mut last_render_pipeline_key = None;
         for renderable in renderables {
             if let Some(render_pipeline_key) =
-                renderable.material_transparent_render_pipeline_key(&ctx)
+                renderable.material_transparent_render_pipeline_key(ctx)
             {
                 if last_render_pipeline_key != Some(render_pipeline_key) {
                     render_pass.set_pipeline(ctx.pipelines.render.get(render_pipeline_key)?);
@@ -91,7 +87,7 @@ impl MaterialTransparentRenderPass {
                 renderable.push_material_transparent_pass_commands(
                     ctx,
                     &render_pass,
-                    &mesh_material_bind_group,
+                    mesh_material_bind_group,
                 )?;
             }
         }

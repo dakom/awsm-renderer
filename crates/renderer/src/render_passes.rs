@@ -7,13 +7,11 @@ pub mod shader_cache_key;
 pub mod shader_template;
 pub mod shared;
 
-use awsm_renderer_core::{renderer::AwsmRendererWebGpu, texture::TextureFormat};
+use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 
-use crate::anti_alias::AntiAliasing;
 use crate::error::Result;
 use crate::{
     bind_group_layout::BindGroupLayouts,
-    bind_groups::BindGroups,
     pipeline_layouts::PipelineLayouts,
     pipelines::Pipelines,
     render_passes::{
@@ -22,7 +20,7 @@ use crate::{
         material_opaque::render_pass::MaterialOpaqueRenderPass,
         material_transparent::render_pass::MaterialTransparentRenderPass,
     },
-    render_textures::{RenderTextureFormats, RenderTextureViews},
+    render_textures::RenderTextureFormats,
     shaders::Shaders,
     textures::Textures,
 };

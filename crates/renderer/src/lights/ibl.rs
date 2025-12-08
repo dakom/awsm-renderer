@@ -4,10 +4,8 @@ use awsm_renderer_core::cubemap::CubemapImage;
 use awsm_renderer_core::sampler::{AddressMode, FilterMode, MipmapFilterMode};
 use awsm_renderer_core::{cubemap::images::CubemapBitmapColors, renderer::AwsmRendererWebGpu};
 
-use crate::bind_groups::BindGroupCreate;
-use crate::error::{AwsmError, Result};
+use crate::error::Result;
 use crate::textures::{CubemapTextureKey, SamplerCacheKey, Textures};
-use crate::AwsmRenderer;
 
 #[derive(Clone)]
 pub struct Ibl {

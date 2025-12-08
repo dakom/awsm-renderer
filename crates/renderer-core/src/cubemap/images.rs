@@ -180,6 +180,7 @@ pub async fn new_sky_gradient(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn create_texture(
     gpu: &AwsmRendererWebGpu,
     z_positive: &ImageData,

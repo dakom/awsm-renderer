@@ -127,11 +127,11 @@ impl MaterialTransparentBindGroups {
 
         let main_bind_group_layout_key = ctx
             .bind_group_layouts
-            .get_key(&ctx.gpu, BindGroupLayoutCacheKey { entries })?;
+            .get_key(ctx.gpu, BindGroupLayoutCacheKey { entries })?;
 
         // Mesh meta
         let mesh_material_bind_group_layout_key = ctx.bind_group_layouts.get_key(
-            &ctx.gpu,
+            ctx.gpu,
             BindGroupLayoutCacheKey {
                 entries: vec![
                     // GeometryMeshMeta
@@ -163,7 +163,7 @@ impl MaterialTransparentBindGroups {
         // lights
 
         let lights_bind_group_layout_key = ctx.bind_group_layouts.get_key(
-            &ctx.gpu,
+            ctx.gpu,
             BindGroupLayoutCacheKey {
                 entries: vec![
                     // info
@@ -334,9 +334,6 @@ impl MaterialTransparentBindGroups {
             (_, _, _, None) => Err(AwsmBindGroupError::NotFound(
                 "Material Transparent - Texture Pool".to_string(),
             )),
-            _ => Err(AwsmBindGroupError::NotFound(
-                "Material Transparent".to_string(),
-            )),
         }
     }
 
@@ -359,7 +356,7 @@ impl MaterialTransparentBindGroups {
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(BufferBinding::new(
-                &ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
+                ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
             )),
         ));
 
@@ -416,7 +413,7 @@ impl MaterialTransparentBindGroups {
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(
-                BufferBinding::new(&ctx.meshes.meta.geometry_gpu_buffer())
+                BufferBinding::new(ctx.meshes.meta.geometry_gpu_buffer())
                     .with_size(GEOMETRY_MESH_META_BYTE_ALIGNMENT),
             ),
         ));
@@ -425,7 +422,7 @@ impl MaterialTransparentBindGroups {
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(
-                BufferBinding::new(&ctx.meshes.meta.material_gpu_buffer())
+                BufferBinding::new(ctx.meshes.meta.material_gpu_buffer())
                     .with_size(MATERIAL_MESH_META_BYTE_ALIGNMENT),
             ),
         ));
@@ -506,7 +503,7 @@ impl MaterialTransparentBindGroups {
         for view in ctx.textures.pool.texture_views() {
             entries.push(BindGroupEntry::new(
                 entries.len() as u32,
-                BindGroupResource::TextureView(Cow::Borrowed(&view)),
+                BindGroupResource::TextureView(Cow::Borrowed(view)),
             ));
         }
 

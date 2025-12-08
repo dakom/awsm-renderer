@@ -1,12 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
-use awsm_renderer_core::{
-    bind_groups::{
-        BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    },
-    error::AwsmCoreError,
-    renderer::AwsmRendererWebGpu,
-};
+use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use strum::{EnumIter, IntoEnumIterator};
 use thiserror::Error;
 
@@ -70,6 +64,12 @@ pub enum BindGroupCreate {
 
 pub struct BindGroups {
     create_list: HashSet<BindGroupCreate>,
+}
+
+impl Default for BindGroups {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BindGroups {
@@ -278,8 +278,6 @@ impl BindGroups {
         Ok(())
     }
 }
-
-pub(super) type Result<T> = std::result::Result<T, AwsmBindGroupError>;
 
 #[derive(Error, Debug)]
 pub enum AwsmBindGroupError {

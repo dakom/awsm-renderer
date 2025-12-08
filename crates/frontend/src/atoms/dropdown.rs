@@ -40,8 +40,8 @@ impl DropdownSize {
             }
         });
         match self {
-            Self::Sm => &*SM,
-            Self::Md => &*MD,
+            Self::Sm => &SM,
+            Self::Md => &MD,
         }
     }
 
@@ -58,8 +58,8 @@ impl DropdownSize {
             }
         });
         match self {
-            Self::Sm => &*SM,
-            Self::Md => &*MD,
+            Self::Sm => &SM,
+            Self::Md => &MD,
         }
     }
 }
@@ -96,7 +96,7 @@ where
         self
     }
 
-    pub fn with_size<'a>(mut self, size: DropdownSize) -> Self {
+    pub fn with_size(mut self, size: DropdownSize) -> Self {
         self.size = size;
         self
     }
@@ -166,16 +166,13 @@ where
 
         let showing = Mutable::new(false);
 
-        let selected: Mutable<Option<Arc<DropdownOption<T>>>> = Mutable::new(
-            initial_selected
-                .map(|initial_selected| {
-                    options
-                        .iter()
-                        .find(|option| option.value == initial_selected)
-                        .cloned()
-                })
-                .flatten(),
-        );
+        let selected: Mutable<Option<Arc<DropdownOption<T>>>> =
+            Mutable::new(initial_selected.and_then(|initial_selected| {
+                options
+                    .iter()
+                    .find(|option| option.value == initial_selected)
+                    .cloned()
+            }));
 
         let selected_label = selected.signal_cloned().map(|selected| {
             selected

@@ -37,7 +37,7 @@ impl PipelineLayouts {
             .map(|key| {
                 bind_group_layouts
                     .get(*key)
-                    .map(|layout| layout.clone())
+                    .cloned()
                     .map_err(AwsmPipelineLayoutError::BindGroupLayout)
             })
             .collect::<Result<Vec<_>>>()?;

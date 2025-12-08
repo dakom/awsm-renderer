@@ -1,11 +1,5 @@
 use crate::{
-    atoms::checkbox::{Checkbox, CheckboxStyle},
-    models::collections::{GltfId, GLTF_SETS},
-    pages::app::{
-        context::{AppContext, IblId},
-        scene::camera::CameraId,
-        sidebar::{current_model_signal, render_checkbox_label},
-    },
+    pages::app::context::{AppContext, IblId},
     prelude::*,
 };
 

@@ -1,9 +1,15 @@
 use super::error::{AwsmMeshError, Result};
-use awsm_renderer_core::pipeline::{primitive::IndexFormat, vertex::VertexFormat};
+use awsm_renderer_core::pipeline::vertex::VertexFormat;
 use slotmap::new_key_type;
 
 pub struct MeshBufferInfos {
     infos: slotmap::SlotMap<MeshBufferInfoKey, MeshBufferInfo>,
+}
+
+impl Default for MeshBufferInfos {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MeshBufferInfos {
@@ -208,11 +214,11 @@ impl MeshBufferInfo {
     }
 
     // Helper to check if we have a specific vertex attribute
-    pub fn has_vertex_attribute(&self, attr: MeshBufferVertexAttributeInfo) -> bool {
+    pub fn has_vertex_attribute(&self, attr: &MeshBufferVertexAttributeInfo) -> bool {
         self.triangles
             .vertex_attributes
             .iter()
-            .any(|a| matches!(a, attr))
+            .any(|a| a.variant_equals(attr))
     }
 }
 
@@ -325,6 +331,25 @@ impl MeshBufferCustomVertexAttributeInfo {
 pub enum MeshBufferVertexAttributeInfo {
     Visibility(MeshBufferVisibilityVertexAttributeInfo),
     Custom(MeshBufferCustomVertexAttributeInfo),
+}
+
+impl MeshBufferVertexAttributeInfo {
+    pub fn variant_equals(&self, other: &Self) -> bool {
+        match self {
+            MeshBufferVertexAttributeInfo::Visibility(vis_self) => match other {
+                MeshBufferVertexAttributeInfo::Visibility(vis_other) => {
+                    std::mem::discriminant(vis_self) == std::mem::discriminant(vis_other)
+                }
+                _ => false,
+            },
+            MeshBufferVertexAttributeInfo::Custom(custom_self) => match other {
+                MeshBufferVertexAttributeInfo::Custom(custom_other) => {
+                    std::mem::discriminant(custom_self) == std::mem::discriminant(custom_other)
+                }
+                _ => false,
+            },
+        }
+    }
 }
 
 impl MeshBufferVertexAttributeInfo {

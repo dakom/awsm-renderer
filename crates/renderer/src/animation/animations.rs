@@ -1,4 +1,3 @@
-use gltf::Animation;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
 use crate::{

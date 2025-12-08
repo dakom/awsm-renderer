@@ -5,18 +5,14 @@ pub mod meta;
 pub mod morphs;
 pub mod skins;
 
-use awsm_renderer_core::command::compute_pass::ComputePassEncoder;
 use awsm_renderer_core::{
     command::render_pass::RenderPassEncoder, pipeline::primitive::IndexFormat,
 };
 
 use crate::materials::MaterialKey;
 use crate::mesh::morphs::{GeometryMorphKey, MaterialMorphKey};
-use crate::pipelines::compute_pipeline::ComputePipelineKey;
 use crate::render::RenderContext;
 use crate::render_passes::geometry::bind_group::GeometryBindGroups;
-use crate::render_passes::material_opaque::bind_group::MaterialOpaqueBindGroups;
-use crate::render_passes::material_transparent::bind_group::MaterialTransparentBindGroups;
 use crate::transforms::TransformKey;
 use crate::{bounds::Aabb, pipelines::render_pipeline::RenderPipelineKey};
 use skins::SkinKey;

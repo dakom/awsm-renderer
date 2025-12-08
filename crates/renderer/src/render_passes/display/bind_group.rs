@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::LazyLock};
+use std::borrow::Cow;
 
 use crate::{
     bind_group_layout::{
@@ -7,15 +7,12 @@ use crate::{
     bind_groups::{AwsmBindGroupError, BindGroupRecreateContext},
     error::Result,
     render_passes::RenderPassInitContext,
-    textures::{SamplerCacheKey, SamplerKey},
 };
 use awsm_renderer_core::{
     bind_groups::{
         BindGroupDescriptor, BindGroupEntry, BindGroupLayoutResource, BindGroupResource,
-        SamplerBindingLayout, SamplerBindingType, TextureBindingLayout,
+        TextureBindingLayout,
     },
-    renderer::AwsmRendererWebGpu,
-    sampler::{FilterMode, SamplerDescriptor},
     texture::{TextureSampleType, TextureViewDimension},
 };
 
@@ -43,7 +40,7 @@ impl DisplayBindGroups {
 
         let bind_group_layout_key = ctx
             .bind_group_layouts
-            .get_key(&ctx.gpu, bind_group_layout_cache_key)?;
+            .get_key(ctx.gpu, bind_group_layout_cache_key)?;
 
         Ok(Self {
             bind_group_layout_key,

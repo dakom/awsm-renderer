@@ -4,9 +4,8 @@ use thiserror::Error;
 
 use crate::{
     bind_groups::{AwsmBindGroupError, BindGroups},
-    debug,
     materials::pbr::{PbrMaterial, PbrMaterialBuffers},
-    textures::{AwsmTextureError, SamplerKey, TextureKey, Textures},
+    textures::{AwsmTextureError, Textures},
     AwsmRendererLogging,
 };
 

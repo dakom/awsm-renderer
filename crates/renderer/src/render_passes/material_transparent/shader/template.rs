@@ -1,9 +1,8 @@
 use askama::Template;
 
 use crate::{
-    debug::debug_unique_string,
     render_passes::material_transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent,
-    shaders::{print_shader_source, AwsmShaderError, Result},
+    shaders::{AwsmShaderError, Result},
 };
 
 #[derive(Debug)]
@@ -171,7 +170,7 @@ impl TryFrom<&ShaderCacheKeyMaterialTransparent> for ShaderTemplateMaterialTrans
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-struct ShaderTemplateMaterialTransparentDebug {
+pub struct ShaderTemplateMaterialTransparentDebug {
     lighting: ShaderTemplateMaterialTransparentDebugLighting,
 }
 
@@ -190,7 +189,7 @@ impl ShaderTemplateMaterialTransparentDebug {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-enum ShaderTemplateMaterialTransparentDebugLighting {
+pub enum ShaderTemplateMaterialTransparentDebugLighting {
     #[default]
     None,
     IblOnly,

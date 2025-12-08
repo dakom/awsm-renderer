@@ -3,15 +3,13 @@ use awsm_renderer::{
         command::color::Color,
         configuration::{CanvasAlphaMode, CanvasConfiguration, CanvasToneMappingMode},
         renderer::{AwsmRendererWebGpuBuilder, DeviceRequestLimits},
-        texture::TextureFormat,
     },
     debug::AwsmRendererLogging,
     AwsmRendererBuilder,
 };
-use awsm_web::dom::resize::{self, ResizeObserver};
 use wasm_bindgen_futures::spawn_local;
 
-use crate::{models::collections::GltfId, pages::app::sidebar::current_model_signal, prelude::*};
+use crate::{pages::app::sidebar::current_model_signal, prelude::*};
 
 use super::{context::AppContext, scene::AppScene};
 
@@ -49,7 +47,7 @@ impl AppCanvas {
             => {
                 match (model_id, scene) {
                     (Some(model_id), Some(scene)) => {
-                        Some((model_id.clone(), scene.clone()))
+                        Some((*model_id, scene.clone()))
                     }
                     _ => {
                         None
@@ -102,14 +100,14 @@ impl AppCanvas {
 
                         scene.clear().await;
 
-                        state.display_text.set(format!("Loading IBL"));
+                        state.display_text.set("Loading IBL".to_string());
                         scene.wait_for_ibl_loaded().await;
 
-                        state.display_text.set(format!("Loading Skybox"));
+                        state.display_text.set("Loading Skybox".to_string());
                         scene.wait_for_skybox_loaded().await;
 
                         state.display_text.set(format!("Loading Model: {}", gltf_id));
-                        let loader = match scene.load_gltf(gltf_id.clone()).await {
+                        let loader = match scene.load_gltf(gltf_id).await {
                             Ok(loader) => loader,
                             Err(err) => {
                                 tracing::error!("{:?}", err);
@@ -137,7 +135,11 @@ impl AppCanvas {
 
                         state.display_text.set(format!("Setting up scene: {}", gltf_id));
 
-                        scene.setup_all().await;
+                        if let Err(err) = scene.setup_all().await {
+                            tracing::error!("{:?}", err);
+                            state.display_text.set(format!("Error setting up scene: {}", gltf_id));
+                            return;
+                        }
 
                         if let Err(err) = scene.render().await {
                             tracing::error!("{:?}", err);

@@ -135,7 +135,7 @@ impl AwsmRenderer {
                         .morphs
                         .geometry
                         .get_info(morph_key)
-                        .map_err(|_| (AwsmGltfError::MissingMorphForAnimation))?
+                        .map_err(|_| AwsmGltfError::MissingMorphForAnimation)?
                         .targets_len
                 }
                 AnimationMorphKey::Material(morph_key) => {
@@ -143,7 +143,7 @@ impl AwsmRenderer {
                         .morphs
                         .material
                         .get_info(morph_key)
-                        .map_err(|_| (AwsmGltfError::MissingMorphForAnimation))?
+                        .map_err(|_| AwsmGltfError::MissingMorphForAnimation)?
                         .targets_len
                 }
             };

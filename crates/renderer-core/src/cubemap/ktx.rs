@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub async fn load_url(url: &str) -> anyhow::Result<ktx2::Reader<Vec<u8>>> {
-    let resp: web_sys::Response = gloo_net::http::Request::get(&url)
+    let resp: web_sys::Response = gloo_net::http::Request::get(url)
         .send()
         .await
         .map_err(|e| AwsmCoreError::Fetch(e.to_string()))?
@@ -127,7 +127,7 @@ pub async fn create_texture(
         // Validate level size matches expected tight size
         let rows = rows_per_image_units(format, mip_height);
         let tight_bpr = if let Some((bw, _bh, bpb)) = block_dims(format) {
-            ((mip_width + (bw - 1)) / bw) * bpb
+            mip_width.div_ceil(bw) * bpb
         } else {
             mip_width * get_format_bytes_per_pixel(format)
         };
@@ -301,7 +301,7 @@ fn block_dims(format: TextureFormat) -> Option<(u32, u32, u32)> {
 fn calculate_bytes_per_row(format: TextureFormat, width: u32) -> u32 {
     if let Some((bw, _bh, bpb)) = block_dims(format) {
         // block columns * bytesPerBlock
-        let blocks_x = (width + (bw - 1)) / bw;
+        let blocks_x = width.div_ceil(bw);
         // 256 alignment required
         align_up(blocks_x * bpb, 256)
     } else {
@@ -311,7 +311,7 @@ fn calculate_bytes_per_row(format: TextureFormat, width: u32) -> u32 {
 
 fn rows_per_image_units(format: TextureFormat, height: u32) -> u32 {
     if let Some((_bw, bh, _bpb)) = block_dims(format) {
-        (height + (bh - 1)) / bh // block rows
+        height.div_ceil(bh) // block rows
     } else {
         height // pixel rows
     }

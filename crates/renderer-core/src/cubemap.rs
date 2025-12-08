@@ -16,6 +16,7 @@ use crate::{
 };
 
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum CubemapImage {
     #[cfg(feature = "ktx")]
     Ktx(Arc<ktx2::Reader<Vec<u8>>>),
