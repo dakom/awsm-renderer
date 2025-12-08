@@ -1,5 +1,5 @@
 use awsm_renderer::bounds::Aabb;
-use glam::{Mat4, Vec3};
+use glam::Mat4;
 
 use crate::pages::app::scene::camera::CameraView;
 
@@ -64,4 +64,6 @@ impl PerspectiveCamera {
     pub fn projection_matrix(&self) -> Mat4 {
         Mat4::perspective_rh(self.fov_y, self.aspect, self.near, self.far)
     }
+
+    pub fn setup_from_gltf(&mut self, _doc: &gltf::Document) {}
 }

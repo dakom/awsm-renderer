@@ -1,5 +1,5 @@
 use awsm_renderer::bounds::Aabb;
-use glam::{Mat4, Vec3, Vec4};
+use glam::Mat4;
 
 use crate::pages::app::scene::camera::CameraView;
 
@@ -16,19 +16,12 @@ pub struct OrthographicCamera {
 
 impl OrthographicCamera {
     pub fn new_aabb(view: &CameraView, aabb: &Aabb, margin: f32, aspect: f32) -> Self {
-        let size = aabb.size();
+        // Use the bounding sphere radius instead of direct XY dimensions
+        // This works correctly regardless of model rotation
+        let bounding_radius = aabb.size().length() * 0.5;
 
-        let width = size.x;
-        let height = size.y;
-        //let aspect = width / height;
-        let mut half_w = width * 0.5;
-        let mut half_h = height * 0.5;
-
-        if half_w / half_h > aspect {
-            half_h = half_w / aspect;
-        } else {
-            half_w = half_h * aspect;
-        }
+        let mut half_h = bounding_radius;
+        let mut half_w = half_h * aspect;
 
         half_w *= margin;
         half_h *= margin;
@@ -48,7 +41,7 @@ impl OrthographicCamera {
     }
 
     pub fn on_wheel(&mut self, view: &CameraView, aabb: &Aabb, margin: f32, delta: f32) {
-        self.zoom(1.0 + delta as f32 * 0.001);
+        self.zoom(1.0 + delta * 0.001);
         self.update_near_far(view, aabb, margin);
     }
 
@@ -62,15 +55,16 @@ impl OrthographicCamera {
         self.far = distance + bounding_radius * margin * 2.0;
 
         // eh, whatever
-        self.near = self.near.min(0.001);
-        self.far = self.far.max(1000000.0);
+        // self.near = 0.1;
+        // self.far = 100.0;
+        // self.near = self.near.min(0.001);
+        // self.far = self.far.max(1000000.0);
     }
 
     // Call this method whenever the window is resized.
     pub fn on_resize(&mut self, view: &CameraView, aabb: &Aabb, margin: f32, aspect: f32) {
         // current centre of the frustum
         let cx = (self.left + self.right) * 0.5;
-        let cy = (self.bottom + self.top) * 0.5;
 
         // keep vertical span, change horizontal to match aspect
         let half_h = (self.top - self.bottom) * 0.5;
@@ -107,4 +101,6 @@ impl OrthographicCamera {
         self.bottom = cy - half_h;
         self.top = cy + half_h;
     }
+
+    pub fn setup_from_gltf(&mut self, _doc: &gltf::Document) {}
 }

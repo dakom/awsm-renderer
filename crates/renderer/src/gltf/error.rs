@@ -3,9 +3,17 @@ use gltf::Semantic;
 use thiserror::Error;
 
 use crate::{
-    animation::AwsmAnimationError, bind_groups::AwsmBindGroupError, materials::AwsmMaterialError,
-    mesh::AwsmMeshError, pipeline::AwsmPipelineError, shaders::AwsmShaderError,
-    skin::AwsmSkinError, transform::AwsmTransformError,
+    animation::AwsmAnimationError,
+    bind_group_layout::AwsmBindGroupLayoutError,
+    bind_groups::AwsmBindGroupError,
+    error::AwsmError,
+    materials::AwsmMaterialError,
+    mesh::{skins::AwsmSkinError, AwsmMeshError, MeshBufferInfoKey},
+    pipeline_layouts::AwsmPipelineLayoutError,
+    pipelines::render_pipeline::AwsmRenderPipelineError,
+    shaders::AwsmShaderError,
+    textures::AwsmTextureError,
+    transforms::AwsmTransformError,
 };
 
 #[derive(Error, Debug)]
@@ -31,9 +39,6 @@ pub enum AwsmGltfError {
     #[error("[gltf] Unable to write buffer: {0:?}")]
     BufferWrite(AwsmCoreError),
 
-    #[error("[gltf] Unable to create bind group layout: {0:?}")]
-    BindGroupLayout(AwsmCoreError),
-
     #[error("[gltf] Unsupported primitive mode: {0:?}")]
     UnsupportedPrimitiveMode(gltf::mesh::Mode),
 
@@ -42,6 +47,12 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] Unsupported index data type: {0:?}")]
     UnsupportedIndexDataType(gltf::accessor::DataType),
+
+    #[error("[gltf] Unsupported index mode: {0:?}")]
+    UnsupportedIndexMode(String),
+
+    #[error("[gltf] Negative index value: {0}")]
+    NegativeIndexValue(i32),
 
     #[error("[gltf] Unsupported index format: {0:?}")]
     UnsupportedIndexFormat(IndexFormat),
@@ -55,6 +66,18 @@ pub enum AwsmGltfError {
     #[error("[gltf] unsupported morph semantic: {0:?}")]
     UnsupportedMorphSemantic(gltf::mesh::Semantic),
 
+    #[error("[gltf] Unsupported skin data type: {0:?}")]
+    UnsupportedSkinDataType(gltf::accessor::DataType),
+
+    #[error("[gltf] Skin indices: {0}")]
+    SkinIndices(String),
+
+    #[error("[gltf] Skin weights: {0}")]
+    SkinWeights(String),
+
+    #[error("[gltf] Skin partial data: {0}")]
+    SkinPartialData(String),
+
     #[error("[gltf] morph storage key missing")]
     MorphStorageKeyMissing,
 
@@ -63,9 +86,6 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] {0:?}")]
     Mesh(#[from] AwsmMeshError),
-
-    #[error("[gltf] {0:?}")]
-    Pipeline(#[from] AwsmPipelineError),
 
     #[error("[gltf] mesh primitive shader: {0:?}")]
     MeshPrimitiveShader(AwsmCoreError),
@@ -78,6 +98,21 @@ pub enum AwsmGltfError {
 
     #[error("[gltf] {0:?}")]
     Skin(#[from] AwsmSkinError),
+
+    #[error("[gltf] {0:?}")]
+    BindGroup(#[from] AwsmBindGroupError),
+
+    #[error("[gltf] {0:?}")]
+    TextureAtlas(AwsmCoreError),
+
+    #[error("[gltf] {0:?}")]
+    BindGroupLayout(#[from] AwsmBindGroupLayoutError),
+
+    #[error("[gltf] {0:?}")]
+    PipelineLayout(#[from] AwsmPipelineLayoutError),
+
+    #[error("[gltf] {0:?}")]
+    RenderPipeline(#[from] AwsmRenderPipelineError),
 
     #[error("[gltf] morph animation exists but no morph target found")]
     MissingMorphForAnimation,
@@ -137,8 +172,29 @@ pub enum AwsmGltfError {
     #[error("[gltf] material: {0:?}")]
     Material(#[from] AwsmMaterialError),
 
+    #[error("[gltf] texture: {0:?}")]
+    Texture(#[from] AwsmTextureError),
+
     #[error("[gltf] unable to construct normals: {0}")]
     ConstructNormals(String),
+
+    #[error("[gltf] unable to get positions: {0}")]
+    Positions(String),
+
+    #[error("[gltf] attribute data: {0}")]
+    AttributeData(String),
+
+    #[error("[gltf] extract indices: {0}")]
+    ExtractIndices(String),
+
+    #[error("[gltf] Couldn't get material opaque compute pipeline key: {0:?}")]
+    MaterialOpaqueComputePipelineKey(AwsmError),
+
+    #[error("[gltf] Visibility geometry requested but not supplied: {0:?}")]
+    VisibilityGeometryNotSupplied(MeshBufferInfoKey),
+
+    #[error("[gltf] Transparent geometry requested but not supplied: {0:?}")]
+    TransparencyGeometryNotSupplied(MeshBufferInfoKey),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

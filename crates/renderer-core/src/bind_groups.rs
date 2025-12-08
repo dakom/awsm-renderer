@@ -1,3 +1,5 @@
+use std::{borrow::Cow, hash::Hash};
+
 use crate::{
     buffers::BufferBinding,
     texture::{TextureFormat, TextureSampleType, TextureViewDimension},
@@ -74,7 +76,7 @@ impl BindGroupLayoutEntry {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum BindGroupLayoutResource {
     Buffer(BufferBindingLayout),
     ExternalTexture, // web_sys::GpuExternalTextureBindingLayout::new()
@@ -83,13 +85,21 @@ pub enum BindGroupLayoutResource {
     Texture(TextureBindingLayout),
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct BufferBindingLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#hasdynamicoffset
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuBufferBindingLayout.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuBufferBindingLayout.html
     pub has_dynamic_offset: Option<bool>,
     pub min_binding_size: Option<usize>,
     pub binding_type: Option<BufferBindingType>,
+}
+
+impl Hash for BufferBindingLayout {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.has_dynamic_offset.hash(state);
+        self.min_binding_size.hash(state);
+        self.binding_type.map(|x| x as u32).hash(state);
+    }
 }
 
 impl BufferBindingLayout {
@@ -112,14 +122,20 @@ impl BufferBindingLayout {
     }
 }
 
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuBufferBindingType.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuBufferBindingType.html
 pub type BufferBindingType = web_sys::GpuBufferBindingType;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SamplerBindingLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#type_2
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuSamplerBindingLayout.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuSamplerBindingLayout.html
     pub binding_type: Option<SamplerBindingType>,
+}
+
+impl Hash for SamplerBindingLayout {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.binding_type.map(|x| x as u32).hash(state);
+    }
 }
 
 impl SamplerBindingLayout {
@@ -133,16 +149,24 @@ impl SamplerBindingLayout {
     }
 }
 
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuSamplerBindingType.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuSamplerBindingType.html
 pub type SamplerBindingType = web_sys::GpuSamplerBindingType;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StorageTextureBindingLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#access
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuStorageTextureBindingLayout.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuStorageTextureBindingLayout.html
     pub access: Option<StorageTextureAccess>,
     pub format: TextureFormat,
     pub view_dimension: Option<TextureViewDimension>,
+}
+
+impl Hash for StorageTextureBindingLayout {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.access.map(|x| x as u32).hash(state);
+        (self.format as u32).hash(state);
+        self.view_dimension.map(|x| x as u32).hash(state);
+    }
 }
 
 impl StorageTextureBindingLayout {
@@ -164,16 +188,24 @@ impl StorageTextureBindingLayout {
     }
 }
 
-// https://rustwasm.github.io/wasm-bindgen/api/web_sys/enum.GpuStorageTextureAccess.html
+// https://docs.rs/web-sys/latest/web_sys/enum.GpuStorageTextureAccess.html
 pub type StorageTextureAccess = web_sys::GpuStorageTextureAccess;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextureBindingLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#multisampled
-    // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuTextureBindingLayout.html
+    // https://docs.rs/web-sys/latest/web_sys/struct.GpuTextureBindingLayout.html
     pub multisampled: Option<bool>,
     pub view_dimension: Option<TextureViewDimension>,
     pub sample_type: Option<TextureSampleType>,
+}
+
+impl Hash for TextureBindingLayout {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.multisampled.hash(state);
+        self.view_dimension.map(|x| x as u32).hash(state);
+        self.sample_type.map(|x| x as u32).hash(state);
+    }
 }
 
 impl Default for TextureBindingLayout {
@@ -233,7 +265,7 @@ pub enum BindGroupResource<'a> {
     Buffer(BufferBinding<'a>),
     ExternalTexture(&'a web_sys::GpuExternalTexture),
     Sampler(&'a web_sys::GpuSampler),
-    TextureView(&'a web_sys::GpuTextureView),
+    TextureView(Cow<'a, web_sys::GpuTextureView>),
 }
 
 impl<'a> BindGroupDescriptor<'a> {
@@ -399,7 +431,7 @@ impl From<BindGroupEntry<'_>> for web_sys::GpuBindGroupEntry {
                 BindGroupResource::Buffer(buffer) => web_sys::GpuBufferBinding::from(buffer).into(),
                 BindGroupResource::ExternalTexture(external_texture) => external_texture.into(),
                 BindGroupResource::Sampler(sampler) => sampler.into(),
-                BindGroupResource::TextureView(texture_view) => texture_view.into(),
+                BindGroupResource::TextureView(texture_view) => texture_view.as_ref().into(),
             },
         )
     }

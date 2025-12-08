@@ -1,5 +1,5 @@
 use awsm_renderer::bounds::Aabb;
-use glam::{Mat4, Quat, Vec3};
+use glam::{Mat4, Vec3};
 
 #[derive(Debug, Clone)]
 pub struct OrbitCamera {
@@ -30,8 +30,11 @@ impl OrbitCamera {
         Self {
             look_at,
             radius,
-            yaw: 0.0,
-            pitch: 0.0,
+            // Start head-on: looking from +Z axis, slightly above
+            // yaw: 0 = looking from +Z, π/2 = from +X, π = from -Z, 3π/2 = from -X
+            yaw: 0.0, // Head-on view from +Z
+            // pitch: positive = camera above looking down
+            pitch: 0.3, // ~17° above horizon, looking down slightly
             dragging: false,
             sensitivity: 0.005,
         }
@@ -39,21 +42,21 @@ impl OrbitCamera {
 
     /// Returns a right-handed look-at view matrix
     pub fn get_view_matrix(&self) -> Mat4 {
-        let q_yaw = Quat::from_rotation_y(self.yaw);
-        let right = q_yaw * Vec3::X;
-        let q_pitch = Quat::from_axis_angle(right, self.pitch);
-        let rotation = q_pitch * q_yaw;
-
-        let cam_pos = self.look_at + rotation * Vec3::new(0.0, 0.0, self.radius);
-        let up_dir = rotation * Vec3::Y;
-        Mat4::look_at_rh(cam_pos, self.look_at, up_dir)
+        let cam_pos = self.get_position();
+        Mat4::look_at_rh(cam_pos, self.look_at, Vec3::Y)
     }
 
     /// Returns the current camera world position (Vec3)
+    /// Uses spherical coordinates: yaw (horizontal angle), pitch (vertical angle), radius (distance)
     pub fn get_position(&self) -> Vec3 {
-        let rotation = Quat::from_rotation_y(self.yaw) * Quat::from_rotation_x(self.pitch);
-        let offset = rotation * Vec3::new(0.0, 0.0, self.radius);
-        self.look_at + offset
+        // Spherical to Cartesian conversion
+        // pitch: angle from XZ plane (0 = horizon, positive = above, negative = below)
+        // yaw: angle around Y axis (0 = +Z, π/2 = +X, π = -Z, 3π/2 = -X)
+        let x = self.radius * self.pitch.cos() * self.yaw.sin();
+        let y = self.radius * self.pitch.sin();
+        let z = self.radius * self.pitch.cos() * self.yaw.cos();
+
+        self.look_at + Vec3::new(x, y, z)
     }
 
     pub fn on_pointer_down(&mut self) {
@@ -68,7 +71,8 @@ impl OrbitCamera {
         self.yaw -= delta_x * self.sensitivity;
         self.pitch -= delta_y * self.sensitivity;
 
-        // clamp pitch so you can’t flip over top
+        // Clamp pitch to ±90° like most 3D viewers
+        // This prevents flipping and matches Khronos glTF viewer behavior
         let limit = std::f32::consts::FRAC_PI_2 - 0.01;
         self.pitch = self.pitch.clamp(-limit, limit);
     }
@@ -80,5 +84,10 @@ impl OrbitCamera {
     pub fn on_wheel(&mut self, delta_y: f32) {
         let zoom_factor = 1.0 + delta_y * 0.001;
         self.radius = (self.radius * zoom_factor).max(0.1);
+    }
+
+    pub fn setup_from_gltf(&mut self, _doc: &gltf::Document) {
+        // TODO: Implement proper camera orientation detection based on glTF scene data
+        // For now, use consistent defaults and let users rotate manually
     }
 }

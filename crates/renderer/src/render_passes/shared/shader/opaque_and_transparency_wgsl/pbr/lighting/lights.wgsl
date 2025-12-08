@@ -1,0 +1,118 @@
+struct LightsInfoPacked {
+    data: vec4<u32>,
+}
+
+struct LightsInfo {
+    n_lights: u32,
+    ibl: IblInfo
+}
+
+struct IblInfo {
+    prefiltered_env_mip_count: u32,
+    irradiance_mip_count: u32,
+}
+
+struct LightPacked {
+  // pos.xyz + range
+  pos_range: vec4<f32>,
+  // dir.xyz + inner_cone
+  dir_inner: vec4<f32>,
+  // color.rgb + intensity
+  color_intensity: vec4<f32>,
+  // kind (as uint) + outer_cone + 2 pads (or extra params)
+  kind_outer_pad: vec4<f32>,
+};
+
+struct Light {
+    kind: u32,
+    color: vec3<f32>,
+    intensity: f32,
+    position: vec3<f32>,
+    range: f32,
+    direction: vec3<f32>,
+    inner_cone: f32,
+    outer_cone: f32,
+};
+
+fn get_lights_info() -> LightsInfo {
+    // expects `lights_info` is global LightsInfoPacked
+    return LightsInfo(
+        lights_info.data.x,
+        IblInfo(
+            lights_info.data.y,
+            lights_info.data.z
+        )
+    );
+}
+
+fn get_light(i: u32) -> Light {
+    // expects `lights` is global array<LightPacked>
+    let p = lights[i];
+    return Light(
+        u32(p.kind_outer_pad.x),
+        p.color_intensity.xyz,
+        p.color_intensity.w,
+        p.pos_range.xyz,
+        p.pos_range.w,
+        p.dir_inner.xyz,
+        p.dir_inner.w,
+        p.kind_outer_pad.y
+    );
+}
+
+struct LightBrdf {
+    normal: vec3<f32>,
+    n_dot_l: f32,
+    light_dir: vec3<f32>,
+    radiance: vec3<f32>,
+};
+
+fn light_to_brdf(light:Light, normal: vec3<f32>, world_position: vec3<f32>) -> LightBrdf {
+    var light_dir: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
+    var radiance: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
+    var n_dot_l: f32 = 0.0;
+
+    switch (light.kind) {
+        case 0u: {
+            // no light, skip
+        }
+        case 1u: { // Directional
+            light_dir = normalize(-light.direction); // light -> surface
+            radiance = light.color * light.intensity;
+            n_dot_l = max(dot(normal, light_dir), 0.0);
+        }
+        case 2u: { // Point
+            let surface_to_light = light.position - world_position;
+            let dist = length(surface_to_light);
+            light_dir = surface_to_light / dist; // light -> surface
+            let attenuation = inverse_square(light.range, dist);
+            radiance = light.color * light.intensity * attenuation;
+            n_dot_l = max(dot(normal, light_dir), 0.0);
+        }
+        case 3u: { // Spot
+            let surface_to_light = light.position - world_position;
+            let dist = length(surface_to_light);
+            light_dir = surface_to_light / dist; // light -> surface
+            let cos_l = dot(light_dir, -normalize(light.direction));
+            let spot = spot_falloff(light.inner_cone, light.outer_cone, cos_l);
+            let attenuation = inverse_square(light.range, dist) * spot;
+            radiance = light.color * light.intensity * attenuation;
+            n_dot_l = max(dot(normal, light_dir), 0.0);
+        }
+        default: { // unexpected
+        }
+    }
+
+    return LightBrdf(
+        normal,
+        n_dot_l,
+        light_dir,
+        radiance,
+    );
+}
+
+// spot light mask (smooth edge)
+fn spot_falloff(inner_cos: f32, outer_cos: f32, cos_l: f32) -> f32 {
+    let smoothed = saturate((cos_l - outer_cos) / (inner_cos - outer_cos));
+    return smoothed * smoothed;
+}

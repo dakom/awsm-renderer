@@ -18,8 +18,6 @@ use std::sync::{Arc, Mutex};
 
 use super::error::AwsmGltfError;
 
-// this is a heavy clone
-#[derive(Clone, Debug)]
 pub struct GltfLoader {
     pub doc: Document,
     pub buffers: Vec<Vec<u8>>,
@@ -83,6 +81,14 @@ impl GltfLoader {
             buffers,
             images,
         })
+    }
+
+    pub fn heavy_clone(&self) -> Self {
+        Self {
+            doc: self.doc.clone(),
+            buffers: self.buffers.clone(),
+            images: self.images.clone(),
+        }
     }
 }
 

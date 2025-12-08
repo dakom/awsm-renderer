@@ -2,10 +2,21 @@ use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
 use crate::{
-    bind_groups::AwsmBindGroupError, camera::AwsmCameraError, instances::AwsmInstanceError,
-    lights::AwsmLightError, materials::AwsmMaterialError, mesh::AwsmMeshError,
-    pipeline::AwsmPipelineError, render::post_process::error::AwsmPostProcessError,
-    shaders::AwsmShaderError, skin::AwsmSkinError, transform::AwsmTransformError,
+    bind_group_layout::AwsmBindGroupLayoutError,
+    bind_groups::AwsmBindGroupError,
+    camera::AwsmCameraError,
+    instances::AwsmInstanceError,
+    lights::AwsmLightError,
+    materials::AwsmMaterialError,
+    mesh::{skins::AwsmSkinError, AwsmMeshError},
+    pipeline_layouts::AwsmPipelineLayoutError,
+    pipelines::{
+        compute_pipeline::AwsmComputePipelineError, render_pipeline::AwsmRenderPipelineError,
+    },
+    render_textures::AwsmRenderTextureError,
+    shaders::AwsmShaderError,
+    textures::AwsmTextureError,
+    transforms::AwsmTransformError,
 };
 
 #[derive(Error, Debug)]
@@ -33,6 +44,9 @@ pub enum AwsmError {
     BindGroup(#[from] AwsmBindGroupError),
 
     #[error("{0}")]
+    BindGroupLayout(#[from] AwsmBindGroupLayoutError),
+
+    #[error("{0}")]
     Shader(#[from] AwsmShaderError),
 
     #[error("{0}")]
@@ -42,13 +56,25 @@ pub enum AwsmError {
     Material(#[from] AwsmMaterialError),
 
     #[error("{0}")]
-    Pipeline(#[from] AwsmPipelineError),
+    PipelineLayout(#[from] AwsmPipelineLayoutError),
+
+    #[error("{0}")]
+    RenderPipeline(#[from] AwsmRenderPipelineError),
+
+    #[error("{0}")]
+    ComputePipeline(#[from] AwsmComputePipelineError),
 
     #[error("{0}")]
     Light(#[from] AwsmLightError),
 
-    #[error("[post-process] missing post process sampler {0:?}")]
-    PostProcess(#[from] AwsmPostProcessError),
+    #[error("{0}")]
+    RenderTexture(#[from] AwsmRenderTextureError),
+
+    #[error("Unregistered Msaa count: {0}")]
+    RenderUnregisteredMsaaCount(u32),
+
+    #[error("{0}")]
+    Texture(#[from] AwsmTextureError),
 }
 
 pub type Result<T> = std::result::Result<T, AwsmError>;

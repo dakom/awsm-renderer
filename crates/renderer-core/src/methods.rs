@@ -1,4 +1,8 @@
-use crate::{configuration::CanvasConfiguration, data::JsData};
+use crate::{
+    buffers::{BufferDescriptor, BufferUsage, MapMode},
+    configuration::CanvasConfiguration,
+    data::JsData,
+};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
@@ -221,7 +225,10 @@ impl AwsmRendererWebGpu {
     }
 
     /// See [create_command_encoder](create_command_encoder) for usage.
-    pub fn submit_commands_batch(&self, command_buffers: &[&web_sys::GpuCommandBuffer]) {
+    pub fn submit_commands_batch<'a>(
+        &self,
+        command_buffers: impl IntoIterator<Item = &'a web_sys::GpuCommandBuffer>,
+    ) {
         let command_buffers_js = js_sys::Array::new();
         for command_buffer in command_buffers {
             command_buffers_js.push(command_buffer);
@@ -403,5 +410,51 @@ impl AwsmRendererWebGpu {
             )
             .map_err(AwsmCoreError::context_configuration)?;
         Ok(())
+    }
+
+    /// Copies GPU buffer data into a new mapped buffer and returns it as a `Vec<u8>`
+    pub async fn extract_buffer(
+        &self,
+        source: &web_sys::GpuBuffer,
+        size: Option<u32>,
+    ) -> Result<Vec<u8>> {
+        let size = size.unwrap_or(source.size() as u32);
+        // Create a staging buffer with MAP_READ and COPY_DST usage
+        let read_buffer = self.create_buffer(
+            &BufferDescriptor::new(
+                Some("buffer extractor"),
+                size as usize,
+                BufferUsage::new().with_map_read().with_copy_dst(),
+            )
+            .into(),
+        )?;
+
+        // Encode command to copy source → read_buffer
+        let encoder = self.device.create_command_encoder();
+        encoder
+            .copy_buffer_to_buffer_with_u32_and_u32_and_u32(source, 0, &read_buffer, 0, size)
+            .map_err(AwsmCoreError::buffer_copy)?;
+        let command_buffer = encoder.finish();
+        self.submit_commands(&command_buffer);
+
+        // Wait for GPU to complete mapping
+        let map_promise = read_buffer.map_async_with_u32_and_u32(MapMode::Read as u32, 0, size);
+        JsFuture::from(map_promise)
+            .await
+            .map_err(AwsmCoreError::buffer_map)?;
+
+        // Get the mapped JS ArrayBuffer slice
+        let array_buffer = read_buffer
+            .get_mapped_range_with_u32_and_u32(0, size)
+            .map_err(AwsmCoreError::buffer_map_range)?;
+
+        // Convert to Uint8Array
+        let uint8_array = js_sys::Uint8Array::new(&array_buffer);
+        let mut vec = vec![0u8; size as usize];
+        uint8_array.copy_to(&mut vec);
+
+        read_buffer.unmap();
+
+        Ok(vec)
     }
 }

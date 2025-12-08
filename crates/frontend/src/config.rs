@@ -1,19 +1,13 @@
 #![allow(dead_code)]
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::{Arc, LazyLock, Mutex},
-};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use crate::{
-    pages::app::sidebar::SidebarSection,
+    pages::app::{
+        context::{IblId, SkyboxId},
+        sidebar::SidebarSection,
+    },
     route::{AppRoute, Route},
 };
-use anyhow::{Context, Result};
-use dominator::clone;
-use futures_signals::signal::Mutable;
-use serde::Deserialize;
-use wasm_bindgen::UnwrapThrowExt;
-use wasm_bindgen_futures::spawn_local;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -21,13 +15,17 @@ pub struct Config {
     pub debug: ConfigDebug,
     pub media_baseurl: String,
     pub gltf_url: String,
+    pub environment_url: String,
     pub generate_mipmaps: bool,
     pub initial_sidebar_open: Option<SidebarSection>,
     pub post_processing_enabled: bool,
+    pub initial_ibl: IblId,
+    pub initial_skybox: SkyboxId,
+    pub cache_buster: bool,
 }
 
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
-    let config = Config {
+    Config {
         root_path: if cfg!(debug_assertions) {
             ""
         } else {
@@ -35,7 +33,7 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         },
         debug: if cfg!(debug_assertions) {
             //ConfigDebug::release_mode()
-            ConfigDebug::dev_mode(true)
+            ConfigDebug::dev_mode()
         } else {
             ConfigDebug::release_mode()
         },
@@ -50,14 +48,20 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         } else {
             "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/refs/heads/main/Models".to_string()
         },
+        environment_url: if cfg!(debug_assertions) {
+            "http://localhost:9082/awsm-renderer-assets".to_string()
+        } else {
+            "https://dakom.github.io/awsm-renderer-assets".to_string()
+        },
 
         generate_mipmaps: true,
         //initial_sidebar_open: Some(SidebarSection::Gltf),
         initial_sidebar_open: Some(SidebarSection::PostProcessing),
         post_processing_enabled: true,
-    };
-
-    config
+        initial_ibl: IblId::default(),
+        initial_skybox: SkyboxId::default(),
+        cache_buster: cfg!(debug_assertions),
+    }
 });
 
 #[derive(Debug, Clone)]
@@ -66,7 +70,7 @@ pub struct ConfigDebug {
 }
 
 impl ConfigDebug {
-    fn dev_mode(autoconnect: bool) -> Self {
+    fn dev_mode() -> Self {
         Self {
             start_route: Arc::new(Mutex::new(Some(Route::App(AppRoute::Init)))),
         }

@@ -3,12 +3,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{
-    skin::SkinKey,
-    textures::{SamplerKey, TextureKey},
-    transform::TransformKey,
-    AwsmRenderer,
-};
+use awsm_renderer_core::texture::texture_pool::TextureColorInfo;
+use glam::Mat4;
+
+use crate::{textures::TextureKey, transforms::TransformKey, AwsmRenderer};
 
 use super::{data::GltfData, error::AwsmGltfError};
 
@@ -17,17 +15,25 @@ mod extensions;
 mod material;
 mod mesh;
 mod skin;
-mod transforms;
+pub(super) mod transforms;
 
 pub(crate) struct GltfPopulateContext {
     pub data: Arc<GltfData>,
-    pub textures: Mutex<HashMap<GltfIndex, (TextureKey, SamplerKey)>>,
+    pub textures: Mutex<HashMap<GltfTextureKey, TextureKey>>,
     pub node_to_transform: Mutex<HashMap<GltfIndex, TransformKey>>,
-    pub node_to_skin: Mutex<HashMap<GltfIndex, SkinKey>>,
+    pub node_to_skin_transform:
+        Mutex<HashMap<GltfIndex, Arc<(Vec<TransformKey>, Vec<SkinInverseBindMatrix>)>>>,
     pub transform_is_joint: Mutex<HashSet<TransformKey>>,
     pub transform_is_instanced: Mutex<HashSet<TransformKey>>,
-    pub generate_mipmaps: bool,
 }
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct GltfTextureKey {
+    pub index: GltfIndex,
+    pub color: TextureColorInfo,
+}
+
+type SkinInverseBindMatrix = Mat4;
 
 type GltfIndex = usize;
 
@@ -36,7 +42,6 @@ impl AwsmRenderer {
         &mut self,
         gltf_data: GltfData,
         scene: Option<usize>,
-        generate_mipmaps: bool,
     ) -> anyhow::Result<()> {
         #[allow(clippy::arc_with_non_send_sync)]
         let gltf_data = Arc::new(gltf_data);
@@ -46,10 +51,9 @@ impl AwsmRenderer {
             data: gltf_data,
             textures: Mutex::new(HashMap::new()),
             node_to_transform: Mutex::new(HashMap::new()),
-            node_to_skin: Mutex::new(HashMap::new()),
+            node_to_skin_transform: Mutex::new(HashMap::new()),
             transform_is_joint: Mutex::new(HashSet::new()),
             transform_is_instanced: Mutex::new(HashSet::new()),
-            generate_mipmaps,
         };
 
         let scene = match scene {
@@ -59,18 +63,20 @@ impl AwsmRenderer {
                 .scenes()
                 .nth(index)
                 .ok_or(AwsmGltfError::InvalidScene(index))?,
-            None => ctx
-                .data
-                .doc
-                .default_scene()
-                .ok_or(AwsmGltfError::NoDefaultScene)?,
+            None => match ctx.data.doc.default_scene() {
+                Some(scene) => scene,
+                None => ctx
+                    .data
+                    .doc
+                    .scenes()
+                    .next()
+                    .ok_or(AwsmGltfError::NoDefaultScene)?,
+            },
         };
 
         for node in scene.nodes() {
             self.populate_gltf_node_transform(&ctx, &node, None)?;
         }
-
-        self.transforms.update_world();
 
         for node in scene.nodes() {
             self.populate_gltf_node_extension_instancing(&ctx, &node)?;
@@ -87,6 +93,8 @@ impl AwsmRenderer {
         for node in scene.nodes() {
             self.populate_gltf_node_mesh(&ctx, &node).await?;
         }
+
+        self.finalize_gpu_textures().await?;
 
         Ok(())
     }

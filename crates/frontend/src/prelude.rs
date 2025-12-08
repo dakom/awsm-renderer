@@ -1,4 +1,4 @@
-#![allow(unused_imports)]
+#![allow(unused_imports, dead_code)]
 pub use super::{
     atoms::{buttons::*, dropdown::*, label::*, modal::*, text_area::*, text_input::*},
     route::*,

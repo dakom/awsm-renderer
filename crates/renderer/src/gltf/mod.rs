@@ -1,7 +1,6 @@
-pub mod buffers;
-pub mod cache;
+pub(super) mod buffers;
+pub(super) mod cache;
 pub mod data;
-pub mod error;
-pub mod layout;
+pub(super) mod error;
 pub mod loader;
-pub mod populate;
+pub(super) mod populate;

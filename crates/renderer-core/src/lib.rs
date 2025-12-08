@@ -1,9 +1,11 @@
 pub mod alignment;
 pub mod bind_groups;
+pub mod brdf_lut;
 pub mod buffers;
 pub mod command;
 pub mod compare;
 pub mod configuration;
+pub mod cubemap;
 pub mod data;
 pub mod error;
 pub mod image;

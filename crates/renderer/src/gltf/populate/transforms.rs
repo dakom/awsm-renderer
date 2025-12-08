@@ -1,7 +1,7 @@
 use glam::{Mat4, Quat, Vec3};
 
 use crate::{
-    transform::{Transform, TransformKey},
+    transforms::{Transform, TransformKey},
     AwsmRenderer,
 };
 
@@ -37,7 +37,7 @@ impl AwsmRenderer {
     }
 }
 
-fn transform_gltf_node(node: &gltf::Node) -> Transform {
+pub fn transform_gltf_node(node: &gltf::Node) -> Transform {
     // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-node
     match node.transform() {
         gltf::scene::Transform::Matrix {

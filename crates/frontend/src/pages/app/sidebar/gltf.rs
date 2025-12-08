@@ -1,5 +1,5 @@
 use crate::{
-    models::collections::{GltfId, GLTF_SETS},
+    models::collections::{GltfId, GltfSetId, GLTF_SETS},
     pages::app::sidebar::current_model_signal,
     prelude::*,
 };
@@ -22,36 +22,14 @@ impl SidebarGltf {
             }
         });
 
-        let ordered_keys = [
-            "Todo",
-            "Simple",
-            "Animation",
-            // "Standard",
-            // "Extension Tests",
-            // "Standard",
-            // "Feature tests",
-        ];
-
-        for key in ordered_keys {
-            if !GLTF_SETS.contains_key(key) {
-                tracing::error!("Key not found in GLTF_SETS: {}", key);
-            }
-        }
-
-        for key in GLTF_SETS.keys() {
-            if !ordered_keys.contains(&key) {
-                tracing::error!("Key not found in ordered_keys: {}", key);
-            }
-        }
-
         html!("div", {
             .class(&*CONTAINER)
             .child(html!("div", {
                 .child_signal(current_model_signal().map(clone!(state => move |model_id| {
                     Some(html!("div", {
                         .children(
-                            ordered_keys.iter().map(|set_name| {
-                                state.render_gltf_selector(set_name, model_id)
+                            GltfSetId::list().into_iter().map(|set_id| {
+                                state.render_gltf_selector(set_id, model_id)
                             }).collect::<Vec<_>>()
                         )
                     }))
@@ -62,15 +40,13 @@ impl SidebarGltf {
 
     fn render_gltf_selector(
         self: &Arc<Self>,
-        set_name: &'static str,
+        set_id: GltfSetId,
         initial_selected: Option<GltfId>,
     ) -> Dom {
-        let state = self;
-
         let options = GLTF_SETS
-            .get(set_name)
+            .get(&set_id)
             .unwrap_throw()
-            .into_iter()
+            .iter()
             .map(|gltf_id| (gltf_id.label().to_string(), *gltf_id))
             .collect::<Vec<_>>();
 
@@ -85,13 +61,13 @@ impl SidebarGltf {
         });
 
         render_dropdown_label(
-            set_name,
+            set_id.as_str(),
             Dropdown::new()
                 .with_intial_selected(initial_selected)
                 .with_bg_color(ColorBackground::Dropdown)
-                .with_on_change(clone!(state => move |id| {
+                .with_on_change(|id| {
                     Route::App(AppRoute::Model(*id)).go_to_url();
-                }))
+                })
                 .with_options(options)
                 .render(),
         )

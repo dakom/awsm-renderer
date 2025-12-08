@@ -1,4 +1,3 @@
-#![allow(allow_dead)]
 pub mod color;
 pub mod misc;
 pub mod responsive;

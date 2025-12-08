@@ -9,6 +9,12 @@ pub struct Color {
 }
 
 impl Color {
+    pub const ZERO: Self = Self {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 0.0,
+    };
     pub const BLACK: Self = Self {
         r: 0.0,
         g: 0.0,
@@ -30,6 +36,20 @@ impl Color {
         a: 1.0,
     };
 
+    pub const RED: Self = Self {
+        r: 1.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    };
+
+    pub const RED_U32: Self = Self {
+        r: u32::MAX as f64,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    };
+
     pub fn new_values(r: f64, g: f64, b: f64, a: f64) -> Self {
         Self { r, g, b, a }
     }
@@ -44,6 +64,23 @@ impl Color {
             b: arr[2],
             a: arr[3],
         }
+    }
+
+    pub fn from_hex_rgb(hex: u32) -> Self {
+        let r = ((hex >> 16) & 0xFF) as f64 / 255.0;
+        let g = ((hex >> 8) & 0xFF) as f64 / 255.0;
+        let b = (hex & 0xFF) as f64 / 255.0;
+
+        Self { r, g, b, a: 1.0 }
+    }
+
+    pub fn from_hex_rgba(hex: u32) -> Self {
+        let r = ((hex >> 24) & 0xFF) as f64 / 255.0;
+        let g = ((hex >> 16) & 0xFF) as f64 / 255.0;
+        let b = ((hex >> 8) & 0xFF) as f64 / 255.0;
+        let a = (hex & 0xFF) as f64 / 255.0;
+
+        Self { r, g, b, a }
     }
 
     pub fn perceptual_to_linear(self) -> Self {

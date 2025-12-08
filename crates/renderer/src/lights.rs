@@ -1,21 +1,201 @@
-use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+pub mod ibl;
+
+use std::sync::LazyLock;
+
+use awsm_renderer_core::{
+    brdf_lut::generate::BrdfLut,
+    buffers::{BufferDescriptor, BufferUsage},
+    error::AwsmCoreError,
+    renderer::AwsmRendererWebGpu,
+};
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
 use crate::{
-    bind_groups::{
-        uniform_storage::{UniformStorageBindGroupIndex, UniversalBindGroupBinding},
-        AwsmBindGroupError, BindGroups,
-    },
-    buffer::dynamic_uniform::DynamicUniformBuffer,
-    AwsmRendererLogging,
+    bind_groups::{BindGroupCreate, BindGroups},
+    lights::ibl::Ibl,
+    AwsmRenderer, AwsmRendererLogging,
 };
 
+static PUNCTUAL_BUFFER_USAGE: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
+
+static INFO_BUFFER_USAGE: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_uniform().with_copy_dst());
+
+impl AwsmRenderer {
+    pub fn set_brdf_lut(&mut self, brdf_lut: BrdfLut) {
+        self.lights.brdf_lut = brdf_lut;
+        self.bind_groups
+            .mark_create(BindGroupCreate::BrdfLutTextures);
+    }
+    pub fn set_ibl(&mut self, ibl: Ibl) {
+        self.lights.ibl = ibl;
+        self.bind_groups.mark_create(BindGroupCreate::IblTextures);
+        self.lights.lighting_info_gpu_dirty = true;
+    }
+}
+
 pub struct Lights {
+    pub gpu_punctual_buffer: web_sys::GpuBuffer,
+    pub gpu_info_buffer: web_sys::GpuBuffer,
+    pub ibl: Ibl,
+    pub brdf_lut: BrdfLut,
     lights: SlotMap<LightKey, Light>,
-    // we use it as a storage buffer, because we need dynamic lengths, but it's a fixed size like a uniform
-    storage_buffer: DynamicUniformBuffer<LightKey>,
-    gpu_dirty: bool,
+    // We do not use DynamicUniformBuffer here because we need dense sequential access in the gpu
+    // not stable offsets per-key that DynamicUniformBuffer provides (with holes, etc)
+    // instead, we rebuild a fresh Vec<u8> when the gpu is dirty
+    // however, we do need to track the size so we can resize the gpu buffer if needed
+    punctual_gpu_size: usize,
+    punctual_gpu_dirty: bool,
+    lighting_info_gpu_dirty: bool,
+}
+
+impl Lights {
+    pub const PUNCTUAL_LIGHT_SIZE: usize = 64;
+    pub const INFO_SIZE: usize = 16; // 2 * u32 for mipmap counts, 1 for number of lights, and 1 for padding
+
+    pub fn new(gpu: &AwsmRendererWebGpu, ibl: Ibl, brdf_lut: BrdfLut) -> Result<Self> {
+        // GPU size should never be 0
+        let punctual_gpu_size = Self::PUNCTUAL_LIGHT_SIZE;
+
+        let gpu_punctual_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(
+                Some("Punctual Lights"),
+                punctual_gpu_size,
+                *PUNCTUAL_BUFFER_USAGE,
+            )
+            .into(),
+        )?;
+
+        let gpu_info_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(Some("Lights Info"), Self::INFO_SIZE, *INFO_BUFFER_USAGE).into(),
+        )?;
+
+        Ok(Lights {
+            lights: SlotMap::with_key(),
+            ibl,
+            brdf_lut,
+            punctual_gpu_size,
+            punctual_gpu_dirty: true,
+            lighting_info_gpu_dirty: true,
+            gpu_punctual_buffer,
+            gpu_info_buffer,
+        })
+    }
+
+    pub fn clear(&mut self) {
+        self.lights.clear();
+        self.punctual_gpu_dirty = true;
+        self.lighting_info_gpu_dirty = true;
+    }
+
+    pub fn insert(&mut self, light: Light) -> Result<LightKey> {
+        let key = self.lights.insert(light.clone());
+
+        self.punctual_gpu_dirty = true;
+        self.lighting_info_gpu_dirty = true;
+        Ok(key)
+    }
+
+    pub fn remove(&mut self, key: LightKey) {
+        self.lights.remove(key);
+        self.punctual_gpu_dirty = true;
+        self.lighting_info_gpu_dirty = true;
+    }
+
+    pub fn update(&mut self, key: LightKey, f: impl FnOnce(&mut Light)) {
+        if let Some(light) = self.lights.get_mut(key) {
+            f(light);
+            self.punctual_gpu_dirty = true;
+        }
+    }
+
+    pub fn write_gpu(
+        &mut self,
+        logging: &AwsmRendererLogging,
+        gpu: &AwsmRendererWebGpu,
+        bind_groups: &mut BindGroups,
+    ) -> Result<()> {
+        if self.punctual_gpu_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(
+                    tracing::span!(
+                        tracing::Level::INFO,
+                        "Punctual Lights Storage Buffer GPU write"
+                    )
+                    .entered(),
+                )
+            } else {
+                None
+            };
+
+            let punctual_light_buffer: Vec<u8> = self
+                .lights
+                .values()
+                .flat_map(|light| light.storage_buffer_data())
+                .collect();
+
+            // GPU size should never be 0, so use at least PUNCTUAL_LIGHT_SIZE
+            let target_gpu_size = if punctual_light_buffer.len() > self.punctual_gpu_size {
+                // Grow with 2x headroom
+                (punctual_light_buffer.len() * 2).max(Self::PUNCTUAL_LIGHT_SIZE)
+            } else if punctual_light_buffer.len() < self.punctual_gpu_size / 2 {
+                // Shrink if using less than half
+                punctual_light_buffer.len().max(Self::PUNCTUAL_LIGHT_SIZE)
+            } else {
+                // Keep current size
+                self.punctual_gpu_size
+            };
+
+            if target_gpu_size != self.punctual_gpu_size {
+                self.gpu_punctual_buffer = gpu.create_buffer(
+                    &BufferDescriptor::new(Some("Lights"), target_gpu_size, *PUNCTUAL_BUFFER_USAGE)
+                        .into(),
+                )?;
+
+                self.punctual_gpu_size = target_gpu_size;
+
+                bind_groups.mark_create(BindGroupCreate::LightsResize);
+            }
+
+            if !punctual_light_buffer.is_empty() {
+                gpu.write_buffer(
+                    &self.gpu_punctual_buffer,
+                    None,
+                    punctual_light_buffer.as_slice(),
+                    None,
+                    None,
+                )?;
+            }
+
+            // for (index, chunk) in punctual_light_buffer.chunks_exact(64).enumerate() {
+            //     let values =
+            //         unsafe { std::slice::from_raw_parts(chunk.as_ptr() as *const f32, 16) };
+            //     tracing::info!("{}: {:?}", index, values);
+            // }
+
+            self.punctual_gpu_dirty = false;
+        }
+
+        if self.lighting_info_gpu_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Lighting Info GPU write").entered())
+            } else {
+                None
+            };
+
+            let mut data = vec![0u8; Self::INFO_SIZE];
+            data[0..4].copy_from_slice(&(self.lights.len() as u32).to_ne_bytes());
+            data[4..8].copy_from_slice(&self.ibl.prefiltered_env.mip_count.to_ne_bytes());
+            data[8..12].copy_from_slice(&self.ibl.irradiance.mip_count.to_ne_bytes());
+
+            gpu.write_buffer(&self.gpu_info_buffer, None, &*data, None, None)?;
+
+            self.lighting_info_gpu_dirty = false;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -46,15 +226,15 @@ impl Light {
     pub const BYTE_SIZE: usize = 64;
 
     pub fn enum_value(&self) -> f32 {
-        // delibarately do not use 0
-        // since removed lights will be zeroed out in memory
-        // so 0 is reserved for "no light"
+        // f32 since we aren't bitcasting, we're reading as item in packed vec4<f32>
         match self {
             Light::Directional { .. } => 1.0,
             Light::Point { .. } => 2.0,
             Light::Spot { .. } => 3.0,
         }
     }
+
+    // matches LightPacked
     pub fn storage_buffer_data(&self) -> [u8; Self::BYTE_SIZE] {
         let mut data = [0u8; Self::BYTE_SIZE];
         let mut offset = 0;
@@ -100,10 +280,16 @@ impl Light {
         };
 
         // Layout is:
-        // vec4<f32>(light_type, color.rgb)
-        // vec4<f32>(intensity, position.xyz)
-        // vec4<f32>(range, direction.xyz)
-        // vec4<f32>(inner_angle, outer_angle, 0.0, 0.0)
+        // struct LightPacked {
+        //   // pos.xyz + range
+        //   pos_range: vec4<f32>,
+        //   // dir.xyz + inner_cone
+        //   dir_inner: vec4<f32>,
+        //   // color.rgb + intensity
+        //   color_intensity: vec4<f32>,
+        //   // kind (as uint) + outer_cone + 2 pads (or extra params)
+        //   kind_outer_pad: vec4<f32>,
+        // };
 
         match self {
             Light::Directional {
@@ -112,16 +298,17 @@ impl Light {
                 direction,
             } => {
                 // row 1
-                write((&self.enum_value()).into()); // light type
-                write(color.into());
-                // row 2
-                write(intensity.into());
                 write(Value::SkipVec3); // skip position
-                                        // row 3
                 write(Value::SkipN32(1)); // skip range
+                                          // row 2
                 write(direction.into());
+                write(Value::SkipN32(1)); // skip inner cone
+                                          // row 3
+                write(color.into());
+                write(intensity.into());
                 // row 4
-                write(Value::SkipN32(4)); // skip all
+                write((&self.enum_value()).into());
+                write(Value::SkipN32(3)); // skip outer cone and padding
             }
             Light::Point {
                 color,
@@ -130,16 +317,16 @@ impl Light {
                 range,
             } => {
                 // row 1
-                write((&self.enum_value()).into()); // light type
-                write(color.into());
-
-                // row 2
-                write(intensity.into());
                 write(position.into());
-                // row 3
                 write(range.into());
-                // row 4 (and direction)
-                write(Value::SkipN32(5)); // skip direction and all of row 4
+                // row 2
+                write(Value::SkipN32(4)); // skip direction and inner cone
+                                          // row 3
+                write(color.into());
+                write(intensity.into());
+                // row 4
+                write((&self.enum_value()).into());
+                write(Value::SkipN32(3)); // skip outer cone and padding
             }
             Light::Spot {
                 color,
@@ -151,122 +338,22 @@ impl Light {
                 outer_angle,
             } => {
                 // row 1
-                write((&self.enum_value()).into()); // light type
-                write(color.into());
-                // row 2
-                write(intensity.into());
                 write(position.into());
-                // row 3
                 write(range.into());
+                // row 2
                 write(direction.into());
-                // row 4
                 write(inner_angle.into());
+                // row 3
+                write(color.into());
+                write(intensity.into());
+                // row 4
+                write((&self.enum_value()).into());
                 write(outer_angle.into());
-                write(Value::SkipN32(2)); // skip end padding
+                write(Value::SkipN32(2)); // skip padding
             }
         }
 
         data
-    }
-}
-
-impl Default for Lights {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Lights {
-    pub const INITIAL_ELEMENTS: usize = 8; // 8 lights is a decent baseline
-    pub const BYTE_ALIGNMENT: usize = 64; // we aren't using it as a uniform buffer, so storage rules apply
-    pub const BYTE_SIZE: usize = 64;
-    pub fn new() -> Self {
-        Lights {
-            lights: SlotMap::with_key(),
-            storage_buffer: DynamicUniformBuffer::new(
-                Self::INITIAL_ELEMENTS,
-                Self::BYTE_SIZE,
-                Self::BYTE_ALIGNMENT,
-                Some("Lights".to_string()),
-            ),
-            gpu_dirty: true,
-        }
-    }
-
-    pub fn insert(&mut self, light: Light) -> Result<LightKey> {
-        let key = self.lights.insert(light.clone());
-
-        self.storage_buffer
-            .update(key, &light.storage_buffer_data());
-
-        self.gpu_dirty = true;
-        Ok(key)
-    }
-
-    pub fn remove(&mut self, key: LightKey) {
-        self.storage_buffer.remove(key);
-        self.lights.remove(key);
-        self.gpu_dirty = true;
-    }
-
-    pub fn update(&mut self, key: LightKey, f: impl FnOnce(&mut Light)) {
-        if let Some(light) = self.lights.get_mut(key) {
-            f(light);
-            self.storage_buffer
-                .update(key, &light.storage_buffer_data());
-            self.gpu_dirty = true;
-        }
-    }
-
-    pub fn write_gpu(
-        &mut self,
-        logging: &AwsmRendererLogging,
-        gpu: &AwsmRendererWebGpu,
-        bind_groups: &mut BindGroups,
-    ) -> Result<()> {
-        if self.gpu_dirty {
-            let _maybe_span_guard = if logging.render_timings {
-                Some(
-                    tracing::span!(tracing::Level::INFO, "Lights Storage Buffer GPU write")
-                        .entered(),
-                )
-            } else {
-                None
-            };
-
-            let bind_group_index =
-                UniformStorageBindGroupIndex::Universal(UniversalBindGroupBinding::Lights);
-            if let Some(new_size) = self.storage_buffer.take_gpu_needs_resize() {
-                bind_groups
-                    .uniform_storages
-                    .gpu_resize(gpu, bind_group_index, new_size)
-                    .map_err(AwsmLightError::BindGroupResize)?;
-            }
-
-            // for (index, chunk) in self.storage_buffer.raw_slice().chunks_exact(64).enumerate() {
-            //     let values = unsafe {
-            //         std::slice::from_raw_parts(chunk.as_ptr() as *const f32, 16)
-            //     };
-            //     tracing::info!("{}: {:?}", index, values);
-            // }
-
-            // tracing::info!("n_lights should be {}", self.storage_buffer.raw_slice().len() / (4 * 16));
-
-            bind_groups
-                .uniform_storages
-                .gpu_write(
-                    gpu,
-                    bind_group_index,
-                    None,
-                    self.storage_buffer.raw_slice(),
-                    None,
-                    None,
-                )
-                .map_err(AwsmLightError::BindGroupWrite)?;
-
-            self.gpu_dirty = false;
-        }
-        Ok(())
     }
 }
 
@@ -278,9 +365,6 @@ type Result<T> = std::result::Result<T, AwsmLightError>;
 
 #[derive(Error, Debug)]
 pub enum AwsmLightError {
-    #[error("[light] unable to resize bind group: {0:?}")]
-    BindGroupResize(AwsmBindGroupError),
-
-    #[error("[light] unable to write bind group: {0:?}")]
-    BindGroupWrite(AwsmBindGroupError),
+    #[error("[light] {0:?}")]
+    Core(#[from] AwsmCoreError),
 }

@@ -1,4 +1,6 @@
-#![allow(warnings)]
+#![allow(dead_code)]
+#![allow(clippy::arc_with_non_send_sync)]
+#![allow(clippy::type_complexity)]
 mod atoms;
 mod config;
 mod header;

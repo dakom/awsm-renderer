@@ -1,0 +1,384 @@
+use std::sync::LazyLock;
+
+use awsm_renderer_core::compare::CompareFunction;
+use awsm_renderer_core::pipeline::depth_stencil::DepthStencilState;
+use awsm_renderer_core::pipeline::fragment::ColorTargetState;
+use awsm_renderer_core::pipeline::multisample::MultisampleState;
+use awsm_renderer_core::pipeline::primitive::{
+    CullMode, FrontFace, PrimitiveState, PrimitiveTopology,
+};
+use awsm_renderer_core::pipeline::vertex::{
+    VertexAttribute, VertexBufferLayout, VertexFormat, VertexStepMode,
+};
+use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+use awsm_renderer_core::texture::TextureFormat;
+
+use crate::anti_alias::AntiAliasing;
+use crate::error::Result;
+use crate::mesh::MeshBufferVertexInfo;
+use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
+use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
+use crate::pipelines::Pipelines;
+use crate::render_passes::geometry::shader::cache_key::ShaderCacheKeyGeometry;
+use crate::render_passes::{geometry::bind_group::GeometryBindGroups, RenderPassInitContext};
+use crate::shaders::{ShaderKey, Shaders};
+
+pub struct GeometryPipelines {
+    pub pipeline_layout_key: PipelineLayoutKey,
+    no_anti_alias_no_cull_no_instancing_render_pipeline_key: RenderPipelineKey,
+    no_anti_alias_no_cull_instancing_render_pipeline_key: RenderPipelineKey,
+    no_anti_alias_back_cull_no_instancing_render_pipeline_key: RenderPipelineKey,
+    no_anti_alias_back_cull_instancing_render_pipeline_key: RenderPipelineKey,
+    msaa_4_anti_alias_no_cull_no_instancing_render_pipeline_key: RenderPipelineKey,
+    msaa_4_anti_alias_no_cull_instancing_render_pipeline_key: RenderPipelineKey,
+    msaa_4_anti_alias_back_cull_no_instancing_render_pipeline_key: RenderPipelineKey,
+    msaa_4_anti_alias_back_cull_instancing_render_pipeline_key: RenderPipelineKey,
+}
+
+static VERTEX_BUFFER_LAYOUT: LazyLock<VertexBufferLayout> = LazyLock::new(|| {
+    VertexBufferLayout {
+        // this is the stride across all of the attributes
+        // position (12) + triangle_index (4) + barycentric (8) + normal (12) + tangent (16) + original_vertex_index (4) = 56 bytes
+        array_stride: MeshBufferVertexInfo::VISIBILITY_GEOMETRY_BYTE_SIZE as u64,
+        step_mode: None,
+        attributes: vec![
+            // Position (vec3<f32>) at offset 0
+            VertexAttribute {
+                format: VertexFormat::Float32x3,
+                offset: 0,
+                shader_location: 0,
+            },
+            // Triangle ID (u32) at offset 12
+            VertexAttribute {
+                format: VertexFormat::Uint32,
+                offset: 12,
+                shader_location: 1,
+            },
+            // Barycentric coordinates (vec2<f32>) at offset 16
+            VertexAttribute {
+                format: VertexFormat::Float32x2,
+                offset: 16,
+                shader_location: 2,
+            },
+            // Normal (vec3<f32>) at offset 24
+            VertexAttribute {
+                format: VertexFormat::Float32x3,
+                offset: 24,
+                shader_location: 3,
+            },
+            // Tangent (vec4<f32>) at offset 36
+            VertexAttribute {
+                format: VertexFormat::Float32x4,
+                offset: 36,
+                shader_location: 4,
+            },
+            // Original vertex index (u32) at offset 52 - for indexed skin/morph access
+            VertexAttribute {
+                format: VertexFormat::Uint32,
+                offset: 52,
+                shader_location: 5,
+            },
+        ],
+    }
+});
+
+static VERTEX_BUFFER_LAYOUT_INSTANCING: LazyLock<VertexBufferLayout> = LazyLock::new(|| {
+    let mut vertex_buffer_layout_instancing = VertexBufferLayout {
+        // this is the stride across all of the attributes
+        array_stride: MeshBufferVertexInfo::INSTANCING_BYTE_SIZE as u64,
+        step_mode: Some(VertexStepMode::Instance),
+        attributes: Vec::new(),
+    };
+
+    let start_location = VERTEX_BUFFER_LAYOUT.attributes.len() as u32;
+
+    for i in 0..4 {
+        vertex_buffer_layout_instancing
+            .attributes
+            .push(VertexAttribute {
+                format: VertexFormat::Float32x4,
+                offset: i * 16,
+                shader_location: start_location + i as u32,
+            });
+    }
+
+    vertex_buffer_layout_instancing
+});
+
+impl GeometryPipelines {
+    pub async fn new(
+        ctx: &mut RenderPassInitContext<'_>,
+        bind_groups: &GeometryBindGroups,
+    ) -> Result<Self> {
+        let pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
+            bind_groups.camera.bind_group_layout_key,
+            bind_groups.transform_materials.bind_group_layout_key,
+            bind_groups.meta.bind_group_layout_key,
+            bind_groups.animation.bind_group_layout_key,
+        ]);
+
+        let pipeline_layout_key = ctx.pipeline_layouts.get_key(
+            ctx.gpu,
+            ctx.bind_group_layouts,
+            pipeline_layout_cache_key,
+        )?;
+
+        let color_targets = &[
+            ColorTargetState::new(ctx.render_texture_formats.visiblity_data),
+            ColorTargetState::new(ctx.render_texture_formats.barycentric),
+            ColorTargetState::new(ctx.render_texture_formats.normal_tangent),
+            ColorTargetState::new(ctx.render_texture_formats.barycentric_derivatives),
+        ];
+
+        let vertex_buffer_layouts_no_instancing = vec![VERTEX_BUFFER_LAYOUT.clone()];
+        let vertex_buffer_layouts_instancing = vec![
+            VERTEX_BUFFER_LAYOUT.clone(),
+            VERTEX_BUFFER_LAYOUT_INSTANCING.clone(),
+        ];
+
+        let shader_key_no_anti_alias_no_instancing = ctx
+            .shaders
+            .get_key(
+                ctx.gpu,
+                ShaderCacheKeyGeometry {
+                    instancing_transforms: false,
+                    msaa_samples: None,
+                },
+            )
+            .await?;
+        let shader_key_no_anti_alias_instancing = ctx
+            .shaders
+            .get_key(
+                ctx.gpu,
+                ShaderCacheKeyGeometry {
+                    instancing_transforms: true,
+                    msaa_samples: None,
+                },
+            )
+            .await?;
+
+        let shader_key_msaa_4_anti_alias_no_instancing = ctx
+            .shaders
+            .get_key(
+                ctx.gpu,
+                ShaderCacheKeyGeometry {
+                    instancing_transforms: false,
+                    msaa_samples: Some(4),
+                },
+            )
+            .await?;
+        let shader_key_msaa_4_anti_alias_instancing = ctx
+            .shaders
+            .get_key(
+                ctx.gpu,
+                ShaderCacheKeyGeometry {
+                    instancing_transforms: true,
+                    msaa_samples: Some(4),
+                },
+            )
+            .await?;
+
+        let no_anti_alias_no_cull_no_instancing_render_pipeline_key = render_pipeline_key(
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_no_anti_alias_no_instancing,
+            vertex_buffer_layouts_no_instancing.clone(),
+            color_targets,
+            None,
+            CullMode::None,
+        )
+        .await?;
+
+        let no_anti_alias_no_cull_instancing_render_pipeline_key = render_pipeline_key(
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_no_anti_alias_instancing,
+            vertex_buffer_layouts_instancing.clone(),
+            color_targets,
+            None,
+            CullMode::None,
+        )
+        .await?;
+
+        let no_anti_alias_back_cull_no_instancing_render_pipeline_key = render_pipeline_key(
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_no_anti_alias_no_instancing,
+            vertex_buffer_layouts_no_instancing.clone(),
+            color_targets,
+            None,
+            CullMode::Back,
+        )
+        .await?;
+
+        let no_anti_alias_back_cull_instancing_render_pipeline_key = render_pipeline_key(
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_no_anti_alias_instancing,
+            vertex_buffer_layouts_instancing.clone(),
+            color_targets,
+            None,
+            CullMode::Back,
+        )
+        .await?;
+
+        let msaa_4_anti_alias_no_cull_no_instancing_render_pipeline_key = render_pipeline_key(
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_msaa_4_anti_alias_no_instancing,
+            vertex_buffer_layouts_no_instancing.clone(),
+            color_targets,
+            Some(4),
+            CullMode::None,
+        )
+        .await?;
+
+        let msaa_4_anti_alias_no_cull_instancing_render_pipeline_key = render_pipeline_key(
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_msaa_4_anti_alias_instancing,
+            vertex_buffer_layouts_instancing.clone(),
+            color_targets,
+            Some(4),
+            CullMode::None,
+        )
+        .await?;
+
+        let msaa_4_anti_alias_back_cull_no_instancing_render_pipeline_key = render_pipeline_key(
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_msaa_4_anti_alias_no_instancing,
+            vertex_buffer_layouts_no_instancing.clone(),
+            color_targets,
+            Some(4),
+            CullMode::Back,
+        )
+        .await?;
+
+        let msaa_4_anti_alias_back_cull_instancing_render_pipeline_key = render_pipeline_key(
+            ctx.gpu,
+            ctx.shaders,
+            ctx.pipelines,
+            ctx.pipeline_layouts,
+            ctx.render_texture_formats.depth,
+            pipeline_layout_key,
+            shader_key_msaa_4_anti_alias_instancing,
+            vertex_buffer_layouts_instancing.clone(),
+            color_targets,
+            Some(4),
+            CullMode::Back,
+        )
+        .await?;
+
+        Ok(Self {
+            pipeline_layout_key,
+            no_anti_alias_no_cull_no_instancing_render_pipeline_key,
+            no_anti_alias_no_cull_instancing_render_pipeline_key,
+            no_anti_alias_back_cull_no_instancing_render_pipeline_key,
+            no_anti_alias_back_cull_instancing_render_pipeline_key,
+            msaa_4_anti_alias_no_cull_no_instancing_render_pipeline_key,
+            msaa_4_anti_alias_no_cull_instancing_render_pipeline_key,
+            msaa_4_anti_alias_back_cull_no_instancing_render_pipeline_key,
+            msaa_4_anti_alias_back_cull_instancing_render_pipeline_key,
+        })
+    }
+
+    pub fn get_render_pipeline_key(
+        &self,
+        double_sided: bool,
+        transform_instancing: bool,
+        anti_aliasing: &AntiAliasing,
+    ) -> RenderPipelineKey {
+        let has_anti_alias = match anti_aliasing.msaa_sample_count {
+            Some(4) => true,
+            None => false,
+            _ => panic!("Unsupported MSAA sample count"),
+        };
+
+        match (has_anti_alias, double_sided, transform_instancing) {
+            (false, false, false) => self.no_anti_alias_back_cull_no_instancing_render_pipeline_key,
+            (false, false, true) => self.no_anti_alias_back_cull_instancing_render_pipeline_key,
+            (false, true, false) => self.no_anti_alias_no_cull_no_instancing_render_pipeline_key,
+            (false, true, true) => self.no_anti_alias_no_cull_instancing_render_pipeline_key,
+            (true, false, false) => {
+                self.msaa_4_anti_alias_back_cull_no_instancing_render_pipeline_key
+            }
+            (true, false, true) => self.msaa_4_anti_alias_back_cull_instancing_render_pipeline_key,
+            (true, true, false) => self.msaa_4_anti_alias_no_cull_no_instancing_render_pipeline_key,
+            (true, true, true) => self.msaa_4_anti_alias_no_cull_instancing_render_pipeline_key,
+        }
+    }
+}
+
+async fn render_pipeline_key(
+    gpu: &AwsmRendererWebGpu,
+    shaders: &mut Shaders,
+    pipelines: &mut Pipelines,
+    pipeline_layouts: &PipelineLayouts,
+    depth_texture_format: TextureFormat,
+    pipeline_layout_key: PipelineLayoutKey,
+    shader_key: ShaderKey,
+    vertex_buffer_layouts: Vec<VertexBufferLayout>,
+    color_targets: &[ColorTargetState],
+    msaa_sample_count: Option<u32>,
+    cull_mode: CullMode,
+) -> Result<RenderPipelineKey> {
+    let primitive_state = PrimitiveState::new()
+        .with_topology(PrimitiveTopology::TriangleList)
+        .with_front_face(FrontFace::Ccw)
+        .with_cull_mode(cull_mode);
+
+    let depth_stencil = DepthStencilState::new(depth_texture_format)
+        .with_depth_write_enabled(true)
+        .with_depth_compare(CompareFunction::LessEqual);
+
+    let mut pipeline_cache_key = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
+        .with_primitive(primitive_state.clone())
+        .with_depth_stencil(depth_stencil.clone());
+
+    for layout in vertex_buffer_layouts {
+        pipeline_cache_key = pipeline_cache_key.with_push_vertex_buffer_layout(layout);
+    }
+
+    if let Some(sample_count) = msaa_sample_count {
+        pipeline_cache_key =
+            pipeline_cache_key.with_multisample(MultisampleState::new().with_count(sample_count));
+    }
+
+    for target in color_targets {
+        pipeline_cache_key = pipeline_cache_key.with_push_fragment_targets(vec![target.clone()]);
+    }
+
+    Ok(pipelines
+        .render
+        .get_key(gpu, shaders, pipeline_layouts, pipeline_cache_key)
+        .await?)
+}

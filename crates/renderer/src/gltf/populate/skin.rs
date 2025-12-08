@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use glam::Mat4;
 
 use crate::{
@@ -12,6 +14,7 @@ use crate::{
 use super::GltfPopulateContext;
 
 impl AwsmRenderer {
+    #[allow(clippy::only_used_in_recursion)]
     pub(super) fn populate_gltf_node_skin<'a, 'b: 'a, 'c: 'a>(
         &'a mut self,
         ctx: &'c GltfPopulateContext,
@@ -58,14 +61,10 @@ impl AwsmRenderer {
                 None => None,
             };
 
-            let skin_key = self
-                .skins
-                .insert(joints, inverse_bind_matrices.unwrap_or_default())?;
-
-            ctx.node_to_skin
-                .lock()
-                .unwrap()
-                .insert(gltf_node.index(), skin_key);
+            ctx.node_to_skin_transform.lock().unwrap().insert(
+                gltf_node.index(),
+                Arc::new((joints, inverse_bind_matrices.unwrap_or_default())),
+            );
         }
 
         for child in gltf_node.children() {

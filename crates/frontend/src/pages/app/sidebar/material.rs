@@ -1,10 +1,8 @@
 use crate::{
-    models::collections::{GltfId, GLTF_SETS},
-    pages::app::{context::AppContext, scene::camera::CameraId, sidebar::current_model_signal},
+    atoms::checkbox::{Checkbox, CheckboxStyle},
+    pages::app::context::AppContext,
     prelude::*,
 };
-
-use super::render_dropdown_label;
 
 pub struct SidebarMaterial {
     ctx: AppContext,
@@ -26,30 +24,22 @@ impl SidebarMaterial {
 
         html!("div", {
             .class(&*CONTAINER)
-            .child(state.render_shader_selector())
+            .child(state.render_debug_normals())
         })
     }
 
-    fn render_shader_selector(self: &Arc<Self>) -> Dom {
+    fn render_debug_normals(self: &Arc<Self>) -> Dom {
         let state = self;
 
-        render_dropdown_label(
-            "Shader",
-            Dropdown::new()
-                .with_intial_selected(Some(state.ctx.shader.get()))
-                .with_bg_color(ColorBackground::Dropdown)
-                .with_on_change(clone!(state => move |shader| {
-                    state.ctx.shader.set_neq(*shader);
-                }))
-                .with_options([
-                    ("PBR".to_string(), FragmentShaderKind::Pbr),
-                    (
-                        "Debug Normals".to_string(),
-                        FragmentShaderKind::DebugNormals,
-                    ),
-                ])
-                .render(),
-        )
+        Checkbox::new(CheckboxStyle::Dark)
+            .with_content_after(html!("span", {
+                .text("Debug Normals")
+            }))
+            .with_selected_signal(state.ctx.material.debug_normals.signal())
+            .with_on_click(clone!(state => move || {
+                state.ctx.material.debug_normals.set_neq(!state.ctx.material.debug_normals.get());
+            }))
+            .render()
     }
 }
 

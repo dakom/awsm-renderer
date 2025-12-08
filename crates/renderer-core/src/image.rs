@@ -1,20 +1,23 @@
 use crate::command::copy_texture::Origin3d;
 use crate::error::Result;
 use crate::renderer::AwsmRendererWebGpu;
-use crate::texture::{Extent3d, TextureAspect, TextureDescriptor, TextureFormat, TextureUsage};
-use mipmap::generate_mipmaps;
+use crate::texture::mipmap::{generate_mipmaps, MipmapTextureKind};
+use crate::texture::{
+    mipmap, Extent3d, TextureAspect, TextureDescriptor, TextureFormat, TextureUsage,
+};
 use std::borrow::Cow;
+#[cfg(feature = "exr")]
+use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 
 pub mod bitmap;
 #[cfg(feature = "exr")]
 pub mod exr;
-pub mod mipmap;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum ImageData {
     #[cfg(feature = "exr")]
-    Exr(Box<exr::ExrImage>),
+    Exr(Arc<exr::ExrImage>),
     Bitmap {
         image: web_sys::ImageBitmap,
         options: Option<ImageBitmapOptions>,
@@ -22,7 +25,7 @@ pub enum ImageData {
 }
 
 // If we don't set premultiply, the browser will use the default, which may be to apply it - or NOT!
-// Recommendation here is to set it explicitly to none rather than relying on defaults.
+// Recommendation here is to set it explicitly rather than relying on defaults.
 // However, for color space conversion, we want the browser to optimally try to load the image in the best color space it can.
 // Since we don't have full control over the image loading process, we might as well let the browser handle it
 // and then we at least *more* safely assume it's srgb, which is the most common color space for web images.
@@ -30,14 +33,8 @@ pub enum ImageData {
 //
 // Color space handling:
 // - EXR: Uses `TextureFormat::Rgba32Float` - data is already linear from the file format
-// - Bitmap images: Uses `TextureFormat::Rgba8Unorm` - we manually convert sRGB→linear in shaders
+// - Bitmap images: Uses `TextureFormat::Rgba8Unorm` - we convert sRGB→linear in shaders
 //
-// We use Rgba8Unorm instead of Rgba8UnormSrgb because sRGB formats don't support STORAGE usage,
-// which is required for compute-based mipmap generation. The manual conversion gives us full control
-// and allows us to handle mixed content (some textures might not be sRGB).
-//
-// The browser loads bitmap data in whatever color space it thinks is appropriate (usually sRGB),
-// then we handle the sRGB→linear conversion explicitly in our shaders using srgb_to_linear().
 // See:
 // https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-imagebitmapoptions-premultiplyalpha
 // https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-imagebitmapoptions-colorspaceconversion
@@ -48,7 +45,7 @@ impl ImageData {
             pub async fn load_url(url:&str, options: Option<ImageBitmapOptions>) -> anyhow::Result<Self> {
                 if url.contains(".exr") {
                     let exr_image = exr::ExrImage::load_url(url).await?;
-                    Ok(Self::Exr(Box::new(exr_image)))
+                    Ok(Self::Exr(Arc::new(exr_image)))
                 } else {
                     let image = bitmap::load(url.to_string(), options.clone()).await?;
                     Ok(Self::Bitmap{image, options})
@@ -90,7 +87,15 @@ impl ImageData {
         }
     }
 
-    pub fn size(&self) -> Extent3d {
+    pub fn size(&self) -> (u32, u32) {
+        match self {
+            #[cfg(feature = "exr")]
+            Self::Exr(exr) => (exr.width as u32, exr.height as u32),
+            Self::Bitmap { image, .. } => (image.width(), image.height()),
+        }
+    }
+
+    pub fn extent_3d(&self) -> Extent3d {
         match self {
             #[cfg(feature = "exr")]
             Self::Exr(exr) => Extent3d {
@@ -123,7 +128,7 @@ impl ImageData {
         &self,
         origin: Option<[f32; 2]>,
         flip_y: Option<bool>,
-    ) -> Result<CopyExternalImageSourceInfo> {
+    ) -> Result<CopyExternalImageSourceInfo<'_>> {
         Ok(CopyExternalImageSourceInfo {
             flip_y,
             origin,
@@ -135,7 +140,9 @@ impl ImageData {
         &self,
         gpu: &AwsmRendererWebGpu,
         source_info: Option<CopyExternalImageSourceInfo<'_>>,
-        generate_mipmap: bool,
+        mipmap_kind: Option<MipmapTextureKind>,
+        // if None, will try to determine from source image options
+        premultiply_alpha: Option<bool>,
     ) -> Result<web_sys::GpuTexture> {
         let mut usage = TextureUsage::new()
             .with_texture_binding()
@@ -143,7 +150,7 @@ impl ImageData {
             .with_render_attachment()
             .with_copy_dst();
 
-        if generate_mipmap {
+        if mipmap_kind.is_some() {
             usage = usage.with_storage_binding();
         }
 
@@ -156,37 +163,31 @@ impl ImageData {
             },
         };
 
-        let mut descriptor = TextureDescriptor::new(self.format(), self.size(), usage);
-        let mipmap_levels = if generate_mipmap {
-            let mipmap_levels =
-                mipmap::calculate_mipmap_levels(self.size().width, self.size().height.unwrap_or(1));
+        let mut descriptor = TextureDescriptor::new(self.format(), self.extent_3d(), usage);
+        let mipmap_levels = if mipmap_kind.is_some() {
+            let (width, height) = self.size();
+
+            let mipmap_levels = mipmap::calculate_mipmap_levels(width, height);
 
             descriptor = descriptor.with_mip_level_count(mipmap_levels);
 
-            Some(mipmap_levels)
+            mipmap_levels
         } else {
-            None
+            0
         };
 
         let texture = gpu.create_texture(&descriptor.into())?;
 
         let mut dest = CopyExternalImageDestInfo::new(&texture)
-            .with_premultiplied_alpha(self.premultiplied_alpha());
+            .with_premultiplied_alpha(premultiply_alpha.unwrap_or(self.premultiplied_alpha()));
 
-        if generate_mipmap {
+        if mipmap_kind.is_some() {
             dest = dest.with_mip_level(0);
         }
-        gpu.copy_external_image_to_texture(&source.into(), &dest.into(), &self.size().into())?;
+        gpu.copy_external_image_to_texture(&source.into(), &dest.into(), &self.extent_3d().into())?;
 
-        if let Some(mipmap_levels) = mipmap_levels {
-            generate_mipmaps(
-                gpu,
-                &texture,
-                self.size().width,
-                self.size().height.unwrap_or(1),
-                mipmap_levels,
-            )
-            .await?;
+        if let Some(mipmap_kind) = mipmap_kind {
+            generate_mipmaps(gpu, &texture, &[mipmap_kind], mipmap_levels).await?;
         }
 
         Ok(texture)
@@ -309,7 +310,7 @@ impl<'a> CopyExternalImageDestInfo<'a> {
 impl From<CopyExternalImageSourceInfo<'_>> for web_sys::GpuCopyExternalImageSourceInfo {
     fn from(info: CopyExternalImageSourceInfo) -> Self {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/copyExternalImageToTexture#source
-        // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuCopyExternalImageSourceInfo.html
+        // https://docs.rs/web-sys/latest/web_sys/struct.GpuCopyExternalImageSourceInfo.html
         let info_js = web_sys::GpuCopyExternalImageSourceInfo::new(&info.source);
 
         if let Some(flip_y) = info.flip_y {
@@ -340,7 +341,7 @@ impl From<CopyExternalImageSourceInfo<'_>> for web_sys::GpuCopyExternalImageSour
 impl From<CopyExternalImageDestInfo<'_>> for web_sys::GpuCopyExternalImageDestInfo {
     fn from(info: CopyExternalImageDestInfo) -> Self {
         // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/copyExternalImageToTexture#destination
-        // https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.GpuCopyExternalImageDestInfo.html
+        // https://docs.rs/web-sys/latest/web_sys/struct.GpuCopyExternalImageDestInfo.html
         let info_js = web_sys::GpuCopyExternalImageDestInfo::new(info.texture);
 
         if let Some(aspect) = info.aspect {

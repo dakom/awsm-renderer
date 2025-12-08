@@ -3,92 +3,162 @@ use std::hash::Hash;
 
 use crate::prelude::*;
 
-pub static GLTF_SETS: LazyLock<HashMap<&'static str, Vec<GltfId>>> = LazyLock::new(|| {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GltfSetId {
+    Todo,
+    Standard,
+    Animation,
+    Comparisons,
+    Basics,
+    Extensions,
+}
+
+impl GltfSetId {
+    pub fn list() -> Vec<GltfSetId> {
+        vec![
+            GltfSetId::Todo,
+            GltfSetId::Standard,
+            GltfSetId::Animation,
+            GltfSetId::Comparisons,
+            GltfSetId::Basics,
+            GltfSetId::Extensions,
+        ]
+    }
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Todo => "Todo",
+            Self::Standard => "Standard",
+            Self::Animation => "Animation",
+            Self::Comparisons => "Comparisons",
+            Self::Basics => "Basics",
+            Self::Extensions => "Extensions",
+        }
+    }
+}
+pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(|| {
     let mut h = HashMap::new();
 
     h.insert(
-        "Todo",
+        GltfSetId::Todo,
         vec![
+            GltfId::BrainStem,
+            GltfId::Fox,
+            GltfId::VertexColor,
+            GltfId::CompareBaseColor,
+            GltfId::CompareAmbientOcclusion,
+            GltfId::CompareEmissiveStrength,
+            GltfId::EmissiveStrength,
+            GltfId::CompareAnisotropy,
             GltfId::AlphaBlendMode,
-            GltfId::MetalRoughSpheresTextureless,
-            GltfId::MetalRoughSpheres,
         ],
     );
 
-    // h.insert(
-    //     "Feature tests",
-    //     vec![
-    //         GltfId::AlphaBlendMode,
-    //         GltfId::BoomBoxAxes,
-    //         //GltfId::MetalRoughSpheres,
-    //         //GltfId::MetalRoughSpheresTextureless,
-    //         GltfId::MorphPrimitives,
-    //         //GltfId::MorphStressTest,
-    //         GltfId::MultiUv,
-    //         //GltfId::NegativeScale,
-    //         // GltfId::NormalTangent,
-    //         // GltfId::NormalTangentMirror,
-    //         GltfId::Orientation,
-    //         //GltfId::RecursiveSkeletons,
-    //         GltfId::TextureCoordinate,
-    //         GltfId::TextureLinearInterpolation,
-    //         GltfId::TextureSettings,
-    //         GltfId::VertexColor,
-    //     ],
-    // );
-
     h.insert(
-        "Simple",
+        GltfSetId::Comparisons,
         vec![
-            GltfId::TriangleWithoutIndices,
-            GltfId::Triangle,
-            GltfId::SimpleSparseAccessor,
-            GltfId::SimpleMeshes,
-            GltfId::SimpleTexture,
-            GltfId::SimpleInstancing,
-            GltfId::SimpleMaterial,
+            // GltfId::CompareBaseColor,
+            // GltfId::CompareAnisotropy,
+            GltfId::CompareAlphaCoverage,
+            //GltfId::CompareAmbientOcclusion,
+            GltfId::CompareClearcoat,
+            GltfId::CompareDispersion,
+            //GltfId::CompareEmissiveStrength,
+            GltfId::CompareIor,
+            GltfId::CompareIridescence,
+            GltfId::CompareMetallic,
+            GltfId::CompareNormal,
+            GltfId::CompareRoughness,
+            GltfId::CompareSheen,
+            GltfId::CompareSpecular,
+            GltfId::CompareTransmission,
+            GltfId::CompareVolume,
         ],
     );
 
     h.insert(
-        "Animation",
+        GltfSetId::Standard,
+        vec![
+            GltfId::DamagedHelmet,
+            //GltfId::AlphaBlendMode
+        ],
+    );
+
+    h.insert(
+        GltfSetId::Animation,
         vec![
             GltfId::SimpleSkin,
             GltfId::SimpleMorph,
             GltfId::AnimatedTriangle,
             GltfId::AnimatedMorphCube,
             GltfId::InterpolationTest,
+            GltfId::RiggedSimple,
+            GltfId::RiggedFigure,
+            GltfId::RecursiveSkeletons,
+            GltfId::MorphStressTest,
         ],
     );
 
-    // h.insert(
-    //     "Standard",
-    //     vec![
-    //         GltfId::Box,
-    //         GltfId::BoxInterleaved,
-    //         GltfId::BoxTextured,
-    //         GltfId::BoxTexturedNpoT,
-    //         GltfId::BoxWithSpaces,
-    //         GltfId::BoxVertexColors,
-    //         GltfId::Cube,
-    //     ],
-    // );
+    h.insert(
+        GltfSetId::Basics,
+        vec![
+            GltfId::TextureCoordinate,
+            GltfId::TextureLinearInterpolation,
+            GltfId::TextureSettings,
+            //GltfId::VertexColor,
+            GltfId::BoomBoxAxes,
+            GltfId::TriangleWithoutIndices,
+            GltfId::SimpleSparseAccessor,
+            GltfId::SimpleMeshes,
+            GltfId::SimpleTexture,
+            GltfId::SimpleMaterial,
+            GltfId::MorphPrimitives,
+            GltfId::MultiUv,
+            GltfId::NegativeScale,
+            GltfId::Orientation,
+            GltfId::NormalTangent,
+            GltfId::NormalTangentMirror,
+            GltfId::Triangle,
+            GltfId::BoxTextured,
+            GltfId::MetalRoughSpheresTextureless,
+            GltfId::MetalRoughSpheres,
+            GltfId::Box,
+            GltfId::BoxInterleaved,
+            GltfId::BoxTexturedNpoT,
+            GltfId::BoxWithSpaces,
+            GltfId::BoxVertexColors,
+            GltfId::Cube,
+            //GltfId::EmissiveStrength,
+        ],
+    );
 
-    // h.insert(
-    //     "Extension Tests",
-    //     vec![
-    //         // GltfId::EnvironmentTest,
-    //         // GltfId::EnvironmentIblTest,
-    //     ],
-    // );
+    h.insert(
+        GltfSetId::Extensions,
+        vec![
+            GltfId::SimpleInstancing,
+            GltfId::TextureTransformMultiTest,
+            GltfId::TextureTransformTest,
+            GltfId::EnvironmentTest,
+            GltfId::EnvironmentIblTest,
+        ],
+    );
+
+    // make sure no ids are in multiple sets
+    let mut all_ids = std::collections::HashSet::new();
+    for ids in h.values() {
+        for id in ids {
+            if !all_ids.insert(id) {
+                panic!("[{:?}] is in multiple sets!", id);
+            }
+        }
+    }
 
     h
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GltfId {
-    // FEATURE TESTS
-    // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#feature-tests
+    BrainStem,
+    Fox,
     AlphaBlendMode,
     BoomBoxAxes,
     MetalRoughSpheres,
@@ -105,9 +175,6 @@ pub enum GltfId {
     TextureLinearInterpolation,
     TextureSettings,
     VertexColor,
-
-    // MINIMAL
-    // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#minimal-tests
     TriangleWithoutIndices,
     Triangle,
     SimpleSparseAccessor,
@@ -120,10 +187,6 @@ pub enum GltfId {
     SimpleTexture,
     SimpleMaterial,
     InterpolationTest,
-    // skipping unicode test...
-
-    // STANDARD
-    // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#standard
     Box,
     BoxInterleaved,
     BoxTextured,
@@ -131,18 +194,37 @@ pub enum GltfId {
     BoxWithSpaces,
     BoxVertexColors,
     Cube,
-
-    // EXTENSION TESTS
-    // https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0#feature-tests-1
+    CompareAlphaCoverage,
+    CompareAmbientOcclusion,
+    CompareAnisotropy,
+    CompareBaseColor,
+    CompareClearcoat,
+    CompareDispersion,
+    CompareEmissiveStrength,
+    CompareIor,
+    CompareIridescence,
+    CompareMetallic,
+    CompareNormal,
+    CompareRoughness,
+    CompareSheen,
+    CompareSpecular,
+    CompareTransmission,
+    CompareVolume,
+    RiggedFigure,
+    RiggedSimple,
+    DamagedHelmet,
     EnvironmentTest,
     EnvironmentIblTest,
+    EmissiveStrength,
+    TextureTransformTest,
+    TextureTransformMultiTest,
 }
 
 impl TryFrom<&str> for GltfId {
     type Error = String;
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        let list: Vec<&GltfId> = GLTF_SETS.iter().map(|x| x.1).flatten().collect();
+        let list: Vec<&GltfId> = GLTF_SETS.iter().flat_map(|x| x.1).collect();
 
         for id in list {
             let id_str = id.to_string();
@@ -162,14 +244,10 @@ impl std::fmt::Display for GltfId {
 }
 
 impl GltfId {
-    pub fn find_set_label(&self) -> &'static str {
-        let res = GLTF_SETS.iter().find(|x| x.1.contains(self));
-        res.unwrap().0
-    }
-
     pub fn filepath(&self) -> &'static str {
         match self {
-            // Feature tests
+            Self::BrainStem => "BrainStem/glTF/BrainStem.gltf",
+            Self::Fox => "Fox/glTF/Fox.gltf",
             Self::AlphaBlendMode => "AlphaBlendModeTest/glTF/AlphaBlendModeTest.gltf",
             Self::BoomBoxAxes => "BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf",
             Self::MetalRoughSpheres => "MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
@@ -191,8 +269,11 @@ impl GltfId {
                 "TextureLinearInterpolationTest/glTF/TextureLinearInterpolationTest.gltf"
             }
             Self::TextureSettings => "TextureSettingsTest/glTF/TextureSettingsTest.gltf",
+            Self::TextureTransformTest => "TextureTransformTest/glTF/TextureTransformTest.gltf",
+            Self::TextureTransformMultiTest => {
+                "TextureTransformMultiTest/glTF/TextureTransformMultiTest.gltf"
+            }
             Self::VertexColor => "VertexColorTest/glTF/VertexColorTest.gltf",
-            // Minimal
             Self::TriangleWithoutIndices => {
                 "TriangleWithoutIndices/glTF/TriangleWithoutIndices.gltf"
             }
@@ -207,8 +288,6 @@ impl GltfId {
             Self::AnimatedMorphCube => "AnimatedMorphCube/glTF/AnimatedMorphCube.gltf",
             Self::SimpleSkin => "SimpleSkin/glTF/SimpleSkin.gltf",
             Self::InterpolationTest => "InterpolationTest/glTF/InterpolationTest.gltf",
-
-            // Standard
             Self::Box => "Box/glTF/Box.gltf",
             Self::BoxInterleaved => "BoxInterleaved/glTF/BoxInterleaved.gltf",
             Self::BoxTextured => "BoxTextured/glTF/BoxTextured.gltf",
@@ -216,16 +295,39 @@ impl GltfId {
             Self::BoxWithSpaces => "Box With Spaces/glTF/Box With Spaces.gltf",
             Self::BoxVertexColors => "BoxVertexColors/glTF/BoxVertexColors.gltf",
             Self::Cube => "Cube/glTF/Cube.gltf",
-
-            // Extension Tests
+            Self::CompareAlphaCoverage => "CompareAlphaCoverage/glTF/CompareAlphaCoverage.gltf",
+            Self::CompareAmbientOcclusion => {
+                "CompareAmbientOcclusion/glTF/CompareAmbientOcclusion.gltf"
+            }
+            Self::CompareAnisotropy => "CompareAnisotropy/glTF/CompareAnisotropy.gltf",
+            Self::CompareBaseColor => "CompareBaseColor/glTF/CompareBaseColor.gltf",
+            Self::CompareClearcoat => "CompareClearcoat/glTF/CompareClearcoat.gltf",
+            Self::CompareDispersion => "CompareDispersion/glTF/CompareDispersion.gltf",
+            Self::CompareEmissiveStrength => {
+                "CompareEmissiveStrength/glTF/CompareEmissiveStrength.gltf"
+            }
+            Self::CompareIor => "CompareIor/glTF/CompareIor.gltf",
+            Self::CompareIridescence => "CompareIridescence/glTF/CompareIridescence.gltf",
+            Self::CompareMetallic => "CompareMetallic/glTF/CompareMetallic.gltf",
+            Self::CompareNormal => "CompareNormal/glTF/CompareNormal.gltf",
+            Self::CompareRoughness => "CompareRoughness/glTF/CompareRoughness.gltf",
+            Self::CompareSheen => "CompareSheen/glTF/CompareSheen.gltf",
+            Self::CompareSpecular => "CompareSpecular/glTF/CompareSpecular.gltf",
+            Self::CompareTransmission => "CompareTransmission/glTF/CompareTransmission.gltf",
+            Self::CompareVolume => "CompareVolume/glTF/CompareVolume.gltf",
+            Self::RiggedFigure => "RiggedFigure/glTF/RiggedFigure.gltf",
+            Self::RiggedSimple => "RiggedSimple/glTF/RiggedSimple.gltf",
+            Self::DamagedHelmet => "DamagedHelmet/glTF/DamagedHelmet.gltf",
             Self::EnvironmentTest => "EnvironmentTest/glTF/EnvironmentTest.gltf",
             Self::EnvironmentIblTest => "EnvironmentTest/glTF-IBL/EnvironmentTest.gltf",
+            Self::EmissiveStrength => "EmissiveStrengthTest/glTF/EmissiveStrengthTest.gltf",
         }
     }
 
     pub fn label(&self) -> &'static str {
         match self {
-            // feature tests
+            Self::BrainStem => "Brain stem",
+            Self::Fox => "Fox",
             Self::AlphaBlendMode => "Alpha blend mode",
             Self::BoomBoxAxes => "Boom box w/ axes",
             Self::MetalRoughSpheres => "Metal rough spheres",
@@ -241,9 +343,9 @@ impl GltfId {
             Self::TextureCoordinate => "Texture coordinates",
             Self::TextureLinearInterpolation => "Linear texture interpolation",
             Self::TextureSettings => "Texture settings",
+            Self::TextureTransformTest => "Texture transform test",
+            Self::TextureTransformMultiTest => "Texture transform multi test",
             Self::VertexColor => "Vertex colors",
-
-            // Minimal
             Self::TriangleWithoutIndices => "Triangle without indices",
             Self::Triangle => "Triangle",
             Self::SimpleSparseAccessor => "Simple Sparse Accessor",
@@ -256,8 +358,6 @@ impl GltfId {
             Self::AnimatedMorphCube => "Animated Morph Cube",
             Self::SimpleSkin => "Simple Skin",
             Self::InterpolationTest => "Interpolation Test",
-
-            // Standard
             Self::Box => "Box",
             Self::BoxInterleaved => "BoxInterleaved",
             Self::BoxTextured => "BoxTextured",
@@ -265,10 +365,28 @@ impl GltfId {
             Self::BoxWithSpaces => "Box with spaces",
             Self::BoxVertexColors => "Box vertex colors",
             Self::Cube => "Cube",
-
-            // Extension Tests
+            Self::CompareAlphaCoverage => "Alpha coverage compare",
+            Self::CompareAmbientOcclusion => "Ambient occlusion compare",
+            Self::CompareAnisotropy => "Anisotropy compare",
+            Self::CompareBaseColor => "Base color compare",
+            Self::CompareClearcoat => "Clearcoat compare",
+            Self::CompareDispersion => "Dispersion compare",
+            Self::CompareEmissiveStrength => "Emissive strength compare",
+            Self::CompareIor => "IOR compare",
+            Self::CompareIridescence => "Iridescence compare",
+            Self::CompareMetallic => "Metallic compare",
+            Self::CompareNormal => "Normal compare",
+            Self::CompareRoughness => "Roughness compare",
+            Self::CompareSheen => "Sheen compare",
+            Self::CompareSpecular => "Specular compare",
+            Self::CompareTransmission => "Transmission compare",
+            Self::CompareVolume => "Volume compare",
+            Self::RiggedFigure => "Rigged figure",
+            Self::RiggedSimple => "Rigged simple",
+            Self::DamagedHelmet => "Damaged helmet",
             Self::EnvironmentTest => "Environment test",
             Self::EnvironmentIblTest => "Environment ibl test",
+            Self::EmissiveStrength => "Emissive strength",
         }
     }
 }

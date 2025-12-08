@@ -1,6 +1,14 @@
 [general]
 # Directories to search for templates, relative to the crate root.
-dirs = ["src/shaders/wgsl"]
+dirs = [
+    "src/render_passes/shared/shader",
+    "src/render_passes/geometry/shader",
+    "src/render_passes/light_culling/shader",
+    "src/render_passes/material_opaque/shader",
+    "src/render_passes/material_transparent/shader",
+    "src/render_passes/display/shader",
+    "src/render_passes/composite/shader",
+]
 # Unless you add a `-` in a block, whitespace characters won't be trimmed.
 whitespace = "preserve"
 

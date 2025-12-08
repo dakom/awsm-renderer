@@ -1,3 +1,4 @@
+#![allow(unused_imports, dead_code)]
 pub mod buttons;
 pub mod checkbox;
 pub mod dropdown;

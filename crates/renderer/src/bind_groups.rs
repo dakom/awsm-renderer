@@ -1,91 +1,286 @@
-pub mod material_textures;
-pub mod uniform_storage;
+use std::collections::HashSet;
 
-use awsm_renderer_core::{
-    bind_groups::{
-        BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    },
-    error::AwsmCoreError,
-    renderer::AwsmRendererWebGpu,
-};
-use material_textures::{MaterialBindGroupLayoutKey, MaterialTextureBindGroups};
+use awsm_renderer_core::renderer::AwsmRendererWebGpu;
+use strum::{EnumIter, IntoEnumIterator};
 use thiserror::Error;
-use uniform_storage::UniformStorageBindGroups;
 
-use crate::{bind_groups::material_textures::MaterialBindGroupKey, materials::MaterialKey};
+use crate::{
+    anti_alias::AntiAliasing, bind_group_layout::BindGroupLayouts, camera::CameraBuffer,
+    environment::Environment, lights::Lights, materials::Materials, mesh::Meshes,
+    render_passes::RenderPasses, render_textures::RenderTextureViews, textures::Textures,
+    transforms::Transforms,
+};
 
-pub struct BindGroups {
-    pub uniform_storages: UniformStorageBindGroups,
-    pub material_textures: MaterialTextureBindGroups,
+// There are no cache keys for bind groups, they are created on demand
+// Since changes to storages, uniforms, and textures are the reason to recreate bind groups,
+// and these may be shared across multiple bind groups, we use a "create list" to track which bind groups need to be recreated
+//
+// Specifically, typical causes of change are:
+// 1. A change in raw buffer size which causes a reallocation
+// 2. A change in texture view size which causes new textures to be created
+//
+// That conscpicuously does not include changes to material textures
+// since those are looked up via the material key and do not require a bind group recreation
+pub struct BindGroupRecreateContext<'a> {
+    pub gpu: &'a AwsmRendererWebGpu,
+    pub render_texture_views: &'a RenderTextureViews,
+    pub textures: &'a Textures,
+    pub materials: &'a Materials,
+    pub bind_group_layouts: &'a BindGroupLayouts,
+    pub meshes: &'a Meshes,
+    pub camera: &'a CameraBuffer,
+    pub environment: &'a Environment,
+    pub lights: &'a Lights,
+    pub transforms: &'a Transforms,
+    pub anti_aliasing: &'a AntiAliasing,
 }
 
-impl BindGroups {
-    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        let buffers = UniformStorageBindGroups::new(gpu)?;
-        let materials = MaterialTextureBindGroups::new();
+#[derive(Hash, Debug, Clone, PartialEq, Eq, EnumIter)]
+pub enum BindGroupCreate {
+    CameraInitOnly,
+    LightsResize,
+    LightsInfoCreate,
+    BrdfLutTextures,
+    IblTextures,
+    EnvironmentSkyboxCreate,
+    TransformsResize,
+    TransformNormalsResize,
+    GeometryMorphTargetWeightsResize,
+    GeometryMorphTargetValuesResize,
+    MaterialMorphTargetWeightsResize,
+    MaterialMorphTargetValuesResize,
+    SkinJointMatricesResize,
+    SkinJointIndexAndWeightsResize,
+    MeshMetaResize,
+    MaterialMeshMetaResize,
+    MeshAttributeDataResize,
+    MeshAttributeIndexResize,
+    PbrMaterialResize,
+    TextureViewResize,
+    TexturePool,
+    TextureTransformsResize,
+    AntiAliasingChange,
+}
 
-        Ok(Self {
-            uniform_storages: buffers,
-            material_textures: materials,
-        })
+pub struct BindGroups {
+    create_list: HashSet<BindGroupCreate>,
+}
+
+impl Default for BindGroups {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-pub(super) fn gpu_create_layout(
-    gpu: &AwsmRendererWebGpu,
-    label: &'static str,
-    entries: Vec<BindGroupLayoutEntry>,
-) -> Result<web_sys::GpuBindGroupLayout> {
-    gpu.create_bind_group_layout(
-        &BindGroupLayoutDescriptor::new(Some(label))
-            .with_entries(entries)
-            .into(),
-    )
-    .map_err(|err| AwsmBindGroupError::Layout {
-        bind_group: label,
-        err,
-    })
-}
+impl BindGroups {
+    pub fn new() -> Self {
+        Self {
+            // startup means all bind groups are "re"created
+            create_list: BindGroupCreate::iter().collect::<HashSet<_>>(),
+        }
+    }
 
-pub(super) fn gpu_create_bind_group(
-    gpu: &AwsmRendererWebGpu,
-    label: &'static str,
-    layout: &web_sys::GpuBindGroupLayout,
-    entries: Vec<BindGroupEntry>,
-) -> web_sys::GpuBindGroup {
-    gpu.create_bind_group(&BindGroupDescriptor::new(layout, Some(label), entries).into())
-}
+    pub fn mark_create(&mut self, create: BindGroupCreate) {
+        self.create_list.insert(create);
+    }
 
-pub(super) type Result<T> = std::result::Result<T, AwsmBindGroupError>;
+    pub fn recreate(
+        &mut self,
+        ctx: BindGroupRecreateContext<'_>,
+        render_passes: &mut RenderPasses,
+    ) -> crate::error::Result<()> {
+        if self.create_list.is_empty() {
+            return Ok(());
+        }
+
+        #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
+        enum FunctionToCall {
+            GeometryCamera,
+            GeometryTransformMaterials,
+            GeometryMeta,
+            GeometryAnimation,
+            OpaqueMain,
+            OpaqueLights,
+            OpaqueTextures,
+            TransparentMain,
+            TransparentMeshMaterial,
+            TransparentLights,
+            TransparentTextures,
+            LightCulling,
+            Display,
+        }
+
+        let mut functions_to_call = HashSet::new();
+
+        for create in self.create_list.drain() {
+            match create {
+                BindGroupCreate::CameraInitOnly => {
+                    functions_to_call.insert(FunctionToCall::GeometryCamera);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                }
+                BindGroupCreate::LightsInfoCreate => {
+                    functions_to_call.insert(FunctionToCall::OpaqueLights);
+                    functions_to_call.insert(FunctionToCall::TransparentLights);
+                }
+                BindGroupCreate::LightsResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueLights);
+                    functions_to_call.insert(FunctionToCall::TransparentLights);
+                }
+                BindGroupCreate::TransformsResize => {
+                    functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
+                }
+                BindGroupCreate::PbrMaterialResize => {
+                    functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
+                    functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
+                }
+                BindGroupCreate::MeshMetaResize => {
+                    functions_to_call.insert(FunctionToCall::GeometryMeta);
+                    functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
+                }
+                BindGroupCreate::GeometryMorphTargetWeightsResize
+                | BindGroupCreate::GeometryMorphTargetValuesResize
+                | BindGroupCreate::SkinJointMatricesResize
+                | BindGroupCreate::SkinJointIndexAndWeightsResize => {
+                    functions_to_call.insert(FunctionToCall::GeometryAnimation);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                }
+                BindGroupCreate::TextureViewResize => {
+                    functions_to_call.insert(FunctionToCall::LightCulling);
+                    functions_to_call.insert(FunctionToCall::Display);
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                }
+                BindGroupCreate::TexturePool => {
+                    functions_to_call.insert(FunctionToCall::OpaqueTextures);
+                    functions_to_call.insert(FunctionToCall::TransparentTextures);
+                }
+                BindGroupCreate::TextureTransformsResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueTextures);
+                    functions_to_call.insert(FunctionToCall::TransparentTextures);
+                }
+                BindGroupCreate::BrdfLutTextures => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                }
+                BindGroupCreate::IblTextures => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                }
+                BindGroupCreate::EnvironmentSkyboxCreate => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                }
+                BindGroupCreate::TransformNormalsResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                }
+                BindGroupCreate::MaterialMorphTargetWeightsResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                }
+                BindGroupCreate::MaterialMorphTargetValuesResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                }
+                BindGroupCreate::MaterialMeshMetaResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                }
+                BindGroupCreate::MeshAttributeDataResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                }
+                BindGroupCreate::MeshAttributeIndexResize => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                }
+                BindGroupCreate::AntiAliasingChange => {
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                }
+            }
+        }
+
+        for f in functions_to_call {
+            match f {
+                FunctionToCall::GeometryCamera => {
+                    render_passes.geometry.bind_groups.camera.recreate(&ctx)?;
+                }
+                FunctionToCall::GeometryTransformMaterials => {
+                    render_passes
+                        .geometry
+                        .bind_groups
+                        .transform_materials
+                        .recreate(&ctx)?;
+                }
+                FunctionToCall::GeometryMeta => {
+                    render_passes.geometry.bind_groups.meta.recreate(&ctx)?;
+                }
+                FunctionToCall::GeometryAnimation => {
+                    render_passes
+                        .geometry
+                        .bind_groups
+                        .animation
+                        .recreate(&ctx)?;
+                }
+                FunctionToCall::OpaqueMain => {
+                    render_passes
+                        .material_opaque
+                        .bind_groups
+                        .recreate_main(&ctx)?;
+                }
+                FunctionToCall::OpaqueLights => {
+                    render_passes
+                        .material_opaque
+                        .bind_groups
+                        .recreate_lights(&ctx)?;
+                }
+                FunctionToCall::OpaqueTextures => {
+                    render_passes
+                        .material_opaque
+                        .bind_groups
+                        .recreate_texture_pool(&ctx)?;
+                }
+                FunctionToCall::TransparentMain => {
+                    render_passes
+                        .material_transparent
+                        .bind_groups
+                        .recreate_main(&ctx)?;
+                }
+                FunctionToCall::TransparentMeshMaterial => {
+                    render_passes
+                        .material_transparent
+                        .bind_groups
+                        .recreate_mesh_material(&ctx)?;
+                }
+                FunctionToCall::TransparentLights => {
+                    render_passes
+                        .material_transparent
+                        .bind_groups
+                        .recreate_lights(&ctx)?;
+                }
+                FunctionToCall::TransparentTextures => {
+                    render_passes
+                        .material_transparent
+                        .bind_groups
+                        .recreate_texture_pool(&ctx)?;
+                }
+                FunctionToCall::LightCulling => {
+                    render_passes.light_culling.bind_groups.recreate(&ctx)?;
+                }
+                FunctionToCall::Display => {
+                    render_passes.display.bind_groups.recreate(&ctx)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum AwsmBindGroupError {
-    #[error("[bind group] Error creating buffer for {label}: {err:?}")]
-    CreateBuffer {
-        label: &'static str,
-        err: AwsmCoreError,
-    },
-    #[error("[bind group] Error creating bind group layout for group {bind_group}: {err:?}")]
-    Layout {
-        bind_group: &'static str,
-        err: AwsmCoreError,
-    },
-
-    #[error("[bind group] Error writing buffer for {label}: {err:?}")]
-    WriteBuffer {
-        label: &'static str,
-        err: AwsmCoreError,
-    },
-
-    #[error("[bind group] missing material for {0:?}")]
-    MissingMaterialBindGroup(MaterialBindGroupKey),
-
-    #[error("[bind group] missing material layout for {0:?}")]
-    MissingMaterialLayout(MaterialBindGroupLayoutKey),
-
-    #[error("[bind group] missing material layout for material {0:?}")]
-    MissingMaterialLayoutForMaterial(MaterialKey),
-
-    #[error("[bind group] missing material bind group for material {0:?}")]
-    MissingMaterialBindGroupForMaterial(MaterialKey),
+    #[error("[bind group] bind group not found for {0}")]
+    NotFound(String),
 }

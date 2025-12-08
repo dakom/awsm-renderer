@@ -6,7 +6,7 @@ mod interpolate;
 mod player;
 mod sampler;
 
-pub use animations::{AnimationKey, Animations};
+pub use animations::{AnimationKey, AnimationMorphKey, Animations};
 pub use clip::AnimationClip;
 pub use data::{Animatable, AnimationData, TransformAnimation, VertexAnimation};
 pub use error::AwsmAnimationError;

@@ -2,16 +2,16 @@ use glam::{Quat, Vec3};
 
 use crate::{
     animation::{
-        AnimationClip, AnimationData, AnimationKey, AnimationPlayer, AnimationSampler,
-        TransformAnimation, VertexAnimation,
+        AnimationClip, AnimationData, AnimationKey, AnimationMorphKey, AnimationPlayer,
+        AnimationSampler, TransformAnimation, VertexAnimation,
     },
     buffer::helpers::u8_to_f32_vec,
     gltf::{
         buffers::accessor::accessor_to_bytes,
         error::{AwsmGltfError, Result},
     },
-    mesh::MorphKey,
-    transform::TransformKey,
+    mesh::morphs::{GeometryMorphKey, MaterialMorphKey},
+    transforms::TransformKey,
     AwsmRenderer,
 };
 
@@ -31,51 +31,68 @@ impl AwsmRenderer {
             .cloned()
             .unwrap();
 
+        // Load all animations from the GLTF file
+        // TODO: Add proper API for selecting/controlling which animations to play
+        // Heuristic: Only load the first animation per property per node
+        // This prevents multiple conflicting animations from playing simultaneously
+        let mut has_translation = false;
+        let mut has_rotation = false;
+        let mut has_scale = false;
+
         for gltf_animation in ctx.data.doc.animations() {
             for channel in gltf_animation.channels() {
                 if channel.target().node().index() == gltf_node.index() {
                     match channel.target().property() {
                         gltf::animation::Property::Translation => {
-                            self.populate_gltf_animation_transform_translation(
-                                ctx,
-                                gltf_animation
-                                    .samplers()
-                                    .nth(channel.sampler().index())
-                                    .ok_or(AwsmGltfError::MissingAnimationSampler {
-                                        animation_index: gltf_animation.index(),
-                                        channel_index: channel.index(),
-                                        sampler_index: channel.sampler().index(),
-                                    })?,
-                                transform_key,
-                            )?;
+                            if !has_translation {
+                                self.populate_gltf_animation_transform_translation(
+                                    ctx,
+                                    gltf_animation
+                                        .samplers()
+                                        .nth(channel.sampler().index())
+                                        .ok_or(AwsmGltfError::MissingAnimationSampler {
+                                            animation_index: gltf_animation.index(),
+                                            channel_index: channel.index(),
+                                            sampler_index: channel.sampler().index(),
+                                        })?,
+                                    transform_key,
+                                )?;
+                                has_translation = true;
+                            }
                         }
                         gltf::animation::Property::Rotation => {
-                            self.populate_gltf_animation_transform_rotation(
-                                ctx,
-                                gltf_animation
-                                    .samplers()
-                                    .nth(channel.sampler().index())
-                                    .ok_or(AwsmGltfError::MissingAnimationSampler {
-                                        animation_index: gltf_animation.index(),
-                                        channel_index: channel.index(),
-                                        sampler_index: channel.sampler().index(),
-                                    })?,
-                                transform_key,
-                            )?;
+                            if !has_rotation {
+                                self.populate_gltf_animation_transform_rotation(
+                                    ctx,
+                                    gltf_animation
+                                        .samplers()
+                                        .nth(channel.sampler().index())
+                                        .ok_or(AwsmGltfError::MissingAnimationSampler {
+                                            animation_index: gltf_animation.index(),
+                                            channel_index: channel.index(),
+                                            sampler_index: channel.sampler().index(),
+                                        })?,
+                                    transform_key,
+                                )?;
+                                has_rotation = true;
+                            }
                         }
                         gltf::animation::Property::Scale => {
-                            self.populate_gltf_animation_transform_scale(
-                                ctx,
-                                gltf_animation
-                                    .samplers()
-                                    .nth(channel.sampler().index())
-                                    .ok_or(AwsmGltfError::MissingAnimationSampler {
-                                        animation_index: gltf_animation.index(),
-                                        channel_index: channel.index(),
-                                        sampler_index: channel.sampler().index(),
-                                    })?,
-                                transform_key,
-                            )?;
+                            if !has_scale {
+                                self.populate_gltf_animation_transform_scale(
+                                    ctx,
+                                    gltf_animation
+                                        .samplers()
+                                        .nth(channel.sampler().index())
+                                        .ok_or(AwsmGltfError::MissingAnimationSampler {
+                                            animation_index: gltf_animation.index(),
+                                            channel_index: channel.index(),
+                                            sampler_index: channel.sampler().index(),
+                                        })?,
+                                    transform_key,
+                                )?;
+                                has_scale = true;
+                            }
                         }
                         gltf::animation::Property::MorphTargetWeights => {
                             // morph targets will be dealt with later when we populate the mesh
@@ -97,48 +114,83 @@ impl AwsmRenderer {
         &'a mut self,
         ctx: &'c GltfPopulateContext,
         gltf_sampler: gltf::animation::Sampler<'b>,
-        morph_key: MorphKey,
-    ) -> Result<AnimationKey> {
-        let morph_info = &self.meshes.morphs.get_info(morph_key)?;
+        geometry_morph_key: Option<GeometryMorphKey>,
+        material_morph_key: Option<MaterialMorphKey>,
+    ) -> Result<Vec<AnimationKey>> {
+        let mut morph_keys = Vec::new();
+        let mut animation_keys = Vec::new();
 
-        let times = sampler_timestamps(ctx, &gltf_sampler)?;
-        let duration = (times.last().copied().unwrap_or(0.0) - times[0]) as f64;
-        let values = accessor_to_bytes(&gltf_sampler.output(), &ctx.data.buffers.raw)?;
-        let values = u8_to_f32_vec(&values);
+        if let Some(morph_key) = geometry_morph_key {
+            morph_keys.push(morph_key.into());
+        }
 
-        let values = values
-            .chunks(morph_info.targets_len)
-            .map(|chunk| AnimationData::Vertex(VertexAnimation::new(chunk.to_vec())))
-            .collect();
+        if let Some(morph_key) = material_morph_key {
+            morph_keys.push(morph_key.into());
+        }
 
-        let sampler = match gltf_sampler.interpolation() {
-            gltf::animation::Interpolation::Linear => AnimationSampler::Linear { times, values },
-            gltf::animation::Interpolation::Step => AnimationSampler::Step { times, values },
-            gltf::animation::Interpolation::CubicSpline => {
-                let mut in_tangents = Vec::with_capacity(values.len() / 3);
-                let mut spline_vertices = Vec::with_capacity(values.len() / 3);
-                let mut out_tangents = Vec::with_capacity(values.len() / 3);
-
-                for x in values.chunks_exact(3) {
-                    in_tangents.push(x[0].clone());
-                    spline_vertices.push(x[1].clone());
-                    out_tangents.push(x[2].clone());
+        for morph_key in morph_keys {
+            let targets_len = match morph_key {
+                AnimationMorphKey::Geometry(morph_key) => {
+                    self.meshes
+                        .morphs
+                        .geometry
+                        .get_info(morph_key)
+                        .map_err(|_| AwsmGltfError::MissingMorphForAnimation)?
+                        .targets_len
                 }
-
-                AnimationSampler::CubicSpline {
-                    times,
-                    in_tangents,
-                    values: spline_vertices,
-                    out_tangents,
+                AnimationMorphKey::Material(morph_key) => {
+                    self.meshes
+                        .morphs
+                        .material
+                        .get_info(morph_key)
+                        .map_err(|_| AwsmGltfError::MissingMorphForAnimation)?
+                        .targets_len
                 }
-            }
-        };
+            };
 
-        let clip = AnimationClip::new(Some("morph".to_string()), duration, sampler);
+            let times = sampler_timestamps(ctx, &gltf_sampler)?;
+            let duration = (times.last().copied().unwrap_or(0.0) - times[0]) as f64;
+            let values = accessor_to_bytes(&gltf_sampler.output(), &ctx.data.buffers.raw)?;
+            let values = u8_to_f32_vec(&values);
 
-        let player = AnimationPlayer::new(clip);
+            let values = values
+                .chunks(targets_len)
+                .map(|chunk| AnimationData::Vertex(VertexAnimation::new(chunk.to_vec())))
+                .collect();
 
-        Ok(self.animations.insert_morph(player, morph_key))
+            let sampler = match gltf_sampler.interpolation() {
+                gltf::animation::Interpolation::Linear => {
+                    AnimationSampler::Linear { times, values }
+                }
+                gltf::animation::Interpolation::Step => AnimationSampler::Step { times, values },
+                gltf::animation::Interpolation::CubicSpline => {
+                    let mut in_tangents = Vec::with_capacity(values.len() / 3);
+                    let mut spline_vertices = Vec::with_capacity(values.len() / 3);
+                    let mut out_tangents = Vec::with_capacity(values.len() / 3);
+
+                    for x in values.chunks_exact(3) {
+                        in_tangents.push(x[0].clone());
+                        spline_vertices.push(x[1].clone());
+                        out_tangents.push(x[2].clone());
+                    }
+
+                    AnimationSampler::CubicSpline {
+                        times,
+                        in_tangents,
+                        values: spline_vertices,
+                        out_tangents,
+                    }
+                }
+            };
+
+            let clip = AnimationClip::new(Some("morph".to_string()), duration, sampler);
+
+            let player = AnimationPlayer::new(clip);
+
+            animation_keys.push(self.animations.insert_morph(player, morph_key));
+        }
+
+        Ok(animation_keys)
     }
 
     fn populate_gltf_animation_transform_translation<'a, 'b: 'a, 'c: 'a>(

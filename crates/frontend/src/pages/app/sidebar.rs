@@ -1,15 +1,20 @@
 mod camera;
 mod gltf;
+mod lighting;
 pub mod material;
 mod post_processing;
+mod textures;
 
 use camera::SidebarCamera;
 use gltf::SidebarGltf;
 use material::SidebarMaterial;
 
 use crate::{
-    models::collections::{GltfId, GLTF_SETS},
-    pages::app::sidebar::post_processing::SidebarPostProcessing,
+    models::collections::GltfId,
+    pages::app::sidebar::{
+        lighting::SidebarLighting, post_processing::SidebarPostProcessing,
+        textures::SidebarTextures,
+    },
     prelude::*,
 };
 
@@ -28,6 +33,7 @@ pub enum SidebarSection {
     Lighting,
     PostProcessing,
     Camera,
+    Textures,
 }
 
 impl AppSidebar {
@@ -39,8 +45,6 @@ impl AppSidebar {
     }
 
     pub fn render(self: &Arc<Self>) -> Dom {
-        let state = self;
-
         static SIDEBAR: LazyLock<String> = LazyLock::new(|| {
             class! {
 
@@ -59,6 +63,7 @@ impl AppSidebar {
                 self.render_section(SidebarSection::Lighting),
                 self.render_section(SidebarSection::PostProcessing),
                 self.render_section(SidebarSection::Camera),
+                self.render_section(SidebarSection::Textures),
             ])
         })
     }
@@ -82,12 +87,10 @@ impl AppSidebar {
                                         .class([FontSize::Lg.class(), ColorText::SidebarHeader.class()])
                                         .text("TODO")
                                     }),
-                                    SidebarSection::Lighting => html!("div", {
-                                        .class([FontSize::Lg.class(), ColorText::SidebarHeader.class()])
-                                        .text("TODO")
-                                    }),
+                                    SidebarSection::Lighting =>  SidebarLighting::new(state.ctx.clone()).render(),
                                     SidebarSection::PostProcessing => SidebarPostProcessing::new(state.ctx.clone()).render(),
                                     SidebarSection::Camera => SidebarCamera::new(state.ctx.clone()).render(),
+                                    SidebarSection::Textures => SidebarTextures::new(state.ctx.clone()).render(),
                                 })
                             }))
                         } else {
@@ -188,6 +191,34 @@ impl AppSidebar {
                                     }),
                                 ]
                             },
+                            SidebarSection::Textures => {
+                                vec![
+                                    svg!("rect", {
+                                        .attrs!{
+                                            "x": "2", "y": "2", "width": "8", "height": "8",
+                                            "fill": "currentColor"
+                                        }
+                                    }),
+                                    svg!("rect", {
+                                        .attrs!{
+                                            "x": "10", "y": "2", "width": "8", "height": "8",
+                                            "fill": "none", "stroke": "currentColor", "stroke-width": "1"
+                                        }
+                                    }),
+                                    svg!("rect", {
+                                        .attrs!{
+                                            "x": "2", "y": "10", "width": "8", "height": "8",
+                                            "fill": "none", "stroke": "currentColor", "stroke-width": "1"
+                                        }
+                                    }),
+                                    svg!("rect", {
+                                        .attrs!{
+                                            "x": "10", "y": "10", "width": "8", "height": "8",
+                                            "fill": "currentColor"
+                                        }
+                                    }),
+                                ]
+                            },
                         }
                     )
                 })
@@ -201,6 +232,7 @@ impl AppSidebar {
                         SidebarSection::Lighting => "Lighting",
                         SidebarSection::PostProcessing => "Post Processing",
                         SidebarSection::Camera => "Camera",
+                        SidebarSection::Textures => "Textures",
                     })
                 })
             )

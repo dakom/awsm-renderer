@@ -1,6 +1,5 @@
 use crate::{
-    models::collections::{GltfId, GLTF_SETS},
-    pages::app::{context::AppContext, scene::camera::CameraId, sidebar::current_model_signal},
+    pages::app::{context::AppContext, scene::camera::CameraId},
     prelude::*,
 };
 
