@@ -1,41 +1,25 @@
 # Indexed Data Optimization Plan
 
+## Phase 0 Status: ✅ COMPLETE
+
+**Joints/Weights have been removed from the custom attributes system.**
+- No longer stored as `MeshBufferCustomVertexAttributeInfo` variants
+- Filtered out during glTF loading (mesh.rs:70-77)
+- Only stored in skin storage buffers
+- **Memory saved: ~320 KB per 10K vertex skinned mesh**
+
 ## Current State Analysis
-
-### Critical Finding: Unnecessary Data Duplication
-
-**Joints and Weights are stored TWICE:**
-
-1. **In Custom Attributes** (`attributes.rs:200-213` → `mesh.rs:129-138`)
-   - Format: Indexed (one per original vertex)
-   - Storage: ~320 KB for 10K vertices
-   - **Usage: NEVER USED** ❌
-
-2. **In Skin Storage Buffer** (`skin.rs:17-116`)
-   - Format: Exploded (one per triangle corner)
-   - Storage: ~1.7 MB for 54K corners
-   - **Usage: Used by geometry pass** ✓
-
-**This is completely unnecessary!** The custom attribute version is never accessed by any shader. We should:
-1. Stop storing Joints/Weights as custom attributes
-2. Keep ONLY the skin storage buffer (and convert it to indexed format)
-
-**Memory savings from eliminating duplication:**
-- Current: 320 KB (attributes) + 1.7 MB (storage) = **2.02 MB**
-- After removing attributes: 1.7 MB → **1.68 MB saved immediately**
-- After indexing storage: 1.7 MB → 320 KB → **1.38 MB additional savings**
-- **Total savings: 1.68 MB + 1.38 MB = 3.06 MB (85% reduction)**
 
 ### What's Exploded (Duplicated per Triangle Corner)
 
-1. **Visibility Geometry Vertices** (`visibility.rs:38-171`)
+1. **Visibility Geometry Vertices** (`visibility.rs`)
    - **STATUS: NECESSARILY EXPLODED** ✓
    - Contains: Position, Normal, Tangent, **Triangle Index**, **Barycentric Coords**
    - **WHY NECESSARY**: Triangle index and barycentric coordinates are unique per corner and cannot be shared
    - Each vertex: 52 bytes (pos:12 + tri_idx:4 + bary:8 + norm:12 + tang:16)
    - Used by: Geometry pass → visibility buffer → material compute pass
 
-2. **Morphs** (`morph.rs:31-204`)
+2. **Morphs** (`morph.rs`) - **TARGET FOR PHASE 2**
    - **STATUS: UNNECESSARILY EXPLODED** ❌
    - Contains: Position deltas, Normal deltas, Tangent deltas (per morph target)
    - **WHY UNNECESSARY**: These are just offsets applied to base geometry - can be indexed
@@ -43,7 +27,7 @@
    - With 4 morph targets: 160 bytes per corner → **480 bytes for a shared vertex**
    - Used by: Geometry pass compute shader
 
-3. **Skins** (`skin.rs:17-196`)
+3. **Skins** (`skin.rs`) - **TARGET FOR PHASE 1**
    - **STATUS: UNNECESSARILY EXPLODED** ❌
    - Contains: Joint indices (4xu32) + Joint weights (4xf32)
    - **WHY UNNECESSARY**: These define how a vertex is influenced by bones - can be indexed
@@ -53,15 +37,15 @@
 
 ### What's Already Indexed (Kept Compact)
 
-1. **Transparency Geometry Vertices** (`transparency.rs:31-164`)
+1. **Transparency Geometry Vertices** (`transparency.rs`)
    - **STATUS: CORRECTLY INDEXED** ✓
    - Contains: Position, Normal, Tangent (NOT exploded)
    - Uses original index buffer for vertex sharing
    - Used by: Transparent fragment shader
 
-2. **Custom Attributes** (`attributes.rs:15-92`, `mesh.rs:125-138`)
+2. **Custom Attributes** (`attributes.rs`, `mesh.rs`)
    - **STATUS: CORRECTLY INDEXED** ✓
-   - Contains: UVs, Colors, Joints, Weights
+   - Contains: UVs, Colors
    - Stored per original vertex, looked up via indices in shaders
    - Used by: Material compute pass (opaque) and material fragment shader (transparent)
 
@@ -74,24 +58,16 @@
 - 4 morph targets (facial animation)
 - 1 skin set (body skinning)
 
-**Current State:**
+**Current State (Phase 0 Complete):**
 - Morphs (storage): 54,000 corners × 4 targets × 40 bytes = **8,640,000 bytes (8.6 MB)**
 - Skins (storage): 54,000 corners × 1 set × 32 bytes = **1,728,000 bytes (1.7 MB)**
-- Skins (attributes - UNUSED): 10,000 vertices × 1 set × 32 bytes = **320,000 bytes (0.3 MB)**
-- **Total: 10.64 MB**
-
-**After Phase 0 (Remove Duplicate Attributes):**
-- Morphs (storage): 8.6 MB (unchanged)
-- Skins (storage): 1.7 MB (unchanged)
-- Skins (attributes): **0 bytes (removed)** ✓
-- **Total: 10.3 MB**
-- **Savings: 0.34 MB from duplication removal**
+- **Total: 10.3 MB** (was 10.64 MB before Phase 0)
 
 **After Phase 1 (Index Skins):**
 - Morphs (storage): 8.6 MB (unchanged)
 - Skins (storage): 10,000 vertices × 1 set × 32 bytes = **320,000 bytes (0.3 MB)** ✓
 - **Total: 8.9 MB**
-- **Additional savings: 1.38 MB from skin indexing**
+- **Savings: 1.4 MB from skin indexing**
 
 **After Phase 2 (Index Morphs):**
 - Morphs (storage): 10,000 vertices × 4 targets × 40 bytes = **1,600,000 bytes (1.6 MB)** ✓
@@ -99,172 +75,22 @@
 - **Total: 1.9 MB**
 - **Additional savings: 7.0 MB from morph indexing**
 
-**Total Cumulative Savings:**
-- Phase 0: 0.34 MB (3.2% reduction) - **IMMEDIATE, ZERO RISK**
-- Phases 0+1: 1.72 MB (16.2% reduction)
-- Phases 0+1+2: 8.74 MB (82.1% reduction)
+**Total Savings from All Phases:**
+- Phase 0 (complete): 0.34 MB saved ✅
+- Phase 1 (pending): 1.4 MB additional
+- Phase 2 (pending): 7.0 MB additional
+- **Total: 8.74 MB (82.1% reduction from original 10.64 MB)**
 
-**Bandwidth impact:**
-- Currently reading: 10.64 MB per frame for animated character
-- After all phases: 1.9 MB per frame
-- **~5.6x less VRAM bandwidth consumed**
+**Bandwidth impact after all phases:**
+- Original: 10.64 MB per frame for animated character
+- Current (Phase 0 done): 10.3 MB per frame
+- After Phase 1: 8.9 MB per frame
+- After Phase 2: 1.9 MB per frame
+- **Final: ~5.6x less VRAM bandwidth consumed**
 
 ## Implementation Plan
 
-### Phase 0: Remove Joints/Weights from Custom Attributes System
-
-**Priority: CRITICAL** - Free memory savings with zero risk, must do first
-
-**Architectural Decision:** Joints/Weights should NOT be "custom attributes" at all. They are skinning data, not vertex attributes. The mesh system should have NO knowledge of them - they should ONLY exist in the gltf→skin pipeline.
-
-**Benefits:**
-- Enforces clean separation: skins ≠ vertex attributes
-- Prevents custom (non-glTF) meshes from accidentally adding them
-- Clearer mental model
-- Less code to maintain
-
-#### 0.1 Remove Joints/Weights from Enum
-
-**File: `crates/renderer/src/mesh/buffer_info.rs`**
-
-**DELETE** `Joints` and `Weights` from `MeshBufferCustomVertexAttributeInfo` enum entirely:
-
-```rust
-pub enum MeshBufferCustomVertexAttributeInfo {
-    Colors { ... },
-    TexCoords { ... },
-    // DELETE THESE VARIANTS COMPLETELY:
-    // Joints { data_size: usize, component_len: usize, index: u32 },
-    // Weights { data_size: usize, component_len: usize, index: u32 },
-}
-```
-
-**Impact:** This will cause compile errors anywhere that references these variants - that's GOOD, we want to find and fix those references.
-
-#### 0.2 Remove Joints/Weights Conversion in glTF Loader
-
-**File: `crates/renderer/src/gltf/buffers/attributes.rs`**
-
-**DELETE** the conversion cases (lines 200-213):
-
-```rust
-// DELETE ENTIRELY:
-Semantic::Joints(index) => {
-    MeshBufferVertexAttributeInfo::Custom(MeshBufferCustomVertexAttributeInfo::Joints {
-        data_size: accessor.data_type().size(),
-        component_len: accessor.dimensions().multiplicity() as usize,
-        index: *index,
-    })
-}
-Semantic::Weights(index) => {
-    MeshBufferVertexAttributeInfo::Custom(MeshBufferCustomVertexAttributeInfo::Weights {
-        data_size: accessor.data_type().size(),
-        component_len: accessor.dimensions().multiplicity() as usize,
-        index: *index,
-    })
-}
-```
-
-These cases should no longer exist in the match statement.
-
-#### 0.3 Filter Joints/Weights Before Processing
-
-**File: `crates/renderer/src/gltf/buffers/mesh.rs`**
-
-**CHANGE** line 68-69 to filter out Joints/Weights before they enter the attribute system:
-
-```rust
-// BEFORE:
-let mut gltf_attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> =
-    primitive.attributes().collect();
-
-// AFTER:
-let mut gltf_attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> =
-    primitive.attributes()
-        .filter(|(semantic, _)| {
-            // Joints and Weights are NOT vertex attributes - they're skinning data
-            // Handled separately by convert_skin(), never enter the attribute system
-            !matches!(semantic, gltf::Semantic::Joints(_) | gltf::Semantic::Weights(_))
-        })
-        .collect();
-```
-
-**Add comment above this code:**
-```rust
-// Step 1: Load all GLTF attributes EXCEPT Joints/Weights
-// Joints and Weights are NOT vertex attributes - they are skinning data
-// and are handled separately by the skin system (see convert_skin() below)
-```
-
-#### 0.4 Fix Any Compile Errors
-
-After removing the enum variants, the compiler will show errors for any code that references them. Expected places:
-
-1. **Match statements** - will be incomplete without Joints/Weights cases
-   - Fix: Remove those match arms (they were never used anyway)
-
-2. **Pattern matching** - code checking for Joints/Weights
-   - Fix: Remove those checks (the data never flows there anymore)
-
-3. **Documentation/Comments** - mentions of Joints/Weights as custom attributes
-   - Fix: Update docs to clarify skins are separate from vertex attributes
-
-**Find all references:**
-```bash
-rg "Joints|Weights" crates/renderer/src --type rust
-```
-
-Fix each one, ensuring the architectural separation is maintained.
-
-#### 0.5 Update Documentation
-
-Add/update comments to reinforce the architectural separation:
-
-**File: `crates/renderer/src/mesh/buffer_info.rs`**
-```rust
-/// Custom vertex attributes that can be attached to meshes.
-/// These are general-purpose vertex data (colors, UVs, etc.)
-///
-/// NOTE: Joints and Weights are NOT custom attributes!
-/// They are skinning data handled by the separate skin system.
-pub enum MeshBufferCustomVertexAttributeInfo {
-    // ...
-}
-```
-
-**File: `crates/renderer/src/gltf/buffers/skin.rs`**
-```rust
-/// Converts GLTF skin data into storage buffers.
-///
-/// IMPORTANT: Skinning data (Joints/Weights) is NOT stored as vertex attributes.
-/// It is stored in dedicated skin storage buffers and accessed by the geometry pass.
-/// This separation ensures:
-/// - Memory efficiency (no duplication)
-/// - Clear architecture (skins ≠ attributes)
-/// - Type safety (custom meshes can't accidentally add skin data as attributes)
-```
-
-#### 0.6 Testing
-
-**Verification:**
-- Print attribute buffer sizes before/after - should see ~320 KB reduction per 10K vertex skinned mesh
-- Visual inspection - should look identical (since custom attribute version was never used)
-- Check that skinning still works (uses skin storage buffer, unchanged)
-
-**Expected results:**
-- Memory usage decreased
-- No visual changes
-- No performance regression (might actually improve due to less data copying)
-
-**Estimated time: 2-4 hours** (including fixing compile errors and testing)
-
-**Why this is the right architectural choice:**
-- **Enforces separation of concerns**: Skinning is fundamentally different from vertex attributes
-- **Prevents misuse**: Custom mesh code can't accidentally treat skin data as attributes
-- **Clearer code**: No confusion about where skin data lives
-- **Better for future**: If you add other animation systems, they follow the same pattern
-
-### Phase 1: Skin Data Indexing
+### Phase 1: Skin Data Indexing (NEXT PRIORITY)
 
 **Priority: HIGH** - Affects all skinned meshes, simpler to implement than morphs
 
@@ -578,29 +404,30 @@ Once validated:
 
 ## Implementation Order
 
-1. **Phase 0: Remove Duplicate Attributes** (FREE MEMORY!)
-   - Filter Joints/Weights from attribute loading (2-4 hours)
-   - Test with skinned models (1 hour)
-   - **QUICK WIN: 0.34 MB saved immediately, zero risk**
+### ✅ Phase 0: Remove Duplicate Attributes - COMPLETE
+- Joints/Weights removed from custom attributes
+- 0.34 MB saved per 10K vertex skinned mesh
 
-2. **Phase 1: Index Skins** (simpler, single data type)
+### 🎯 Next Steps
+
+1. **Phase 1: Index Skins** (RECOMMENDED NEXT - simpler, single data type)
    - Implement indexed storage (1-2 days)
    - Update geometry shader (1 day)
    - Test with RecursiveSkeletons.gltf (1 day)
+   - **Expected savings: 1.4 MB per example mesh**
 
-3. **Phase 2: Index Morphs** (more complex, multiple interleaved attributes)
+2. **Phase 2: Index Morphs** (more complex, multiple interleaved attributes)
    - Implement indexed storage (2-3 days)
    - Update geometry shader (1-2 days)
    - Test with morph target models (1 day)
+   - **Expected savings: 7.0 MB per example mesh**
 
-4. **Phase 3: Optimize and Polish** (1-2 days)
+3. **Phase 3: Optimize and Polish** (1-2 days)
    - Performance benchmarking
    - Memory profiling
    - Documentation updates
 
-**Total estimated time: 0.5 + 4 + 5 + 2 = 11.5 days**
-
-**Recommendation: Do Phase 0 IMMEDIATELY** - it's a 30-minute task with guaranteed savings and no risk.
+**Remaining estimated time: 4 + 5 + 2 = 11 days**
 
 ## Risks and Mitigations
 
@@ -640,17 +467,25 @@ Once validated:
 
 ## Success Metrics
 
-### Must Have
+### Phase 0 (Complete) ✅
+- [x] Joints/Weights removed from custom attributes
+- [x] No visual changes
+- [x] Memory reduced by ~320 KB per 10K vertex skinned mesh
+- [x] Clean architectural separation maintained
+
+### Phases 1-2 (Remaining)
+
+#### Must Have
 - [ ] Visual output identical to current implementation
 - [ ] All existing glTF test files render correctly
 - [ ] No GPU errors or validation warnings
 
-### Performance Goals
-- [ ] VRAM usage reduced by >70% for skinned/morphed meshes
+#### Performance Goals
+- [ ] VRAM usage reduced by >70% for skinned/morphed meshes (from original baseline)
 - [ ] Frame time improved or equal (should not regress)
 - [ ] CPU→GPU transfer time reduced by >70%
 
-### Code Quality
+#### Code Quality
 - [ ] All code properly documented
 - [ ] No increase in shader complexity (subjective)
 - [ ] Test coverage for new code paths
