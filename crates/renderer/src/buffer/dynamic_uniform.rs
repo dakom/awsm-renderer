@@ -277,8 +277,8 @@ mod test {
         assert_eq!(buffer.byte_size, 16);
         assert_eq!(buffer.aligned_slice_size, 32);
 
-        // All slots should initially be free
-        assert_eq!(buffer.free_slots, vec![0, 1]);
+        // All slots should initially be free (reversed so slot 0 is used first)
+        assert_eq!(buffer.free_slots, vec![1, 0]);
 
         // No keys should be assigned
         assert_eq!(buffer.slot_indices.len(), 0);
@@ -292,13 +292,13 @@ mod test {
         let test_data = b"hello world 1234"; // 16 bytes
         buffer.update(key1, test_data);
 
-        // Should use the first free slot (index 1, since free_slots is [0, 1] and we pop from end)
-        assert_eq!(buffer.slot_indices.get(key1), Some(&1));
-        assert_eq!(buffer.free_slots, vec![0]);
+        // Should use the first free slot (index 0, since free_slots is [1, 0] and we pop from end)
+        assert_eq!(buffer.slot_indices.get(key1), Some(&0));
+        assert_eq!(buffer.free_slots, vec![1]);
 
         // Check that data was written correctly
         let offset = buffer.offset(key1).unwrap();
-        assert_eq!(offset, 32); // slot 1 * 32 bytes
+        assert_eq!(offset, 0); // slot 0 * 32 bytes
         assert_eq!(&buffer.raw_data[offset..offset + 16], test_data);
     }
 
