@@ -40,7 +40,7 @@ pub struct GeometryPipelines {
 static VERTEX_BUFFER_LAYOUT: LazyLock<VertexBufferLayout> = LazyLock::new(|| {
     VertexBufferLayout {
         // this is the stride across all of the attributes
-        // position (12) + triangle_index (4) + barycentric (8) + normal (12) + tangent (16) = 52 bytes
+        // position (12) + triangle_index (4) + barycentric (8) + normal (12) + tangent (16) + original_vertex_index (4) = 56 bytes
         array_stride: MeshBufferVertexInfo::VISIBILITY_GEOMETRY_BYTE_SIZE as u64,
         step_mode: None,
         attributes: vec![
@@ -73,6 +73,12 @@ static VERTEX_BUFFER_LAYOUT: LazyLock<VertexBufferLayout> = LazyLock::new(|| {
                 format: VertexFormat::Float32x4,
                 offset: 36,
                 shader_location: 4,
+            },
+            // Original vertex index (u32) at offset 52 - for indexed skin/morph access
+            VertexAttribute {
+                format: VertexFormat::Uint32,
+                offset: 52,
+                shader_location: 5,
             },
         ],
     }

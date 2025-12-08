@@ -11,7 +11,7 @@ fn apply_position_skin(input: ApplyVertexInput) -> ApplyVertexInput {
 
     let original_position = vec4<f32>(input.position, 1.0);
 
-    // Calculate base offset for this exploded vertex's skin data
+    // Calculate base offset for this vertex's skin data (indexed per original vertex)
     let base_offset = (geometry_mesh_meta.skin_index_weights_offset / 4) + input.vertex_index * skin_sets_count * floats_per_set;
 
     let matrix_offset = geometry_mesh_meta.skin_matrices_offset / 64; // mat4x4<f32> is 64 bytes
@@ -84,7 +84,7 @@ fn apply_position_skin(input: ApplyVertexInput) -> ApplyVertexInput {
 fn apply_normal_skin(input: ApplyVertexInput, normal: vec3<f32>) -> vec3<f32> {
     let skin_sets_count = geometry_mesh_meta.skin_sets_len;
 
-    // Calculate base offset for this exploded vertex's skin data
+    // Calculate base offset for this vertex's skin data (indexed per original vertex)
     let base_offset = (geometry_mesh_meta.skin_index_weights_offset / 4) + input.vertex_index * skin_sets_count * floats_per_set;
     let matrix_offset = geometry_mesh_meta.skin_matrices_offset / 64; // mat4x4<f32> is 64 bytes
 

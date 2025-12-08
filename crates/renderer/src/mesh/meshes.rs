@@ -157,8 +157,8 @@ impl Meshes {
         mesh: Mesh,
         materials: &Materials,
         transforms: &Transforms,
-        visibility_geometry_data: Option<&[u8]>, // visibility index will be auto-generated
-        transparency_geometry_data: Option<&[u8]>, // visibility index will be auto-generated
+        visibility_geometry_data: Option<&[u8]>,
+        transparency_geometry_data: Option<&[u8]>,
         attribute_data: &[u8],
         attribute_index: &[u8],
     ) -> Result<MeshKey> {
@@ -182,7 +182,7 @@ impl Meshes {
 
         let visibility_geometry_data_offset = match visibility_geometry_data {
             Some(geometry_data) => {
-                // visibility geometry - index (auto-generated)
+                // visibility geometry - index (auto-generated sequential for drawing)
                 if let Some(vertex_info) = &buffer_info.visibility_geometry_vertex {
                     let mut geometry_index = Vec::new();
                     for i in 0..vertex_info.count {

@@ -41,6 +41,8 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
     h.insert(
         GltfSetId::Todo,
         vec![
+            GltfId::BrainStem,
+            GltfId::Fox,
             GltfId::VertexColor,
             GltfId::CompareBaseColor,
             GltfId::CompareAmbientOcclusion,
@@ -155,6 +157,8 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GltfId {
+    BrainStem,
+    Fox,
     AlphaBlendMode,
     BoomBoxAxes,
     MetalRoughSpheres,
@@ -247,6 +251,8 @@ impl GltfId {
 
     pub fn filepath(&self) -> &'static str {
         match self {
+            Self::BrainStem => "BrainStem/glTF/BrainStem.gltf",
+            Self::Fox => "Fox/glTF/Fox.gltf",
             Self::AlphaBlendMode => "AlphaBlendModeTest/glTF/AlphaBlendModeTest.gltf",
             Self::BoomBoxAxes => "BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf",
             Self::MetalRoughSpheres => "MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
@@ -325,6 +331,8 @@ impl GltfId {
 
     pub fn label(&self) -> &'static str {
         match self {
+            Self::BrainStem => "Brain stem",
+            Self::Fox => "Fox",
             Self::AlphaBlendMode => "Alpha blend mode",
             Self::BoomBoxAxes => "Boom box w/ axes",
             Self::MetalRoughSpheres => "Metal rough spheres",

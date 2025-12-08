@@ -30,7 +30,8 @@ use crate::{
 /// - Barycentric (vec2<f32>): 8 bytes - unique per corner (why explosion is needed!)
 /// - Normal (vec3<f32>): 12 bytes - copied from original GLTF vertex (preserves smooth/hard edges)
 /// - Tangent (vec4<f32>): 16 bytes - copied from original GLTF vertex
-/// - Total: 52 bytes per vertex
+/// - Original Vertex Index (u32): 4 bytes - for indexed skin/morph access
+/// - Total: 56 bytes per vertex
 ///
 /// The explosion preserves GLTF's original normals:
 /// - Smooth edges: GLTF shared vertices with averaged normals → same normal copied to all 3 corners → smooth shading preserved
@@ -140,7 +141,7 @@ pub(super) fn create_visibility_vertices(
                 [0.0, 0.0, 0.0, 1.0] // Default tangent
             };
 
-            // Write vertex data: position (12) + triangle_index (4) + barycentric (8) + normal (12) + tangent (16) = 52 bytes
+            // Write vertex data: position (12) + triangle_index (4) + barycentric (8) + normal (12) + tangent (16) + original_vertex_index (4) = 56 bytes
 
             // Position (12 bytes)
             visibility_vertex_bytes.extend_from_slice(&position[0].to_le_bytes());
@@ -164,6 +165,9 @@ pub(super) fn create_visibility_vertices(
             visibility_vertex_bytes.extend_from_slice(&tangent[1].to_le_bytes());
             visibility_vertex_bytes.extend_from_slice(&tangent[2].to_le_bytes());
             visibility_vertex_bytes.extend_from_slice(&tangent[3].to_le_bytes());
+
+            // Original vertex index (4 bytes) - for indexed skin/morph access
+            visibility_vertex_bytes.extend_from_slice(&(vertex_index as u32).to_le_bytes());
         }
     }
 

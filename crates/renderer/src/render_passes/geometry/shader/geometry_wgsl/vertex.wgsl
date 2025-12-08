@@ -14,12 +14,13 @@ struct VertexInput {
     @location(2) barycentric: vec2<f32>,   // Barycentric coordinates (x, y) - z = 1.0 - x - y
     @location(3) normal: vec3<f32>,        // Model-space normal
     @location(4) tangent: vec4<f32>,       // Model-space tangent (w = handedness)
+    @location(5) original_vertex_index: u32, // Original vertex index (for indexed skin/morph access)
     {% if instancing_transforms %}
     // instance transform matrix
-    @location(5) instance_transform_row_0: vec4<f32>,
-    @location(6) instance_transform_row_1: vec4<f32>,
-    @location(7) instance_transform_row_2: vec4<f32>,
-    @location(8) instance_transform_row_3: vec4<f32>,
+    @location(6) instance_transform_row_0: vec4<f32>,
+    @location(7) instance_transform_row_1: vec4<f32>,
+    @location(8) instance_transform_row_2: vec4<f32>,
+    @location(9) instance_transform_row_3: vec4<f32>,
     {% endif %}
 };
 
@@ -36,7 +37,7 @@ fn vert_main(input: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 
     let applied = apply_vertex(ApplyVertexInput(
-        input.vertex_index,
+        input.original_vertex_index,
         input.position,
         input.normal,
         input.tangent,

@@ -162,9 +162,7 @@ pub(super) fn convert_to_mesh_buffer(
     let (geometry_morph, material_morph) = convert_morph_targets(
         primitive,
         buffers,
-        custom_attribute_index,
-        custom_attribute_index_bytes,
-        triangle_count,
+        vertex_count,
         geometry_morph_bytes,
         material_morph_bytes,
     )?;
@@ -173,9 +171,7 @@ pub(super) fn convert_to_mesh_buffer(
     let skin = convert_skin(
         primitive,
         buffers,
-        custom_attribute_index,
-        custom_attribute_index_bytes,
-        triangle_count,
+        vertex_count,
         skin_joint_index_weight_bytes,
     )?;
 

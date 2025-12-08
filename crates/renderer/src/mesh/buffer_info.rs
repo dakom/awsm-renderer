@@ -51,8 +51,9 @@ impl MeshBufferVertexInfo {
     // - barycentric coordinates (vec2<f32>), 8 bytes per vertex
     // - normals (vec3<f32>), 12 bytes per vertex
     // - tangents (vec4<f32>), 16 bytes per vertex (w = handedness)
-    // Total size per vertex = 12 + 4 + 8 + 12 + 16 = 52 bytes
-    pub const VISIBILITY_GEOMETRY_BYTE_SIZE: usize = 52;
+    // - original_vertex_index (u32), 4 bytes per vertex (for indexed skin/morph access)
+    // Total size per vertex = 12 + 4 + 8 + 12 + 16 + 4 = 56 bytes
+    pub const VISIBILITY_GEOMETRY_BYTE_SIZE: usize = 56;
 
     // positions (vec3<f32>), 12 bytes per vertex
     // normals (vec3<f32>), 12 bytes per vertex
@@ -167,11 +168,11 @@ pub struct MeshBufferTriangleDataInfo {
     pub total_size: usize,
 }
 
-/// Information about geometry morphs (positions only, exploded for visibility buffer)
+/// Information about geometry morphs (positions, normals, tangents - indexed per vertex)
 #[derive(Debug, Clone)]
 pub struct MeshBufferGeometryMorphInfo {
     pub targets_len: usize,
-    pub triangle_stride_size: usize, // Size per triangle across all targets (positions only)
+    pub vertex_stride_size: usize, // Size per vertex across all targets (position + normal + tangent)
     pub values_size: usize,
 }
 
@@ -190,14 +191,14 @@ pub struct MeshBufferMaterialMorphAttributes {
     pub tangent: bool,
 }
 
-/// Information about skin (indices and weights, exploded per-vertex)
+/// Information about skin (indices and weights, indexed per original vertex)
 #[derive(Debug, Clone)]
 pub struct MeshBufferSkinInfo {
     // 4 joint influences per set
     pub set_count: usize, // Number of skin sets (JOINTS_0/WEIGHTS_0, JOINTS_1/WEIGHTS_1, etc.)
 
     // Buffer size info
-    pub index_weights_size: usize, // Total bytes: exploded_vertices * set_count * 16 (vec4<u32>) * 2 (index and weights)
+    pub index_weights_size: usize, // Total bytes: original_vertices * set_count * 16 (vec4<u32>) * 2 (index and weights)
 }
 
 impl MeshBufferInfo {

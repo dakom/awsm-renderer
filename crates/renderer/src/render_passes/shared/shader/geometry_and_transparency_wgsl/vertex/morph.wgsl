@@ -13,7 +13,7 @@ fn apply_position_morphs(input: ApplyVertexInput) -> ApplyVertexInput {
     let floats_per_target = floats_per_position + floats_per_normal + floats_per_tangent; // 10
     let total_floats_per_vertex = target_count * floats_per_target;
 
-    // Calculate base offset for this exploded vertex's morph data
+    // Calculate base offset for this vertex's morph data (indexed per original vertex)
     // NOTE: weights buffer format is [target_count, weight0, weight1, weight2, ...]
     // So we add 1 to skip the target_count stored at index 0
     let base_weights_offset = (geometry_mesh_meta.morph_geometry_weights_offset / 4) + 1u;
@@ -67,7 +67,7 @@ fn apply_normal_morphs(input: ApplyVertexInput, normal: vec3<f32>) -> vec3<f32> 
     let floats_per_target = floats_per_position + floats_per_normal + floats_per_tangent; // 10
     let total_floats_per_vertex = target_count * floats_per_target;
 
-    // Calculate base offset for this exploded vertex's morph data
+    // Calculate base offset for this vertex's morph data (indexed per original vertex)
     // NOTE: weights buffer format is [target_count, weight0, weight1, weight2, ...]
     // So we add 1 to skip the target_count stored at index 0
     let base_weights_offset = (geometry_mesh_meta.morph_geometry_weights_offset / 4) + 1u;
@@ -124,7 +124,7 @@ fn apply_tangent_morphs(input: ApplyVertexInput, tangent: vec4<f32>) -> vec4<f32
     let floats_per_target = floats_per_position + floats_per_normal + floats_per_tangent; // 10
     let total_floats_per_vertex = target_count * floats_per_target;
 
-    // Calculate base offset for this exploded vertex's morph data
+    // Calculate base offset for this vertex's morph data (indexed per original vertex)
     // NOTE: weights buffer format is [target_count, weight0, weight1, weight2, ...]
     // So we add 1 to skip the target_count stored at index 0
     let base_weights_offset = (geometry_mesh_meta.morph_geometry_weights_offset / 4) + 1u;

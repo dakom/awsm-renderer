@@ -1,8 +1,5 @@
 # Next up
 
-- Rewrite entire pipeline to match README doc (Visiblity+)
-  - See [TODO.md](TODO.md)
-
 - get demo working again
   - fix "dev-release" mode (just base path?)
 
@@ -11,6 +8,8 @@
   - unlit as example?
 
 - More extensions (see below)
+
+- Frustum culling
 
 - Get started with light culling pass
   - research best practices

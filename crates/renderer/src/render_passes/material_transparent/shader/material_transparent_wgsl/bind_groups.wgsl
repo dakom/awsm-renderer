@@ -4,9 +4,9 @@
 @group(0) @binding(3) var<storage, read> geometry_morph_weights: array<f32>;
 @group(0) @binding(4) var<storage, read> geometry_morph_values: array<f32>;
 @group(0) @binding(5) var<storage, read> skin_joint_matrices: array<mat4x4<f32>>;
-// Joint buffer - exploded per vertex (matches morph pattern)
+// Joint buffer - indexed per original vertex (matches morph pattern)
 // We interleave indices with weights and get our index back losslessly via bitcast
-// Layout: exploded vertex 0: [joints_0, joints_1, ...], exploded vertex 1: [joints_0, joints_1, ...], etc.
+// Layout: vertex 0: [joints_0, joints_1, ...], vertex 1: [joints_0, joints_1, ...], etc.
 @group(0) @binding(6) var<storage, read> skin_joint_index_weights: array<f32>;
 @group(0) @binding(7) var<storage, read> texture_transforms: array<TextureTransform>;
 

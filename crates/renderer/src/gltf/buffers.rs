@@ -236,11 +236,11 @@ pub struct MeshBufferVertexAttributeInfosWithOffset {
     pub offset: usize,
 }
 
-/// Information about geometry morphs (positions only, exploded for visibility buffer)
+/// Information about geometry morphs (positions, normals, tangents - indexed per vertex)
 #[derive(Debug, Clone)]
 pub struct MeshBufferGeometryMorphInfoWithOffset {
     pub targets_len: usize,
-    pub triangle_stride_size: usize, // Size per triangle across all targets (positions only)
+    pub vertex_stride_size: usize, // Size per vertex across all targets (position + normal + tangent)
     pub values_size: usize,
     pub values_offset: usize,
 }
@@ -249,7 +249,7 @@ impl From<MeshBufferGeometryMorphInfoWithOffset> for MeshBufferGeometryMorphInfo
     fn from(info: MeshBufferGeometryMorphInfoWithOffset) -> Self {
         MeshBufferGeometryMorphInfo {
             targets_len: info.targets_len,
-            triangle_stride_size: info.triangle_stride_size,
+            vertex_stride_size: info.vertex_stride_size,
             values_size: info.values_size,
         }
     }

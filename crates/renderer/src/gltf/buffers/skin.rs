@@ -4,8 +4,7 @@ use crate::buffer::helpers::{
     slice_zeroes, u8_to_f32_iter, u8_to_u16_iter, u8_to_u16_vec, u8_to_u32_iter,
 };
 use crate::gltf::buffers::accessor::accessor_to_bytes;
-use crate::gltf::buffers::index::extract_triangle_indices;
-use crate::gltf::buffers::{MeshBufferAttributeIndexInfoWithOffset, MeshBufferSkinInfoWithOffset};
+use crate::gltf::buffers::MeshBufferSkinInfoWithOffset;
 use crate::gltf::error::{AwsmGltfError, Result};
 
 /// Converts GLTF skin data into storage buffers.
@@ -17,16 +16,15 @@ use crate::gltf::error::{AwsmGltfError, Result};
 /// - Clear architecture (skins ≠ attributes)
 /// - Type safety (custom meshes can't accidentally add skin data as attributes)
 ///
-/// EXPLODED SKIN DATA:
-/// - Skins are exploded to match visibility buffer triangle layout
-/// - Each triangle corner gets its own copy of joint indices/weights
+/// INDEXED SKIN DATA:
+/// - Skins are stored per original vertex (not exploded)
+/// - One entry per original vertex containing joint indices/weights
 /// - All data is standardized: indices as u32, weights as f32
+/// - Shaders access via original vertex index from the index buffer
 pub(super) fn convert_skin(
     primitive: &gltf::Primitive,
     buffers: &[Vec<u8>],
-    index: &MeshBufferAttributeIndexInfoWithOffset,
-    index_bytes: &[u8],
-    triangle_count: usize,
+    vertex_count: usize, // NEW: Original vertex count instead of triangle/index data
     skin_joint_index_weight_bytes: &mut Vec<u8>, // Indices (u32) interleaved with weights (f32)
 ) -> Result<Option<MeshBufferSkinInfoWithOffset>> {
     // Check if we have any skin data
@@ -81,34 +79,28 @@ pub(super) fn convert_skin(
     let set_count = skin_sets_data.len();
     let index_weights_offset = skin_joint_index_weight_bytes.len();
 
-    // Get triangles with ORIGINAL vertex indices for explosion
-    let triangle_indices = extract_triangle_indices(index, index_bytes)?;
-
-    // TRIANGLE EXPLOSION FOR SKIN DATA
-    // Convert from original indexed skin data to exploded triangle-corner data
+    // INDEXED SKIN DATA (per original vertex, not exploded)
+    // Store one entry per original vertex
     // All data is standardized to u32 indices and f32 weights
-    for triangle in &triangle_indices {
-        // For each vertex corner in this triangle (3 corners per triangle)
-        for vertex_index in triangle {
-            // For each skin set (interleaved per vertex corner)
-            for skin_set_data in &skin_sets_data {
-                // Convert and add joint indices (standardized to u32)
-                let indices_u32 = convert_indices_to_u32(
-                    &skin_set_data.joints_data,
-                    skin_set_data.joints_data_type,
-                    *vertex_index,
-                )?;
-                // Convert and add joint weights (standardized to f32)
-                let weights_f32 = convert_weights_to_f32(
-                    &skin_set_data.weights_data,
-                    skin_set_data.weights_data_type,
-                    *vertex_index,
-                )?;
+    for vertex_index in 0..vertex_count {
+        // For each skin set (interleaved per vertex)
+        for skin_set_data in &skin_sets_data {
+            // Convert and add joint indices (standardized to u32)
+            let indices_u32 = convert_indices_to_u32(
+                &skin_set_data.joints_data,
+                skin_set_data.joints_data_type,
+                vertex_index,
+            )?;
+            // Convert and add joint weights (standardized to f32)
+            let weights_f32 = convert_weights_to_f32(
+                &skin_set_data.weights_data,
+                skin_set_data.weights_data_type,
+                vertex_index,
+            )?;
 
-                for i in 0..4 {
-                    skin_joint_index_weight_bytes.extend_from_slice(&indices_u32[i].to_le_bytes());
-                    skin_joint_index_weight_bytes.extend_from_slice(&weights_f32[i].to_le_bytes());
-                }
+            for i in 0..4 {
+                skin_joint_index_weight_bytes.extend_from_slice(&indices_u32[i].to_le_bytes());
+                skin_joint_index_weight_bytes.extend_from_slice(&weights_f32[i].to_le_bytes());
             }
         }
     }
