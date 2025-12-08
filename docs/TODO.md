@@ -1,8 +1,5 @@
-# Fix recursive skeleton bug
-
-# Transparency Pass
-
-- vertex buffer data from non-geometry attributes (what we use for storage in opaque)
+- skin and morph data should be index, with a bit of redirection - not exploded
+- skin and morph data should not exist in custom attributes at all (only from gltf side, not mesh)
   - strip out MeshBufferCustomVertexAttributeInfo::Joints and MeshBufferCustomVertexAttributeInfo::Weights 
     - these only need to be in the storage buffer, we extract them in gltf/buffers/skin.rs and 
     - also confirm that morphs are not in attributes

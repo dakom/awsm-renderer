@@ -61,14 +61,6 @@ impl From<&MeshBufferInfo> for ShaderMaterialVertexAttributes {
                             None => Some(*index + 1),
                         }
                     }
-                    MeshBufferCustomVertexAttributeInfo::Joints { .. } => {
-                        // Custom attribute - goes in attribute_data buffer
-                        // Not currently used in material shader offset calculations
-                    }
-                    MeshBufferCustomVertexAttributeInfo::Weights { .. } => {
-                        // Custom attribute - goes in attribute_data buffer
-                        // Not currently used in material shader offset calculations
-                    }
                 },
             }
         }

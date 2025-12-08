@@ -345,7 +345,6 @@ impl GltfBuffers {
                         }
                     };
 
-                // TODO - determine this
                 let geometry_kind = mesh_buffer_geometry_kind(&primitive);
 
                 // Step 2: Convert to mesh buffer format

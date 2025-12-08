@@ -19,7 +19,10 @@ pub(super) fn load_attribute_data_by_kind<'a>(
     let mut attribute_data = BTreeMap::new();
 
     for (semantic, accessor) in gltf_attributes {
-        let mut attribute_kind = convert_attribute_kind(semantic, accessor);
+        let mut attribute_kind = match convert_attribute_kind(semantic, accessor) {
+            Some(kind) => kind,
+            None => continue, // Skip unsupported semantics
+        };
         let bytes = accessor_to_bytes(accessor, buffers)?;
 
         // wgsl doesn't work with 16-bit, so we may need to convert to 32-bit
@@ -159,57 +162,51 @@ pub(super) fn pack_vertex_attributes(
 pub(super) fn convert_attribute_kind(
     semantic: &gltf::Semantic,
     accessor: &gltf::Accessor<'_>,
-) -> MeshBufferVertexAttributeInfo {
+) -> Option<MeshBufferVertexAttributeInfo> {
     use crate::mesh::{
         MeshBufferCustomVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo,
     };
 
     match semantic {
-        Semantic::Positions => MeshBufferVertexAttributeInfo::Visibility(
+        Semantic::Positions => Some(MeshBufferVertexAttributeInfo::Visibility(
             MeshBufferVisibilityVertexAttributeInfo::Positions {
                 data_size: accessor.data_type().size(),
                 component_len: accessor.dimensions().multiplicity() as usize,
             },
-        ),
-        Semantic::Normals => MeshBufferVertexAttributeInfo::Visibility(
+        )),
+        Semantic::Normals => Some(MeshBufferVertexAttributeInfo::Visibility(
             MeshBufferVisibilityVertexAttributeInfo::Normals {
                 data_size: accessor.data_type().size(),
                 component_len: accessor.dimensions().multiplicity() as usize,
             },
-        ),
-        Semantic::Tangents => MeshBufferVertexAttributeInfo::Visibility(
+        )),
+        Semantic::Tangents => Some(MeshBufferVertexAttributeInfo::Visibility(
             MeshBufferVisibilityVertexAttributeInfo::Tangents {
                 data_size: accessor.data_type().size(),
                 component_len: accessor.dimensions().multiplicity() as usize,
             },
-        ),
-        Semantic::Colors(index) => {
-            MeshBufferVertexAttributeInfo::Custom(MeshBufferCustomVertexAttributeInfo::Colors {
+        )),
+        Semantic::Colors(index) => Some(MeshBufferVertexAttributeInfo::Custom(
+            MeshBufferCustomVertexAttributeInfo::Colors {
                 data_size: accessor.data_type().size(),
                 component_len: accessor.dimensions().multiplicity() as usize,
                 index: *index,
-            })
-        }
-        Semantic::TexCoords(index) => {
-            MeshBufferVertexAttributeInfo::Custom(MeshBufferCustomVertexAttributeInfo::TexCoords {
+            },
+        )),
+        Semantic::TexCoords(index) => Some(MeshBufferVertexAttributeInfo::Custom(
+            MeshBufferCustomVertexAttributeInfo::TexCoords {
                 data_size: accessor.data_type().size(),
                 component_len: accessor.dimensions().multiplicity() as usize,
                 index: *index,
-            })
-        }
+            },
+        )),
         Semantic::Joints(index) => {
-            MeshBufferVertexAttributeInfo::Custom(MeshBufferCustomVertexAttributeInfo::Joints {
-                data_size: accessor.data_type().size(),
-                component_len: accessor.dimensions().multiplicity() as usize,
-                index: *index,
-            })
+            //extracted into storage buffer
+            None
         }
         Semantic::Weights(index) => {
-            MeshBufferVertexAttributeInfo::Custom(MeshBufferCustomVertexAttributeInfo::Weights {
-                data_size: accessor.data_type().size(),
-                component_len: accessor.dimensions().multiplicity() as usize,
-                index: *index,
-            })
+            // extracted into storage buffer
+            None
         }
     }
 }

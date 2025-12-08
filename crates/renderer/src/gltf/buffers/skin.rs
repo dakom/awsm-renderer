@@ -8,7 +8,7 @@ use crate::gltf::buffers::index::extract_triangle_indices;
 use crate::gltf::buffers::{MeshBufferAttributeIndexInfoWithOffset, MeshBufferSkinInfoWithOffset};
 use crate::gltf::error::{AwsmGltfError, Result};
 
-/// Converts GLTF skin into exploded index and weight buffers
+/// Converts GLTF skin into exploded index and weight storage buffers
 ///
 /// EXPLODED SKIN DATA:
 /// - Skins are exploded to match visibility buffer triangle layout

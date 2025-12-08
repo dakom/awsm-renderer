@@ -275,20 +275,6 @@ pub enum MeshBufferCustomVertexAttributeInfo {
         data_size: usize,
         component_len: usize,
     },
-
-    /// Joint indices.
-    Joints {
-        index: u32,
-        data_size: usize,
-        component_len: usize,
-    },
-
-    /// Joint weights.
-    Weights {
-        index: u32,
-        data_size: usize,
-        component_len: usize,
-    },
 }
 
 impl MeshBufferCustomVertexAttributeInfo {
@@ -311,22 +297,6 @@ impl MeshBufferCustomVertexAttributeInfo {
                     _ => panic!("Unsupported texcoord attribute component length"),
                 }
             }
-            MeshBufferCustomVertexAttributeInfo::Joints { component_len, .. } => {
-                match component_len {
-                    4 => VertexFormat::Uint32x4,
-                    2 => VertexFormat::Uint32x2,
-                    1 => VertexFormat::Uint32,
-                    _ => panic!("Unsupported joints attribute component length"),
-                }
-            }
-            MeshBufferCustomVertexAttributeInfo::Weights { component_len, .. } => {
-                match component_len {
-                    4 => VertexFormat::Float32x4,
-                    2 => VertexFormat::Float32x2,
-                    1 => VertexFormat::Float32,
-                    _ => panic!("Unsupported weights attribute component length"),
-                }
-            }
         }
     }
 
@@ -338,16 +308,6 @@ impl MeshBufferCustomVertexAttributeInfo {
                 index: _,
             } => *component_len * *data_size,
             MeshBufferCustomVertexAttributeInfo::TexCoords {
-                component_len,
-                data_size,
-                index: _,
-            } => *component_len * *data_size,
-            MeshBufferCustomVertexAttributeInfo::Joints {
-                component_len,
-                data_size,
-                index: _,
-            } => *component_len * *data_size,
-            MeshBufferCustomVertexAttributeInfo::Weights {
                 component_len,
                 data_size,
                 index: _,
@@ -383,8 +343,6 @@ impl MeshBufferVertexAttributeInfo {
             MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
                 MeshBufferCustomVertexAttributeInfo::Colors { .. } => 3,
                 MeshBufferCustomVertexAttributeInfo::TexCoords { .. } => 4,
-                MeshBufferCustomVertexAttributeInfo::Joints { .. } => 5,
-                MeshBufferCustomVertexAttributeInfo::Weights { .. } => 6,
             },
         }
     }
@@ -395,8 +353,6 @@ impl MeshBufferVertexAttributeInfo {
             MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
                 MeshBufferCustomVertexAttributeInfo::Colors { index, .. } => *index,
                 MeshBufferCustomVertexAttributeInfo::TexCoords { index, .. } => *index,
-                MeshBufferCustomVertexAttributeInfo::Joints { index, .. } => *index,
-                MeshBufferCustomVertexAttributeInfo::Weights { index, .. } => *index,
             },
         }
     }
@@ -421,12 +377,6 @@ impl MeshBufferVertexAttributeInfo {
                 MeshBufferCustomVertexAttributeInfo::TexCoords { data_size, .. } => {
                     *data_size = new_size
                 }
-                MeshBufferCustomVertexAttributeInfo::Joints { data_size, .. } => {
-                    *data_size = new_size
-                }
-                MeshBufferCustomVertexAttributeInfo::Weights { data_size, .. } => {
-                    *data_size = new_size
-                }
             },
         }
     }
@@ -441,8 +391,6 @@ impl MeshBufferVertexAttributeInfo {
             MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
                 MeshBufferCustomVertexAttributeInfo::Colors { data_size, .. } => *data_size,
                 MeshBufferCustomVertexAttributeInfo::TexCoords { data_size, .. } => *data_size,
-                MeshBufferCustomVertexAttributeInfo::Joints { data_size, .. } => *data_size,
-                MeshBufferCustomVertexAttributeInfo::Weights { data_size, .. } => *data_size,
             },
         }
     }
@@ -463,10 +411,6 @@ impl MeshBufferVertexAttributeInfo {
             MeshBufferVertexAttributeInfo::Custom(custom) => match custom {
                 MeshBufferCustomVertexAttributeInfo::Colors { component_len, .. } => *component_len,
                 MeshBufferCustomVertexAttributeInfo::TexCoords { component_len, .. } => {
-                    *component_len
-                }
-                MeshBufferCustomVertexAttributeInfo::Joints { component_len, .. } => *component_len,
-                MeshBufferCustomVertexAttributeInfo::Weights { component_len, .. } => {
                     *component_len
                 }
             },
