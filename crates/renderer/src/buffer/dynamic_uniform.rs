@@ -698,7 +698,7 @@ mod test {
         let slot4 = *buffer.slot_indices.get(key4).unwrap();
         assert_ne!(slot4, 2, "New key should not reuse allocated slot 2");
         assert!(
-            slot4 >= 3 && slot4 <= 5,
+            (3..=5).contains(&slot4),
             "New key should use a slot from free_slots"
         );
 
@@ -1347,9 +1347,6 @@ mod test {
 
         let slot1 = *buffer.slot_indices.get(key1).unwrap();
         let slot2 = *buffer.slot_indices.get(key2).unwrap();
-
-        assert_eq!(buffer.offset(key1).unwrap(), slot1 * 1);
-        assert_eq!(buffer.offset(key2).unwrap(), slot2 * 1);
 
         // With aligned_slice_size=1, offsets should just be the slot indices
         assert_eq!(buffer.offset(key1).unwrap(), slot1);

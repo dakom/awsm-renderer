@@ -798,15 +798,15 @@ mod test {
         assert_eq!(buffer.used_size(), 0);
 
         // Add items and track used size
-        buffer.update(key1, &vec![1u8; 100]);
+        buffer.update(key1, &[1u8; 100]);
         let size1 = buffer.size(key1).unwrap();
         assert_eq!(buffer.used_size(), size1);
 
-        buffer.update(key2, &vec![2u8; 200]);
+        buffer.update(key2, &[2u8; 200]);
         let size2 = buffer.size(key2).unwrap();
         assert_eq!(buffer.used_size(), size1 + size2);
 
-        buffer.update(key3, &vec![3u8; 50]);
+        buffer.update(key3, &[3u8; 50]);
         let size3 = buffer.size(key3).unwrap();
         assert_eq!(buffer.used_size(), size1 + size2 + size3);
 
@@ -841,10 +841,10 @@ mod test {
         let key2 = key_map.insert(());
         let key3 = key_map.insert(());
 
-        buffer.update(key1, &vec![1u8; 100]);
-        buffer.update(key2, &vec![2u8; 200]);
+        buffer.update(key1, &[1u8; 100]);
+        buffer.update(key2, &[2u8; 200]);
         buffer.remove(key1);
-        buffer.update(key3, &vec![3u8; 150]);
+        buffer.update(key3, &[3u8; 150]);
 
         // Verify that allocations work correctly and don't overlap
         let offset2 = buffer.offset(key2).unwrap();
@@ -884,7 +884,7 @@ mod test {
         for _ in 0..4 {
             let key = key_map.insert(());
             keys.push(key);
-            buffer.update(key, &vec![0xAA; MIN_BLOCK]);
+            buffer.update(key, &[0xAA; MIN_BLOCK]);
         }
 
         // Remove alternating ones to create fragmentation
