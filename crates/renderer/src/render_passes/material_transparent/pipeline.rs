@@ -239,7 +239,7 @@ fn vertex_buffer_layouts(mesh: &Mesh, buffer_info: &MeshBufferInfo) -> Vec<Verte
         .attributes
         .last()
         .unwrap()
-        .shader_location as u32
+        .shader_location
         + 1;
 
     for attribute_info in buffer_info
