@@ -36,6 +36,8 @@ pub enum MipmapTextureKind {
 ///
 /// # Example
 /// ```
+/// use awsm_renderer_core::texture::mipmap::calculate_mipmap_levels;
+///
 /// assert_eq!(calculate_mipmap_levels(512, 512), 10); // 512 → 256 → ... → 1
 /// assert_eq!(calculate_mipmap_levels(256, 128), 9);  // Based on max dimension
 /// ```
