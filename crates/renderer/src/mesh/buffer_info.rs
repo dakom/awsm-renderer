@@ -258,8 +258,11 @@ impl MeshBufferVisibilityVertexAttributeInfo {
     }
 }
 
-/// Custom attributes: UVs, colors, joints, weights.
-/// These are stored in the attribute_data buffer and accessed via indexed lookup.
+/// Custom vertex attributes that can be attached to meshes.
+/// These are general-purpose vertex data (colors, UVs, etc.)
+///
+/// NOTE: Joints and Weights are NOT custom attributes!
+/// They are skinning data handled by the separate skin system.
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MeshBufferCustomVertexAttributeInfo {
     /// RGB or RGBA vertex color.

@@ -8,7 +8,14 @@ use crate::gltf::buffers::index::extract_triangle_indices;
 use crate::gltf::buffers::{MeshBufferAttributeIndexInfoWithOffset, MeshBufferSkinInfoWithOffset};
 use crate::gltf::error::{AwsmGltfError, Result};
 
-/// Converts GLTF skin into exploded index and weight storage buffers
+/// Converts GLTF skin data into storage buffers.
+///
+/// IMPORTANT: Skinning data (Joints/Weights) is NOT stored as vertex attributes.
+/// It is stored in dedicated skin storage buffers and accessed by the geometry pass.
+/// This separation ensures:
+/// - Memory efficiency (no duplication)
+/// - Clear architecture (skins ≠ attributes)
+/// - Type safety (custom meshes can't accidentally add skin data as attributes)
 ///
 /// EXPLODED SKIN DATA:
 /// - Skins are exploded to match visibility buffer triangle layout

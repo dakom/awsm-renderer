@@ -15,6 +15,14 @@ use crate::mesh::{
 
 /// Converts GLTF morph targets into storage buffer with exploded triangle-corner format
 ///
+/// IMPORTANT: Morphing data is NOT stored as vertex attributes.
+/// It is stored in dedicated morph storage buffers and accessed by the geometry pass.
+/// This separation ensures:
+/// - Memory efficiency (no duplication)
+/// - Clear architecture (morphs ≠ attributes)
+/// - Type safety (custom meshes can't accidentally add morph data as attributes)
+///
+///
 /// KEY CONCEPT - Unified Exploded Format:
 ///
 /// ALL MORPHS (Position + Normal + Tangent):

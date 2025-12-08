@@ -65,8 +65,17 @@ pub(super) fn convert_to_mesh_buffer(
     skin_joint_index_weight_bytes: &mut Vec<u8>,
 ) -> Result<MeshBufferInfoWithOffset> {
     // Step 1: Load all GLTF attributes
-    let mut gltf_attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> =
-        primitive.attributes().collect();
+    let mut gltf_attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> = primitive
+        .attributes()
+        .filter(|(semantic, _)| {
+            // Joints and Weights are NOT vertex attributes - they're skinning data
+            // Handled separately by convert_skin(), never enter the attribute system
+            !matches!(
+                semantic,
+                gltf::Semantic::Joints(_) | gltf::Semantic::Weights(_)
+            )
+        })
+        .collect();
 
     // this should never be empty, but let's be safe
     let vertex_count = gltf_attributes
