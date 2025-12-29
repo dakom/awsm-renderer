@@ -81,7 +81,9 @@ impl AppCanvas {
                             .await
                             .unwrap();
 
-                        state.ctx.scene.set(Some(AppScene::new(state.ctx.clone(), renderer)));
+                        let scene = AppScene::new(state.ctx.clone(), renderer).await.unwrap();
+
+                        state.ctx.scene.set(Some(scene));
                     }));
                 }))
             }))

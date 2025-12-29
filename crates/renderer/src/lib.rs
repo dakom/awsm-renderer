@@ -148,13 +148,21 @@ impl AwsmRendererBuilder {
             clear_color: Color::BLACK,
             brdf_lut_options: BrdfLutOptions::default(),
             skybox_colors: CubemapBitmapColors {
-                z_positive: Color::from_hex_rgb(0xFF0000), // red
-                z_negative: Color::from_hex_rgb(0x00FF00), // green
-                x_positive: Color::from_hex_rgb(0x0000FF), // blue
-                x_negative: Color::from_hex_rgb(0xFFFF00), // yellow
-                y_positive: Color::from_hex_rgb(0xFF00FF), // magenta
-                y_negative: Color::from_hex_rgb(0x00FFFF), // cyan
+                z_positive: Color::BLACK,
+                z_negative: Color::BLACK,
+                x_positive: Color::BLACK,
+                x_negative: Color::BLACK,
+                y_positive: Color::BLACK,
+                y_negative: Color::BLACK,
             },
+            // skybox_colors: CubemapBitmapColors {
+            //     z_positive: Color::from_hex_rgb(0xFF0000), // red
+            //     z_negative: Color::from_hex_rgb(0x00FF00), // green
+            //     x_positive: Color::from_hex_rgb(0x0000FF), // blue
+            //     x_negative: Color::from_hex_rgb(0xFFFF00), // yellow
+            //     y_positive: Color::from_hex_rgb(0xFF00FF), // magenta
+            //     y_negative: Color::from_hex_rgb(0x00FFFF), // cyan
+            // },
             ibl_filtered_env_colors: CubemapBitmapColors {
                 z_positive: Color::WHITE,
                 z_negative: Color::WHITE,
@@ -170,14 +178,7 @@ impl AwsmRendererBuilder {
                 x_negative: Color::WHITE,
                 y_positive: Color::WHITE,
                 y_negative: Color::WHITE,
-            }, // skybox_colors: CubemapBitmapColors {
-            //     z_positive: Color::BLACK,
-            //     z_negative: Color::BLACK,
-            //     x_positive: Color::BLACK,
-            //     x_negative: Color::BLACK,
-            //     y_positive: Color::BLACK,
-            //     y_negative: Color::BLACK,
-            // },
+            },
             anti_aliasing: AntiAliasing::default(),
         }
     }

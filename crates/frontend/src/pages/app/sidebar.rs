@@ -1,4 +1,5 @@
 mod camera;
+mod editor;
 mod gltf;
 mod lighting;
 pub mod material;
@@ -12,7 +13,7 @@ use material::SidebarMaterial;
 use crate::{
     models::collections::GltfId,
     pages::app::sidebar::{
-        lighting::SidebarLighting, post_processing::SidebarPostProcessing,
+        editor::SidebarEditor, lighting::SidebarLighting, post_processing::SidebarPostProcessing,
         textures::SidebarTextures,
     },
     prelude::*,
@@ -34,6 +35,7 @@ pub enum SidebarSection {
     PostProcessing,
     Camera,
     Textures,
+    Editor,
 }
 
 impl AppSidebar {
@@ -64,6 +66,7 @@ impl AppSidebar {
                 self.render_section(SidebarSection::PostProcessing),
                 self.render_section(SidebarSection::Camera),
                 self.render_section(SidebarSection::Textures),
+                self.render_section(SidebarSection::Editor),
             ])
         })
     }
@@ -90,6 +93,7 @@ impl AppSidebar {
                                     SidebarSection::Lighting =>  SidebarLighting::new(state.ctx.clone()).render(),
                                     SidebarSection::PostProcessing => SidebarPostProcessing::new(state.ctx.clone()).render(),
                                     SidebarSection::Camera => SidebarCamera::new(state.ctx.clone()).render(),
+                                    SidebarSection::Editor => SidebarEditor::new(state.ctx.clone()).render(),
                                     SidebarSection::Textures => SidebarTextures::new(state.ctx.clone()).render(),
                                 })
                             }))
@@ -191,6 +195,13 @@ impl AppSidebar {
                                     }),
                                 ]
                             },
+                            SidebarSection::Editor => {
+                                vec![
+                                    svg!("path", {
+                                        .attr("d", "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 000-1.41l-2.34-2.34a.996.996 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z")
+                                    }),
+                                ]
+                            },
                             SidebarSection::Textures => {
                                 vec![
                                     svg!("rect", {
@@ -228,6 +239,7 @@ impl AppSidebar {
                     .text(match section {
                         SidebarSection::Gltf => "Pick GLTF Model",
                         SidebarSection::Material => "Material",
+                        SidebarSection::Editor => "Editor",
                         SidebarSection::Animation => "Animation",
                         SidebarSection::Lighting => "Lighting",
                         SidebarSection::PostProcessing => "Post Processing",

@@ -1,4 +1,5 @@
 pub mod camera;
+pub mod editor;
 mod ibl;
 mod skybox;
 
@@ -22,6 +23,7 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::models::collections::GltfId;
 use crate::pages::app::context::{IblId, SkyboxId};
+use crate::pages::app::scene::editor::AppSceneEditor;
 use crate::pages::app::sidebar::material::FragmentShaderKind;
 use crate::prelude::*;
 
@@ -30,6 +32,7 @@ use super::context::AppContext;
 pub struct AppScene {
     pub ctx: AppContext,
     pub renderer: futures::lock::Mutex<AwsmRenderer>,
+    pub editor: Mutex<Option<editor::AppSceneEditor>>,
     pub gltf_cache: Mutex<HashMap<GltfId, GltfLoader>>,
     pub latest_gltf_data: Mutex<Option<GltfData>>,
     pub ibl_cache: Mutex<HashMap<IblId, Ibl>>,
@@ -45,7 +48,7 @@ pub struct AppScene {
 }
 
 impl AppScene {
-    pub fn new(ctx: AppContext, renderer: AwsmRenderer) -> Arc<Self> {
+    pub async fn new(ctx: AppContext, renderer: AwsmRenderer) -> Result<Arc<Self>> {
         let canvas = renderer.gpu.canvas();
 
         let state = Arc::new(Self {
@@ -63,6 +66,7 @@ impl AppScene {
             last_size: Cell::new((0.0, 0.0)),
             last_camera_id: Cell::new(CameraId::default()),
             last_shader_kind: Cell::new(None),
+            editor: Mutex::new(None),
         });
 
         let resize_observer = ResizeObserver::new(
@@ -157,7 +161,7 @@ impl AppScene {
             }))).await;
         }));
 
-        state
+        Ok(state)
     }
 
     fn on_viewport_change(self: &Arc<Self>) {
@@ -192,15 +196,40 @@ impl AppScene {
     pub async fn clear(self: &Arc<Self>) {
         let state = self;
 
-        let mut renderer = state.renderer.lock().await;
-
         state.stop_animation_loop();
-        if let Err(err) = renderer.remove_all().await {
+        if let Err(err) = state.renderer.lock().await.remove_all().await {
             tracing::error!("Failed to clear renderer: {:?}", err);
         }
-        if let Err(err) = renderer.render(None) {
-            tracing::error!("Failed to render after clearing: {:?}", err);
+
+        match AppSceneEditor::new(
+            &mut *state.renderer.lock().await,
+            state.ctx.editor_grid_enabled.clone(),
+            state.ctx.editor_gizmos_enabled.clone(),
+        )
+        .await
+        {
+            Ok(editor) => {
+                *state.editor.lock().unwrap() = Some(editor);
+            }
+            Err(err) => {
+                tracing::error!("Failed to recreate scene editor after clear: {:?}", err);
+            }
         }
+
+        if let Err(err) = self.render().await {
+            tracing::error!("Failed to render after clear: {:?}", err);
+        }
+    }
+
+    pub async fn render(self: &Arc<Self>) -> Result<()> {
+        let state = self;
+        let mut renderer = state.renderer.lock().await;
+        let editor_guard = state.editor.lock().unwrap();
+        let hooks = editor_guard
+            .as_ref()
+            .and_then(|editor| editor.render_hooks.read().unwrap().clone());
+
+        Ok(renderer.render(hooks.as_deref())?)
     }
 
     pub async fn load_gltf(self: &Arc<Self>, gltf_id: GltfId) -> Result<GltfLoader> {
@@ -463,14 +492,6 @@ impl AppScene {
         Ok(())
     }
 
-    pub async fn render(self: &Arc<Self>) -> Result<()> {
-        let mut renderer = self.renderer.lock().await;
-
-        renderer.render(None)?;
-
-        Ok(())
-    }
-
     pub async fn setup_all(self: &Arc<Self>) -> Result<()> {
         self.last_shader_kind.set(None);
 
@@ -567,7 +588,7 @@ impl AppScene {
                 }
 
                 if let Err(err) = state.render().await {
-                    tracing::error!("Failed to render after animation: {:?}", err);
+                    tracing::error!("Failed to render during animation loop: {:?}", err);
                 }
             }
 
