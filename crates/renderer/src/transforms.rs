@@ -298,6 +298,25 @@ impl Transforms {
         &self.world_matrices
     }
 
+    // should only be used for debugging really
+    pub fn get_tree(&self) -> TransformTreeNode {
+        fn build_node(transforms: &Transforms, key: TransformKey) -> TransformTreeNode {
+            let children = transforms.children.get(key).unwrap();
+
+            let child_nodes = children
+                .iter()
+                .map(|&child_key| build_node(transforms, child_key))
+                .collect();
+
+            TransformTreeNode {
+                key,
+                children: child_nodes,
+            }
+        }
+
+        build_node(self, self.root_node)
+    }
+
     // internal-only function
     // See: https://gameprogrammingpatterns.com/dirty-flag.html
     // the overall idea is we walk the tree and skip over nodes that are not dirty
@@ -363,6 +382,13 @@ impl Transforms {
             }
         }
     }
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TransformTreeNode {
+    pub key: TransformKey,
+    pub children: Vec<TransformTreeNode>,
 }
 
 #[derive(Clone, Debug)]

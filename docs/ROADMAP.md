@@ -1,8 +1,5 @@
 # Next up
-
-- get demo working again
-  - fix "dev-release" mode (just base path?)
-
+  
 - Support different kinds of Materials
   - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
   - unlit as example?

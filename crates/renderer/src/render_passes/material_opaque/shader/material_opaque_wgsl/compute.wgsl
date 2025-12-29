@@ -6,6 +6,10 @@
 {% include "opaque_and_transparency_wgsl/debug.wgsl" %}
 /*************** END debug.wgsl ******************/
 
+/*************** START camera.wgsl ******************/
+{% include "geometry_and_all_material_wgsl/camera.wgsl" %}
+/*************** END camera.wgsl ******************/
+
 /*************** START math.wgsl ******************/
 {% include "utils_wgsl/math.wgsl" %}
 /*************** END math.wgsl ******************/
@@ -47,9 +51,9 @@
 {% include "opaque_and_transparency_wgsl/pbr/material.wgsl" %}
 /*************** END material.wgsl ******************/
 
-/*************** START material.wgsl ******************/
+/*************** START material_color.wgsl ******************/
 {% include "opaque_and_transparency_wgsl/pbr/material_color.wgsl" %}
-/*************** END material.wgsl ******************/
+/*************** END material_color.wgsl ******************/
 
 {% match mipmap %}
     {% when MipmapMode::Gradient %}
@@ -95,20 +99,6 @@
 /*************** END debug.wgsl ******************/
 {% endif %}
 
-// Mirrors the CPU-side `CameraBuffer` layout. The extra inverse matrices and frustum rays give
-// us everything needed to reconstruct world-space positions from a depth value inside this
-// compute pass.
-struct CameraUniform {
-    view: mat4x4<f32>,
-    proj: mat4x4<f32>,
-    view_proj: mat4x4<f32>,
-    inv_view_proj: mat4x4<f32>,
-    inv_proj: mat4x4<f32>,
-    inv_view: mat4x4<f32>,
-    position: vec3<f32>,
-    frame_count: u32,
-    frustum_rays: array<vec4<f32>, 4>,
-};
 
 @compute @workgroup_size(8, 8)
 fn main(

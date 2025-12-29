@@ -1,4 +1,5 @@
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::GpuSupportedLimits;
 
@@ -60,6 +61,12 @@ impl AwsmRendererWebGpuBuilder {
     }
 
     pub async fn build(self) -> Result<AwsmRendererWebGpu> {
+        let context: web_sys::GpuCanvasContext = match self.canvas.get_context("webgpu") {
+            Ok(Some(ctx)) => Ok(ctx.unchecked_into()),
+            Err(err) => Err(AwsmCoreError::canvas_context(err)),
+            Ok(None) => Err(AwsmCoreError::CanvasContext("No context found".to_string())),
+        }?;
+
         let adapter: web_sys::GpuAdapter = match self.adapter {
             Some(adapter) => adapter,
             None => JsFuture::from(self.gpu.request_adapter())
@@ -68,16 +75,29 @@ impl AwsmRendererWebGpuBuilder {
                 .unchecked_into(),
         };
 
+        if adapter.is_null() || adapter.is_undefined() {
+            return Err(AwsmCoreError::GpuAdapter("is null".to_string()));
+        }
+
         let device: web_sys::GpuDevice = match self.device {
             Some(device) => device,
             None => {
                 if let Some(limits) = self.device_req_limits {
-                    let descriptor = web_sys::GpuDeviceDescriptor::new();
-                    descriptor.set_required_limits(&limits.into_js(&adapter.limits()));
-                    JsFuture::from(adapter.request_device_with_descriptor(&descriptor))
-                        .await
-                        .map_err(AwsmCoreError::gpu_device)?
-                        .unchecked_into()
+                    let adapter_limits = adapter.limits();
+                    if adapter_limits.is_null() || adapter_limits.is_undefined() {
+                        tracing::warn!("adapter limits are null or undefined");
+                        JsFuture::from(adapter.request_device())
+                            .await
+                            .map_err(AwsmCoreError::gpu_device)?
+                            .unchecked_into()
+                    } else {
+                        let descriptor = web_sys::GpuDeviceDescriptor::new();
+                        descriptor.set_required_limits(&limits.into_js(&adapter.limits()));
+                        JsFuture::from(adapter.request_device_with_descriptor(&descriptor))
+                            .await
+                            .map_err(AwsmCoreError::gpu_device)?
+                            .unchecked_into()
+                    }
                 } else {
                     JsFuture::from(adapter.request_device())
                         .await
@@ -87,11 +107,9 @@ impl AwsmRendererWebGpuBuilder {
             }
         };
 
-        let context: web_sys::GpuCanvasContext = match self.canvas.get_context("webgpu") {
-            Ok(Some(ctx)) => Ok(ctx.unchecked_into()),
-            Err(err) => Err(AwsmCoreError::canvas_context(err)),
-            Ok(None) => Err(AwsmCoreError::CanvasContext("No context found".to_string())),
-        }?;
+        if device.is_null() || device.is_undefined() {
+            return Err(AwsmCoreError::GpuDevice("is null".to_string()));
+        }
 
         context
             .configure(

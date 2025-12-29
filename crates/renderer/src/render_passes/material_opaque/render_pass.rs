@@ -55,19 +55,31 @@ impl MaterialOpaqueRenderPass {
             ctx.render_texture_views.height.div_ceil(8),
         );
 
-        let mut seen_pipeline_keys = SecondaryMap::new();
-        for renderable in renderables {
-            if let Some(compute_pipeline_key) = renderable.material_opaque_compute_pipeline_key() {
-                // only need to dispatch once per pipeline, not per renderable
-                if !seen_pipeline_keys.contains_key(compute_pipeline_key) {
-                    seen_pipeline_keys.insert(compute_pipeline_key, ());
+        if renderables.is_empty() {
+            if let Some(key) = self
+                .pipelines
+                .get_empty_compute_pipeline_key(ctx.anti_aliasing)
+            {
+                compute_pass.set_pipeline(ctx.pipelines.compute.get(key)?);
+                compute_pass.dispatch_workgroups(workgroup_size.0, Some(workgroup_size.1), Some(1));
+            }
+        } else {
+            let mut seen_pipeline_keys = SecondaryMap::new();
+            for renderable in renderables {
+                if let Some(compute_pipeline_key) =
+                    renderable.material_opaque_compute_pipeline_key()
+                {
+                    // only need to dispatch once per pipeline, not per renderable
+                    if !seen_pipeline_keys.contains_key(compute_pipeline_key) {
+                        seen_pipeline_keys.insert(compute_pipeline_key, ());
 
-                    compute_pass.set_pipeline(ctx.pipelines.compute.get(compute_pipeline_key)?);
-                    compute_pass.dispatch_workgroups(
-                        workgroup_size.0,
-                        Some(workgroup_size.1),
-                        Some(1),
-                    );
+                        compute_pass.set_pipeline(ctx.pipelines.compute.get(compute_pipeline_key)?);
+                        compute_pass.dispatch_workgroups(
+                            workgroup_size.0,
+                            Some(workgroup_size.1),
+                            Some(1),
+                        );
+                    }
                 }
             }
         }

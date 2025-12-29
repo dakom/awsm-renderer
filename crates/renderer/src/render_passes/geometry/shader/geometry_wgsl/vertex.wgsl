@@ -1,5 +1,5 @@
 {% include "geometry_and_transparency_wgsl/vertex/geometry_mesh_meta.wgsl" %}
-{% include "geometry_and_transparency_wgsl/vertex/camera.wgsl" %}
+{% include "geometry_and_all_material_wgsl/camera.wgsl" %}
 {% include "geometry_and_transparency_wgsl/vertex/transform.wgsl" %}
 {% include "geometry_and_transparency_wgsl/vertex/morph.wgsl" %}
 {% include "geometry_and_transparency_wgsl/vertex/skin.wgsl" %}

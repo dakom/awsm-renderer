@@ -27,7 +27,7 @@ impl AwsmRenderer {
 
 pub struct CameraBuffer {
     pub(crate) raw_data: [u8; Self::BYTE_SIZE],
-    pub(crate) gpu_buffer: web_sys::GpuBuffer,
+    pub gpu_buffer: web_sys::GpuBuffer,
     pub last_matrices: Option<CameraMatrices>,
     camera_moved: bool,
     gpu_dirty: bool,
@@ -237,6 +237,11 @@ fn write_f32_slice(buffer: &mut [u8], offset: &mut usize, values: &[f32]) {
     // All matrices/vectors in the camera buffer are tightly packed f32 arrays. Writing them this
     // way keeps the CPU-side layout authoritative and avoids duplicating offset math.
     let byte_len = std::mem::size_of_val(values);
+
+    // crate::debug::debug_unique_string(*offset as u32, &format!("{:?}", values), || {
+    //     tracing::info!("[{}]: {:?}", offset, values);
+    // });
+
     let bytes = unsafe { std::slice::from_raw_parts(values.as_ptr() as *const u8, byte_len) };
     buffer[*offset..*offset + byte_len].copy_from_slice(bytes);
     *offset += byte_len;

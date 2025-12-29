@@ -198,7 +198,7 @@ impl AppScene {
         if let Err(err) = renderer.remove_all().await {
             tracing::error!("Failed to clear renderer: {:?}", err);
         }
-        if let Err(err) = renderer.render() {
+        if let Err(err) = renderer.render(None) {
             tracing::error!("Failed to render after clearing: {:?}", err);
         }
     }
@@ -466,7 +466,7 @@ impl AppScene {
     pub async fn render(self: &Arc<Self>) -> Result<()> {
         let mut renderer = self.renderer.lock().await;
 
-        renderer.render()?;
+        renderer.render(None)?;
 
         Ok(())
     }
