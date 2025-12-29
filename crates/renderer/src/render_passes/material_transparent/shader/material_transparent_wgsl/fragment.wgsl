@@ -22,6 +22,9 @@ struct FragmentOutput {
 fn fs_main(input: FragmentInput) -> FragmentOutput {
     var out: FragmentOutput;
 
+    // Convert raw camera uniform to friendly structure
+    let camera = camera_from_raw(camera_raw);
+
     // Get material from mesh metadata
     let material = pbr_get_material(material_mesh_meta.material_offset);
 

@@ -22,6 +22,8 @@ pub struct Config {
     pub initial_ibl: IblId,
     pub initial_skybox: SkyboxId,
     pub cache_buster: bool,
+    pub initial_show_grid: bool,
+    pub initial_show_gizmos: bool,
 }
 
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
@@ -61,6 +63,8 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         initial_ibl: IblId::default(),
         initial_skybox: SkyboxId::default(),
         cache_buster: cfg!(debug_assertions),
+        initial_show_grid: true,
+        initial_show_gizmos: true,
     }
 });
 

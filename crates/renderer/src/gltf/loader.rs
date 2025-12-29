@@ -30,9 +30,13 @@ pub enum GltfFileType {
     Draco, //TODO
 }
 
-pub fn get_type_from_filename(_url: &str) -> Option<GltfFileType> {
-    //todo - look for .gltf, .glb, etc.
-    Some(GltfFileType::Json)
+pub fn get_type_from_filename(url: &str) -> Option<GltfFileType> {
+    match url.rsplit('.').next() {
+        Some("gltf") => Some(GltfFileType::Json),
+        Some("glb") => Some(GltfFileType::Glb),
+        Some("drc") => Some(GltfFileType::Draco),
+        _ => None,
+    }
 }
 
 impl GltfLoader {

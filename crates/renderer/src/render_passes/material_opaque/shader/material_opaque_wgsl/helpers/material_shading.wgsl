@@ -4,6 +4,7 @@
     {% when MipmapMode::Gradient %}
         // Compute material color with gradient-based mipmapping
         fn compute_material_color(
+            camera: Camera,
             triangle_indices: vec3<u32>,
             attribute_data_offset: u32,
             triangle_index: u32,
@@ -45,6 +46,7 @@
     {% when MipmapMode::None %}
         // Compute material color without mipmapping
         fn compute_material_color(
+            camera: Camera,
             triangle_indices: vec3<u32>,
             attribute_data_offset: u32,
             triangle_index: u32,

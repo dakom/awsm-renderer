@@ -7,7 +7,7 @@
 /*************** END meta.wgsl ******************/
 
 /*************** START camera.wgsl ******************/
-{% include "geometry_and_transparency_wgsl/vertex/camera.wgsl" %}
+{% include "geometry_and_all_material_wgsl/camera.wgsl" %}
 /*************** END camera.wgsl ******************/
 
 /*************** START transform.wgsl ******************/

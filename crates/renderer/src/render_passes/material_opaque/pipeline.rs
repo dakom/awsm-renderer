@@ -7,6 +7,7 @@ use crate::mesh::{Mesh, MeshBufferInfos, MeshKey};
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::compute_pipeline::{ComputePipelineCacheKey, ComputePipelineKey};
 use crate::pipelines::Pipelines;
+use crate::render_passes::material_opaque::shader::cache_key::ShaderCacheKeyMaterialOpaqueEmpty;
 use crate::render_passes::{
     material_opaque::{
         bind_group::MaterialOpaqueBindGroups, shader::cache_key::ShaderCacheKeyMaterialOpaque,
@@ -20,6 +21,8 @@ pub struct MaterialOpaquePipelines {
     multisampled_pipeline_layout_key: PipelineLayoutKey,
     singlesampled_pipeline_layout_key: PipelineLayoutKey,
     compute_pipeline_keys: SecondaryMap<MeshKey, ComputePipelineKey>,
+    msaa_4_empty_compute_pipeline_key: ComputePipelineKey,
+    singlesampled_empty_compute_pipeline_key: ComputePipelineKey,
 }
 
 impl MaterialOpaquePipelines {
@@ -49,11 +52,77 @@ impl MaterialOpaquePipelines {
             singlesampled_pipeline_layout_cache_key,
         )?;
 
+        // Pre-create an empty compute pipeline key for cases where no mesh is provided
+        let msaa_4_shader_cache_key = ShaderCacheKeyMaterialOpaqueEmpty {
+            texture_pool_arrays_len: bind_groups.texture_pool_arrays_len,
+            texture_pool_samplers_len: bind_groups.texture_pool_sampler_keys.len() as u32,
+            msaa_sample_count: Some(4),
+        };
+
+        let singlesampled_shader_cache_key = ShaderCacheKeyMaterialOpaqueEmpty {
+            texture_pool_arrays_len: bind_groups.texture_pool_arrays_len,
+            texture_pool_samplers_len: bind_groups.texture_pool_sampler_keys.len() as u32,
+            msaa_sample_count: None,
+        };
+
+        let msaa_4_shader_key = ctx
+            .shaders
+            .get_key(ctx.gpu, msaa_4_shader_cache_key)
+            .await?;
+
+        let singlesampled_shader_key = ctx
+            .shaders
+            .get_key(ctx.gpu, singlesampled_shader_cache_key)
+            .await?;
+
+        let msaa_4_compute_pipeline_cache_key =
+            ComputePipelineCacheKey::new(msaa_4_shader_key, multisampled_pipeline_layout_key);
+
+        let singlesampled_compute_pipeline_cache_key = ComputePipelineCacheKey::new(
+            singlesampled_shader_key,
+            singlesampled_pipeline_layout_key,
+        );
+
+        let msaa_4_empty_compute_pipeline_key = ctx
+            .pipelines
+            .compute
+            .get_key(
+                ctx.gpu,
+                ctx.shaders,
+                ctx.pipeline_layouts,
+                msaa_4_compute_pipeline_cache_key,
+            )
+            .await?;
+
+        let singlesampled_empty_compute_pipeline_key = ctx
+            .pipelines
+            .compute
+            .get_key(
+                ctx.gpu,
+                ctx.shaders,
+                ctx.pipeline_layouts,
+                singlesampled_compute_pipeline_cache_key,
+            )
+            .await?;
+
         Ok(Self {
             multisampled_pipeline_layout_key,
             singlesampled_pipeline_layout_key,
             compute_pipeline_keys: SecondaryMap::new(),
+            msaa_4_empty_compute_pipeline_key,
+            singlesampled_empty_compute_pipeline_key,
         })
+    }
+
+    pub fn get_empty_compute_pipeline_key(
+        &self,
+        anti_aliasing: &AntiAliasing,
+    ) -> Option<ComputePipelineKey> {
+        match anti_aliasing.msaa_sample_count {
+            Some(4) => Some(self.msaa_4_empty_compute_pipeline_key),
+            None => Some(self.singlesampled_empty_compute_pipeline_key),
+            _ => None,
+        }
     }
 
     pub fn get_compute_pipeline_key(&self, mesh_key: MeshKey) -> Option<ComputePipelineKey> {

@@ -1,7 +1,9 @@
 use askama::Template;
 
 use crate::{
-    render_passes::material_opaque::shader::cache_key::ShaderCacheKeyMaterialOpaque,
+    render_passes::material_opaque::shader::cache_key::{
+        ShaderCacheKeyMaterialOpaque, ShaderCacheKeyMaterialOpaqueEmpty,
+    },
     shaders::{AwsmShaderError, Result},
 };
 
@@ -227,5 +229,41 @@ impl ShaderTemplateMaterialOpaque {
     #[cfg(debug_assertions)]
     pub fn debug_label(&self) -> Option<&str> {
         Some("Material Opaque")
+    }
+}
+
+impl TryFrom<&ShaderCacheKeyMaterialOpaqueEmpty> for ShaderTemplateMaterialOpaqueEmpty {
+    type Error = AwsmShaderError;
+
+    fn try_from(value: &ShaderCacheKeyMaterialOpaqueEmpty) -> Result<Self> {
+        Ok(Self {
+            texture_pool_arrays_len: value.texture_pool_arrays_len,
+            texture_pool_samplers_len: value.texture_pool_samplers_len,
+            multisampled_geometry: value.msaa_sample_count.is_some(),
+        })
+    }
+}
+
+#[derive(Template, Debug)]
+#[template(path = "material_opaque_wgsl/empty.wgsl", whitespace = "minimize")]
+pub struct ShaderTemplateMaterialOpaqueEmpty {
+    pub texture_pool_arrays_len: u32,
+    pub texture_pool_samplers_len: u32,
+    pub multisampled_geometry: bool,
+}
+
+impl ShaderTemplateMaterialOpaqueEmpty {
+    pub fn into_source(self) -> Result<String> {
+        let source = self.render()?;
+        // print_shader_source(&source, true);
+
+        //debug_unique_string(1, &source, || print_shader_source(&source, false));
+
+        Ok(source)
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn debug_label(&self) -> Option<&str> {
+        Some("Material Opaque Empty")
     }
 }

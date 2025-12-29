@@ -1,7 +1,7 @@
 fn sample_skybox(
     coords: vec2<i32>,
     screen_dims: vec2<f32>,
-    camera: CameraUniform,
+    camera: Camera,
     skybox_tex: texture_cube<f32>,
     skybox_sampler: sampler
 ) -> vec4<f32> {

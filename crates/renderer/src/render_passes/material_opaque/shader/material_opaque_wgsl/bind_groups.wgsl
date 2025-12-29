@@ -19,7 +19,7 @@
 @group(0) @binding(10) var<storage, read> model_transforms: array<mat4x4<f32>>;
 @group(0) @binding(11) var<storage, read> normal_matrices: array<f32>;
 @group(0) @binding(12) var<storage, read> texture_transforms: array<TextureTransform>;
-@group(0) @binding(13) var<uniform> camera: CameraUniform;
+@group(0) @binding(13) var<uniform> camera_raw: CameraRaw;
 @group(0) @binding(14) var skybox_tex: texture_cube<f32>;
 @group(0) @binding(15) var skybox_sampler: sampler;
 @group(0) @binding(16) var ibl_filtered_env_tex: texture_cube<f32>;

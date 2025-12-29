@@ -14,11 +14,16 @@ use crate::render_textures::{RenderTextureViews, RenderTextures};
 use crate::transforms::Transforms;
 use crate::{AwsmRenderer, AwsmRendererLogging};
 
+#[derive(Default)]
+pub struct RenderHooks {
+    pub after_opaque: Option<Box<dyn Fn(&RenderContext) -> Result<()>>>,
+}
+
 impl AwsmRenderer {
     // this should only be called once per frame
     // the various underlying raw data can be updated on their own cadence
     // or just call .update_all() right before .render() for convenience
-    pub fn render(&mut self) -> Result<()> {
+    pub fn render(&mut self, hooks: Option<&RenderHooks>) -> Result<()> {
         let _maybe_span_guard = if self.logging.render_timings {
             Some(tracing::span!(tracing::Level::INFO, "Render").entered())
         } else {
@@ -178,6 +183,10 @@ impl AwsmRenderer {
                 &ctx.render_texture_views.transparent,
                 &ctx.command_encoder,
             )?;
+        }
+
+        if let Some(hook) = hooks.and_then(|h| h.after_opaque.as_ref()) {
+            hook(&ctx)?;
         }
 
         {

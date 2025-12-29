@@ -9,6 +9,8 @@ pub struct AppContext {
     pub material: MutableMaterial,
     pub ibl_id: Mutable<IblId>,
     pub skybox_id: Mutable<SkyboxId>,
+    pub editor_grid_enabled: Mutable<bool>,
+    pub editor_gizmos_enabled: Mutable<bool>,
 }
 
 #[derive(Clone)]
@@ -42,6 +44,8 @@ impl Default for AppContext {
             },
             ibl_id: Mutable::new(CONFIG.initial_ibl),
             skybox_id: Mutable::new(CONFIG.initial_skybox),
+            editor_grid_enabled: Mutable::new(CONFIG.initial_show_grid),
+            editor_gizmos_enabled: Mutable::new(CONFIG.initial_show_gizmos),
         }
     }
 }

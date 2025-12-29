@@ -24,6 +24,12 @@ impl Shaders {
         }
     }
 
+    // usually used with hooks, i.e. third-party shaders that are completely outside
+    // of the normal renderer system
+    pub fn insert_uncached(&mut self, shader_module: web_sys::GpuShaderModule) -> ShaderKey {
+        self.lookup.insert(shader_module)
+    }
+
     pub async fn get_key(
         &mut self,
         gpu: &AwsmRendererWebGpu,

@@ -20,3 +20,16 @@ impl From<ShaderCacheKeyMaterialOpaque> for ShaderCacheKey {
         ShaderCacheKey::RenderPass(ShaderCacheKeyRenderPass::MaterialOpaque(key))
     }
 }
+
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
+pub struct ShaderCacheKeyMaterialOpaqueEmpty {
+    pub texture_pool_arrays_len: u32,
+    pub texture_pool_samplers_len: u32,
+    pub msaa_sample_count: Option<u32>,
+}
+
+impl From<ShaderCacheKeyMaterialOpaqueEmpty> for ShaderCacheKey {
+    fn from(key: ShaderCacheKeyMaterialOpaqueEmpty) -> Self {
+        ShaderCacheKey::RenderPass(ShaderCacheKeyRenderPass::MaterialOpaqueEmpty(key))
+    }
+}
