@@ -63,8 +63,8 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         initial_ibl: IblId::default(),
         initial_skybox: SkyboxId::default(),
         cache_buster: cfg!(debug_assertions),
-        initial_show_grid: true,
-        initial_show_gizmos: true,
+        initial_show_grid: false,
+        initial_show_gizmos: false,
     }
 });
 
