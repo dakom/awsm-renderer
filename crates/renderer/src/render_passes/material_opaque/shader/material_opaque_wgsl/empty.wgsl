@@ -51,6 +51,8 @@ fn main(
         return;
     }
 
+    let camera = camera_from_raw(camera_raw);
+
     let skybox_col = sample_skybox(coords, screen_dims_f32, camera, skybox_tex, skybox_sampler);
 
     textureStore(opaque_tex, coords, skybox_col);

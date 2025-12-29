@@ -51,17 +51,19 @@ impl CameraMatrices {
 }
 
 impl CameraBuffer {
-    // Layout:
+    // Layout (tightly packed, no implicit padding):
     //  view                (mat4)  64 bytes
     //  projection          (mat4)  64 bytes
     //  view_projection     (mat4)  64 bytes
     //  inv_view_projection (mat4)  64 bytes
     //  inv_projection      (mat4)  64 bytes
     //  inv_view            (mat4)  64 bytes
-    //  position (vec3) + frame_count (u32 padded) 16 bytes
+    //  position (vec4, w=unused) 16 bytes
+    //  frame_count_and_padding (vec4<u32>) 16 bytes
     //  frustum corner rays (4 * vec4) 64 bytes
-    // Total = 464 bytes (already 16-byte aligned for WGSL uniform layout)
-    pub const BYTE_SIZE: usize = 464;
+    //  padding (2 * vec4) 32 bytes
+    // Total = 512 bytes (all members 16-byte aligned, no implicit gaps)
+    pub const BYTE_SIZE: usize = 512;
 
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let gpu_buffer = gpu.create_buffer(
@@ -127,11 +129,20 @@ impl CameraBuffer {
         // Layout written below (mirrors `CameraUniform` in WGSL). The additional inverse
         // projection and frustum rays let compute passes reconstruct per-pixel view/world
         // positions directly from the depth buffer.
+        //
+        // IMPORTANT: frustum_rays are for SCREEN-SPACE RECONSTRUCTION, NOT frustum culling!
+        // They are 4 normalized view-space ray directions at the near plane corners,
+        // used for unprojecting screen pixels to world space (deferred rendering, grids, etc.).
+        // For frustum culling, you need 6 frustum planes extracted from the view-proj matrix.
 
         let inv_projection = camera_matrices.projection.inverse();
         let inv_view_projection = camera_matrices.inv_view_projection();
         let inv_view = camera_matrices.view.inverse();
         let frustum_rays = compute_view_frustum_rays(inv_projection);
+
+        // let s = format!("CameraBuffer Update, inv_projection: {inv_projection:?} inv_view_projection: {inv_view_projection:?} inv_view: {inv_view:?} frustum rays: {frustum_rays:?}");
+
+        // debug_unique_string(1, &s, || tracing::info!("{s}"));
 
         let mut offset = 0;
 
@@ -147,18 +158,29 @@ impl CameraBuffer {
         write_f32_slice(&mut self.raw_data, &mut offset, &inv_projection_cols);
         let inv_view_cols = inv_view.to_cols_array();
         write_f32_slice(&mut self.raw_data, &mut offset, &inv_view_cols);
-        let position = camera_matrices.position_world.to_array();
+        // Write position as vec4 (xyz + unused w component)
+        let position = camera_matrices.position_world.extend(0.0).to_array();
         write_f32_slice(&mut self.raw_data, &mut offset, &position);
+        // Write frame_count_and_padding as vec4<u32> (x = frame_count, yzw = padding)
         write_u32(
             &mut self.raw_data,
             &mut offset,
             render_textures.frame_count(),
         );
+        write_u32(&mut self.raw_data, &mut offset, 0);
+        write_u32(&mut self.raw_data, &mut offset, 0);
+        write_u32(&mut self.raw_data, &mut offset, 0);
 
         for ray in frustum_rays.iter() {
             let ray_values = ray.to_array();
             write_f32_slice(&mut self.raw_data, &mut offset, &ray_values);
         }
+
+        // Struct alignment padding (32 bytes at end) - WGSL compute pipeline requirement
+        write_f32_slice(&mut self.raw_data, &mut offset, &[0.0, 0.0, 0.0, 0.0]);
+        write_f32_slice(&mut self.raw_data, &mut offset, &[0.0, 0.0, 0.0, 0.0]);
+
+        debug_assert_eq!(offset, Self::BYTE_SIZE, "Buffer layout mismatch!");
 
         self.gpu_dirty = true;
 
@@ -213,21 +235,33 @@ fn halton(mut index: u32, base: u32) -> f32 {
     result
 }
 
+/// Compute 4 normalized view-space ray directions for the near plane corners.
+///
+/// These rays are used for screen-space reconstruction (unprojecting screen pixels to world space).
+/// Shaders bilinearly interpolate these corner rays to get the ray direction for any pixel,
+/// providing better numerical precision than doing full unprojection per-pixel.
+///
+/// **NOT for frustum culling** - culling needs 6 frustum planes extracted from view-proj matrix.
+///
+/// Order: [0]=bottom-left, [1]=bottom-right, [2]=top-left, [3]=top-right
 fn compute_view_frustum_rays(inv_projection: Mat4) -> [Vec4; 4] {
     // Reproject the clip-space corners of the near plane back into view space. These serve as
     // canonical ray directions that the compute shader can bilinearly interpolate per pixel.
+    // Use z=0 (near plane in WebGPU NDC), not z=1 (far plane) to avoid infinities
     let ndc_corners = [
-        Vec4::new(-1.0, -1.0, 1.0, 1.0),
-        Vec4::new(1.0, -1.0, 1.0, 1.0),
-        Vec4::new(-1.0, 1.0, 1.0, 1.0),
-        Vec4::new(1.0, 1.0, 1.0, 1.0),
+        Vec4::new(-1.0, -1.0, 0.0, 1.0),
+        Vec4::new(1.0, -1.0, 0.0, 1.0),
+        Vec4::new(-1.0, 1.0, 0.0, 1.0),
+        Vec4::new(1.0, 1.0, 0.0, 1.0),
     ];
 
     let mut rays = [Vec4::ZERO; 4];
     for (i, corner) in ndc_corners.iter().enumerate() {
         let view_space = inv_projection * *corner;
         let view_space = view_space / view_space.w;
-        rays[i] = Vec4::new(view_space.x, view_space.y, view_space.z, 0.0);
+        // Normalize to get ray direction (not position)
+        let ray_dir = Vec3::new(view_space.x, view_space.y, view_space.z).normalize();
+        rays[i] = Vec4::new(ray_dir.x, ray_dir.y, ray_dir.z, 0.0);
     }
 
     rays

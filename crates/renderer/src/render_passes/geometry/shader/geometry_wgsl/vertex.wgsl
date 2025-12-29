@@ -36,6 +36,8 @@ struct VertexOutput {
 fn vert_main(input: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 
+    let camera = camera_from_raw(camera_raw);
+
     let applied = apply_vertex(ApplyVertexInput(
         input.original_vertex_index,
         input.position,
@@ -47,7 +49,7 @@ fn vert_main(input: VertexInput) -> VertexOutput {
             input.instance_transform_row_2,
             input.instance_transform_row_3,
         {% endif %}
-    ));
+    ), camera);
 
     out.clip_position = applied.clip_position;
     out.world_normal = applied.world_normal;

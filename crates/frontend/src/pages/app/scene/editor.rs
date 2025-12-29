@@ -36,7 +36,7 @@ impl AppSceneEditor {
             let mut stream = map_ref! {
                 let grid_enabled = grid_enabled.signal(),
                 let gizmos_enabled = gizmos_enabled.signal()
-                => (grid_enabled.clone(), gizmos_enabled.clone())
+                => (*grid_enabled, *gizmos_enabled)
             }.to_stream();
 
             while let Some((grid_enabled, _gizmos_enabled)) = stream.next().await {
@@ -64,8 +64,6 @@ impl AppSceneEditor {
                     } else {
                         None
                     },
-                    // You can add gizmos rendering here similarly
-                    ..Default::default()
                 }));
             }
         }));

@@ -21,7 +21,7 @@ struct ApplyVertexOutput {
     world_position: vec3<f32>,   // Transformed world-space position
 }
 
-fn apply_vertex(vertex_orig: ApplyVertexInput) -> ApplyVertexOutput {
+fn apply_vertex(vertex_orig: ApplyVertexInput, camera: Camera) -> ApplyVertexOutput {
     var out: ApplyVertexOutput;
 
     var vertex = vertex_orig;

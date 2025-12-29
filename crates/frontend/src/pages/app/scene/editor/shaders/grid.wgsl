@@ -1,6 +1,21 @@
-@group(0) @binding(0) var<uniform> camera: CameraUniform;
+@group(0) @binding(0) var<uniform> camera_raw: CameraRaw;
 
-struct CameraUniform {
+// Raw camera uniform structure (matches GPU buffer layout with padding)
+struct CameraRaw {
+    view: mat4x4<f32>,
+    proj: mat4x4<f32>,
+    view_proj: mat4x4<f32>,
+    inv_view_proj: mat4x4<f32>,
+    inv_proj: mat4x4<f32>,
+    inv_view: mat4x4<f32>,
+    position: vec4<f32>,  // .xyz = position, .w = unused
+    frame_count_and_padding: vec4<u32>,  // .x = frame_count, .yzw = padding
+    frustum_rays: array<vec4<f32>, 4>,
+    _padding_end: array<vec4<f32>, 2>,  // Total: 512 bytes
+};
+
+// Friendly camera structure (no padding, easier to work with)
+struct Camera {
     view: mat4x4<f32>,
     proj: mat4x4<f32>,
     view_proj: mat4x4<f32>,
@@ -11,6 +26,21 @@ struct CameraUniform {
     frame_count: u32,
     frustum_rays: array<vec4<f32>, 4>,
 };
+
+// Convert from raw uniform to friendly structure
+fn camera_from_raw(raw: CameraRaw) -> Camera {
+    var camera: Camera;
+    camera.view = raw.view;
+    camera.proj = raw.proj;
+    camera.view_proj = raw.view_proj;
+    camera.inv_view_proj = raw.inv_view_proj;
+    camera.inv_proj = raw.inv_proj;
+    camera.inv_view = raw.inv_view;
+    camera.position = raw.position.xyz;
+    camera.frame_count = raw.frame_count_and_padding.x;
+    camera.frustum_rays = raw.frustum_rays;
+    return camera;
+}
 
 
 @vertex
@@ -61,36 +91,74 @@ const GRID_ALPHA_MINOR: f32 = 0.9;
 const GRID_ALPHA_MAJOR: f32 = 1.0;
 const GRID_ALPHA_AXIS: f32 = 1.0;
 
-// Fade distances to reduce moire
-const FADE_MINOR_START: f32 = 15.0;
-const FADE_MINOR_END: f32 = 30.0;
-const FADE_MAJOR_START: f32 = 80.0;
-const FADE_MAJOR_END: f32 = 150.0;
-
 @fragment
 fn frag_main(in: FragmentInput) -> FragmentOutput {
     let ndc = in.ndc;
 
-    // Extract camera basis from view matrix
-    let view_right = normalize(vec3<f32>(camera.view[0].x, camera.view[1].x, camera.view[2].x));
-    let view_up = normalize(vec3<f32>(camera.view[0].y, camera.view[1].y, camera.view[2].y));
-    let view_forward = normalize(vec3<f32>(camera.view[0].z, camera.view[1].z, camera.view[2].z));
+    // Convert raw camera uniform to friendly structure
+    let camera = camera_from_raw(camera_raw);
 
-    // Construct ray direction (needs FOV scaling for proper perspective)
-    let fov_scale = 1.0;
-    let ray_dir = normalize(view_right * ndc.x * fov_scale + view_up * ndc.y * fov_scale - view_forward);
+    // ===== PERSPECTIVE & ORTHOGRAPHIC =====
+    // Unproject NDC to world space
+    let clip_near = vec4<f32>(ndc.x, ndc.y, 0.0, 1.0);
+    var world_near_h = camera.inv_view_proj * clip_near;
+    let world_near = world_near_h.xyz / world_near_h.w;
 
-    // Intersect with y=0 plane
-    let t = (0.0 - camera.position.y) / ray_dir.y;
-    let world_pos = camera.position + ray_dir * t;
+    // Detect camera type
+    let is_ortho = camera.proj[3][3] > 0.9;
+
+    var ray_origin: vec3<f32>;
+    var ray_dir: vec3<f32>;
+    var world_pos: vec3<f32>;
+    var t: f32;
+
+    if (is_ortho) {
+        // Orthographic: unproject far plane for direction
+        let clip_far = vec4<f32>(ndc.x, ndc.y, 1.0, 1.0);
+        var world_far_h = camera.inv_view_proj * clip_far;
+        let world_far = world_far_h.xyz / world_far_h.w;
+
+        ray_origin = world_near;
+        // DON'T normalize - preserves world-space derivative consistency
+        ray_dir = world_far - world_near;
+
+        // Intersect with y=0 plane
+        t = (0.0 - ray_origin.y) / ray_dir.y;
+        world_pos = ray_origin + ray_dir * t;
+    } else {
+        // Perspective: use pre-computed frustum rays
+        let uv = (ndc + 1.0) * 0.5;
+
+        // Bilinearly interpolate frustum rays
+        let ray_bottom = mix(camera.frustum_rays[0].xyz, camera.frustum_rays[1].xyz, uv.x);
+        let ray_top = mix(camera.frustum_rays[2].xyz, camera.frustum_rays[3].xyz, uv.x);
+        let view_ray = mix(ray_bottom, ray_top, uv.y);
+
+        // Transform view-space ray to world space (rotation only)
+        let world_ray = mat3x3<f32>(
+            camera.inv_view[0].xyz,
+            camera.inv_view[1].xyz,
+            camera.inv_view[2].xyz
+        ) * view_ray;
+
+        ray_origin = camera.position;
+        ray_dir = world_ray; // Already normalized from CPU
+
+        // Intersect with y=0 plane
+        t = (0.0 - camera.position.y) / ray_dir.y;
+        world_pos = camera.position + ray_dir * t;
+    }
 
     // Calculate derivatives BEFORE any branching
     let coord = world_pos.xz;
     let derivative = fwidth(coord);
 
-    // NOW check for invalid intersections
+    // Check for invalid intersections
     let is_parallel = abs(ray_dir.y) < 0.001;
-    let is_behind = t < 0.0;
+
+    // For orthographic, don't check is_behind - let depth buffer handle clipping
+    // For perspective, reject rays pointing away from the ground plane
+    let is_behind = !is_ortho && t < 0.0;
 
     if (is_parallel || is_behind) {
         // Discard pixels that don't hit the ground
@@ -100,15 +168,12 @@ fn frag_main(in: FragmentInput) -> FragmentOutput {
         return output;
     }
 
-    // Simple approach: just cut off when derivative gets too large to avoid moire
-    let deriv_len = length(derivative);
-
-    // Minor grid (every 1 unit) - cut off when too far
+    // Minor grid (every 1 unit)
     let grid = abs(fract(coord - 0.5) - 0.5) / derivative;
     let line_minor = min(grid.x, grid.y);
     let minor_alpha = (1.0 - min(line_minor, 1.0)) * GRID_ALPHA_MINOR;
 
-    // Major grid (every 10 units) - cut off when too far
+    // Major grid (every 10 units)
     let grid_major = abs(fract(coord / 10.0 - 0.5) - 0.5) / (derivative / 10.0);
     let line_major = min(grid_major.x, grid_major.y);
     let major_alpha = (1.0 - min(line_major, 1.0)) * GRID_ALPHA_MAJOR;
@@ -126,42 +191,34 @@ fn frag_main(in: FragmentInput) -> FragmentOutput {
     // Layer lines on top of background (higher priority = drawn on top)
     if (minor_alpha > 0.01) {
         final_color = GRID_COLOR_MINOR;
-        final_alpha = GRID_ALPHA_MINOR;
+        final_alpha = minor_alpha;
     }
 
     if (major_alpha > 0.01) {
         final_color = GRID_COLOR_MAJOR;
-        final_alpha = GRID_ALPHA_MAJOR;
+        final_alpha = major_alpha;
     }
 
     if (z_axis_alpha > 0.01) {
         final_color = GRID_COLOR_Z_AXIS;
-        final_alpha = GRID_ALPHA_AXIS;
+        final_alpha = z_axis_alpha;
     }
 
     if (x_axis_alpha > 0.01) {
         final_color = GRID_COLOR_X_AXIS;
-        final_alpha = GRID_ALPHA_AXIS;
+        final_alpha = x_axis_alpha;
     }
 
-    // Calculate depth manually since view_proj matrix might have same issues as inv_view_proj
-    // Transform world position to view space
-    let view_pos = camera.view * vec4<f32>(world_pos.x, world_pos.y, world_pos.z, 1.0);
-    let view_z = -view_pos.z;  // View space Z (positive = in front of camera)
+    // Calculate depth by transforming world position back through view and projection
+    let view_pos_depth = camera.view * vec4<f32>(world_pos, 1.0);
+    let clip_pos_depth = camera.proj * view_pos_depth;
+    let ndc_depth = clip_pos_depth.z / clip_pos_depth.w;
 
-    // Project to NDC depth using projection matrix properties
-    let clip_pos = camera.proj * view_pos;
-    let ndc_depth = clip_pos.z / clip_pos.w;
+    // Clamp depth to valid WebGPU range [0, 1]
+    let depth = clamp(ndc_depth, 0.0, 1.0);
 
-    // Apply bias to prevent z-fighting in both directions
-    // Above grid: positive bias (push grid farther) so objects appear in front
-    // Below grid: negative bias (pull grid closer) so grid appears in front
-    let camera_above_grid = camera.position.y > 0.0;
-    let depth_bias = select(-0.0001, 0.0001, camera_above_grid);
-    let depth = ndc_depth + depth_bias;
-
-    var output: FragmentOutput;
-    output.color = vec4<f32>(final_color, final_alpha);
-    output.depth = depth;
-    return output;
+    var output_final: FragmentOutput;
+    output_final.color = vec4<f32>(final_color, final_alpha);
+    output_final.depth = depth;
+    return output_final;
 }

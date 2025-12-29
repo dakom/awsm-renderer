@@ -27,17 +27,19 @@ const EDGE_MSAA_DEPTH_THRESHOLD: f32 = 0.02;      // 2% relative difference betw
 
 // Main entry point - pass in already-calculated values to avoid redundant work
 fn depth_edge_mask(
+  camera: Camera,
   coords: vec2<i32>,
   pixel_center: vec2<f32>,
   screen_dims_f32: vec2<f32>,
   center_normal: vec3<f32>,
   center_triangle_id: u32
 ) -> bool {
-  return edge_mask_depth_msaa(coords, pixel_center, screen_dims_f32)
-      || edge_mask_neighbors(coords, pixel_center, screen_dims_f32, center_normal, center_triangle_id);
+  return edge_mask_depth_msaa(camera, coords, pixel_center, screen_dims_f32)
+      || edge_mask_neighbors(camera, coords, pixel_center, screen_dims_f32, center_normal, center_triangle_id);
 }
 
 fn edge_mask_neighbors(
+  camera: Camera,
   coords: vec2<i32>,
   pixel_center: vec2<f32>,
   screen_dims_f32: vec2<f32>,
@@ -87,7 +89,7 @@ fn edge_mask_neighbors(
       // Only check depth if normals are similar (lazy-load center depth on first need)
       if (!center_depth_loaded) {
         depth_c = textureLoad(depth_tex, coords, 0);
-        view_depth_c = viewSpaceDepth(depth_c, pixel_center, screen_dims_f32);
+        view_depth_c = viewSpaceDepth(camera, depth_c, pixel_center, screen_dims_f32);
         depth_threshold = EDGE_DEPTH_THRESHOLD * abs(view_depth_c);
         center_depth_loaded = true;
       }
@@ -95,7 +97,7 @@ fn edge_mask_neighbors(
       // Check depth discontinuity in view-space
       let neighbor_depth = textureLoad(depth_tex, neighbor_coords, 0);
       let neighbor_pixel_center = pixel_center + pixel_offsets[i];
-      let neighbor_view_depth = viewSpaceDepth(neighbor_depth, neighbor_pixel_center, screen_dims_f32);
+      let neighbor_view_depth = viewSpaceDepth(camera, neighbor_depth, neighbor_pixel_center, screen_dims_f32);
 
       if (abs(view_depth_c - neighbor_view_depth) > depth_threshold) {
         return true;
@@ -113,6 +115,7 @@ fn edge_mask_neighbors(
 // This catches sub-pixel edges that neighbor checks would miss
 // IMPORTANT: Only returns true for cross-triangle edges to preserve texture detail
 fn edge_mask_depth_msaa(
+  camera: Camera,
   coords: vec2<i32>,
   pixel_center: vec2<f32>,
   screen_dims_f32: vec2<f32>
@@ -128,7 +131,7 @@ fn edge_mask_depth_msaa(
 
       sample_count++;
       let depth = textureLoad(depth_tex, coords, {{ s }});
-      let view_depth = viewSpaceDepth(depth, pixel_center, screen_dims_f32);
+      let view_depth = viewSpaceDepth(camera, depth, pixel_center, screen_dims_f32);
       dmin = min(dmin, view_depth);
       dmax = max(dmax, view_depth);
     }
@@ -155,7 +158,7 @@ fn sampleCovered(coords: vec2<i32>, s: i32) -> bool {
 
 // Convert depth buffer value to view-space depth (negative Z in view space)
 // This gives us linear depth that we can meaningfully compare across the scene
-fn viewSpaceDepth(depth: f32, pixel_coords: vec2<f32>, screen_dims: vec2<f32>) -> f32 {
+fn viewSpaceDepth(camera: Camera, depth: f32, pixel_coords: vec2<f32>, screen_dims: vec2<f32>) -> f32 {
   // Reconstruct NDC coordinates (optimized to single expression)
   let ndc_xy = vec2<f32>(
     (pixel_coords.x / screen_dims.x) * 2.0 - 1.0,
@@ -173,6 +176,7 @@ fn viewSpaceDepth(depth: f32, pixel_coords: vec2<f32>, screen_dims: vec2<f32>) -
 // Check if we should use MSAA resolve for this pixel
 // Returns the number of samples to process (1 for non-edge, MSAA_SAMPLES for edge)
 fn msaa_sample_count_for_pixel(
+  camera: Camera,
   coords: vec2<i32>,
   pixel_center: vec2<f32>,
   screen_dims_f32: vec2<f32>,
@@ -197,7 +201,7 @@ fn msaa_sample_count_for_pixel(
   }
 
   // Check if this is an edge pixel
-  let is_edge = depth_edge_mask(coords, pixel_center, screen_dims_f32, center_normal, center_triangle_id);
+  let is_edge = depth_edge_mask(camera, coords, pixel_center, screen_dims_f32, center_normal, center_triangle_id);
 
   if (is_edge) {
     return MSAA_SAMPLES;

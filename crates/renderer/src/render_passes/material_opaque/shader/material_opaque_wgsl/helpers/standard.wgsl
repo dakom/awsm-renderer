@@ -9,6 +9,9 @@ struct StandardCoordinates {
 }
 
 fn get_standard_coordinates(coords: vec2<i32>, screen_dims: vec2<u32>) -> StandardCoordinates {
+    // Convert raw camera uniform to friendly structure
+    let camera = camera_from_raw(camera_raw);
+
     let screen_dims_f32 = vec2<f32>(f32(screen_dims.x), f32(screen_dims.y));
     let depth_sample : f32 = textureLoad(depth_tex, coords, 0);
 

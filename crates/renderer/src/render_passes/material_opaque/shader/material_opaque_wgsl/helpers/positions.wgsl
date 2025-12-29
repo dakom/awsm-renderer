@@ -16,11 +16,11 @@ struct VertexProjection {
     valid : bool,
 }
 
-fn project_vertices(os: ObjectSpaceVertices, model_transform: mat4x4<f32>, screen_dims: vec2<f32>) -> ProjectedVertices {
+fn project_vertices(camera: Camera, os: ObjectSpaceVertices, model_transform: mat4x4<f32>, screen_dims: vec2<f32>) -> ProjectedVertices {
     return ProjectedVertices(
-        _project_vertex(os.p0, model_transform, screen_dims),
-        _project_vertex(os.p1, model_transform, screen_dims),
-        _project_vertex(os.p2, model_transform, screen_dims),
+        _project_vertex(camera, os.p0, model_transform, screen_dims),
+        _project_vertex(camera, os.p1, model_transform, screen_dims),
+        _project_vertex(camera, os.p2, model_transform, screen_dims),
     );
 }
 
@@ -58,6 +58,7 @@ fn _get_vertex_position(visibility_data_offset: u32, triangle_index: u32, vertex
 }
 
 fn _project_vertex(
+    camera: Camera,
     position_os: vec3<f32>,
     model_transform: mat4x4<f32>,
     screen_dims: vec2<f32>

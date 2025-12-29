@@ -59,7 +59,7 @@ pub fn render_gizmos(
         .into(),
     )?;
 
-    render_pass.set_pipeline(&gizmos_pipeline);
+    render_pass.set_pipeline(gizmos_pipeline);
     render_pass.draw(3);
     render_pass.end();
     renderer.gpu.submit_commands(&command_encoder.finish());

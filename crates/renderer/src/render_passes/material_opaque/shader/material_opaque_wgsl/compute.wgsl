@@ -120,6 +120,8 @@ fn main(
     let triangle_index = join32(visibility_data.x, visibility_data.y);
     let material_meta_offset = join32(visibility_data.z, visibility_data.w);
 
+    let camera = camera_from_raw(camera_raw);
+
     // early return if we only hit skybox / no geometry (for all samples if MSAA)
     {% if multisampled_geometry %}
         // With MSAA, check if ANY sample hit geometry before early returning
@@ -212,6 +214,7 @@ fn main(
                         {% match mipmap %}
                             {% when MipmapMode::Gradient %}
                                 let mat_color_{{s}} = compute_material_color(
+                                    camera,
                                     tri_indices_{{s}},
                                     attribute_data_offset_{{s}},
                                     tri_{{s}},
@@ -226,6 +229,7 @@ fn main(
                                 );
                             {% when MipmapMode::None %}
                                 let mat_color_{{s}} = compute_material_color(
+                                    camera,
                                     tri_indices_{{s}},
                                     attribute_data_offset_{{s}},
                                     tri_{{s}},
@@ -312,6 +316,7 @@ fn main(
         {% when MipmapMode::Gradient %}
             let bary_derivs = textureLoad(barycentric_derivatives_tex, coords, 0);
             let material_color = compute_material_color(
+                camera,
                 triangle_indices,
                 attribute_data_offset,
                 triangle_index,
@@ -326,6 +331,7 @@ fn main(
             );
         {% when MipmapMode::None %}
             let material_color = compute_material_color(
+                camera,
                 triangle_indices,
                 attribute_data_offset,
                 triangle_index,
@@ -349,7 +355,7 @@ fn main(
 
     // If we're not doing MSAA, we're done here, but if we are, we need to check if this is an edge pixel
     {% if multisampled_geometry && !debug.msaa_detect_edges %}
-        let samples_to_process = msaa_sample_count_for_pixel(coords, pixel_center, screen_dims_f32, world_normal, triangle_index);
+        let samples_to_process = msaa_sample_count_for_pixel(camera, coords, pixel_center, screen_dims_f32, world_normal, triangle_index);
 
         // If more than 1 sample to process, it's an edge pixel
         if (samples_to_process > 1u) {
@@ -412,6 +418,7 @@ fn main(
                         {% match mipmap %}
                             {% when MipmapMode::Gradient %}
                                 let material_color_{{s}} = compute_material_color(
+                                    camera,
                                     triangle_indices_{{s}},
                                     attribute_data_offset_{{s}},
                                     tri_id_{{s}},
@@ -426,6 +433,7 @@ fn main(
                                 );
                             {% when MipmapMode::None %}
                                 let material_color_{{s}} = compute_material_color(
+                                    camera,
                                     triangle_indices_{{s}},
                                     attribute_data_offset_{{s}},
                                     tri_id_{{s}},
