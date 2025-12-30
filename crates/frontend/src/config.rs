@@ -64,7 +64,7 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         initial_skybox: SkyboxId::default(),
         cache_buster: cfg!(debug_assertions),
         initial_show_grid: false,
-        initial_show_gizmos: false,
+        initial_show_gizmos: true,
     }
 });
 
