@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::{
     anti_alias::AntiAliasing, bind_group_layout::BindGroupLayouts, camera::CameraBuffer,
-    environment::Environment, lights::Lights, materials::Materials, mesh::Meshes,
+    environment::Environment, lights::Lights, materials::Materials, mesh::Meshes, picker::Picker,
     render_passes::RenderPasses, render_textures::RenderTextureViews, textures::Textures,
     transforms::Transforms,
 };
@@ -56,6 +56,7 @@ pub enum BindGroupCreate {
     MeshAttributeDataResize,
     MeshAttributeIndexResize,
     PbrMaterialResize,
+    HudMaterialResize,
     TextureViewResize,
     TexturePool,
     TextureTransformsResize,
@@ -88,6 +89,7 @@ impl BindGroups {
         &mut self,
         ctx: BindGroupRecreateContext<'_>,
         render_passes: &mut RenderPasses,
+        picker: &mut Picker,
     ) -> crate::error::Result<()> {
         if self.create_list.is_empty() {
             return Ok(());
@@ -108,6 +110,7 @@ impl BindGroups {
             TransparentTextures,
             LightCulling,
             Display,
+            Picker,
         }
 
         let mut functions_to_call = HashSet::new();
@@ -132,6 +135,10 @@ impl BindGroups {
                     functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
                 }
                 BindGroupCreate::PbrMaterialResize => {
+                    functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
+                    functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
+                }
+                BindGroupCreate::HudMaterialResize => {
                     functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
                     functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
                 }
@@ -186,6 +193,7 @@ impl BindGroups {
                 BindGroupCreate::MaterialMeshMetaResize => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
                     functions_to_call.insert(FunctionToCall::TransparentMain);
+                    functions_to_call.insert(FunctionToCall::Picker);
                 }
                 BindGroupCreate::MeshAttributeDataResize => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
@@ -271,6 +279,9 @@ impl BindGroups {
                 }
                 FunctionToCall::Display => {
                     render_passes.display.bind_groups.recreate(&ctx)?;
+                }
+                FunctionToCall::Picker => {
+                    picker.recreate_bind_group(&ctx)?;
                 }
             }
         }

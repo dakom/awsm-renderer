@@ -15,14 +15,18 @@ use awsm_renderer::gltf::data::GltfData;
 use awsm_renderer::gltf::loader::GltfLoader;
 use awsm_renderer::lights::ibl::IblTexture;
 use awsm_renderer::lights::{ibl::Ibl, Light};
+
+use awsm_renderer::picker::PickResult;
 use awsm_renderer::AwsmRenderer;
 use awsm_web::dom::resize::ResizeObserver;
 use camera::{Camera, CameraId};
 use gloo_events::EventListener;
 use wasm_bindgen_futures::spawn_local;
+use web_sys::PointerEvent;
 
 use crate::models::collections::GltfId;
 use crate::pages::app::context::{IblId, SkyboxId};
+use crate::pages::app::scene::editor::transform_controller::TransformController;
 use crate::pages::app::scene::editor::AppSceneEditor;
 use crate::pages::app::sidebar::material::FragmentShaderKind;
 use crate::prelude::*;
@@ -31,7 +35,7 @@ use super::context::AppContext;
 
 pub struct AppScene {
     pub ctx: AppContext,
-    pub renderer: futures::lock::Mutex<AwsmRenderer>,
+    pub renderer: Arc<futures::lock::Mutex<AwsmRenderer>>,
     pub editor: Mutex<Option<editor::AppSceneEditor>>,
     pub gltf_cache: Mutex<HashMap<GltfId, GltfLoader>>,
     pub latest_gltf_data: Mutex<Option<GltfData>>,
@@ -53,7 +57,7 @@ impl AppScene {
 
         let state = Arc::new(Self {
             ctx,
-            renderer: futures::lock::Mutex::new(renderer),
+            renderer: Arc::new(futures::lock::Mutex::new(renderer)),
             gltf_cache: Mutex::new(HashMap::new()),
             ibl_cache: Mutex::new(HashMap::new()),
             skybox_by_ibl_cache: Mutex::new(HashMap::new()),
@@ -91,10 +95,31 @@ impl AppScene {
             EventListener::new(
                 &canvas,
                 "pointerdown",
-                clone!(state => move |_event| {
+                clone!(state => move |event| {
                     if let Some(camera) = state.camera.lock().unwrap().as_mut() {
                         camera.on_pointer_down();
                     }
+
+
+                    spawn_local(clone!(state, event => async move {
+                        let renderer = state.renderer.lock().await;
+                        let event = event.unchecked_into::<PointerEvent>();
+                        let (x, y) = renderer.gpu.pointer_event_to_canvas_coords_i32(&event);
+                        match renderer.pick(x,y).await {
+                            Err(err) => {
+                                tracing::error!("Pick error: {:?}", err);
+                            }
+                            Ok(res) => {
+                                if let PickResult::Hit(mesh_key) = res {
+                                    if let Some(editor) = state.editor.lock().unwrap().as_ref() {
+                                        editor.start_pick(mesh_key, x, y);
+                                    }
+                                } else {
+                                    tracing::info!("MISSED {},{}: {:?}", x, y, res);
+                                }
+                            }
+                        }
+                    }));
                 }),
             ),
             EventListener::new(
@@ -202,9 +227,11 @@ impl AppScene {
         }
 
         match AppSceneEditor::new(
-            &mut *state.renderer.lock().await,
+            state.renderer.clone(),
             state.ctx.editor_grid_enabled.clone(),
-            state.ctx.editor_gizmos_enabled.clone(),
+            state.ctx.editor_gizmo_translation_enabled.clone(),
+            state.ctx.editor_gizmo_rotation_enabled.clone(),
+            state.ctx.editor_gizmo_scale_enabled.clone(),
         )
         .await
         {
@@ -245,9 +272,7 @@ impl AppScene {
             return Ok(loader);
         }
 
-        let url = format!("{}/{}", CONFIG.gltf_url, gltf_id.filepath());
-
-        let loader = GltfLoader::load(&url, None).await?;
+        let loader = GltfLoader::load(&gltf_id.url(), None).await?;
 
         state
             .gltf_cache
@@ -426,7 +451,7 @@ impl AppScene {
     }
 
     pub async fn upload_data(self: &Arc<Self>, _gltf_id: GltfId, loader: GltfLoader) -> Result<()> {
-        let data = loader.into_data()?;
+        let data = loader.into_data(None)?;
 
         *self.latest_gltf_data.lock().unwrap() = Some(data);
 
@@ -444,6 +469,17 @@ impl AppScene {
         let mut renderer = self.renderer.lock().await;
 
         renderer.populate_gltf(data, None).await?;
+
+        if let Some(editor) = self.editor.lock().unwrap().as_mut() {
+            let ctx = renderer
+                .populate_gltf(editor.gizmo_gltf_data.clone(), None)
+                .await?;
+
+            *editor.transform_controller.lock().unwrap() = Some(TransformController::new(
+                &mut renderer,
+                &*ctx.key_lookups.lock().unwrap(),
+            )?);
+        }
 
         renderer.lights.insert(Light::Directional {
             color: [1.0, 0.97, 0.92],

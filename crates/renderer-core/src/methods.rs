@@ -1,5 +1,5 @@
 use crate::{
-    buffers::{BufferDescriptor, BufferUsage, MapMode},
+    buffers::{extract_buffer_vec, BufferDescriptor, BufferUsage},
     configuration::CanvasConfiguration,
     data::JsData,
 };
@@ -413,7 +413,7 @@ impl AwsmRendererWebGpu {
     }
 
     /// Copies GPU buffer data into a new mapped buffer and returns it as a `Vec<u8>`
-    pub async fn extract_buffer(
+    pub async fn new_copy_and_extract_buffer(
         &self,
         source: &web_sys::GpuBuffer,
         size: Option<u32>,
@@ -437,24 +437,54 @@ impl AwsmRendererWebGpu {
         let command_buffer = encoder.finish();
         self.submit_commands(&command_buffer);
 
-        // Wait for GPU to complete mapping
-        let map_promise = read_buffer.map_async_with_u32_and_u32(MapMode::Read as u32, 0, size);
-        JsFuture::from(map_promise)
-            .await
-            .map_err(AwsmCoreError::buffer_map)?;
+        extract_buffer_vec(&read_buffer, Some(size)).await
+    }
 
-        // Get the mapped JS ArrayBuffer slice
-        let array_buffer = read_buffer
-            .get_mapped_range_with_u32_and_u32(0, size)
-            .map_err(AwsmCoreError::buffer_map_range)?;
+    pub fn pointer_event_to_canvas_coords_f64(&self, evt: &web_sys::PointerEvent) -> (f64, f64) {
+        let canvas = self.canvas();
+        let rect = canvas.get_bounding_client_rect();
 
-        // Convert to Uint8Array
-        let uint8_array = js_sys::Uint8Array::new(&array_buffer);
-        let mut vec = vec![0u8; size as usize];
-        uint8_array.copy_to(&mut vec);
+        // CSS pixels relative to the canvas' top-left
+        let css_x = evt.client_x() as f64 - rect.left();
+        let css_y = evt.client_y() as f64 - rect.top();
 
-        read_buffer.unmap();
+        // Avoid division by zero if the element is not laid out (display:none etc.)
+        let rect_w = rect.width().max(1.0);
+        let rect_h = rect.height().max(1.0);
 
-        Ok(vec)
+        // Convert CSS pixels -> backing pixels
+        let scale_x = canvas.width() as f64 / rect_w;
+        let scale_y = canvas.height() as f64 / rect_h;
+
+        let x = css_x * scale_x;
+        let y = css_y * scale_y;
+
+        (x, y)
+    }
+
+    pub fn pointer_event_to_canvas_coords_i32(&self, evt: &web_sys::PointerEvent) -> (i32, i32) {
+        let (x, y) = self.pointer_event_to_canvas_coords_f64(evt);
+
+        let canvas = self.canvas();
+        let w = canvas.width().max(1);
+        let h = canvas.height().max(1);
+
+        let mut ix = x.floor() as i64;
+        let mut iy = y.floor() as i64;
+
+        if ix < 0 {
+            ix = 0;
+        }
+        if iy < 0 {
+            iy = 0;
+        }
+        if ix >= w as i64 {
+            ix = w as i64 - 1;
+        }
+        if iy >= h as i64 {
+            iy = h as i64 - 1;
+        }
+
+        (ix as i32, iy as i32)
     }
 }

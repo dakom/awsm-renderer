@@ -6,25 +6,95 @@ use std::{
 use awsm_renderer_core::texture::texture_pool::TextureColorInfo;
 use glam::Mat4;
 
-use crate::{textures::TextureKey, transforms::TransformKey, AwsmRenderer};
+use crate::{mesh::MeshKey, textures::TextureKey, transforms::TransformKey, AwsmRenderer};
 
 use super::{data::GltfData, error::AwsmGltfError};
 
 mod animation;
 mod extensions;
-mod material;
+pub mod material;
 mod mesh;
 mod skin;
 pub(super) mod transforms;
 
-pub(crate) struct GltfPopulateContext {
+pub struct GltfPopulateContext {
     pub data: Arc<GltfData>,
     pub textures: Mutex<HashMap<GltfTextureKey, TextureKey>>,
-    pub node_to_transform: Mutex<HashMap<GltfIndex, TransformKey>>,
     pub node_to_skin_transform:
         Mutex<HashMap<GltfIndex, Arc<(Vec<TransformKey>, Vec<SkinInverseBindMatrix>)>>>,
     pub transform_is_joint: Mutex<HashSet<TransformKey>>,
     pub transform_is_instanced: Mutex<HashSet<TransformKey>>,
+    pub key_lookups: Mutex<GltfKeyLookups>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct GltfKeyLookups {
+    pub node_transforms: HashMap<String, TransformKey>,
+    // for all nodes with a name, get mesh_keys per primitive for that node, and optional mesh name
+    pub node_meshes: HashMap<String, Vec<(Option<String>, Vec<MeshKey>)>>,
+    // for all the meshes with a name, get mesh_keys per primitive for that mesh
+    pub mesh_primitives: HashMap<String, Vec<MeshKey>>,
+    pub node_index_to_transform: HashMap<GltfIndex, TransformKey>,
+    pub all_mesh_keys: HashMap<GltfIndex, Vec<MeshKey>>,
+}
+
+impl GltfKeyLookups {
+    pub fn insert_transform(&mut self, node: &gltf::Node, key: TransformKey) {
+        if let Some(name) = node.name() {
+            self.node_transforms.insert(name.to_string(), key);
+        }
+
+        self.node_index_to_transform.insert(node.index(), key);
+    }
+
+    pub fn insert_mesh(&mut self, node: &gltf::Node, mesh: &gltf::Mesh, mesh_key: MeshKey) {
+        self.all_mesh_keys
+            .entry(mesh.index())
+            .or_default()
+            .push(mesh_key.clone());
+
+        if let Some(mesh_name) = mesh.name() {
+            self.mesh_primitives
+                .entry(mesh_name.to_string())
+                .or_default()
+                .push(mesh_key.clone());
+        }
+
+        if let Some(node_name) = node.name() {
+            let entry = self.node_meshes.entry(node_name.to_string()).or_default();
+            match mesh.name() {
+                None => {
+                    // no mesh name, just add to the list with None
+                    entry.push((None, vec![mesh_key]));
+                }
+                Some(name) => {
+                    // see if we already have an entry for this mesh name
+                    let mut found = false;
+                    for (mesh_name_opt, mesh_keys) in entry.iter_mut() {
+                        if let Some(mesh_name) = mesh_name_opt {
+                            if mesh_name == name {
+                                mesh_keys.push(mesh_key);
+                                found = true;
+                            }
+                        }
+                    }
+
+                    // otherwise add a new entry
+                    if !found {
+                        entry.push((Some(name.to_string()), vec![mesh_key]));
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn meshes_for_node_iter(&self, node_name: &str) -> impl Iterator<Item = &MeshKey> {
+        self.node_meshes
+            .get(node_name)
+            .into_iter()
+            .flat_map(|entries| entries.iter())
+            .flat_map(|(_mesh_name_opt, mesh_keys)| mesh_keys.iter())
+    }
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -40,20 +110,21 @@ type GltfIndex = usize;
 impl AwsmRenderer {
     pub async fn populate_gltf(
         &mut self,
-        gltf_data: GltfData,
+        gltf_data: impl Into<Arc<GltfData>>,
         scene: Option<usize>,
-    ) -> anyhow::Result<()> {
-        #[allow(clippy::arc_with_non_send_sync)]
-        let gltf_data = Arc::new(gltf_data);
+    ) -> anyhow::Result<GltfPopulateContext> {
+        let gltf_data = gltf_data.into();
         self.gltf.raw_datas.push(gltf_data.clone());
+
+        let mut mesh_keys = Vec::new();
 
         let ctx = GltfPopulateContext {
             data: gltf_data,
             textures: Mutex::new(HashMap::new()),
-            node_to_transform: Mutex::new(HashMap::new()),
             node_to_skin_transform: Mutex::new(HashMap::new()),
             transform_is_joint: Mutex::new(HashSet::new()),
             transform_is_instanced: Mutex::new(HashSet::new()),
+            key_lookups: Mutex::new(GltfKeyLookups::default()),
         };
 
         let scene = match scene {
@@ -91,11 +162,11 @@ impl AwsmRenderer {
         }
 
         for node in scene.nodes() {
-            self.populate_gltf_node_mesh(&ctx, &node).await?;
+            mesh_keys.push(self.populate_gltf_node_mesh(&ctx, &node).await?);
         }
 
         self.finalize_gpu_textures().await?;
 
-        Ok(())
+        Ok(ctx)
     }
 }

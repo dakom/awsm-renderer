@@ -8,8 +8,11 @@ use thiserror::Error;
 
 use awsm_renderer_core::shaders::ShaderModuleExt;
 
-use crate::render_passes::{
-    shader_cache_key::ShaderCacheKeyRenderPass, shader_template::ShaderTemplateRenderPass,
+use crate::{
+    picker::{ShaderCacheKeyPicker, ShaderTemplatePicker},
+    render_passes::{
+        shader_cache_key::ShaderCacheKeyRenderPass, shader_template::ShaderTemplateRenderPass,
+    },
 };
 
 pub struct Shaders {
@@ -69,10 +72,12 @@ impl Default for Shaders {
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum ShaderCacheKey {
     RenderPass(ShaderCacheKeyRenderPass),
+    Picker(ShaderCacheKeyPicker),
 }
 
 pub enum ShaderTemplate {
     RenderPass(ShaderTemplateRenderPass),
+    Picker(ShaderTemplatePicker),
 }
 
 impl TryFrom<&ShaderCacheKey> for ShaderTemplate {
@@ -83,6 +88,7 @@ impl TryFrom<&ShaderCacheKey> for ShaderTemplate {
             ShaderCacheKey::RenderPass(cache_key) => {
                 Ok(ShaderTemplate::RenderPass(cache_key.try_into()?))
             }
+            ShaderCacheKey::Picker(cache_key) => Ok(ShaderTemplate::Picker(cache_key.into())),
         }
     }
 }
@@ -103,12 +109,14 @@ impl ShaderTemplate {
     pub fn debug_label(&self) -> Option<&str> {
         match self {
             ShaderTemplate::RenderPass(tmpl) => tmpl.debug_label(),
+            ShaderTemplate::Picker(tmpl) => tmpl.debug_label(),
         }
     }
 
     pub fn into_source(self) -> Result<String> {
         let source = match self {
             ShaderTemplate::RenderPass(tmpl) => tmpl.into_source()?,
+            ShaderTemplate::Picker(tmpl) => tmpl.into_source()?,
         };
         //tracing::info!("{:#?}", tmpl);
         // print_shader_source(&source, true);

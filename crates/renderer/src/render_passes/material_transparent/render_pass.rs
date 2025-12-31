@@ -40,7 +40,12 @@ impl MaterialTransparentRenderPass {
         Ok(())
     }
 
-    pub fn render(&self, ctx: &RenderContext, renderables: Vec<Renderable>) -> Result<()> {
+    pub fn render(
+        &self,
+        ctx: &RenderContext,
+        renderables: Vec<Renderable>,
+        is_hud: bool,
+    ) -> Result<()> {
         let mut color_attachment = ColorAttachment::new(
             &ctx.render_texture_views.transparent,
             LoadOp::Load,
@@ -52,15 +57,22 @@ impl MaterialTransparentRenderPass {
                 color_attachment.with_resolve_target(&ctx.render_texture_views.composite);
         }
 
+        let depth_stencil_attachment = if is_hud {
+            DepthStencilAttachment::new(&ctx.render_texture_views.hud_depth)
+                .with_depth_load_op(LoadOp::Clear)
+                .with_depth_clear_value(1.0)
+                .with_depth_store_op(StoreOp::Store)
+        } else {
+            DepthStencilAttachment::new(&ctx.render_texture_views.depth)
+                .with_depth_load_op(LoadOp::Load)
+                .with_depth_store_op(StoreOp::Store)
+        };
+
         let render_pass = ctx.command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 label: Some("Material Transparent Pass"),
                 color_attachments: vec![color_attachment],
-                depth_stencil_attachment: Some(
-                    DepthStencilAttachment::new(&ctx.render_texture_views.depth)
-                        .with_depth_load_op(LoadOp::Load)
-                        .with_depth_store_op(StoreOp::Store),
-                ),
+                depth_stencil_attachment: Some(depth_stencil_attachment),
                 ..Default::default()
             }
             .into(),

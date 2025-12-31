@@ -7,6 +7,7 @@ use awsm_renderer_core::command::{
 };
 
 use crate::{
+    debug::{debug_unique_string, DEBUG_ID_RENDERABLE},
     error::Result,
     render::RenderContext,
     render_passes::{
@@ -42,39 +43,76 @@ impl GeometryRenderPass {
         })
     }
 
-    pub fn render(&self, ctx: &RenderContext, renderables: &[Renderable]) -> Result<()> {
+    pub fn render(
+        &self,
+        ctx: &RenderContext,
+        renderables: &[Renderable],
+        is_hud: bool,
+    ) -> Result<()> {
+        let color_attachments = if is_hud {
+            vec![
+                ColorAttachment::new(
+                    &ctx.render_texture_views.visibility_data,
+                    LoadOp::Load,
+                    StoreOp::Store,
+                )
+                .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
+                ColorAttachment::new(
+                    &ctx.render_texture_views.barycentric,
+                    LoadOp::Load,
+                    StoreOp::Store,
+                ),
+                ColorAttachment::new(
+                    &ctx.render_texture_views.normal_tangent,
+                    LoadOp::Load,
+                    StoreOp::Store,
+                ),
+                ColorAttachment::new(
+                    &ctx.render_texture_views.barycentric_derivatives,
+                    LoadOp::Load,
+                    StoreOp::Store,
+                ),
+            ]
+        } else {
+            vec![
+                ColorAttachment::new(
+                    &ctx.render_texture_views.visibility_data,
+                    LoadOp::Clear,
+                    StoreOp::Store,
+                )
+                .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
+                ColorAttachment::new(
+                    &ctx.render_texture_views.barycentric,
+                    LoadOp::Clear,
+                    StoreOp::Store,
+                ),
+                ColorAttachment::new(
+                    &ctx.render_texture_views.normal_tangent,
+                    LoadOp::Clear,
+                    StoreOp::Store,
+                ),
+                ColorAttachment::new(
+                    &ctx.render_texture_views.barycentric_derivatives,
+                    LoadOp::Clear,
+                    StoreOp::Store,
+                ),
+            ]
+        };
+
+        let depth_stencil_attachment = DepthStencilAttachment::new(if is_hud {
+            &ctx.render_texture_views.hud_depth
+        } else {
+            &ctx.render_texture_views.depth
+        })
+        .with_depth_load_op(LoadOp::Clear)
+        .with_depth_store_op(StoreOp::Store)
+        .with_depth_clear_value(1.0);
+
         let render_pass = ctx.command_encoder.begin_render_pass(
             &RenderPassDescriptor {
                 label: Some("Geometry Render Pass"),
-                color_attachments: vec![
-                    ColorAttachment::new(
-                        &ctx.render_texture_views.visibility_data,
-                        LoadOp::Clear,
-                        StoreOp::Store,
-                    )
-                    .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
-                    ColorAttachment::new(
-                        &ctx.render_texture_views.barycentric,
-                        LoadOp::Clear,
-                        StoreOp::Store,
-                    ),
-                    ColorAttachment::new(
-                        &ctx.render_texture_views.normal_tangent,
-                        LoadOp::Clear,
-                        StoreOp::Store,
-                    ),
-                    ColorAttachment::new(
-                        &ctx.render_texture_views.barycentric_derivatives,
-                        LoadOp::Clear,
-                        StoreOp::Store,
-                    ),
-                ],
-                depth_stencil_attachment: Some(
-                    DepthStencilAttachment::new(&ctx.render_texture_views.depth)
-                        .with_depth_load_op(LoadOp::Clear)
-                        .with_depth_store_op(StoreOp::Store)
-                        .with_depth_clear_value(1.0),
-                ),
+                color_attachments,
+                depth_stencil_attachment: Some(depth_stencil_attachment),
                 ..Default::default()
             }
             .into(),
@@ -92,13 +130,24 @@ impl GeometryRenderPass {
 
         let mut last_render_pipeline_key = None;
         for renderable in renderables {
-            let render_pipeline_key = renderable.geometry_render_pipeline_key(ctx);
-            if last_render_pipeline_key != Some(render_pipeline_key) {
-                render_pass.set_pipeline(ctx.pipelines.render.get(render_pipeline_key)?);
-                last_render_pipeline_key = Some(render_pipeline_key);
-            }
+            match renderable.geometry_render_pipeline_key(ctx) {
+                Ok(render_pipeline_key) => {
+                    if last_render_pipeline_key != Some(render_pipeline_key) {
+                        render_pass.set_pipeline(ctx.pipelines.render.get(render_pipeline_key)?);
+                        last_render_pipeline_key = Some(render_pipeline_key);
+                    }
 
-            renderable.push_geometry_pass_commands(ctx, &render_pass, &self.bind_groups)?;
+                    renderable.push_geometry_pass_commands(ctx, &render_pass, &self.bind_groups)?;
+                }
+                Err(err) => {
+                    debug_unique_string(DEBUG_ID_RENDERABLE, &err.to_string(), || {
+                        tracing::warn!(
+                            "Skipping renderable in Geometry Pass due to missing pipeline: {:?}",
+                            renderable
+                        )
+                    });
+                }
+            }
         }
 
         render_pass.end();

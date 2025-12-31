@@ -13,10 +13,10 @@ pub mod pbr;
 
 pub struct Materials {
     lookup: SlotMap<MaterialKey, Material>,
-    // optimization to avoid loading whole material to check if it has alpha blend
+    buffers: MaterialBuffers,
+    // optimization to avoid loading whole material to check for basic properties
     alpha_blend: SecondaryMap<MaterialKey, ()>,
     alpha_mask: SecondaryMap<MaterialKey, f32>,
-    buffers: MaterialBuffers,
 }
 
 struct MaterialBuffers {
@@ -53,9 +53,9 @@ impl Materials {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Materials {
             lookup: SlotMap::with_key(),
+            buffers: MaterialBuffers::new(gpu)?,
             alpha_blend: SecondaryMap::new(),
             alpha_mask: SecondaryMap::new(),
-            buffers: MaterialBuffers::new(gpu)?,
         })
     }
 
@@ -76,7 +76,7 @@ impl Materials {
             self.alpha_mask.insert(key, alpha_mask);
         }
         self.buffers.buffer_kind.insert(key, buffer_kind);
-        self.update(key, |_| {}, textures);
+        self.update(key, textures, |_| {});
 
         key
     }
@@ -107,8 +107,8 @@ impl Materials {
     pub fn update(
         &mut self,
         key: MaterialKey,
-        mut f: impl FnMut(&mut Material),
         textures: &Textures,
+        mut f: impl FnMut(&mut Material),
     ) {
         if let Some(material) = self.lookup.get_mut(key) {
             let old_has_alpha_blend = material.has_alpha_blend();
@@ -136,6 +136,11 @@ impl Materials {
                 }
             }
             if old_buffer_kind != new_buffer_kind {
+                match old_buffer_kind {
+                    MaterialBufferKind::Pbr => {
+                        self.buffers.pbr.remove(key);
+                    }
+                }
                 self.buffers.buffer_kind.insert(key, new_buffer_kind);
             }
             match material {
@@ -146,6 +151,13 @@ impl Materials {
         }
     }
 
+    pub fn buffer_kind(&self, key: MaterialKey) -> Result<MaterialBufferKind> {
+        self.buffers
+            .buffer_kind
+            .get(key)
+            .copied()
+            .ok_or(AwsmMaterialError::BufferSlotMissing(key))
+    }
     pub fn has_alpha_blend(&self, key: MaterialKey) -> bool {
         self.alpha_blend.contains_key(key)
     }

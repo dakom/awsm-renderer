@@ -168,6 +168,7 @@ pub struct RenderTextureViews {
     pub transparent_to_composite_blit_bind_group_no_anti_alias: Option<web_sys::GpuBindGroup>,
 
     pub depth: web_sys::GpuTextureView,
+    pub hud_depth: web_sys::GpuTextureView,
     pub size_changed: bool,
     pub width: u32,
     pub height: u32,
@@ -202,6 +203,7 @@ impl RenderTextureViews {
                 .clone(),
             transparent: inner.transparent_view.clone(),
             depth: inner.depth_view.clone(),
+            hud_depth: inner.hud_depth_view.clone(),
             composite: inner.composite_view.clone(),
             size_changed,
             curr_index,
@@ -239,6 +241,9 @@ pub struct RenderTexturesInner {
 
     pub depth: web_sys::GpuTexture,
     pub depth_view: web_sys::GpuTextureView,
+
+    pub hud_depth: web_sys::GpuTexture,
+    pub hud_depth_view: web_sys::GpuTextureView,
 
     pub composite: web_sys::GpuTexture,
     pub composite_view: web_sys::GpuTextureView,
@@ -357,6 +362,12 @@ impl RenderTexturesInner {
             // sample it directly for world-position reconstruction.
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
+        let hud_depth = gpu
+            .create_texture(
+                &maybe_multisample_texture(render_texture_formats.depth, "Hud Depth").into(),
+            )
+            .map_err(AwsmRenderTextureError::CreateTexture)?;
+
         // NEVER multisampled, that's the point
         let composite = gpu
             .create_texture(
@@ -412,6 +423,10 @@ impl RenderTexturesInner {
             .create_view()
             .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("depth: {e:?}")))?;
 
+        let hud_depth_view = depth
+            .create_view()
+            .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("hud_depth: {e:?}")))?;
+
         let composite_view = composite
             .create_view()
             .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("composite: {e:?}")))?;
@@ -463,6 +478,9 @@ impl RenderTexturesInner {
 
             depth,
             depth_view,
+
+            hud_depth,
+            hud_depth_view,
 
             composite,
             composite_view,

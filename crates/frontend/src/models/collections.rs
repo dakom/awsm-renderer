@@ -41,6 +41,7 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
     h.insert(
         GltfSetId::Todo,
         vec![
+            GltfId::AwsmTransformGizmo,
             GltfId::BrainStem,
             GltfId::Fox,
             GltfId::VertexColor,
@@ -218,6 +219,7 @@ pub enum GltfId {
     EmissiveStrength,
     TextureTransformTest,
     TextureTransformMultiTest,
+    AwsmTransformGizmo,
 }
 
 impl TryFrom<&str> for GltfId {
@@ -244,6 +246,15 @@ impl std::fmt::Display for GltfId {
 }
 
 impl GltfId {
+    pub fn url(&self) -> String {
+        let base_url = match self {
+            Self::AwsmTransformGizmo => &CONFIG.additional_assets_url,
+            _ => &CONFIG.gltf_samples_url,
+        };
+
+        format!("{}/{}", base_url, self.filepath())
+    }
+
     pub fn filepath(&self) -> &'static str {
         match self {
             Self::BrainStem => "BrainStem/glTF/BrainStem.gltf",
@@ -321,6 +332,7 @@ impl GltfId {
             Self::EnvironmentTest => "EnvironmentTest/glTF/EnvironmentTest.gltf",
             Self::EnvironmentIblTest => "EnvironmentTest/glTF-IBL/EnvironmentTest.gltf",
             Self::EmissiveStrength => "EmissiveStrengthTest/glTF/EmissiveStrengthTest.gltf",
+            Self::AwsmTransformGizmo => "gizmo/gizmo.glb",
         }
     }
 
@@ -387,6 +399,7 @@ impl GltfId {
             Self::EnvironmentTest => "Environment test",
             Self::EnvironmentIblTest => "Environment ibl test",
             Self::EmissiveStrength => "Emissive strength",
+            Self::AwsmTransformGizmo => "Awsm Transform Gizmo",
         }
     }
 }

@@ -1,3 +1,7 @@
+use wasm_bindgen_futures::JsFuture;
+
+use crate::error::AwsmCoreError;
+
 #[derive(Debug, Clone)]
 pub struct BufferDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBuffer#descriptor
@@ -130,6 +134,58 @@ impl BufferUsage {
 pub enum MapMode {
     Read = web_sys::gpu_map_mode::READ,
     Write = web_sys::gpu_map_mode::WRITE,
+}
+
+/// Extracts GPU buffer data into a new mapped buffer and returns it as a `Vec<u8>`
+pub async fn extract_buffer_vec(
+    read_buffer: &web_sys::GpuBuffer,
+    size: Option<u32>,
+) -> crate::error::Result<Vec<u8>> {
+    let size = size.unwrap_or(read_buffer.size() as u32);
+
+    // Wait for GPU to complete mapping
+    let map_promise = read_buffer.map_async_with_u32_and_u32(MapMode::Read as u32, 0, size);
+    JsFuture::from(map_promise)
+        .await
+        .map_err(AwsmCoreError::buffer_map)?;
+
+    // Get the mapped JS ArrayBuffer slice
+    let array_buffer = read_buffer
+        .get_mapped_range_with_u32_and_u32(0, size)
+        .map_err(AwsmCoreError::buffer_map_range)?;
+
+    // Convert to Uint8Array
+    let uint8_array = js_sys::Uint8Array::new(&array_buffer);
+    let mut vec = vec![0u8; size as usize];
+    uint8_array.copy_to(&mut vec);
+
+    read_buffer.unmap();
+
+    Ok(vec)
+}
+
+pub async fn extract_buffer_array<const N: usize>(
+    read_buffer: &web_sys::GpuBuffer,
+    dest: &mut [u8; N],
+) -> crate::error::Result<()> {
+    // Wait for GPU to complete mapping
+    let map_promise = read_buffer.map_async_with_u32_and_u32(MapMode::Read as u32, 0, N as u32);
+    JsFuture::from(map_promise)
+        .await
+        .map_err(AwsmCoreError::buffer_map)?;
+
+    // Get the mapped JS ArrayBuffer slice
+    let array_buffer = read_buffer
+        .get_mapped_range_with_u32_and_u32(0, N as u32)
+        .map_err(AwsmCoreError::buffer_map_range)?;
+
+    // Convert to Uint8Array
+    let uint8_array = js_sys::Uint8Array::new(&array_buffer);
+    uint8_array.copy_to(dest);
+
+    read_buffer.unmap();
+
+    Ok(())
 }
 
 // js conversion

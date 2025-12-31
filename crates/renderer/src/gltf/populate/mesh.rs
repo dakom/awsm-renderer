@@ -4,10 +4,10 @@ use crate::{
     bounds::Aabb,
     gltf::{
         error::{AwsmGltfError, Result},
-        populate::material::GltfMaterialInfo,
+        populate::material::pbr_material_mapper,
     },
     materials::Material,
-    mesh::{Mesh, MeshBufferInfo, MeshBufferVertexInfo},
+    mesh::{Mesh, MeshBufferInfo, MeshBufferVertexInfo, MeshKey},
     transforms::{Transform, TransformKey},
     AwsmRenderer,
 };
@@ -27,7 +27,8 @@ impl AwsmRenderer {
                 // so we swap out this node's transform with an identity matrix, but keep the hierarchy intact
                 // might need to pass the joint transform key down too, not sure yet
                 let mesh_transform_key = {
-                    let node_to_transform = ctx.node_to_transform.lock().unwrap();
+                    let node_to_transform =
+                        &ctx.key_lookups.lock().unwrap().node_index_to_transform;
                     let transform_key = node_to_transform.get(&gltf_node.index()).cloned().unwrap();
                     if ctx
                         .transform_is_joint
@@ -52,21 +53,28 @@ impl AwsmRenderer {
                 };
 
                 for gltf_primitive in gltf_mesh.primitives() {
-                    self.populate_gltf_primitive(
-                        ctx,
-                        gltf_node,
-                        &gltf_mesh,
-                        gltf_primitive,
-                        mesh_transform_key,
-                        mesh_skin_transform.clone(),
-                    )
-                    .await?;
+                    let mesh_key = self
+                        .populate_gltf_primitive(
+                            ctx,
+                            gltf_node,
+                            &gltf_mesh,
+                            gltf_primitive,
+                            mesh_transform_key,
+                            mesh_skin_transform.clone(),
+                        )
+                        .await?;
+
+                    ctx.key_lookups
+                        .lock()
+                        .unwrap()
+                        .insert_mesh(gltf_node, &gltf_mesh, mesh_key);
                 }
             }
 
             for child in gltf_node.children() {
                 self.populate_gltf_node_mesh(ctx, &child).await?;
             }
+
             Ok(())
         })
     }
@@ -79,14 +87,14 @@ impl AwsmRenderer {
         gltf_primitive: gltf::Primitive<'_>,
         transform_key: TransformKey,
         skin_transform: Option<Arc<(Vec<TransformKey>, Vec<Mat4>)>>,
-    ) -> Result<()> {
+    ) -> Result<MeshKey> {
         let primitive_buffer_info =
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
         let native_primitive_buffer_info = MeshBufferInfo::from(primitive_buffer_info.clone());
 
-        let material_info =
-            GltfMaterialInfo::new(self, ctx, primitive_buffer_info, gltf_primitive.material())
+        let material =
+            pbr_material_mapper(self, ctx, primitive_buffer_info, gltf_primitive.material())
                 .await?;
 
         let geometry_morph_key = match primitive_buffer_info.geometry_morph.clone() {
@@ -141,10 +149,11 @@ impl AwsmRenderer {
             }
         };
 
-        let material_key = self.materials.insert(
-            Material::Pbr(material_info.material.clone()),
-            &self.textures,
-        );
+        let double_sided = match &material {
+            Material::Pbr(pbr) => pbr.double_sided(),
+        };
+
+        let material_key = self.materials.insert(material, &self.textures);
 
         let buffer_info_key = self
             .meshes
@@ -155,11 +164,13 @@ impl AwsmRenderer {
             buffer_info_key,
             transform_key,
             material_key,
-            material_info.material.double_sided(),
+            double_sided,
             ctx.transform_is_instanced
                 .lock()
                 .unwrap()
                 .contains(&transform_key),
+            ctx.data.hints.hud,
+            ctx.data.hints.hidden,
         );
 
         if let Some(aabb) = try_position_aabb(&gltf_primitive) {
@@ -178,7 +189,7 @@ impl AwsmRenderer {
             mesh = mesh.with_skin_key(skin_key);
         }
 
-        let _mesh_key = {
+        let mesh_key = {
             let visibility_geometry_data =
                 match primitive_buffer_info.visibility_geometry_vertex.clone() {
                     Some(info) => {
@@ -275,7 +286,7 @@ impl AwsmRenderer {
             }
         }
 
-        Ok(())
+        Ok(mesh_key)
     }
 }
 

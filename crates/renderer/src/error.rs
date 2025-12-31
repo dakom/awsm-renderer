@@ -1,4 +1,4 @@
-use awsm_renderer_core::error::AwsmCoreError;
+use awsm_renderer_core::{error::AwsmCoreError, pipeline::primitive::CullMode};
 use thiserror::Error;
 
 use crate::{
@@ -71,7 +71,10 @@ pub enum AwsmError {
     RenderTexture(#[from] AwsmRenderTextureError),
 
     #[error("Unregistered Msaa count: {0}")]
-    RenderUnregisteredMsaaCount(u32),
+    UnsupportedMsaaCount(u32),
+
+    #[error("Unregistered Cull Mode: {0:?}")]
+    UnsupportedCullMode(CullMode),
 
     #[error("{0}")]
     Texture(#[from] AwsmTextureError),

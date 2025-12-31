@@ -86,6 +86,7 @@ impl MaterialTransparentPipelines {
             msaa_sample_count: anti_aliasing.msaa_sample_count,
             mipmaps: anti_aliasing.mipmap,
             instancing_transforms: mesh.instanced,
+            hud: mesh.hud,
         };
 
         let shader_key = shaders.get_key(gpu, shader_cache_key).await?;
@@ -119,6 +120,7 @@ impl MaterialTransparentPipelines {
             } else {
                 CullMode::Back
             },
+            mesh.hud,
         )
         .await?;
 
@@ -145,15 +147,23 @@ async fn render_pipeline_key(
     color_targets: &[ColorTargetState],
     msaa_sample_count: Option<u32>,
     cull_mode: CullMode,
+    is_hud: bool,
 ) -> Result<RenderPipelineKey> {
     let primitive_state = PrimitiveState::new()
         .with_topology(PrimitiveTopology::TriangleList)
         .with_front_face(FrontFace::Ccw)
         .with_cull_mode(cull_mode);
 
-    let depth_stencil = DepthStencilState::new(depth_texture_format)
-        .with_depth_write_enabled(false)
-        .with_depth_compare(CompareFunction::LessEqual);
+    let depth_stencil = match is_hud {
+        // HUD elements will start with a FRESH depth buffer
+        // so we can write to it for proper layering
+        true => DepthStencilState::new(depth_texture_format)
+            .with_depth_write_enabled(true)
+            .with_depth_compare(CompareFunction::LessEqual),
+        false => DepthStencilState::new(depth_texture_format)
+            .with_depth_write_enabled(false)
+            .with_depth_compare(CompareFunction::LessEqual),
+    };
 
     let mut pipeline_cache_key = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
         .with_primitive(primitive_state.clone())

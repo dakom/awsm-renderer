@@ -110,6 +110,7 @@ impl MeshMeta {
             normal_matrix_offset,
             materials,
             morphs,
+            mesh,
         }
         .to_bytes()?;
         self.material_buffers.update(key, &meta_data);

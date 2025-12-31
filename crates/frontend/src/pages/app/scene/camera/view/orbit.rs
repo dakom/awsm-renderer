@@ -23,18 +23,31 @@ impl OrbitCamera {
         let bounding_radius = size.length() * 0.5;
         let radius = bounding_radius * margin;
 
-        OrbitCamera::new(center, radius)
+        // Start head-on: looking from +Z axis, slightly above
+        // yaw: 0 = looking from +Z, π/2 = from +X, π = from -Z, 3π/2 = from -X
+        let yaw = 0.0; // Head-on view from +Z
+                       // pitch: positive = camera above looking down
+        let pitch = 0.3; // ~17° above horizon, looking down slightly
+
+        OrbitCamera::new(yaw, pitch, center, radius)
     }
 
-    pub fn new(look_at: Vec3, radius: f32) -> Self {
+    pub fn new_default(radius: f32) -> Self {
+        // head-on view from -Z of about -1 units and X,Y zeroed
+        // useful for sanity checking coordinate system
+        let yaw: f32 = std::f32::consts::PI; // π = looking from -Z
+        let pitch: f32 = 0.0; // 0 = horizon level (X,Y ~= 0)
+        let look_at = Vec3::ZERO;
+
+        Self::new(yaw, pitch, look_at, radius)
+    }
+
+    pub fn new(yaw: f32, pitch: f32, look_at: Vec3, radius: f32) -> Self {
         Self {
             look_at,
             radius,
-            // Start head-on: looking from +Z axis, slightly above
-            // yaw: 0 = looking from +Z, π/2 = from +X, π = from -Z, 3π/2 = from -X
-            yaw: 0.0, // Head-on view from +Z
-            // pitch: positive = camera above looking down
-            pitch: 0.3, // ~17° above horizon, looking down slightly
+            yaw,
+            pitch,
             dragging: false,
             sensitivity: 0.005,
         }

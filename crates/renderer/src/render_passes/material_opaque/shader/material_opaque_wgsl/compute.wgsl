@@ -115,12 +115,13 @@ fn main(
         return;
     }
 
-    let visibility_data = textureLoad(visibility_data_tex, coords, 0);
+    let visibility_data_info = textureLoad(visibility_data_tex, coords, 0);
 
-    let triangle_index = join32(visibility_data.x, visibility_data.y);
-    let material_meta_offset = join32(visibility_data.z, visibility_data.w);
+    let triangle_index = join32(visibility_data_info.x, visibility_data_info.y);
+    let material_meta_offset = join32(visibility_data_info.z, visibility_data_info.w);
 
     let camera = camera_from_raw(camera_raw);
+
 
     // early return if we only hit skybox / no geometry (for all samples if MSAA)
     {% if multisampled_geometry %}
@@ -270,8 +271,14 @@ fn main(
     {% endif %}
 
     // If we've reached this point, the main sample hit geometry.
-
     let material_mesh_meta = material_mesh_metas[material_meta_offset / META_SIZE_IN_BYTES];
+
+    // return early if the geometry hit is hud element (will be redrawn in transparency pass)
+    if (material_mesh_meta.is_hud == 1u) {
+        // this may bleed a little due to MSAA, but that's okay since huds are redrawn later
+        return;
+    }
+
 
     // Early exit if the main sample doesn't match this mesh's attributes
     // (even if other MSAA samples might match - those will be handled by _some_ main sample matching)

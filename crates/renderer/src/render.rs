@@ -82,6 +82,7 @@ impl AwsmRenderer {
                 anti_aliasing: &self.anti_aliasing,
             },
             &mut self.render_passes,
+            &mut self.picker,
         )?;
 
         let ctx = RenderContext {
@@ -111,7 +112,19 @@ impl AwsmRenderer {
 
             self.render_passes
                 .geometry
-                .render(&ctx, &renderables.opaque)?;
+                .render(&ctx, &renderables.opaque, false)?;
+        }
+
+        {
+            let _maybe_span_guard = if self.logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "HUD Geometry RenderPass").entered())
+            } else {
+                None
+            };
+
+            self.render_passes
+                .geometry
+                .render(&ctx, &renderables.hud, true)?;
         }
 
         {
@@ -164,7 +177,7 @@ impl AwsmRenderer {
                             .opaque_to_transparent_blit_pipeline_no_anti_alias
                     }
                     Some(count) => {
-                        return Err(AwsmError::RenderUnregisteredMsaaCount(*count));
+                        return Err(AwsmError::UnsupportedMsaaCount(*count));
                     }
                 },
                 match &ctx.anti_aliasing.msaa_sample_count {
@@ -177,7 +190,7 @@ impl AwsmRenderer {
                             .opaque_to_transparent_blit_bind_group_no_anti_alias
                     }
                     Some(count) => {
-                        return Err(AwsmError::RenderUnregisteredMsaaCount(*count));
+                        return Err(AwsmError::UnsupportedMsaaCount(*count));
                     }
                 },
                 &ctx.render_texture_views.transparent,
@@ -201,7 +214,19 @@ impl AwsmRenderer {
 
             self.render_passes
                 .material_transparent
-                .render(&ctx, renderables.transparent)?;
+                .render(&ctx, renderables.transparent, false)?;
+        }
+
+        {
+            let _maybe_span_guard = if self.logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "HUD RenderPass").entered())
+            } else {
+                None
+            };
+
+            self.render_passes
+                .material_transparent
+                .render(&ctx, renderables.hud, true)?;
         }
 
         // if None, it's handled by MSAA resolve in transparent pass

@@ -24,10 +24,10 @@ impl AwsmRenderer {
         let transform = transform_gltf_node(gltf_node);
         let transform_key = self.transforms.insert(transform, parent_transform_key);
 
-        ctx.node_to_transform
+        ctx.key_lookups
             .lock()
             .unwrap()
-            .insert(gltf_node.index(), transform_key);
+            .insert_transform(gltf_node, transform_key);
 
         for child in gltf_node.children() {
             self.populate_gltf_node_transform(ctx, &child, Some(transform_key))?;
