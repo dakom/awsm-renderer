@@ -41,7 +41,7 @@ pub struct AppScene {
     pub latest_gltf_data: Mutex<Option<GltfData>>,
     pub ibl_cache: Mutex<HashMap<IblId, Ibl>>,
     pub skybox_by_ibl_cache: Mutex<HashMap<IblId, Skybox>>,
-    pub camera: Mutex<Option<Camera>>,
+    pub camera: Arc<Mutex<Option<Camera>>>,
     pub resize_observer: Mutex<Option<ResizeObserver>>,
     pub request_animation_frame: Mutex<Option<gloo_render::AnimationFrame>>,
     pub last_request_animation_frame: Cell<Option<f64>>,
@@ -62,7 +62,7 @@ impl AppScene {
             ibl_cache: Mutex::new(HashMap::new()),
             skybox_by_ibl_cache: Mutex::new(HashMap::new()),
             latest_gltf_data: Mutex::new(None),
-            camera: Mutex::new(None),
+            camera: Arc::new(Mutex::new(None)),
             resize_observer: Mutex::new(None),
             request_animation_frame: Mutex::new(None),
             last_request_animation_frame: Cell::new(None),
@@ -199,7 +199,7 @@ impl AppScene {
 
             {
                 let renderer = state.renderer.lock().await;
-                let (canvas_width, canvas_height) = renderer.gpu.canvas_size();
+                let (canvas_width, canvas_height) = renderer.gpu.canvas_size(false);
                 if (canvas_width, canvas_height) == last_size && camera_id == last_camera_id {
                     return;
                 }
@@ -228,6 +228,7 @@ impl AppScene {
 
         match AppSceneEditor::new(
             state.renderer.clone(),
+            state.camera.clone(),
             state.ctx.editor_grid_enabled.clone(),
             state.ctx.editor_gizmo_translation_enabled.clone(),
             state.ctx.editor_gizmo_rotation_enabled.clone(),
@@ -470,15 +471,22 @@ impl AppScene {
 
         renderer.populate_gltf(data, None).await?;
 
-        if let Some(editor) = self.editor.lock().unwrap().as_mut() {
-            let ctx = renderer
-                .populate_gltf(editor.gizmo_gltf_data.clone(), None)
-                .await?;
+        let editor_gizmo_gltf_data = {
+            let editor_guard = self.editor.lock().unwrap();
+            editor_guard
+                .as_ref()
+                .map(|editor| editor.gizmo_gltf_data.clone())
+        };
 
-            *editor.transform_controller.lock().unwrap() = Some(TransformController::new(
-                &mut renderer,
-                &*ctx.key_lookups.lock().unwrap(),
-            )?);
+        if let Some(editor_gizmo_gltf_data) = editor_gizmo_gltf_data {
+            let ctx = renderer.populate_gltf(editor_gizmo_gltf_data, None).await?;
+
+            if let Some(editor) = self.editor.lock().unwrap().as_ref() {
+                *editor.transform_controller.lock().unwrap() = Some(TransformController::new(
+                    &mut renderer,
+                    &ctx.key_lookups.lock().unwrap(),
+                )?);
+            }
         }
 
         renderer.lights.insert(Light::Directional {
@@ -539,7 +547,7 @@ impl AppScene {
     pub async fn setup_viewport(self: &Arc<Self>) -> Result<()> {
         let mut renderer = self.renderer.lock().await;
 
-        let (canvas_width, canvas_height) = renderer.gpu.canvas_size();
+        let (canvas_width, canvas_height) = renderer.gpu.canvas_size(false);
 
         // call these first so we can get the extents
         renderer.update_animations(0.0)?;

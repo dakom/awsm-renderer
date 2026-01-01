@@ -1,5 +1,15 @@
 # Next up
-  
+
+- Transform Gizmo
+  - picking is working, now need to implement functionality
+    - project plane for each axis
+    - get intersection of mouse ray with plane
+    - get gizmo center on plane
+    - mouse movement to delta
+    - apply delta to object transform
+      - rotation
+      - scale
+      - translation
 - Support different kinds of Materials
   - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
   - unlit as example?

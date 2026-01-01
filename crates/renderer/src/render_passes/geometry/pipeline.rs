@@ -148,7 +148,7 @@ impl GeometryPipelines {
             }
         };
 
-        Ok(level.render_pipeline_key.clone())
+        Ok(level.render_pipeline_key)
     }
 }
 

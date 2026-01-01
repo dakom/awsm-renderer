@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 use crate::{
     bind_group_layout::{
@@ -67,7 +67,7 @@ impl AwsmRenderer {
 
         // keep the lock scope before the await point
         let read_buffer = {
-            let state = &mut *self.picker.state.lock().unwrap();
+            let state = &mut *self.picker.state.borrow_mut();
 
             if state.in_flight {
                 return Ok(PickResult::InFlight);
@@ -88,10 +88,11 @@ impl AwsmRenderer {
         let res = extract_buffer_array(&read_buffer, &mut bytes).await;
 
         {
-            self.picker.state.lock().unwrap().in_flight = false;
+            self.picker.state.borrow_mut().in_flight = false;
         }
 
         // now we can error out if needed
+        #[allow(clippy::let_unit_value)]
         let _ = res?;
 
         // read validity
@@ -116,7 +117,7 @@ pub struct Picker {
     multisampled_bind_group_layout_key: BindGroupLayoutKey,
     _bind_group: Option<web_sys::GpuBindGroup>,
 
-    state: Arc<std::sync::Mutex<PickerState>>,
+    state: Rc<RefCell<PickerState>>,
 }
 
 impl Picker {
@@ -169,13 +170,13 @@ impl Picker {
             multisampled_compute_pipeline_key,
             singlesampled_bind_group_layout_key,
             multisampled_bind_group_layout_key,
-            state: Arc::new(std::sync::Mutex::new(PickerState::new(gpu)?)),
+            state: Rc::new(RefCell::new(PickerState::new(gpu)?)),
             _bind_group: None,
         })
     }
 
     pub fn recreate_bind_group(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.borrow();
 
         let mut entries = Vec::new();
 

@@ -51,13 +51,13 @@ impl GltfKeyLookups {
         self.all_mesh_keys
             .entry(mesh.index())
             .or_default()
-            .push(mesh_key.clone());
+            .push(mesh_key);
 
         if let Some(mesh_name) = mesh.name() {
             self.mesh_primitives
                 .entry(mesh_name.to_string())
                 .or_default()
-                .push(mesh_key.clone());
+                .push(mesh_key);
         }
 
         if let Some(node_name) = node.name() {

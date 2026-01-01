@@ -1,11 +1,16 @@
 use anyhow::{Context, Result};
-use awsm_renderer::{gltf::GltfKeyLookups, mesh::MeshKey, AwsmRenderer};
+use awsm_renderer::{
+    debug::debug_unique_string, gltf::GltfKeyLookups, mesh::MeshKey, transforms::TransformKey,
+    AwsmRenderer,
+};
+use glam::Vec3;
 
-use crate::config::CONFIG;
+use crate::{config::CONFIG, pages::app::scene::camera::Camera};
 
 #[derive(Clone, Debug)]
 pub struct TransformController {
     pub mesh_keys: TransformControllerMeshKeys,
+    pub transform_keys: TransformControllerTransformKeys,
 }
 
 #[derive(Clone, Debug)]
@@ -21,6 +26,11 @@ pub struct TransformControllerMeshKeys {
     pub arrow_x: MeshKey,
     pub arrow_y: MeshKey,
     pub arrow_z: MeshKey,
+}
+
+#[derive(Clone, Debug)]
+pub struct TransformControllerTransformKeys {
+    pub root: TransformKey,
 }
 
 #[derive(Clone, Debug)]
@@ -40,6 +50,7 @@ impl TransformController {
     pub fn new(renderer: &mut AwsmRenderer, lookups: &GltfKeyLookups) -> Result<Self> {
         let _self = Self {
             mesh_keys: TransformControllerMeshKeys::new(lookups)?,
+            transform_keys: TransformControllerTransformKeys::new(lookups)?,
         };
 
         _self.set_hidden(
@@ -50,6 +61,46 @@ impl TransformController {
         )?;
 
         Ok(_self)
+    }
+
+    pub fn update_transforms(
+        &self,
+        renderer: &mut AwsmRenderer,
+        camera: &Camera,
+    ) -> awsm_renderer::error::Result<()> {
+        let mut transform = renderer
+            .transforms
+            .get_local(self.transform_keys.root)?
+            .clone();
+
+        const DESIRED_PIXEL_SIZE: f32 = 100.0; // Desired size in pixels
+        const REFERENCE_SIZE: f32 = 1.0; // Reference size of the gizmo in world
+
+        let (_, viewport_y) = renderer.gpu.canvas_size(false);
+
+        let desired_ndc = 2.0 * DESIRED_PIXEL_SIZE / viewport_y as f32;
+        let proj11 = camera.projection_matrix().y_axis.y;
+
+        let depth = if camera.is_orthographic() {
+            1.0
+        } else {
+            let cam_pos = camera.position_world();
+            let gizmo_pos = transform.translation;
+            (gizmo_pos - cam_pos).length()
+        };
+
+        debug_unique_string(1, &transform.translation.to_string(), || {
+            tracing::info!("Gizmo position: {:?}", transform.translation);
+        });
+        let scale = (desired_ndc * depth / proj11) / REFERENCE_SIZE;
+
+        transform.scale = Vec3::new(scale, scale, scale);
+
+        renderer
+            .transforms
+            .set_local(self.transform_keys.root, transform)?;
+
+        Ok(())
     }
 
     fn get_mesh_kind(&self, mesh_key: MeshKey) -> Option<MeshKind> {
@@ -158,6 +209,22 @@ impl TransformControllerMeshKeys {
             arrow_x: get_mesh_key("Arrow_X")?,
             arrow_y: get_mesh_key("Arrow_Y")?,
             arrow_z: get_mesh_key("Arrow_Z")?,
+        })
+    }
+}
+
+impl TransformControllerTransformKeys {
+    pub fn new(lookups: &GltfKeyLookups) -> Result<Self> {
+        let get_transform_key = |node_name: &str| -> Result<TransformKey> {
+            lookups
+                .node_transforms
+                .get(node_name)
+                .cloned()
+                .context(format!("No transform for node '{}'", node_name))
+        };
+
+        Ok(Self {
+            root: get_transform_key("GizmoRoot")?,
         })
     }
 }

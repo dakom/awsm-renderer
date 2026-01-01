@@ -1,7 +1,11 @@
 use crate::{
     models::collections::GltfId,
-    pages::app::scene::editor::{
-        pipelines::EditorPipelines, render::render_grid, transform_controller::TransformController,
+    pages::app::scene::{
+        camera::Camera,
+        editor::{
+            pipelines::EditorPipelines, render::render_grid,
+            transform_controller::TransformController,
+        },
     },
     prelude::*,
 };
@@ -38,6 +42,7 @@ pub struct AppSceneEditor {
 impl AppSceneEditor {
     pub async fn new(
         renderer: Arc<futures::lock::Mutex<AwsmRenderer>>,
+        camera: Arc<std::sync::Mutex<Option<Camera>>>,
         grid_enabled: Mutable<bool>,
         gizmo_translation_enabled: Mutable<bool>,
         gizmo_rotation_enabled: Mutable<bool>,
@@ -70,36 +75,52 @@ impl AppSceneEditor {
             }.to_stream();
 
             while let Some((grid_enabled, gizmo_translation_enabled, gizmo_rotation_enabled, gizmo_scale_enabled)) = stream.next().await {
-                let mut render_hooks = render_hooks.write().unwrap();
+                {
+                    let mut render_hooks = render_hooks.write().unwrap();
 
-                *render_hooks = Some(Arc::new(RenderHooks {
-                    after_opaque: if grid_enabled {
-                        let grid_bind_group = pipelines.grid_bind_group.clone();
-                        let grid_pipeline_msaa_4_key = pipelines.grid_pipeline_msaa_4_key;
-                        let grid_pipeline_singlesampled_key = pipelines.grid_pipeline_singlesampled_key;
+                    *render_hooks = Some(Arc::new(RenderHooks {
+                        pre_render: Some(Box::new(clone!(transform_controller, camera => move |renderer| {
+                            #[allow(clippy::single_match)]
+                            match (transform_controller.lock().unwrap().as_mut(), camera.lock().unwrap().as_ref()) {
+                                (Some(transform_controller), Some(camera)) => {
+                                    transform_controller.update_transforms(renderer, camera)?;
+                                }
+                                _ => {}
+                            }
 
-                        Some(Box::new(move |ctx| {
-                            let grid_pipeline_key = match ctx.anti_aliasing.msaa_sample_count {
-                                Some(4) => grid_pipeline_msaa_4_key,
-                                None => grid_pipeline_singlesampled_key,
-                                _ => panic!("Unsupported MSAA sample count for grid pipeline"),
-                            };
+                            Ok(())
+                        }))),
+                        before_transparent_pass: if grid_enabled {
+                            let grid_bind_group = pipelines.grid_bind_group.clone();
+                            let grid_pipeline_msaa_4_key = pipelines.grid_pipeline_msaa_4_key;
+                            let grid_pipeline_singlesampled_key = pipelines.grid_pipeline_singlesampled_key;
 
-                            render_grid(
-                                ctx,
-                                &grid_bind_group,
-                                grid_pipeline_key,
-                            )
-                        }))
-                    } else {
-                        None
-                    },
-                }));
+                            Some(Box::new(move |ctx| {
+                                let grid_pipeline_key = match ctx.anti_aliasing.msaa_sample_count {
+                                    Some(4) => grid_pipeline_msaa_4_key,
+                                    None => grid_pipeline_singlesampled_key,
+                                    _ => panic!("Unsupported MSAA sample count for grid pipeline"),
+                                };
 
+                                render_grid(
+                                    ctx,
+                                    &grid_bind_group,
+                                    grid_pipeline_key,
+                                )
+                            }))
+                        } else {
+                            None
+                        },
+                        ..Default::default()
+                    }));
+                }
 
-                if let Some(transform_controller) = transform_controller.lock().unwrap().as_mut() {
-                    if let Err(err) = transform_controller.set_hidden(&mut *renderer.lock().await, !gizmo_translation_enabled, !gizmo_rotation_enabled, !gizmo_scale_enabled) {
-                        tracing::error!("Error setting transform controller enabled state: {}", err);
+                {
+                    let renderer = &mut *renderer.lock().await;
+                    if let Some(transform_controller) = transform_controller.lock().unwrap().as_mut() {
+                        if let Err(err) = transform_controller.set_hidden(renderer, !gizmo_translation_enabled, !gizmo_rotation_enabled, !gizmo_scale_enabled) {
+                            tracing::error!("Error setting transform controller enabled state: {}", err);
+                        }
                     }
                 }
             }

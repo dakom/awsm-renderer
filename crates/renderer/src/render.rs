@@ -16,7 +16,11 @@ use crate::{AwsmRenderer, AwsmRendererLogging};
 
 #[derive(Default)]
 pub struct RenderHooks {
-    pub after_opaque: Option<Box<dyn Fn(&RenderContext) -> Result<()>>>,
+    pub pre_render: Option<Box<dyn Fn(&mut AwsmRenderer) -> Result<()>>>,
+    pub first_pass: Option<Box<dyn Fn(&RenderContext) -> Result<()>>>,
+    pub before_transparent_pass: Option<Box<dyn Fn(&RenderContext) -> Result<()>>>,
+    pub last_pass: Option<Box<dyn Fn(&RenderContext) -> Result<()>>>,
+    pub post_render: Option<Box<dyn Fn(&mut AwsmRenderer) -> Result<()>>>,
 }
 
 impl AwsmRenderer {
@@ -24,6 +28,17 @@ impl AwsmRenderer {
     // the various underlying raw data can be updated on their own cadence
     // or just call .update_all() right before .render() for convenience
     pub fn render(&mut self, hooks: Option<&RenderHooks>) -> Result<()> {
+        if let Some(hook) = hooks.and_then(|h| h.pre_render.as_ref()) {
+            {
+                let _maybe_span_guard = if self.logging.render_timings {
+                    Some(tracing::span!(tracing::Level::INFO, "PreRender Hook").entered())
+                } else {
+                    None
+                };
+                hook(self)?;
+            }
+        }
+
         let _maybe_span_guard = if self.logging.render_timings {
             Some(tracing::span!(tracing::Level::INFO, "Render").entered())
         } else {
@@ -102,6 +117,17 @@ impl AwsmRenderer {
         };
 
         let renderables = self.collect_renderables(&ctx)?;
+
+        if let Some(hook) = hooks.and_then(|h| h.first_pass.as_ref()) {
+            {
+                let _maybe_span_guard = if self.logging.render_timings {
+                    Some(tracing::span!(tracing::Level::INFO, "FirstPass Hook").entered())
+                } else {
+                    None
+                };
+                hook(&ctx)?;
+            }
+        }
 
         {
             let _maybe_span_guard = if self.logging.render_timings {
@@ -198,8 +224,18 @@ impl AwsmRenderer {
             )?;
         }
 
-        if let Some(hook) = hooks.and_then(|h| h.after_opaque.as_ref()) {
-            hook(&ctx)?;
+        if let Some(hook) = hooks.and_then(|h| h.before_transparent_pass.as_ref()) {
+            {
+                let _maybe_span_guard = if self.logging.render_timings {
+                    Some(
+                        tracing::span!(tracing::Level::INFO, "BeforeTransparentPass Hook")
+                            .entered(),
+                    )
+                } else {
+                    None
+                };
+                hook(&ctx)?;
+            }
         }
 
         {
@@ -261,8 +297,29 @@ impl AwsmRenderer {
             self.render_passes.display.render(&ctx)?;
         }
 
+        if let Some(hook) = hooks.and_then(|h| h.last_pass.as_ref()) {
+            {
+                let _maybe_span_guard = if self.logging.render_timings {
+                    Some(tracing::span!(tracing::Level::INFO, "LastPass Hook").entered())
+                } else {
+                    None
+                };
+                hook(&ctx)?;
+            }
+        }
+
         self.gpu.submit_commands(&ctx.command_encoder.finish());
 
+        if let Some(hook) = hooks.and_then(|h| h.post_render.as_ref()) {
+            {
+                let _maybe_span_guard = if self.logging.render_timings {
+                    Some(tracing::span!(tracing::Level::INFO, "PostRender Hook").entered())
+                } else {
+                    None
+                };
+                hook(self)?;
+            }
+        }
         Ok(())
     }
 }
