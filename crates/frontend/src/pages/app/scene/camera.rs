@@ -25,20 +25,27 @@ pub struct Camera {
 
 // This is what needs to be implemented to make the camera work with the renderer
 impl Camera {
-    fn projection_matrix(&self) -> Mat4 {
+    pub fn is_orthographic(&self) -> bool {
+        matches!(self.projection, CameraProjection::Orthographic(_))
+    }
+
+    pub fn is_perspective(&self) -> bool {
+        matches!(self.projection, CameraProjection::Perspective(_))
+    }
+    pub fn projection_matrix(&self) -> Mat4 {
         match &self.projection {
             CameraProjection::Orthographic(camera) => camera.projection_matrix(),
             CameraProjection::Perspective(camera) => camera.projection_matrix(),
         }
     }
 
-    fn view_matrix(&self) -> Mat4 {
+    pub fn view_matrix(&self) -> Mat4 {
         match &self.view {
             CameraView::Orbit(camera) => camera.get_view_matrix(),
         }
     }
 
-    fn position_world(&self) -> Vec3 {
+    pub fn position_world(&self) -> Vec3 {
         match &self.view {
             CameraView::Orbit(camera) => camera.get_position(),
         }

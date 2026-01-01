@@ -55,6 +55,11 @@ impl PbrMaterialBuffers {
         self.uniform_buffer.offset(key)
     }
 
+    pub fn remove(&mut self, key: MaterialKey) {
+        self.uniform_buffer.remove(key);
+        self.uniform_buffer_gpu_dirty = true;
+    }
+
     pub fn update(
         &mut self,
         key: MaterialKey,

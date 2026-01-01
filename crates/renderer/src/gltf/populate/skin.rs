@@ -29,7 +29,7 @@ impl AwsmRenderer {
             // note: skin.skeleton() is not actually used for anything, it's just decorative to help authoring tools
 
             let mut joints = Vec::with_capacity(skin.joints().len());
-            let node_to_transform = ctx.node_to_transform.lock().unwrap();
+            let node_to_transform = &ctx.key_lookups.lock().unwrap().node_index_to_transform;
             for joint_node in skin.joints() {
                 let transform_key = *node_to_transform.get(&joint_node.index()).ok_or(
                     AwsmGltfError::SkinJointTransformNotFound(joint_node.index()),
@@ -78,7 +78,7 @@ impl AwsmRenderer {
 fn mark_gltf_node_as_joint(ctx: &GltfPopulateContext, gltf_node: &gltf::Node) -> Result<()> {
     if let Some(skin) = gltf_node.skin() {
         let mut transform_is_joint = ctx.transform_is_joint.lock().unwrap();
-        let node_to_transform = ctx.node_to_transform.lock().unwrap();
+        let node_to_transform = &ctx.key_lookups.lock().unwrap().node_index_to_transform;
         for joint_node in skin.joints() {
             let transform_key = node_to_transform.get(&joint_node.index()).unwrap();
             transform_is_joint.insert(*transform_key);

@@ -139,9 +139,10 @@ impl AwsmRenderer {
 
             if count > 0 {
                 let key = *ctx
-                    .node_to_transform
+                    .key_lookups
                     .lock()
                     .unwrap()
+                    .node_index_to_transform
                     .get(&gltf_node.index())
                     .ok_or(AwsmGltfError::ExtInstancing(anyhow!(
                         "no transform key for node {}",

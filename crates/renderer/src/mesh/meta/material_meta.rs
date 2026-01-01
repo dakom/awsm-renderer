@@ -7,13 +7,13 @@ use crate::{
     materials::{MaterialKey, Materials},
     mesh::{
         morphs::{MaterialMorphKey, Morphs},
-        AwsmMeshError, MeshBufferInfo, MeshKey,
+        AwsmMeshError, Mesh, MeshBufferInfo, MeshKey,
     },
 };
 
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_NORMAL: u32 = 1;
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_TANGENT: u32 = 1 << 1;
-pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 64;
+pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 68;
 pub const MATERIAL_MESH_META_BYTE_ALIGNMENT: usize = 256;
 
 pub static MATERIAL_BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| {
@@ -36,6 +36,7 @@ pub struct MaterialMeshMeta<'a> {
     pub buffer_info: &'a MeshBufferInfo,
     pub materials: &'a Materials,
     pub morphs: &'a Morphs,
+    pub mesh: &'a Mesh,
 }
 
 /// Calculate the offset (in floats) to TEXCOORD_0 within the vertex attribute data.
@@ -105,6 +106,7 @@ impl<'a> MaterialMeshMeta<'a> {
             normal_matrix_offset,
             materials,
             morphs,
+            mesh,
         } = self;
 
         let mut result = [0u8; MATERIAL_MESH_META_BYTE_SIZE];
@@ -173,6 +175,9 @@ impl<'a> MaterialMeshMeta<'a> {
 
         // Geometry data offset (4 bytes)
         push_u32(visibility_geometry_data_offset.unwrap_or_default() as u32);
+
+        // is hud
+        push_u32(if mesh.hud { 1 } else { 0 });
 
         Ok(result)
     }

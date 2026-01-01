@@ -11,15 +11,9 @@ use awsm_renderer::{
         compare::CompareFunction,
         pipeline::{
             depth_stencil::DepthStencilState,
-            fragment::{
-                BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState,
-                FragmentState,
-            },
-            layout::{PipelineLayoutDescriptor, PipelineLayoutKind},
+            fragment::{BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState},
             multisample::MultisampleState,
             primitive::PrimitiveState,
-            vertex::VertexState,
-            RenderPipelineDescriptor,
         },
         shaders::{ShaderModuleDescriptor, ShaderModuleExt},
     },
@@ -32,7 +26,6 @@ pub struct EditorPipelines {
     pub grid_bind_group: web_sys::GpuBindGroup,
     pub grid_pipeline_msaa_4_key: RenderPipelineKey,
     pub grid_pipeline_singlesampled_key: RenderPipelineKey,
-    pub gizmos_pipeline: web_sys::GpuRenderPipeline,
 }
 
 impl EditorPipelines {
@@ -56,7 +49,6 @@ impl EditorPipelines {
             load_grid_pipeline(renderer, bind_group_layout_key, Some(4)).await?;
         let grid_pipeline_singlesampled_key =
             load_grid_pipeline(renderer, bind_group_layout_key, None).await?;
-        let gizmos_pipeline = load_gizmos_pipeline(renderer).await?;
 
         let grid_bind_group = renderer.gpu.create_bind_group(
             &BindGroupDescriptor::new(
@@ -73,7 +65,6 @@ impl EditorPipelines {
         Ok(Self {
             grid_pipeline_msaa_4_key,
             grid_pipeline_singlesampled_key,
-            gizmos_pipeline,
             grid_bind_group,
         })
     }
@@ -118,10 +109,11 @@ async fn load_grid_pipeline(
                 .with_dst_factor(BlendFactor::OneMinusSrcAlpha)
                 .with_operation(BlendOperation::Add),
         ));
+    //let color_target = ColorTargetState::new(renderer.render_textures.formats.color);
 
     let mut pipeline_cache_key = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
         .with_primitive(PrimitiveState::new())
-        .with_depth_stencil(depth_stencil.clone())
+        .with_depth_stencil(depth_stencil)
         .with_push_fragment_targets(vec![color_target]);
 
     if let Some(sample_count) = msaa_sample_count {
@@ -141,38 +133,4 @@ async fn load_grid_pipeline(
         .await?;
 
     Ok(render_pipeline_key)
-}
-
-async fn load_gizmos_pipeline(
-    renderer: &mut AwsmRenderer,
-) -> anyhow::Result<web_sys::GpuRenderPipeline> {
-    let shader_source = include_str!("shaders/gizmos.wgsl");
-
-    let shader_module = renderer
-        .gpu
-        .compile_shader(&ShaderModuleDescriptor::new(shader_source, Some("gizmos shader")).into());
-
-    shader_module.validate_shader().await?;
-
-    let pipeline_layout = renderer.gpu.create_pipeline_layout(
-        &PipelineLayoutDescriptor::new(Some("gizmos pipeline Layout"), vec![]).into(),
-    );
-
-    let vertex = VertexState::new(&shader_module, None);
-
-    let color_targets = vec![ColorTargetState::new(renderer.gpu.current_context_format())];
-
-    let fragment = FragmentState::new(&shader_module, None, color_targets);
-
-    let pipeline_descriptor = RenderPipelineDescriptor::new(vertex, Some("gizmos"))
-        .with_primitive(PrimitiveState::new())
-        .with_layout(PipelineLayoutKind::Custom(&pipeline_layout))
-        .with_fragment(fragment);
-
-    let render_pipeline = renderer
-        .gpu
-        .create_render_pipeline(&pipeline_descriptor.into())
-        .await?;
-
-    Ok(render_pipeline)
 }

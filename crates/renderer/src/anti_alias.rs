@@ -8,6 +8,16 @@ pub struct AntiAliasing {
     pub mipmap: bool,
 }
 
+impl AntiAliasing {
+    pub fn has_msaa_checked(&self) -> crate::error::Result<bool> {
+        match self.msaa_sample_count {
+            Some(4) => Ok(true),
+            None => Ok(false),
+            Some(sample_count) => Err(crate::error::AwsmError::UnsupportedMsaaCount(sample_count)),
+        }
+    }
+}
+
 impl Default for AntiAliasing {
     fn default() -> Self {
         Self {

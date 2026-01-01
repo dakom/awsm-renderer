@@ -24,9 +24,10 @@ impl AwsmRenderer {
         gltf_node: &'b gltf::Node<'b>,
     ) -> Result<()> {
         let transform_key = ctx
-            .node_to_transform
+            .key_lookups
             .lock()
             .unwrap()
+            .node_index_to_transform
             .get(&gltf_node.index())
             .cloned()
             .unwrap();

@@ -15,6 +15,7 @@ pub mod instances;
 pub mod lights;
 pub mod materials;
 pub mod mesh;
+pub mod picker;
 pub mod pipeline_layouts;
 pub mod pipelines;
 pub mod render;
@@ -58,6 +59,7 @@ use crate::{
     debug::AwsmRendererLogging,
     environment::{Environment, Skybox},
     lights::ibl::{Ibl, IblTexture},
+    picker::Picker,
     pipeline_layouts::PipelineLayouts,
     render_passes::{RenderPassInitContext, RenderPasses},
     render_textures::{RenderTextureFormats, RenderTextures},
@@ -82,6 +84,7 @@ pub struct AwsmRenderer {
     pub render_passes: RenderPasses,
     pub environment: Environment,
     pub anti_aliasing: AntiAliasing,
+    pub picker: Picker,
     // we pick between these on the fly
     _clear_color_perceptual_to_linear: Color,
     _clear_color: Color,
@@ -290,6 +293,15 @@ impl AwsmRendererBuilder {
         let bind_groups = BindGroups::new();
         let render_textures = RenderTextures::new(&gpu, render_texture_formats).await?;
 
+        let picker = Picker::new(
+            &gpu,
+            &mut bind_group_layouts,
+            &mut pipeline_layouts,
+            &mut shaders,
+            &mut pipelines,
+        )
+        .await?;
+
         #[cfg(feature = "gltf")]
         let gltf = gltf::cache::GltfCache::default();
         #[cfg(feature = "animation")]
@@ -316,6 +328,7 @@ impl AwsmRendererBuilder {
             logging,
             render_textures,
             anti_aliasing,
+            picker,
             #[cfg(feature = "gltf")]
             gltf,
             #[cfg(feature = "animation")]

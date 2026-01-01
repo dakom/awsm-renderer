@@ -15,6 +15,7 @@ use crate::gltf::buffers::{
     MeshBufferAttributeIndexInfoWithOffset, MeshBufferInfoWithOffset,
     MeshBufferTriangleInfoWithOffset, MeshBufferVertexInfoWithOffset,
 };
+use crate::gltf::data::GltfDataHints;
 use crate::gltf::error::AwsmGltfError;
 use crate::mesh::MeshBufferVertexAttributeInfo;
 
@@ -23,16 +24,21 @@ use super::Result;
 pub(super) enum GltfMeshBufferGeometryKind {
     Visibility,
     Transparency,
-    #[allow(dead_code)]
     Both,
 }
 
-// in theory a primitive could have both opaque and transparent materials via an extension which allows multiple materials
-pub(super) fn mesh_buffer_geometry_kind(primitive: &gltf::Primitive) -> GltfMeshBufferGeometryKind {
-    match primitive.material().alpha_mode() {
-        AlphaMode::Opaque => GltfMeshBufferGeometryKind::Visibility,
-        AlphaMode::Mask => GltfMeshBufferGeometryKind::Transparency,
-        AlphaMode::Blend => GltfMeshBufferGeometryKind::Transparency,
+pub(super) fn mesh_buffer_geometry_kind(
+    primitive: &gltf::Primitive,
+    hints: &GltfDataHints,
+) -> GltfMeshBufferGeometryKind {
+    if hints.hud {
+        GltfMeshBufferGeometryKind::Both
+    } else {
+        match primitive.material().alpha_mode() {
+            AlphaMode::Opaque => GltfMeshBufferGeometryKind::Visibility,
+            AlphaMode::Mask => GltfMeshBufferGeometryKind::Transparency,
+            AlphaMode::Blend => GltfMeshBufferGeometryKind::Transparency,
+        }
     }
 }
 

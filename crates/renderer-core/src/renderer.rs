@@ -61,13 +61,15 @@ impl AwsmRendererWebGpuBuilder {
     }
 
     pub async fn build(self) -> Result<AwsmRendererWebGpu> {
+        tracing::info!("Building WebGPU Context");
+
         let context: web_sys::GpuCanvasContext = match self.canvas.get_context("webgpu") {
             Ok(Some(ctx)) => Ok(ctx.unchecked_into()),
             Err(err) => Err(AwsmCoreError::canvas_context(err)),
             Ok(None) => Err(AwsmCoreError::CanvasContext("No context found".to_string())),
         }?;
 
-        let adapter: web_sys::GpuAdapter = match self.adapter {
+        let mut adapter: web_sys::GpuAdapter = match self.adapter {
             Some(adapter) => adapter,
             None => JsFuture::from(self.gpu.request_adapter())
                 .await
@@ -76,7 +78,15 @@ impl AwsmRendererWebGpuBuilder {
         };
 
         if adapter.is_null() || adapter.is_undefined() {
-            return Err(AwsmCoreError::GpuAdapter("is null".to_string()));
+            // try one more time... maybe necessary for "lost context" scenarios?
+            adapter = JsFuture::from(self.gpu.request_adapter())
+                .await
+                .map_err(AwsmCoreError::gpu_adapter)?
+                .unchecked_into();
+
+            if adapter.is_null() || adapter.is_undefined() {
+                return Err(AwsmCoreError::GpuAdapter("is null".to_string()));
+            }
         }
 
         let device: web_sys::GpuDevice = match self.device {

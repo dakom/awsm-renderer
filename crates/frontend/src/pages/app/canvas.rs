@@ -74,12 +74,18 @@ impl AppCanvas {
                             .with_device_request_limits(DeviceRequestLimits::default().with_max_storage_buffer_binding_size().with_max_storage_buffers_per_shader_stage());
                             //.with_device_request_limits(DeviceRequestLimits::max_all());
 
-                        let renderer = AwsmRendererBuilder::new(gpu_builder)
+                        let renderer = match AwsmRendererBuilder::new(gpu_builder)
                             .with_logging(AwsmRendererLogging { render_timings: true })
                             .with_clear_color(Color::MID_GREY)
                             .build()
-                            .await
-                            .unwrap();
+                            .await {
+                                Ok(renderer) => renderer,
+                                Err(err) => {
+                                    tracing::error!("Error initializing renderer: {:?}", err);
+                                    state.display_text.set(format!("Error initializing renderer: {:?}", err));
+                                    return;
+                                }
+                            };
 
                         let scene = AppScene::new(state.ctx.clone(), renderer).await.unwrap();
 

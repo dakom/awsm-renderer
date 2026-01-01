@@ -8,6 +8,8 @@ pub struct AwsmRendererLogging {
     pub render_timings: bool,
 }
 
+pub const DEBUG_ID_RENDERABLE: u32 = u32::MAX - 1;
+
 static DEBUG_TRANSACTION_ID: LazyLock<Mutex<HashMap<u32, u64>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 static DEBUG_UNIQUE_STRING: LazyLock<Mutex<HashMap<u32, String>>> =

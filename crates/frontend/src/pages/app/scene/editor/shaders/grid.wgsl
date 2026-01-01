@@ -156,16 +156,17 @@ fn frag_main(in: FragmentInput) -> FragmentOutput {
     // Check for invalid intersections
     let is_parallel = abs(ray_dir.y) < 0.001;
 
-    // For orthographic, don't check is_behind - let depth buffer handle clipping
-    // For perspective, reject rays pointing away from the ground plane
+    // For perspective, reject rays pointing away from the ground plane (t < 0)
+    // For orthographic, only reject if parallel (no horizon line - grid fills screen like Blender)
     let is_behind = !is_ortho && t < 0.0;
 
     if (is_parallel || is_behind) {
-        // Discard pixels that don't hit the ground
-        var output: FragmentOutput;
-        output.color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-        output.depth = 1.0; // Far plane
-        return output;
+        discard;
+        // // Discard pixels that don't hit the ground
+        // var output: FragmentOutput;
+        // output.color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+        // output.depth = 1.0; // Far plane
+        // return output;
     }
 
     // Minor grid (every 1 unit)

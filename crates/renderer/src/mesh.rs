@@ -13,6 +13,7 @@ use crate::materials::MaterialKey;
 use crate::mesh::morphs::{GeometryMorphKey, MaterialMorphKey};
 use crate::render::RenderContext;
 use crate::render_passes::geometry::bind_group::GeometryBindGroups;
+use crate::render_passes::geometry::pipeline::GeometryRenderPipelineKeyOpts;
 use crate::transforms::TransformKey;
 use crate::{bounds::Aabb, pipelines::render_pipeline::RenderPipelineKey};
 use skins::SkinKey;
@@ -37,6 +38,8 @@ pub struct Mesh {
     pub skin_key: Option<SkinKey>,
     pub double_sided: bool,
     pub instanced: bool,
+    pub hud: bool,
+    pub hidden: bool,
 }
 
 impl Mesh {
@@ -46,6 +49,8 @@ impl Mesh {
         material_key: MaterialKey,
         double_sided: bool,
         instanced: bool,
+        hud: bool,
+        hidden: bool,
     ) -> Self {
         Self {
             buffer_info_key,
@@ -53,11 +58,13 @@ impl Mesh {
             material_key,
             double_sided,
             instanced,
+            hud,
             aabb: None,
             world_aabb: None,
             geometry_morph_key: None,
             material_morph_key: None,
             skin_key: None,
+            hidden,
         }
     }
 
@@ -82,11 +89,19 @@ impl Mesh {
         self
     }
 
-    pub fn geometry_render_pipeline_key(&self, ctx: &RenderContext) -> RenderPipelineKey {
+    pub fn geometry_render_pipeline_key(&self, ctx: &RenderContext) -> Result<RenderPipelineKey> {
         ctx.render_passes
             .geometry
             .pipelines
-            .get_render_pipeline_key(self.double_sided, self.instanced, ctx.anti_aliasing)
+            .get_render_pipeline_key(GeometryRenderPipelineKeyOpts {
+                anti_aliasing: ctx.anti_aliasing,
+                instancing: self.instanced,
+                cull_mode: if self.double_sided {
+                    awsm_renderer_core::pipeline::primitive::CullMode::None
+                } else {
+                    awsm_renderer_core::pipeline::primitive::CullMode::Back
+                },
+            })
     }
 
     pub fn push_geometry_pass_commands(

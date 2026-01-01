@@ -10,7 +10,9 @@ pub struct AppContext {
     pub ibl_id: Mutable<IblId>,
     pub skybox_id: Mutable<SkyboxId>,
     pub editor_grid_enabled: Mutable<bool>,
-    pub editor_gizmos_enabled: Mutable<bool>,
+    pub editor_gizmo_translation_enabled: Mutable<bool>,
+    pub editor_gizmo_rotation_enabled: Mutable<bool>,
+    pub editor_gizmo_scale_enabled: Mutable<bool>,
 }
 
 #[derive(Clone)]
@@ -45,7 +47,9 @@ impl Default for AppContext {
             ibl_id: Mutable::new(CONFIG.initial_ibl),
             skybox_id: Mutable::new(CONFIG.initial_skybox),
             editor_grid_enabled: Mutable::new(CONFIG.initial_show_grid),
-            editor_gizmos_enabled: Mutable::new(CONFIG.initial_show_gizmos),
+            editor_gizmo_translation_enabled: Mutable::new(CONFIG.initial_show_gizmo_translation),
+            editor_gizmo_rotation_enabled: Mutable::new(CONFIG.initial_show_gizmo_rotation),
+            editor_gizmo_scale_enabled: Mutable::new(CONFIG.initial_show_gizmo_scale),
         }
     }
 }

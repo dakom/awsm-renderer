@@ -1,5 +1,5 @@
 use crate::{
-    buffers::{BufferDescriptor, BufferUsage, MapMode},
+    buffers::{extract_buffer_vec, BufferDescriptor, BufferUsage},
     configuration::CanvasConfiguration,
     data::JsData,
 };
@@ -18,17 +18,37 @@ impl AwsmRendererWebGpu {
         self.context.canvas().unchecked_into()
     }
 
-    pub fn canvas_size(&self) -> (f64, f64) {
-        thread_local! {
-            static WINDOW: web_sys::Window = web_sys::window().unwrap();
-        }
-        (self.canvas().width() as f64, self.canvas().height() as f64)
+    /// Returns the canvas size.
+    ///
+    /// # Parameters
+    /// * `css_pixels`
+    /// - If `true`, returns the CSS display size (the size as shown in the browser).
+    /// - If `false`, returns the backing buffer size (the actual pixel buffer dimensions).
+    ///
+    /// # Usage
+    /// - Use `canvas_size(true)` for UI layout and CSS-based calculations
+    /// - Use `canvas_size(false)` (default) for rendering, transforms, and coordinate conversions
+    ///   where you need the actual buffer dimensions
+    ///
+    /// # Examples
+    /// ```ignore
+    /// // Get backing buffer size for rendering
+    /// let (width, height) = renderer.canvas_size(false);
+    ///
+    /// // Get CSS display size for layout
+    /// let (css_width, css_height) = renderer.canvas_size(true);
+    /// ```
+    pub fn canvas_size(&self, css_pixels: bool) -> (f64, f64) {
+        let canvas = self.canvas();
 
-        // let device_pixel_ratio = WINDOW.with(|window| window.device_pixel_ratio());
-        // (
-        //     self.canvas().width() as f64 * device_pixel_ratio,
-        //     self.canvas().height() as f64 * device_pixel_ratio,
-        // )
+        if css_pixels {
+            // Return CSS display size
+            let rect = canvas.get_bounding_client_rect();
+            (rect.width(), rect.height())
+        } else {
+            // Return backing buffer size (default behavior)
+            (canvas.width() as f64, canvas.height() as f64)
+        }
     }
 
     pub fn current_context_format(&self) -> TextureFormat {
@@ -413,7 +433,7 @@ impl AwsmRendererWebGpu {
     }
 
     /// Copies GPU buffer data into a new mapped buffer and returns it as a `Vec<u8>`
-    pub async fn extract_buffer(
+    pub async fn new_copy_and_extract_buffer(
         &self,
         source: &web_sys::GpuBuffer,
         size: Option<u32>,
@@ -437,24 +457,70 @@ impl AwsmRendererWebGpu {
         let command_buffer = encoder.finish();
         self.submit_commands(&command_buffer);
 
-        // Wait for GPU to complete mapping
-        let map_promise = read_buffer.map_async_with_u32_and_u32(MapMode::Read as u32, 0, size);
-        JsFuture::from(map_promise)
-            .await
-            .map_err(AwsmCoreError::buffer_map)?;
+        extract_buffer_vec(&read_buffer, Some(size)).await
+    }
 
-        // Get the mapped JS ArrayBuffer slice
-        let array_buffer = read_buffer
-            .get_mapped_range_with_u32_and_u32(0, size)
-            .map_err(AwsmCoreError::buffer_map_range)?;
+    /// Converts a pointer event to canvas coordinates in backing buffer pixels (f64).
+    ///
+    /// This method takes pointer event coordinates (which are in CSS pixels relative to the viewport)
+    /// and converts them to backing buffer pixel coordinates, accounting for the canvas's position
+    /// and the scaling between CSS pixels and backing buffer pixels.
+    pub fn pointer_event_to_canvas_coords_f64(&self, evt: &web_sys::PointerEvent) -> (f64, f64) {
+        let canvas = self.canvas();
+        let rect = canvas.get_bounding_client_rect();
 
-        // Convert to Uint8Array
-        let uint8_array = js_sys::Uint8Array::new(&array_buffer);
-        let mut vec = vec![0u8; size as usize];
-        uint8_array.copy_to(&mut vec);
+        // CSS pixels relative to the canvas' top-left
+        let css_x = evt.client_x() as f64 - rect.left();
+        let css_y = evt.client_y() as f64 - rect.top();
 
-        read_buffer.unmap();
+        // Get CSS and backing buffer sizes
+        let (css_w, css_h) = self.canvas_size(true);
+        let (buffer_w, buffer_h) = self.canvas_size(false);
 
-        Ok(vec)
+        // Avoid division by zero if the element is not laid out (display:none etc.)
+        let css_w = css_w.max(1.0);
+        let css_h = css_h.max(1.0);
+
+        // Convert CSS pixels -> backing buffer pixels
+        let scale_x = buffer_w / css_w;
+        let scale_y = buffer_h / css_h;
+
+        let x = css_x * scale_x;
+        let y = css_y * scale_y;
+
+        (x, y)
+    }
+
+    /// Converts a pointer event to canvas coordinates in backing buffer pixels (i32).
+    ///
+    /// This method is similar to `pointer_event_to_canvas_coords_f64` but returns integer coordinates
+    /// clamped to the canvas bounds. Useful for pixel-perfect operations like reading specific pixels
+    /// or texel access.
+    pub fn pointer_event_to_canvas_coords_i32(&self, evt: &web_sys::PointerEvent) -> (i32, i32) {
+        let (x, y) = self.pointer_event_to_canvas_coords_f64(evt);
+
+        // Get backing buffer size for clamping bounds
+        let (w, h) = self.canvas_size(false);
+        let w = w.max(1.0) as i64;
+        let h = h.max(1.0) as i64;
+
+        // Floor and clamp to canvas bounds
+        let mut ix = x.floor() as i64;
+        let mut iy = y.floor() as i64;
+
+        if ix < 0 {
+            ix = 0;
+        }
+        if iy < 0 {
+            iy = 0;
+        }
+        if ix >= w {
+            ix = w - 1;
+        }
+        if iy >= h {
+            iy = h - 1;
+        }
+
+        (ix as i32, iy as i32)
     }
 }

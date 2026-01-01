@@ -61,7 +61,8 @@ impl CameraBuffer {
     //  position (vec4, w=unused) 16 bytes
     //  frame_count_and_padding (vec4<u32>) 16 bytes
     //  frustum corner rays (4 * vec4) 64 bytes
-    //  padding (2 * vec4) 32 bytes
+    //  viewport (vec4) 16 bytes
+    //  padding (vec4) 16 bytes
     // Total = 512 bytes (all members 16-byte aligned, no implicit gaps)
     pub const BYTE_SIZE: usize = 512;
 
@@ -175,9 +176,14 @@ impl CameraBuffer {
             let ray_values = ray.to_array();
             write_f32_slice(&mut self.raw_data, &mut offset, &ray_values);
         }
+        //viewport
+        write_f32_slice(
+            &mut self.raw_data,
+            &mut offset,
+            &[0.0, 0.0, screen_width, screen_height],
+        );
 
-        // Struct alignment padding (32 bytes at end) - WGSL compute pipeline requirement
-        write_f32_slice(&mut self.raw_data, &mut offset, &[0.0, 0.0, 0.0, 0.0]);
+        // Struct alignment padding (16 bytes at end) - WGSL compute pipeline requirement
         write_f32_slice(&mut self.raw_data, &mut offset, &[0.0, 0.0, 0.0, 0.0]);
 
         debug_assert_eq!(offset, Self::BYTE_SIZE, "Buffer layout mismatch!");

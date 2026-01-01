@@ -14,6 +14,7 @@ use crate::{
 pub struct Renderables<'a> {
     pub opaque: Vec<Renderable<'a>>,
     pub transparent: Vec<Renderable<'a>>,
+    pub hud: Vec<Renderable<'a>>,
 }
 
 impl AwsmRenderer {
@@ -26,8 +27,9 @@ impl AwsmRenderer {
 
         let mut opaque = Vec::new();
         let mut transparent = Vec::new();
+        let mut hud = Vec::new();
 
-        for (mesh_key, mesh) in self.meshes.iter() {
+        for (mesh_key, mesh) in self.meshes.iter().filter(|(_k, m)| !m.hidden) {
             // TODO - frustum cull here
             if let Some(_world_aabb) = &mesh.world_aabb {
                 // if !self.camera.frustum.intersects_aabb(&world_aabb) {
@@ -50,7 +52,10 @@ impl AwsmRenderer {
                     .pipelines
                     .get_render_pipeline_key(mesh_key),
             };
-            if self.materials.has_alpha_blend(mesh.material_key)
+
+            if mesh.hud {
+                hud.push(renderable.clone());
+            } else if self.materials.has_alpha_blend(mesh.material_key)
                 || self.materials.has_alpha_mask(mesh.material_key)
             {
                 transparent.push(renderable);
@@ -63,11 +68,13 @@ impl AwsmRenderer {
             let view_proj = camera_matrices.view_projection();
             opaque.sort_by(|a, b| geometry_sort_renderable(ctx, a, b, &view_proj, false));
             transparent.sort_by(|a, b| geometry_sort_renderable(ctx, a, b, &view_proj, true));
+            hud.sort_by(|a, b| geometry_sort_renderable(ctx, a, b, &view_proj, true));
         }
 
         Ok(Renderables {
             opaque,
             transparent,
+            hud,
         })
     }
 }
@@ -79,15 +86,22 @@ fn geometry_sort_renderable(
     view_proj: &Mat4,
     transparent: bool,
 ) -> std::cmp::Ordering {
-    // Criteria 1: group by render_pipeline_key.
-    let pipeline_ordering = a
-        .geometry_render_pipeline_key(ctx)
-        .cmp(&b.geometry_render_pipeline_key(ctx));
-    if pipeline_ordering != std::cmp::Ordering::Equal {
-        return pipeline_ordering;
+    // Criteria 2: group by render_pipeline_key.
+    match (
+        a.geometry_render_pipeline_key(ctx),
+        b.geometry_render_pipeline_key(ctx),
+    ) {
+        (Err(_), _) => return std::cmp::Ordering::Greater,
+        (_, Err(_)) => return std::cmp::Ordering::Less,
+        (Ok(key_a), Ok(key_b)) => {
+            let pipeline_ordering = key_a.cmp(&key_b);
+            if pipeline_ordering != std::cmp::Ordering::Equal {
+                return pipeline_ordering;
+            }
+        }
     }
 
-    // Criterion 2: sort by depth.
+    // Criteria 3: sort by depth.
     match (a.world_aabb(), b.world_aabb()) {
         (Some(a_world_aabb), Some(b_world_aabb)) => {
             let a_min_z = view_proj.transform_point3(a_world_aabb.min).z;
@@ -125,7 +139,7 @@ fn geometry_sort_renderable(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Renderable<'a> {
     Mesh {
         key: MeshKey,
@@ -136,7 +150,7 @@ pub enum Renderable<'a> {
 }
 
 impl Renderable<'_> {
-    pub fn geometry_render_pipeline_key(&self, ctx: &RenderContext) -> RenderPipelineKey {
+    pub fn geometry_render_pipeline_key(&self, ctx: &RenderContext) -> Result<RenderPipelineKey> {
         match self {
             Self::Mesh { mesh, .. } => mesh.geometry_render_pipeline_key(ctx),
         }

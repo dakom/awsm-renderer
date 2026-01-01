@@ -14,8 +14,8 @@ pub struct Config {
     pub root_path: &'static str,
     pub debug: ConfigDebug,
     pub media_baseurl: String,
-    pub gltf_url: String,
-    pub environment_url: String,
+    pub gltf_samples_url: String,
+    pub additional_assets_url: String,
     pub generate_mipmaps: bool,
     pub initial_sidebar_open: Option<SidebarSection>,
     pub post_processing_enabled: bool,
@@ -23,7 +23,9 @@ pub struct Config {
     pub initial_skybox: SkyboxId,
     pub cache_buster: bool,
     pub initial_show_grid: bool,
-    pub initial_show_gizmos: bool,
+    pub initial_show_gizmo_translation: bool,
+    pub initial_show_gizmo_rotation: bool,
+    pub initial_show_gizmo_scale: bool,
 }
 
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
@@ -45,13 +47,13 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
             "/awsm-renderer/media".to_string()
             //format!("{}/media", web_sys::window().unwrap().origin())
         },
-        gltf_url: if cfg!(debug_assertions) {
+        gltf_samples_url: if cfg!(debug_assertions) {
             "http://localhost:9082/glTF-Sample-Assets/Models".to_string()
         } else {
             "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/refs/heads/main/Models".to_string()
         },
-        environment_url: if cfg!(debug_assertions) {
-            "http://localhost:9082/awsm-renderer-assets".to_string()
+        additional_assets_url: if cfg!(debug_assertions) {
+            "http://localhost:9083".to_string()
         } else {
             "https://dakom.github.io/awsm-renderer-assets".to_string()
         },
@@ -64,7 +66,9 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         initial_skybox: SkyboxId::default(),
         cache_buster: cfg!(debug_assertions),
         initial_show_grid: false,
-        initial_show_gizmos: false,
+        initial_show_gizmo_translation: true,
+        initial_show_gizmo_rotation: true,
+        initial_show_gizmo_scale: true,
     }
 });
 

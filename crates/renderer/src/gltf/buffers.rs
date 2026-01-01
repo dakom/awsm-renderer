@@ -14,9 +14,12 @@ use glam::{Mat4, Quat, Vec3};
 use std::collections::HashMap;
 
 use crate::{
-    gltf::buffers::{
-        index::{generate_fresh_indices_from_primitive, GltfMeshBufferIndexInfo},
-        mesh::{convert_to_mesh_buffer, mesh_buffer_geometry_kind},
+    gltf::{
+        buffers::{
+            index::{generate_fresh_indices_from_primitive, GltfMeshBufferIndexInfo},
+            mesh::{convert_to_mesh_buffer, mesh_buffer_geometry_kind},
+        },
+        data::GltfDataHints,
     },
     mesh::{
         MeshBufferAttributeIndexInfo, MeshBufferGeometryMorphInfo, MeshBufferInfo,
@@ -299,7 +302,7 @@ impl From<MeshBufferTriangleDataInfoWithOffset> for MeshBufferTriangleDataInfo {
 }
 
 impl GltfBuffers {
-    pub fn new(doc: &gltf::Document, buffers: Vec<Vec<u8>>) -> Result<Self> {
+    pub fn new(doc: &gltf::Document, buffers: Vec<Vec<u8>>, hints: GltfDataHints) -> Result<Self> {
         let world_matrices = compute_world_matrices(doc);
 
         // refactor original buffers into the format we want
@@ -334,7 +337,7 @@ impl GltfBuffers {
                         }
                     };
 
-                let geometry_kind = mesh_buffer_geometry_kind(&primitive);
+                let geometry_kind = mesh_buffer_geometry_kind(&primitive, &hints);
 
                 // Step 2: Convert to mesh buffer format
                 let mesh_buffer_info = convert_to_mesh_buffer(
