@@ -14,7 +14,6 @@ pub struct ShaderCacheKeyMaterialTransparent {
     pub texture_pool_samplers_len: u32,
     pub msaa_sample_count: Option<u32>,
     pub mipmaps: bool,
-    pub hud: bool,
 }
 
 impl From<ShaderCacheKeyMaterialTransparent> for ShaderCacheKey {

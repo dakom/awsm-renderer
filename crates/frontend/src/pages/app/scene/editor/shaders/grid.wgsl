@@ -161,11 +161,12 @@ fn frag_main(in: FragmentInput) -> FragmentOutput {
     let is_behind = !is_ortho && t < 0.0;
 
     if (is_parallel || is_behind) {
-        // Discard pixels that don't hit the ground
-        var output: FragmentOutput;
-        output.color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-        output.depth = 1.0; // Far plane
-        return output;
+        discard;
+        // // Discard pixels that don't hit the ground
+        // var output: FragmentOutput;
+        // output.color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+        // output.depth = 1.0; // Far plane
+        // return output;
     }
 
     // Minor grid (every 1 unit)

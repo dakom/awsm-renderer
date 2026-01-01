@@ -423,7 +423,7 @@ impl RenderTexturesInner {
             .create_view()
             .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("depth: {e:?}")))?;
 
-        let hud_depth_view = depth
+        let hud_depth_view = hud_depth
             .create_view()
             .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("hud_depth: {e:?}")))?;
 

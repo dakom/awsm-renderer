@@ -86,7 +86,6 @@ impl MaterialTransparentPipelines {
             msaa_sample_count: anti_aliasing.msaa_sample_count,
             mipmaps: anti_aliasing.mipmap,
             instancing_transforms: mesh.instanced,
-            hud: mesh.hud,
         };
 
         let shader_key = shaders.get_key(gpu, shader_cache_key).await?;

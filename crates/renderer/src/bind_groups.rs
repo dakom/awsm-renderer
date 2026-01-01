@@ -51,12 +51,11 @@ pub enum BindGroupCreate {
     MaterialMorphTargetValuesResize,
     SkinJointMatricesResize,
     SkinJointIndexAndWeightsResize,
-    MeshMetaResize,
+    GeometryMeshMetaResize,
     MaterialMeshMetaResize,
     MeshAttributeDataResize,
     MeshAttributeIndexResize,
     PbrMaterialResize,
-    HudMaterialResize,
     TextureViewResize,
     TexturePool,
     TextureTransformsResize,
@@ -138,11 +137,7 @@ impl BindGroups {
                     functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
                     functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
                 }
-                BindGroupCreate::HudMaterialResize => {
-                    functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
-                    functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
-                }
-                BindGroupCreate::MeshMetaResize => {
+                BindGroupCreate::GeometryMeshMetaResize => {
                     functions_to_call.insert(FunctionToCall::GeometryMeta);
                     functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
                 }

@@ -12,7 +12,8 @@ struct CameraRaw {
     // 4 normalized view-space ray directions at near plane corners [bottom-left, bottom-right, top-left, top-right]
     // Used for unprojecting screen pixels to world space with better precision than per-pixel unprojection
     frustum_rays: array<vec4<f32>, 4>,
-    _padding_end: array<vec4<f32>, 2>,  // Total: 512 bytes
+    viewport: vec4<f32>, // in pixels, x,y,width,height
+    _padding_end: vec4<f32>  // Total: 512 bytes
 };
 
 // Friendly camera structure (no padding, easier to work with)
@@ -27,6 +28,8 @@ struct Camera {
     frame_count: u32,
     // Screen-space reconstruction rays (see CameraRaw for details)
     frustum_rays: array<vec4<f32>, 4>,
+    viewport_pos: vec2<f32>, // x,y
+    viewport_size: vec2<f32>, // width,height
 };
 
 // Convert from raw uniform to friendly structure
@@ -41,5 +44,7 @@ fn camera_from_raw(raw: CameraRaw) -> Camera {
     camera.position = raw.position.xyz;
     camera.frame_count = raw.frame_count_and_padding.x;
     camera.frustum_rays = raw.frustum_rays;
+    camera.viewport_pos = vec2<f32>(raw.viewport.x, raw.viewport.y);
+    camera.viewport_size = vec2<f32>(raw.viewport.z, raw.viewport.w);
     return camera;
 }
