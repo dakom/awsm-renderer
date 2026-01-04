@@ -96,11 +96,6 @@ impl AppScene {
                 &canvas,
                 "pointerdown",
                 clone!(state => move |event| {
-                    if let Some(camera) = state.camera.lock().unwrap().as_mut() {
-                        camera.on_pointer_down();
-                    }
-
-
                     spawn_local(clone!(state, event => async move {
                         let renderer = state.renderer.lock().await;
                         let event = event.unchecked_into::<PointerEvent>();
@@ -111,9 +106,18 @@ impl AppScene {
                             }
                             Ok(res) => {
                                 if let PickResult::Hit(mesh_key) = res {
-                                    if let Some(editor) = state.editor.lock().unwrap().as_ref() {
-                                        editor.start_pick(mesh_key, x, y);
-                                    }
+                                    let is_editor = if let Some(editor) = state.editor.lock().unwrap().as_ref() {
+                                        editor.start_pick(mesh_key, x, y)
+                                    } else {
+                                        false
+                                    };
+
+                                   if !is_editor {
+                                       if let Some(camera) = state.camera.lock().unwrap().as_mut() {
+                                            camera.on_pointer_down();
+                                        }
+                                   }
+
                                 } else {
                                     tracing::info!("MISSED {},{}: {:?}", x, y, res);
                                 }

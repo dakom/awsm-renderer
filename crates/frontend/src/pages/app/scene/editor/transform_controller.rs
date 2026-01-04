@@ -63,7 +63,7 @@ impl TransformController {
         Ok(_self)
     }
 
-    pub fn update_transforms(
+    pub fn zoom_gizmo_transforms(
         &self,
         renderer: &mut AwsmRenderer,
         camera: &Camera,
@@ -127,13 +127,15 @@ impl TransformController {
         }
     }
 
-    pub fn start_pick(&self, mesh_key: MeshKey, x: i32, y: i32) {
+    pub fn start_pick(&self, mesh_key: MeshKey, x: i32, y: i32) -> bool {
         let mesh_kind = match self.get_mesh_kind(mesh_key) {
             Some(kind) => kind,
-            None => return,
+            None => return false,
         };
 
         tracing::info!("Start pick: {:?} at {},{}", mesh_kind, x, y);
+
+        true
     }
 
     pub fn set_hidden(

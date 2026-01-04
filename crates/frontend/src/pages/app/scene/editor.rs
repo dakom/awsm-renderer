@@ -83,7 +83,7 @@ impl AppSceneEditor {
                             #[allow(clippy::single_match)]
                             match (transform_controller.lock().unwrap().as_mut(), camera.lock().unwrap().as_ref()) {
                                 (Some(transform_controller), Some(camera)) => {
-                                    transform_controller.update_transforms(renderer, camera)?;
+                                    transform_controller.zoom_gizmo_transforms(renderer, camera)?;
                                 }
                                 _ => {}
                             }
@@ -139,9 +139,11 @@ impl AppSceneEditor {
         })
     }
 
-    pub fn start_pick(&self, mesh_key: MeshKey, x: i32, y: i32) {
+    pub fn start_pick(&self, mesh_key: MeshKey, x: i32, y: i32) -> bool {
         if let Some(transform_controller) = self.transform_controller.lock().unwrap().as_mut() {
-            transform_controller.start_pick(mesh_key, x, y);
+            transform_controller.start_pick(mesh_key, x, y)
+        } else {
+            false
         }
     }
 }
