@@ -143,9 +143,9 @@ impl AppScene {
                     match state.move_action.get() {
                         Some(MoveAction::GizmoTransforming) => {
                             spawn_local(clone!(state, event => async move {
+                                let mut renderer = state.renderer.lock().await;
                                 if let Some(editor) = state.editor.lock().unwrap().as_mut() {
                                     if let Some(transform_controller) = editor.transform_controller.lock().unwrap().as_mut() {
-                                        let mut renderer = state.renderer.lock().await;
                                         transform_controller.update_transform(&mut renderer, event.movement_x(), event.movement_y());
                                     }
                                 }
@@ -517,6 +517,7 @@ impl AppScene {
                     &mut renderer,
                     ctx.key_lookups.clone(),
                     editor.selected_object_transform_key.clone(),
+                    self.ctx.editor_gizmo_space.clone(),
                 )?);
             }
         }

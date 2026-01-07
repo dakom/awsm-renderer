@@ -1,14 +1,43 @@
-use std::{cell::Cell, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use awsm_renderer::{
-    debug::debug_unique_string, gltf::GltfKeyLookups, mesh::MeshKey, transforms::TransformKey,
-    AwsmRenderer,
+    camera::CameraMatrices, debug::debug_unique_string, gltf::GltfKeyLookups, mesh::MeshKey,
+    transforms::TransformKey, AwsmRenderer,
 };
 use futures_signals::signal::Mutable;
-use glam::Vec3;
+use glam::{Quat, Vec3, Vec4};
 
 use crate::{config::CONFIG, pages::app::scene::camera::Camera};
+
+/// State tracked during a gizmo drag operation
+#[derive(Clone, Debug)]
+struct DragState {
+    /// Current accumulated screen position (starts at initial click, updated by deltas)
+    screen_pos: (f32, f32),
+    /// Initial object local translation when drag started
+    initial_translation: Vec3,
+    /// Initial object local scale when drag started
+    initial_scale: Vec3,
+    /// Initial object local rotation when drag started
+    initial_rotation: Quat,
+    /// Initial object world position when drag started
+    initial_world_position: Vec3,
+    /// Initial object world rotation when drag started
+    initial_world_rotation: Quat,
+    /// The constraint axis in world space (may be rotated for local mode)
+    world_axis: Vec3,
+    /// Inverse of parent's world rotation (to convert world deltas to parent space)
+    parent_inverse_rotation: Quat,
+    /// The plane used for ray intersection (normal vector)
+    plane_normal: Vec3,
+    /// A point on the plane (the initial world position)
+    plane_point: Vec3,
+    /// Initial intersection point on the plane
+    initial_intersection: Vec3,
+    /// For rotation: the initial angle from center to intersection (in the rotation plane)
+    initial_angle: f32,
+}
 
 #[derive(Clone, Debug)]
 pub struct TransformController {
@@ -17,6 +46,8 @@ pub struct TransformController {
     pub gltf_lookups: Arc<std::sync::Mutex<GltfKeyLookups>>,
     pub selected_object_transform_key: Mutable<Option<TransformKey>>,
     current_gizmo_kind: Option<GizmoKind>,
+    drag_state: Option<DragState>,
+    _gizmo_space: Arc<std::sync::RwLock<GizmoSpace>>,
 }
 
 #[derive(Clone, Debug)]
@@ -52,11 +83,19 @@ pub enum GizmoKind {
     ScaleZ,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum GizmoSpace {
+    Local,
+    #[default]
+    Global,
+}
+
 impl TransformController {
     pub fn new(
         renderer: &mut AwsmRenderer,
         lookups: Arc<std::sync::Mutex<GltfKeyLookups>>,
         selected_object_transform_key: Mutable<Option<TransformKey>>,
+        gizmo_space: Arc<std::sync::RwLock<GizmoSpace>>,
     ) -> Result<Self> {
         let (mesh_keys, transform_keys) = {
             let lookups = lookups.lock().unwrap();
@@ -71,6 +110,8 @@ impl TransformController {
             gltf_lookups: lookups,
             selected_object_transform_key,
             current_gizmo_kind: None,
+            drag_state: None,
+            _gizmo_space: gizmo_space,
         };
 
         _self.set_hidden(
@@ -155,34 +196,168 @@ impl TransformController {
         &mut self,
         renderer: &mut AwsmRenderer,
         mesh_key: MeshKey,
-        _x: i32,
-        _y: i32,
+        x: i32,
+        y: i32,
     ) -> bool {
         match self.get_gizmo_mesh_kind(mesh_key) {
             Some(gizmo_kind) => {
                 self.current_gizmo_kind = Some(gizmo_kind);
+
+                // Initialize drag state for gizmo manipulation
+                if let Some(selected_key) = self.selected_object_transform_key.get_cloned() {
+                    if let (Ok(selected_transform), Ok(world_matrix), Some(camera_matrices)) = (
+                        renderer.transforms.get_local(selected_key).cloned(),
+                        renderer.transforms.get_world(selected_key).cloned(),
+                        renderer.camera.last_matrices.as_ref(),
+                    ) {
+                        // Extract world position and rotation from world matrix
+                        let (_world_scale, world_rotation, world_position) =
+                            world_matrix.to_scale_rotation_translation();
+                        let camera_pos = camera_matrices.position_world;
+
+                        // Get parent's world rotation to convert deltas back to parent space
+                        let parent_inverse_rotation =
+                            if let Ok(parent_key) = renderer.transforms.get_parent(selected_key) {
+                                if let Ok(parent_world) = renderer.transforms.get_world(parent_key)
+                                {
+                                    let (_, parent_rot, _) =
+                                        parent_world.to_scale_rotation_translation();
+                                    parent_rot.inverse()
+                                } else {
+                                    Quat::IDENTITY
+                                }
+                            } else {
+                                Quat::IDENTITY
+                            };
+
+                        let gizmo_space = self.gizmo_space();
+
+                        // Get the local axis for this gizmo kind
+                        let local_axis = match gizmo_kind {
+                            GizmoKind::TranslationX | GizmoKind::ScaleX | GizmoKind::RotationX => {
+                                Vec3::X
+                            }
+                            GizmoKind::TranslationY | GizmoKind::ScaleY | GizmoKind::RotationY => {
+                                Vec3::Y
+                            }
+                            GizmoKind::TranslationZ | GizmoKind::ScaleZ | GizmoKind::RotationZ => {
+                                Vec3::Z
+                            }
+                        };
+
+                        // Compute world-space axis based on gizmo space mode
+                        let world_axis = match gizmo_space {
+                            GizmoSpace::Global => local_axis,
+                            GizmoSpace::Local => world_rotation * local_axis,
+                        };
+
+                        // Determine the plane normal based on gizmo kind
+                        let plane_normal = match gizmo_kind {
+                            // Translation/Scale: plane contains the axis and faces the camera
+                            GizmoKind::TranslationX
+                            | GizmoKind::TranslationY
+                            | GizmoKind::TranslationZ
+                            | GizmoKind::ScaleX
+                            | GizmoKind::ScaleY
+                            | GizmoKind::ScaleZ => {
+                                let to_camera = (camera_pos - world_position).normalize();
+                                let normal =
+                                    (to_camera - world_axis * to_camera.dot(world_axis)).normalize();
+                                // Handle edge case when camera looks along axis
+                                if normal.length_squared() < 0.001 {
+                                    if world_axis.dot(Vec3::Y).abs() < 0.9 {
+                                        (Vec3::Y - world_axis * Vec3::Y.dot(world_axis)).normalize()
+                                    } else {
+                                        (Vec3::X - world_axis * Vec3::X.dot(world_axis)).normalize()
+                                    }
+                                } else {
+                                    normal
+                                }
+                            }
+                            // Rotation: plane is perpendicular to the rotation axis
+                            GizmoKind::RotationX | GizmoKind::RotationY | GizmoKind::RotationZ => {
+                                world_axis
+                            }
+                        };
+
+                        // Get viewport size for screen-to-NDC conversion
+                        let (width, height) = renderer.gpu.canvas_size(false);
+
+                        // Compute initial ray-plane intersection
+                        if let Some(intersection) = ray_plane_intersection(
+                            x as f32,
+                            y as f32,
+                            width as f32,
+                            height as f32,
+                            camera_matrices,
+                            world_position,
+                            plane_normal,
+                        ) {
+                            // For rotation, compute the initial angle in the rotation plane
+                            let initial_angle = match gizmo_kind {
+                                GizmoKind::RotationX
+                                | GizmoKind::RotationY
+                                | GizmoKind::RotationZ => {
+                                    let from_center = intersection - world_position;
+                                    // Get two basis vectors in the rotation plane
+                                    let (basis_u, basis_v) = get_rotation_plane_basis(world_axis);
+                                    let u = from_center.dot(basis_u);
+                                    let v = from_center.dot(basis_v);
+                                    v.atan2(u)
+                                }
+                                _ => 0.0,
+                            };
+
+                            self.drag_state = Some(DragState {
+                                screen_pos: (x as f32, y as f32),
+                                initial_translation: selected_transform.translation,
+                                initial_scale: selected_transform.scale,
+                                initial_rotation: selected_transform.rotation,
+                                initial_world_position: world_position,
+                                initial_world_rotation: world_rotation,
+                                world_axis,
+                                parent_inverse_rotation,
+                                plane_normal,
+                                plane_point: world_position,
+                                initial_intersection: intersection,
+                                initial_angle,
+                            });
+                        }
+                    }
+                }
+
                 true
             }
             None => {
                 self.current_gizmo_kind = None;
+                self.drag_state = None;
+
                 if let Ok(mesh) = renderer.meshes.get(mesh_key) {
                     self.selected_object_transform_key
                         .set_neq(Some(mesh.transform_key));
 
-                    match (
-                        renderer.transforms.get_local(mesh.transform_key),
+                    // Position gizmo at object's world position
+                    if let (Ok(world_matrix), Ok(gizmo_transform)) = (
+                        renderer.transforms.get_world(mesh.transform_key),
                         renderer.transforms.get_local(self.transform_keys.root),
                     ) {
-                        (Ok(selected_transform), Ok(gizmo_transform)) => {
-                            let gizmo_transform = gizmo_transform
-                                .clone()
-                                .with_translation(selected_transform.translation);
+                        let (_, world_rotation, world_position) =
+                            world_matrix.to_scale_rotation_translation();
 
-                            let _ = renderer
-                                .transforms
-                                .set_local(self.transform_keys.root, gizmo_transform);
-                        }
-                        _ => {}
+                        // For local mode, also rotate the gizmo
+                        let gizmo_rotation = match self.gizmo_space() {
+                            GizmoSpace::Global => Quat::IDENTITY,
+                            GizmoSpace::Local => world_rotation,
+                        };
+
+                        let gizmo_transform = gizmo_transform
+                            .clone()
+                            .with_translation(world_position)
+                            .with_rotation(gizmo_rotation);
+
+                        let _ = renderer
+                            .transforms
+                            .set_local(self.transform_keys.root, gizmo_transform);
                     }
                 }
 
@@ -191,47 +366,147 @@ impl TransformController {
         }
     }
     pub fn update_transform(&mut self, renderer: &mut AwsmRenderer, x_delta: i32, y_delta: i32) {
-        match (
-            self.selected_object_transform_key.get_cloned(),
-            self.current_gizmo_kind,
-        ) {
-            (Some(selected_transform_key), Some(gizmo_kind)) => {
-                if let Ok(mut selected_transform) = renderer
-                    .transforms
-                    .get_local(selected_transform_key)
-                    .cloned()
-                {
-                    // Simple example: just move along X axis based on x_delta
-                    match gizmo_kind {
-                        GizmoKind::TranslationX => {
-                            selected_transform.translation.x += x_delta as f32 * 0.01;
-                        }
-                        GizmoKind::TranslationY => {
-                            selected_transform.translation.y += y_delta as f32 * 0.01;
-                        }
-                        GizmoKind::TranslationZ => {
-                            selected_transform.translation.z += y_delta as f32 * 0.01;
-                        }
-                        GizmoKind::ScaleX => {
-                            selected_transform.scale.x *= 1.0 + (-x_delta as f32 * 0.01);
-                        }
-                        GizmoKind::ScaleY => {
-                            selected_transform.scale.y *= 1.0 + (-y_delta as f32 * 0.01);
-                        }
-                        GizmoKind::ScaleZ => {
-                            selected_transform.scale.z *= 1.0 + (-y_delta as f32 * 0.01);
-                        }
-                        _ => {
-                            // Rotation handling can be added here
-                        }
-                    }
+        let Some(drag_state) = self.drag_state.as_mut() else {
+            return;
+        };
 
-                    let _ = renderer
-                        .transforms
-                        .set_local(selected_transform_key, selected_transform);
-                }
+        let Some(selected_transform_key) = self.selected_object_transform_key.get_cloned() else {
+            return;
+        };
+
+        let Some(gizmo_kind) = self.current_gizmo_kind else {
+            return;
+        };
+
+        let Some(camera_matrices) = renderer.camera.last_matrices.as_ref() else {
+            return;
+        };
+
+        // Accumulate screen position from deltas
+        drag_state.screen_pos.0 += x_delta as f32;
+        drag_state.screen_pos.1 += y_delta as f32;
+
+        let (width, height) = renderer.gpu.canvas_size(false);
+
+        // Compute new ray-plane intersection at current screen position
+        let Some(current_intersection) = ray_plane_intersection(
+            drag_state.screen_pos.0,
+            drag_state.screen_pos.1,
+            width as f32,
+            height as f32,
+            camera_matrices,
+            drag_state.plane_point,
+            drag_state.plane_normal,
+        ) else {
+            return;
+        };
+
+        // Apply the transform based on gizmo kind
+        let Ok(mut selected_transform) = renderer
+            .transforms
+            .get_local(selected_transform_key)
+            .cloned()
+        else {
+            return;
+        };
+
+        // Use the stored world-space axis
+        let world_axis = drag_state.world_axis;
+
+        match gizmo_kind {
+            GizmoKind::TranslationX | GizmoKind::TranslationY | GizmoKind::TranslationZ => {
+                // Calculate the movement in world space and project onto the world axis
+                let world_delta = current_intersection - drag_state.initial_intersection;
+                let movement_along_axis = world_delta.dot(world_axis);
+
+                // World-space translation delta along the constraint axis
+                let world_translation_delta = world_axis * movement_along_axis;
+
+                // Convert world delta to parent space
+                let parent_space_delta = drag_state.parent_inverse_rotation * world_translation_delta;
+
+                // Translation: add the parent-space movement to the initial local translation
+                selected_transform.translation = drag_state.initial_translation + parent_space_delta;
             }
-            _ => {}
+            GizmoKind::ScaleX | GizmoKind::ScaleY | GizmoKind::ScaleZ => {
+                // Scale: use ratio of distances from object center along the world axis
+                // This ensures dragging "outward" always increases scale
+                let initial_offset =
+                    drag_state.initial_intersection - drag_state.initial_world_position;
+                let current_offset = current_intersection - drag_state.initial_world_position;
+
+                let initial_dist = initial_offset.dot(world_axis);
+                let current_dist = current_offset.dot(world_axis);
+
+                // Compute scale factor based on ratio of distances
+                let scale_factor = if initial_dist.abs() > 0.001 {
+                    // Ratio of current to initial distance
+                    (current_dist / initial_dist).max(0.01)
+                } else {
+                    // Initial click was at center, use linear fallback
+                    let camera_distance =
+                        (camera_matrices.position_world - drag_state.initial_world_position)
+                            .length();
+                    let sensitivity = camera_distance * 0.5;
+                    (1.0 + current_dist / sensitivity).max(0.01)
+                };
+
+                // Scale is always applied to the local axis (X, Y, or Z component)
+                let mut new_scale = drag_state.initial_scale;
+                match gizmo_kind {
+                    GizmoKind::ScaleX => new_scale.x = drag_state.initial_scale.x * scale_factor,
+                    GizmoKind::ScaleY => new_scale.y = drag_state.initial_scale.y * scale_factor,
+                    GizmoKind::ScaleZ => new_scale.z = drag_state.initial_scale.z * scale_factor,
+                    _ => {}
+                }
+                selected_transform.scale = new_scale;
+            }
+            GizmoKind::RotationX | GizmoKind::RotationY | GizmoKind::RotationZ => {
+                // Compute current angle in the rotation plane using the world axis
+                let from_center = current_intersection - drag_state.plane_point;
+                let (basis_u, basis_v) = get_rotation_plane_basis(world_axis);
+                let u = from_center.dot(basis_u);
+                let v = from_center.dot(basis_v);
+                let current_angle = v.atan2(u);
+
+                // Calculate the angle delta
+                let angle_delta = current_angle - drag_state.initial_angle;
+
+                // Create rotation quaternion in parent space
+                // Convert the world-space rotation axis to parent space
+                let parent_space_axis = drag_state.parent_inverse_rotation * world_axis;
+                let rotation_delta = Quat::from_axis_angle(parent_space_axis, angle_delta);
+                selected_transform.rotation =
+                    (rotation_delta * drag_state.initial_rotation).normalize();
+            }
+        }
+
+        let _ = renderer
+            .transforms
+            .set_local(selected_transform_key, selected_transform.clone());
+
+        // Force update of world matrices so we can get the new world position
+        renderer.update_transforms();
+
+        // Also update the gizmo position to follow the object's world position
+        if let (Ok(world_matrix), Ok(mut gizmo_transform)) = (
+            renderer.transforms.get_world(selected_transform_key),
+            renderer.transforms.get_local(self.transform_keys.root).cloned(),
+        ) {
+            let (_, world_rotation, world_position) =
+                world_matrix.to_scale_rotation_translation();
+
+            gizmo_transform.translation = world_position;
+
+            // For local mode, also update gizmo rotation to follow object
+            match self.gizmo_space() {
+                GizmoSpace::Global => gizmo_transform.rotation = Quat::IDENTITY,
+                GizmoSpace::Local => gizmo_transform.rotation = world_rotation,
+            }
+
+            let _ = renderer
+                .transforms
+                .set_local(self.transform_keys.root, gizmo_transform);
         }
     }
 
@@ -286,6 +561,10 @@ impl TransformController {
         ]
         .into_iter()
     }
+
+    fn gizmo_space(&self) -> GizmoSpace {
+        *self._gizmo_space.read().unwrap()
+    }
 }
 
 impl TransformControllerMeshKeys {
@@ -326,4 +605,80 @@ impl TransformControllerTransformKeys {
             root: get_transform_key("GizmoRoot")?,
         })
     }
+}
+
+/// Get two orthonormal basis vectors in the plane perpendicular to the given axis.
+/// Used for computing angles in the rotation plane.
+fn get_rotation_plane_basis(axis: Vec3) -> (Vec3, Vec3) {
+    // Choose a vector not parallel to the axis
+    let not_parallel = if axis.dot(Vec3::Y).abs() < 0.9 {
+        Vec3::Y
+    } else {
+        Vec3::X
+    };
+
+    // First basis vector: perpendicular to axis
+    let basis_u = axis.cross(not_parallel).normalize();
+    // Second basis vector: perpendicular to both axis and basis_u
+    let basis_v = axis.cross(basis_u).normalize();
+
+    (basis_u, basis_v)
+}
+
+/// Cast a ray from the camera through a screen point and find intersection with a plane.
+///
+/// Returns the world-space intersection point, or None if the ray is parallel to the plane
+/// or pointing away from it.
+fn ray_plane_intersection(
+    screen_x: f32,
+    screen_y: f32,
+    viewport_width: f32,
+    viewport_height: f32,
+    camera_matrices: &CameraMatrices,
+    plane_point: Vec3,
+    plane_normal: Vec3,
+) -> Option<Vec3> {
+    // Convert screen coordinates to NDC (Normalized Device Coordinates)
+    // Screen Y is typically top-down, NDC Y is bottom-up
+    let ndc_x = (2.0 * screen_x / viewport_width) - 1.0;
+    let ndc_y = 1.0 - (2.0 * screen_y / viewport_height);
+
+    // Create points on the near and far planes in clip space
+    // WebGPU uses depth range [0, 1], so near plane is z=0, far plane is z=1
+    let near_clip = Vec4::new(ndc_x, ndc_y, 0.0, 1.0);
+    let far_clip = Vec4::new(ndc_x, ndc_y, 1.0, 1.0);
+
+    // Transform to world space using inverse view-projection matrix
+    let inv_view_proj = camera_matrices.inv_view_projection();
+
+    let near_world = inv_view_proj * near_clip;
+    let far_world = inv_view_proj * far_clip;
+
+    // Perspective divide
+    let near_world = near_world.truncate() / near_world.w;
+    let far_world = far_world.truncate() / far_world.w;
+
+    // Construct ray
+    let ray_origin = near_world;
+    let ray_direction = (far_world - near_world).normalize();
+
+    // Ray-plane intersection
+    // Plane equation: dot(P - plane_point, plane_normal) = 0
+    // Ray equation: P = ray_origin + t * ray_direction
+    // Solving for t: t = dot(plane_point - ray_origin, plane_normal) / dot(ray_direction, plane_normal)
+    let denom = ray_direction.dot(plane_normal);
+
+    // If denom is close to zero, ray is parallel to plane
+    if denom.abs() < 1e-6 {
+        return None;
+    }
+
+    let t = (plane_point - ray_origin).dot(plane_normal) / denom;
+
+    // If t is negative, intersection is behind the camera
+    if t < 0.0 {
+        return None;
+    }
+
+    Some(ray_origin + ray_direction * t)
 }

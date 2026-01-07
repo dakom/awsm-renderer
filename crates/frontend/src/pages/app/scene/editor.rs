@@ -126,11 +126,8 @@ impl AppSceneEditor {
                             if let Err(err) = transform_controller.set_hidden(renderer, !gizmo_translation_enabled, !gizmo_rotation_enabled, !gizmo_scale_enabled) {
                                 tracing::error!("Error setting transform controller enabled state: {}", err);
                             }
-                        } else {
-                            if let Err(err) = transform_controller.set_hidden(renderer, true, true, true) {
-                                tracing::error!("Error setting transform controller enabled state: {}", err);
-                            }
-
+                        } else if let Err(err) = transform_controller.set_hidden(renderer, true, true, true) {
+                            tracing::error!("Error setting transform controller enabled state: {}", err);
                         }
                     }
                 }

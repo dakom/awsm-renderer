@@ -1,6 +1,9 @@
 use crate::{
     atoms::checkbox::{Checkbox, CheckboxStyle},
-    pages::app::context::AppContext,
+    pages::app::{
+        context::AppContext, scene::editor::transform_controller::GizmoSpace,
+        sidebar::render_dropdown_label,
+    },
     prelude::*,
 };
 
@@ -31,6 +34,7 @@ impl SidebarEditor {
             .child(state.render_show_gizmo_translation())
             .child(state.render_show_gizmo_rotation())
             .child(state.render_show_gizmo_scale())
+            .child(state.render_show_gizmo_space())
         })
     }
 
@@ -88,5 +92,23 @@ impl SidebarEditor {
                 state.ctx.editor_gizmo_scale_enabled.set_neq(!state.ctx.editor_gizmo_scale_enabled.get());
             }))
             .render()
+    }
+
+    fn render_show_gizmo_space(self: &Arc<Self>) -> Dom {
+        let state = self;
+        render_dropdown_label(
+            "Gizmo Space",
+            Dropdown::new()
+                .with_intial_selected(Some(*state.ctx.editor_gizmo_space.read().unwrap()))
+                .with_bg_color(ColorBackground::Dropdown)
+                .with_on_change(clone!(state => move |space| {
+                    *state.ctx.editor_gizmo_space.write().unwrap() = *space;
+                }))
+                .with_options([
+                    ("Local".to_string(), GizmoSpace::Local),
+                    ("Global".to_string(), GizmoSpace::Global),
+                ])
+                .render(),
+        )
     }
 }
