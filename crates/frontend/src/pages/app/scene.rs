@@ -46,9 +46,16 @@ pub struct AppScene {
     pub request_animation_frame: Mutex<Option<gloo_render::AnimationFrame>>,
     pub last_request_animation_frame: Cell<Option<f64>>,
     pub event_listeners: Mutex<Vec<EventListener>>,
+    move_action: Cell<Option<MoveAction>>,
     last_size: Cell<(f64, f64)>,
     last_camera_id: Cell<CameraId>,
     last_shader_kind: Cell<Option<FragmentShaderKind>>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MoveAction {
+    CameraMoving,
+    GizmoTransforming,
 }
 
 impl AppScene {
@@ -71,6 +78,7 @@ impl AppScene {
             last_camera_id: Cell::new(CameraId::default()),
             last_shader_kind: Cell::new(None),
             editor: Mutex::new(None),
+            move_action: Cell::new(None),
         });
 
         let resize_observer = ResizeObserver::new(
@@ -97,7 +105,7 @@ impl AppScene {
                 "pointerdown",
                 clone!(state => move |event| {
                     spawn_local(clone!(state, event => async move {
-                        let renderer = state.renderer.lock().await;
+                        let mut renderer = state.renderer.lock().await;
                         let event = event.unchecked_into::<PointerEvent>();
                         let (x, y) = renderer.gpu.pointer_event_to_canvas_coords_i32(&event);
                         match renderer.pick(x,y).await {
@@ -106,22 +114,23 @@ impl AppScene {
                             }
                             Ok(res) => {
                                 if let PickResult::Hit(mesh_key) = res {
-                                    let is_editor = if let Some(editor) = state.editor.lock().unwrap().as_ref() {
-                                        editor.start_pick(mesh_key, x, y)
-                                    } else {
-                                        false
-                                    };
-
-                                   if !is_editor {
-                                       if let Some(camera) = state.camera.lock().unwrap().as_mut() {
-                                            camera.on_pointer_down();
+                                    if let Some(editor) = state.editor.lock().unwrap().as_ref() {
+                                        if let Some(transform_controller) = editor.transform_controller.lock().unwrap().as_mut() {
+                                            if transform_controller.start_pick(&mut renderer, mesh_key, x, y) {
+                                                state.move_action.set(Some(MoveAction::GizmoTransforming));
+                                            }
                                         }
-                                   }
-
-                                } else {
-                                    tracing::info!("MISSED {},{}: {:?}", x, y, res);
+                                    }
                                 }
+
                             }
+                        }
+
+                        if state.move_action.get() != Some(MoveAction::GizmoTransforming) {
+                            if let Some(camera) = state.camera.lock().unwrap().as_mut() {
+                                camera.on_pointer_down();
+                            }
+                            state.move_action.set(Some(MoveAction::CameraMoving));
                         }
                     }));
                 }),
@@ -130,9 +139,24 @@ impl AppScene {
                 &web_sys::window().unwrap(),
                 "pointermove",
                 clone!(state => move |event| {
-                    if let Some(camera) = state.camera.lock().unwrap().as_mut() {
-                        let event = event.unchecked_ref::<web_sys::PointerEvent>();
-                        camera.on_pointer_move(event.movement_x(), event.movement_y());
+                    let event = event.unchecked_ref::<web_sys::PointerEvent>();
+                    match state.move_action.get() {
+                        Some(MoveAction::GizmoTransforming) => {
+                            spawn_local(clone!(state, event => async move {
+                                if let Some(editor) = state.editor.lock().unwrap().as_mut() {
+                                    if let Some(transform_controller) = editor.transform_controller.lock().unwrap().as_mut() {
+                                        let mut renderer = state.renderer.lock().await;
+                                        transform_controller.update_transform(&mut renderer, event.movement_x(), event.movement_y());
+                                    }
+                                }
+                            }));
+                        }
+                        Some(MoveAction::CameraMoving) => {
+                            if let Some(camera) = state.camera.lock().unwrap().as_mut() {
+                                camera.on_pointer_move(event.movement_x(), event.movement_y());
+                            }
+                        }
+                        None => {}
                     }
                 }),
             ),
@@ -140,9 +164,12 @@ impl AppScene {
                 &web_sys::window().unwrap(),
                 "pointerup",
                 clone!(state => move |_event| {
+
                     if let Some(camera) = state.camera.lock().unwrap().as_mut() {
                         camera.on_pointer_up();
                     }
+                    state.move_action.set(None);
+
                 }),
             ),
             EventListener::new(
@@ -488,7 +515,8 @@ impl AppScene {
             if let Some(editor) = self.editor.lock().unwrap().as_ref() {
                 *editor.transform_controller.lock().unwrap() = Some(TransformController::new(
                     &mut renderer,
-                    &ctx.key_lookups.lock().unwrap(),
+                    ctx.key_lookups.clone(),
+                    editor.selected_object_transform_key.clone(),
                 )?);
             }
         }

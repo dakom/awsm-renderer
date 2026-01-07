@@ -1,8 +1,11 @@
+use std::{cell::Cell, sync::Arc};
+
 use anyhow::{Context, Result};
 use awsm_renderer::{
     debug::debug_unique_string, gltf::GltfKeyLookups, mesh::MeshKey, transforms::TransformKey,
     AwsmRenderer,
 };
+use futures_signals::signal::Mutable;
 use glam::Vec3;
 
 use crate::{config::CONFIG, pages::app::scene::camera::Camera};
@@ -11,6 +14,9 @@ use crate::{config::CONFIG, pages::app::scene::camera::Camera};
 pub struct TransformController {
     pub mesh_keys: TransformControllerMeshKeys,
     pub transform_keys: TransformControllerTransformKeys,
+    pub gltf_lookups: Arc<std::sync::Mutex<GltfKeyLookups>>,
+    pub selected_object_transform_key: Mutable<Option<TransformKey>>,
+    current_gizmo_kind: Option<GizmoKind>,
 }
 
 #[derive(Clone, Debug)]
@@ -33,8 +39,8 @@ pub struct TransformControllerTransformKeys {
     pub root: TransformKey,
 }
 
-#[derive(Clone, Debug)]
-enum MeshKind {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GizmoKind {
     TranslationX,
     TranslationY,
     TranslationZ,
@@ -47,17 +53,34 @@ enum MeshKind {
 }
 
 impl TransformController {
-    pub fn new(renderer: &mut AwsmRenderer, lookups: &GltfKeyLookups) -> Result<Self> {
+    pub fn new(
+        renderer: &mut AwsmRenderer,
+        lookups: Arc<std::sync::Mutex<GltfKeyLookups>>,
+        selected_object_transform_key: Mutable<Option<TransformKey>>,
+    ) -> Result<Self> {
+        let (mesh_keys, transform_keys) = {
+            let lookups = lookups.lock().unwrap();
+            let mesh_keys = TransformControllerMeshKeys::new(&lookups)?;
+            let transform_keys = TransformControllerTransformKeys::new(&lookups)?;
+
+            (mesh_keys, transform_keys)
+        };
         let _self = Self {
-            mesh_keys: TransformControllerMeshKeys::new(lookups)?,
-            transform_keys: TransformControllerTransformKeys::new(lookups)?,
+            mesh_keys,
+            transform_keys,
+            gltf_lookups: lookups,
+            selected_object_transform_key,
+            current_gizmo_kind: None,
         };
 
         _self.set_hidden(
             renderer,
-            !CONFIG.initial_show_gizmo_translation,
-            !CONFIG.initial_show_gizmo_rotation,
-            !CONFIG.initial_show_gizmo_scale,
+            _self.selected_object_transform_key.lock_ref().is_none()
+                || !CONFIG.initial_show_gizmo_translation,
+            _self.selected_object_transform_key.lock_ref().is_none()
+                || !CONFIG.initial_show_gizmo_rotation,
+            _self.selected_object_transform_key.lock_ref().is_none()
+                || !CONFIG.initial_show_gizmo_scale,
         )?;
 
         Ok(_self)
@@ -103,39 +126,113 @@ impl TransformController {
         Ok(())
     }
 
-    fn get_mesh_kind(&self, mesh_key: MeshKey) -> Option<MeshKind> {
+    fn get_gizmo_mesh_kind(&self, mesh_key: MeshKey) -> Option<GizmoKind> {
         if mesh_key == self.mesh_keys.arrow_x {
-            Some(MeshKind::TranslationX)
+            Some(GizmoKind::TranslationX)
         } else if mesh_key == self.mesh_keys.arrow_y {
-            Some(MeshKind::TranslationY)
+            Some(GizmoKind::TranslationY)
         } else if mesh_key == self.mesh_keys.arrow_z {
-            Some(MeshKind::TranslationZ)
+            Some(GizmoKind::TranslationZ)
         } else if mesh_key == self.mesh_keys.ring_x {
-            Some(MeshKind::RotationX)
+            Some(GizmoKind::RotationX)
         } else if mesh_key == self.mesh_keys.ring_y {
-            Some(MeshKind::RotationY)
+            Some(GizmoKind::RotationY)
         } else if mesh_key == self.mesh_keys.ring_z {
-            Some(MeshKind::RotationZ)
+            Some(GizmoKind::RotationZ)
         } else if mesh_key == self.mesh_keys.cube_x {
-            Some(MeshKind::ScaleX)
+            Some(GizmoKind::ScaleX)
         } else if mesh_key == self.mesh_keys.cube_y {
-            Some(MeshKind::ScaleY)
+            Some(GizmoKind::ScaleY)
         } else if mesh_key == self.mesh_keys.cube_z {
-            Some(MeshKind::ScaleZ)
+            Some(GizmoKind::ScaleZ)
         } else {
             None
         }
     }
 
-    pub fn start_pick(&self, mesh_key: MeshKey, x: i32, y: i32) -> bool {
-        let mesh_kind = match self.get_mesh_kind(mesh_key) {
-            Some(kind) => kind,
-            None => return false,
-        };
+    // returns whether or not we hit a gizmo mesh
+    pub fn start_pick(
+        &mut self,
+        renderer: &mut AwsmRenderer,
+        mesh_key: MeshKey,
+        _x: i32,
+        _y: i32,
+    ) -> bool {
+        match self.get_gizmo_mesh_kind(mesh_key) {
+            Some(gizmo_kind) => {
+                self.current_gizmo_kind = Some(gizmo_kind);
+                true
+            }
+            None => {
+                self.current_gizmo_kind = None;
+                if let Ok(mesh) = renderer.meshes.get(mesh_key) {
+                    self.selected_object_transform_key
+                        .set_neq(Some(mesh.transform_key));
 
-        tracing::info!("Start pick: {:?} at {},{}", mesh_kind, x, y);
+                    match (
+                        renderer.transforms.get_local(mesh.transform_key),
+                        renderer.transforms.get_local(self.transform_keys.root),
+                    ) {
+                        (Ok(selected_transform), Ok(gizmo_transform)) => {
+                            let gizmo_transform = gizmo_transform
+                                .clone()
+                                .with_translation(selected_transform.translation);
 
-        true
+                            let _ = renderer
+                                .transforms
+                                .set_local(self.transform_keys.root, gizmo_transform);
+                        }
+                        _ => {}
+                    }
+                }
+
+                false
+            }
+        }
+    }
+    pub fn update_transform(&mut self, renderer: &mut AwsmRenderer, x_delta: i32, y_delta: i32) {
+        match (
+            self.selected_object_transform_key.get_cloned(),
+            self.current_gizmo_kind,
+        ) {
+            (Some(selected_transform_key), Some(gizmo_kind)) => {
+                if let Ok(mut selected_transform) = renderer
+                    .transforms
+                    .get_local(selected_transform_key)
+                    .cloned()
+                {
+                    // Simple example: just move along X axis based on x_delta
+                    match gizmo_kind {
+                        GizmoKind::TranslationX => {
+                            selected_transform.translation.x += x_delta as f32 * 0.01;
+                        }
+                        GizmoKind::TranslationY => {
+                            selected_transform.translation.y += y_delta as f32 * 0.01;
+                        }
+                        GizmoKind::TranslationZ => {
+                            selected_transform.translation.z += y_delta as f32 * 0.01;
+                        }
+                        GizmoKind::ScaleX => {
+                            selected_transform.scale.x *= 1.0 + (-x_delta as f32 * 0.01);
+                        }
+                        GizmoKind::ScaleY => {
+                            selected_transform.scale.y *= 1.0 + (-y_delta as f32 * 0.01);
+                        }
+                        GizmoKind::ScaleZ => {
+                            selected_transform.scale.z *= 1.0 + (-y_delta as f32 * 0.01);
+                        }
+                        _ => {
+                            // Rotation handling can be added here
+                        }
+                    }
+
+                    let _ = renderer
+                        .transforms
+                        .set_local(selected_transform_key, selected_transform);
+                }
+            }
+            _ => {}
+        }
     }
 
     pub fn set_hidden(
