@@ -29,8 +29,28 @@ impl Aabb {
     }
 
     pub fn transform(&mut self, mat: &Mat4) {
-        self.min = mat.transform_point3(self.min);
-        self.max = mat.transform_point3(self.max);
+        // Transform all 8 corners of the AABB and recompute bounds
+        // This is necessary because rotation can change which corners are min/max
+        let corners = [
+            Vec3::new(self.min.x, self.min.y, self.min.z),
+            Vec3::new(self.max.x, self.min.y, self.min.z),
+            Vec3::new(self.min.x, self.max.y, self.min.z),
+            Vec3::new(self.max.x, self.max.y, self.min.z),
+            Vec3::new(self.min.x, self.min.y, self.max.z),
+            Vec3::new(self.max.x, self.min.y, self.max.z),
+            Vec3::new(self.min.x, self.max.y, self.max.z),
+            Vec3::new(self.max.x, self.max.y, self.max.z),
+        ];
+
+        let first = mat.transform_point3(corners[0]);
+        self.min = first;
+        self.max = first;
+
+        for corner in &corners[1..] {
+            let transformed = mat.transform_point3(*corner);
+            self.min = self.min.min(transformed);
+            self.max = self.max.max(transformed);
+        }
     }
 
     pub fn center(&self) -> Vec3 {

@@ -578,13 +578,20 @@ impl AppScene {
     pub async fn setup_all(self: &Arc<Self>) -> Result<()> {
         self.last_shader_kind.set(None);
 
-        self.setup_viewport().await?;
+        self.setup_viewport_inner(true).await?;
 
         Ok(())
     }
 
     pub async fn setup_viewport(self: &Arc<Self>) -> Result<()> {
+        self.setup_viewport_inner(false).await
+    }
+
+    async fn setup_viewport_inner(self: &Arc<Self>, force_new_camera: bool) -> Result<()> {
         let mut renderer = self.renderer.lock().await;
+
+        // Ensure canvas buffer size matches CSS display size
+        renderer.gpu.sync_canvas_buffer_with_css();
 
         let (canvas_width, canvas_height) = renderer.gpu.canvas_size(false);
 
@@ -592,6 +599,34 @@ impl AppScene {
         renderer.update_animations(0.0)?;
         renderer.update_transforms();
 
+        let camera_aspect = canvas_width as f32 / canvas_height as f32;
+        let camera_id = self.ctx.camera_id.get();
+
+        // Check if we can just resize the existing camera
+        let mut camera_guard = self.camera.lock().unwrap();
+        let needs_new_camera = force_new_camera
+            || match camera_guard.as_ref() {
+                None => true,
+                Some(camera) => {
+                    // Need new camera if type changed
+                    match camera_id {
+                        CameraId::Orthographic => !camera.is_orthographic(),
+                        CameraId::Perspective => !camera.is_perspective(),
+                    }
+                }
+            };
+
+        if !needs_new_camera {
+            // Just update the aspect ratio on the existing camera
+            if let Some(camera) = camera_guard.as_mut() {
+                camera.on_resize(camera_aspect);
+                // Update renderer's camera matrices so gizmo interactions work correctly
+                renderer.update_camera(camera.matrices())?;
+            }
+            return Ok(());
+        }
+
+        // Need to create a new camera - compute scene bounds
         let mut scene_aabb: Option<Aabb> = None;
 
         for (_, mesh) in renderer.meshes.iter() {
@@ -614,21 +649,15 @@ impl AppScene {
             .as_ref()
             .map(|data| data.doc.clone());
 
-        let camera_aspect = canvas_width as f32 / canvas_height as f32;
-        let mut camera = self.camera.lock().unwrap();
-        match self.ctx.camera_id.get() {
-            CameraId::Orthographic => {
-                *camera = Some(Camera::new_orthographic(
-                    scene_aabb,
-                    gltf_doc,
-                    camera_aspect,
-                ));
-            }
-            CameraId::Perspective => {
-                tracing::info!("setting new perspective camera");
-                *camera = Some(Camera::new_perspective(scene_aabb, gltf_doc, camera_aspect));
-            }
-        }
+        let new_camera = match camera_id {
+            CameraId::Orthographic => Camera::new_orthographic(scene_aabb, gltf_doc, camera_aspect),
+            CameraId::Perspective => Camera::new_perspective(scene_aabb, gltf_doc, camera_aspect),
+        };
+
+        // Update renderer's camera matrices immediately so gizmo interactions work correctly
+        renderer.update_camera(new_camera.matrices())?;
+
+        *camera_guard = Some(new_camera);
 
         Ok(())
     }

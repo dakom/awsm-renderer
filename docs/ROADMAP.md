@@ -1,10 +1,5 @@
 # Next up
 
-- Fix popping glitch
-  - Correct canvas size happens only after resizing window
-  - Can't get it to be correct just by calling `state.on_viewport_change();` after load
-  - Maybe canvas size needs to be set like in resize observer?
-  
 - Support different kinds of Materials
   - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
   - unlit as example?
