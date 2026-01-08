@@ -79,10 +79,9 @@ tasks:
     deps: [trunk-build-release]
     desc: "Build frontend for production"
     cmds:
-      # no need to copy additional assets from separate repo, as they are referenced remotely in production
+      # no need to copy media, it's referenced remotely in production
       - mkdir -p {{.PATH_BUILD_ARTIFACTS_FRONTEND}}
       - cp -r {{joinPath .PATH_CRATE_FRONTEND "dist" }}/* {{.PATH_BUILD_ARTIFACTS_FRONTEND}}/
-      - cp -r {{.PATH_MEDIA_LOCAL}}/* {{joinPath .PATH_BUILD_ARTIFACTS_FRONTEND "media"}}/
       - cp {{joinPath .PATH_CRATE_FRONTEND "index.html" }} {{joinPath .PATH_BUILD_ARTIFACTS_FRONTEND "404.html"}}
 
   trunk-build-release:
