@@ -31,7 +31,7 @@ vars:
 
   # Misc
   PROD_ROOT_BASE_URI_PATH: "/awsm-renderer"
-  DEV_ROOT_BASE_URI_PATH: ".."
+  DEV_ROOT_BASE_URI_PATH: ""
 
 tasks:
   default:

@@ -9,6 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 awsm-renderer = { path = "../renderer", features = ["texture-export", "ktx", "serde"] }
+awsm-renderer-editor = { path = "../editor" }
 serde = {workspace = true}
 serde_json = {workspace = true}
 anyhow = {workspace = true}

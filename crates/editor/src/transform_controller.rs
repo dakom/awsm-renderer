@@ -2,13 +2,27 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use awsm_renderer::{
-    camera::CameraMatrices, debug::debug_unique_string, gltf::GltfKeyLookups, mesh::MeshKey,
-    transforms::TransformKey, AwsmRenderer,
+    camera::CameraMatrices, gltf::GltfKeyLookups, mesh::MeshKey, transforms::TransformKey,
+    AwsmRenderer,
 };
-use futures_signals::signal::Mutable;
 use glam::{Quat, Vec3, Vec4};
 
-use crate::{config::CONFIG, pages::app::scene::camera::Camera};
+#[derive(Clone, Debug)]
+pub struct TransformController {
+    pub mesh_keys: TransformControllerMeshKeys,
+    pub transform_keys: TransformControllerTransformKeys,
+    pub gltf_lookups: Arc<std::sync::Mutex<GltfKeyLookups>>,
+    pub selected_object_transform_key: Option<TransformKey>,
+    _gizmo_space: GizmoSpace,
+    current_gizmo_kind: Option<GizmoKind>,
+    drag_state: Option<DragState>,
+}
+
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
+pub enum TransformTarget {
+    GizmoHit(GizmoKind),
+    ObjectHit(TransformKey),
+}
 
 /// State tracked during a gizmo drag operation
 #[derive(Clone, Debug)]
@@ -23,8 +37,6 @@ struct DragState {
     initial_rotation: Quat,
     /// Initial object world position when drag started
     initial_world_position: Vec3,
-    /// Initial object world rotation when drag started
-    initial_world_rotation: Quat,
     /// The constraint axis in world space (may be rotated for local mode)
     world_axis: Vec3,
     /// Inverse of parent's world rotation (to convert world deltas to parent space)
@@ -37,17 +49,10 @@ struct DragState {
     initial_intersection: Vec3,
     /// For rotation: the initial angle from center to intersection (in the rotation plane)
     initial_angle: f32,
-}
-
-#[derive(Clone, Debug)]
-pub struct TransformController {
-    pub mesh_keys: TransformControllerMeshKeys,
-    pub transform_keys: TransformControllerTransformKeys,
-    pub gltf_lookups: Arc<std::sync::Mutex<GltfKeyLookups>>,
-    pub selected_object_transform_key: Mutable<Option<TransformKey>>,
-    current_gizmo_kind: Option<GizmoKind>,
-    drag_state: Option<DragState>,
-    _gizmo_space: Arc<std::sync::RwLock<GizmoSpace>>,
+    /// For scale in Global mode: which local axis to actually scale (0=X, 1=Y, 2=Z)
+    /// In Global mode, this maps the world axis to the closest local axis.
+    /// In Local mode, this matches the gizmo kind directly.
+    scale_target_axis: u8,
 }
 
 #[derive(Clone, Debug)]
@@ -70,7 +75,7 @@ pub struct TransformControllerTransformKeys {
     pub root: TransformKey,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum GizmoKind {
     TranslationX,
     TranslationY,
@@ -92,10 +97,8 @@ pub enum GizmoSpace {
 
 impl TransformController {
     pub fn new(
-        renderer: &mut AwsmRenderer,
         lookups: Arc<std::sync::Mutex<GltfKeyLookups>>,
-        selected_object_transform_key: Mutable<Option<TransformKey>>,
-        gizmo_space: Arc<std::sync::RwLock<GizmoSpace>>,
+        gizmo_space: GizmoSpace,
     ) -> Result<Self> {
         let (mesh_keys, transform_keys) = {
             let lookups = lookups.lock().unwrap();
@@ -104,33 +107,21 @@ impl TransformController {
 
             (mesh_keys, transform_keys)
         };
-        let _self = Self {
+        Ok(Self {
             mesh_keys,
             transform_keys,
             gltf_lookups: lookups,
-            selected_object_transform_key,
+            selected_object_transform_key: None,
             current_gizmo_kind: None,
             drag_state: None,
             _gizmo_space: gizmo_space,
-        };
-
-        _self.set_hidden(
-            renderer,
-            _self.selected_object_transform_key.lock_ref().is_none()
-                || !CONFIG.initial_show_gizmo_translation,
-            _self.selected_object_transform_key.lock_ref().is_none()
-                || !CONFIG.initial_show_gizmo_rotation,
-            _self.selected_object_transform_key.lock_ref().is_none()
-                || !CONFIG.initial_show_gizmo_scale,
-        )?;
-
-        Ok(_self)
+        })
     }
 
     pub fn zoom_gizmo_transforms(
         &self,
         renderer: &mut AwsmRenderer,
-        camera: &Camera,
+        camera_matrices: &CameraMatrices,
     ) -> awsm_renderer::error::Result<()> {
         let mut transform = renderer
             .transforms
@@ -143,19 +134,16 @@ impl TransformController {
         let (_, viewport_y) = renderer.gpu.canvas_size(false);
 
         let desired_ndc = 2.0 * DESIRED_PIXEL_SIZE / viewport_y as f32;
-        let proj11 = camera.projection_matrix().y_axis.y;
+        let proj11 = camera_matrices.projection.y_axis.y;
 
-        let depth = if camera.is_orthographic() {
+        let depth = if camera_matrices.is_orthographic() {
             1.0
         } else {
-            let cam_pos = camera.position_world();
+            let cam_pos = camera_matrices.position_world;
             let gizmo_pos = transform.translation;
             (gizmo_pos - cam_pos).length()
         };
 
-        debug_unique_string(1, &transform.translation.to_string(), || {
-            tracing::info!("Gizmo position: {:?}", transform.translation);
-        });
         let scale = (desired_ndc * depth / proj11) / REFERENCE_SIZE;
 
         transform.scale = Vec3::new(scale, scale, scale);
@@ -198,13 +186,13 @@ impl TransformController {
         mesh_key: MeshKey,
         x: i32,
         y: i32,
-    ) -> bool {
+    ) -> Option<TransformTarget> {
         match self.get_gizmo_mesh_kind(mesh_key) {
             Some(gizmo_kind) => {
                 self.current_gizmo_kind = Some(gizmo_kind);
 
                 // Initialize drag state for gizmo manipulation
-                if let Some(selected_key) = self.selected_object_transform_key.get_cloned() {
+                if let Some(selected_key) = self.selected_object_transform_key {
                     if let (Ok(selected_transform), Ok(world_matrix), Some(camera_matrices)) = (
                         renderer.transforms.get_local(selected_key).cloned(),
                         renderer.transforms.get_world(selected_key).cloned(),
@@ -230,7 +218,7 @@ impl TransformController {
                             Quat::IDENTITY
                         };
 
-                        let gizmo_space = self.gizmo_space();
+                        let gizmo_space = self._gizmo_space;
 
                         // Get the local axis for this gizmo kind
                         let local_axis = match gizmo_kind {
@@ -249,6 +237,43 @@ impl TransformController {
                         let world_axis = match gizmo_space {
                             GizmoSpace::Global => local_axis,
                             GizmoSpace::Local => world_rotation * local_axis,
+                        };
+
+                        // For scale in Global mode, find which local axis is closest to the world axis
+                        // This allows scaling to visually match the gizmo direction
+                        let scale_target_axis = match gizmo_kind {
+                            GizmoKind::ScaleX | GizmoKind::ScaleY | GizmoKind::ScaleZ => {
+                                match gizmo_space {
+                                    GizmoSpace::Global => {
+                                        // Find which object local axis is closest to the gizmo's world axis
+                                        let local_x_world = world_rotation * Vec3::X;
+                                        let local_y_world = world_rotation * Vec3::Y;
+                                        let local_z_world = world_rotation * Vec3::Z;
+
+                                        let dot_x = world_axis.dot(local_x_world).abs();
+                                        let dot_y = world_axis.dot(local_y_world).abs();
+                                        let dot_z = world_axis.dot(local_z_world).abs();
+
+                                        if dot_x >= dot_y && dot_x >= dot_z {
+                                            0 // Scale X
+                                        } else if dot_y >= dot_x && dot_y >= dot_z {
+                                            1 // Scale Y
+                                        } else {
+                                            2 // Scale Z
+                                        }
+                                    }
+                                    GizmoSpace::Local => {
+                                        // In Local mode, use the axis matching the gizmo kind directly
+                                        match gizmo_kind {
+                                            GizmoKind::ScaleX => 0,
+                                            GizmoKind::ScaleY => 1,
+                                            GizmoKind::ScaleZ => 2,
+                                            _ => 0,
+                                        }
+                                    }
+                                }
+                            }
+                            _ => 0, // Not used for non-scale operations
                         };
 
                         // Determine the plane normal based on gizmo kind
@@ -314,54 +339,31 @@ impl TransformController {
                                 initial_scale: selected_transform.scale,
                                 initial_rotation: selected_transform.rotation,
                                 initial_world_position: world_position,
-                                initial_world_rotation: world_rotation,
                                 world_axis,
                                 parent_inverse_rotation,
                                 plane_normal,
                                 plane_point: world_position,
                                 initial_intersection: intersection,
                                 initial_angle,
+                                scale_target_axis,
                             });
                         }
                     }
                 }
 
-                true
+                Some(TransformTarget::GizmoHit(gizmo_kind))
             }
             None => {
                 self.current_gizmo_kind = None;
                 self.drag_state = None;
 
-                if let Ok(mesh) = renderer.meshes.get(mesh_key) {
-                    self.selected_object_transform_key
-                        .set_neq(Some(mesh.transform_key));
-
-                    // Position gizmo at object's world position
-                    if let (Ok(world_matrix), Ok(gizmo_transform)) = (
-                        renderer.transforms.get_world(mesh.transform_key),
-                        renderer.transforms.get_local(self.transform_keys.root),
-                    ) {
-                        let (_, world_rotation, world_position) =
-                            world_matrix.to_scale_rotation_translation();
-
-                        // For local mode, also rotate the gizmo
-                        let gizmo_rotation = match self.gizmo_space() {
-                            GizmoSpace::Global => Quat::IDENTITY,
-                            GizmoSpace::Local => world_rotation,
-                        };
-
-                        let gizmo_transform = gizmo_transform
-                            .clone()
-                            .with_translation(world_position)
-                            .with_rotation(gizmo_rotation);
-
-                        let _ = renderer
-                            .transforms
-                            .set_local(self.transform_keys.root, gizmo_transform);
-                    }
+                if let Ok(transform_key) = renderer.meshes.get(mesh_key).map(|m| m.transform_key) {
+                    self.selected_object_transform_key = Some(transform_key);
+                    self.update_gizmo_transform(renderer);
+                    Some(TransformTarget::ObjectHit(transform_key))
+                } else {
+                    None
                 }
-
-                false
             }
         }
     }
@@ -370,7 +372,7 @@ impl TransformController {
             return;
         };
 
-        let Some(selected_transform_key) = self.selected_object_transform_key.get_cloned() else {
+        let Some(selected_transform_key) = self.selected_object_transform_key else {
             return;
         };
 
@@ -453,13 +455,12 @@ impl TransformController {
                     (1.0 + current_dist / sensitivity).max(0.01)
                 };
 
-                // Scale is always applied to the local axis (X, Y, or Z component)
+                // Use the pre-computed target axis (handles Global mode remapping)
                 let mut new_scale = drag_state.initial_scale;
-                match gizmo_kind {
-                    GizmoKind::ScaleX => new_scale.x = drag_state.initial_scale.x * scale_factor,
-                    GizmoKind::ScaleY => new_scale.y = drag_state.initial_scale.y * scale_factor,
-                    GizmoKind::ScaleZ => new_scale.z = drag_state.initial_scale.z * scale_factor,
-                    _ => {}
+                match drag_state.scale_target_axis {
+                    0 => new_scale.x = drag_state.initial_scale.x * scale_factor,
+                    1 => new_scale.y = drag_state.initial_scale.y * scale_factor,
+                    _ => new_scale.z = drag_state.initial_scale.z * scale_factor,
                 }
                 selected_transform.scale = new_scale;
             }
@@ -503,7 +504,7 @@ impl TransformController {
             gizmo_transform.translation = world_position;
 
             // For local mode, also update gizmo rotation to follow object
-            match self.gizmo_space() {
+            match self._gizmo_space {
                 GizmoSpace::Global => gizmo_transform.rotation = Quat::IDENTITY,
                 GizmoSpace::Local => gizmo_transform.rotation = world_rotation,
             }
@@ -566,8 +567,42 @@ impl TransformController {
         .into_iter()
     }
 
-    fn gizmo_space(&self) -> GizmoSpace {
-        *self._gizmo_space.read().unwrap()
+    /// Updates the gizmo's position and rotation to match the selected object.
+    /// Call this when the selected object changes or when the gizmo space changes.
+    fn update_gizmo_transform(&self, renderer: &mut AwsmRenderer) {
+        let Some(selected_key) = self.selected_object_transform_key else {
+            return;
+        };
+
+        let (Ok(world_matrix), Ok(gizmo_transform)) = (
+            renderer.transforms.get_world(selected_key),
+            renderer.transforms.get_local(self.transform_keys.root),
+        ) else {
+            return;
+        };
+
+        let (_, world_rotation, world_position) = world_matrix.to_scale_rotation_translation();
+
+        let gizmo_rotation = match self._gizmo_space {
+            GizmoSpace::Global => Quat::IDENTITY,
+            GizmoSpace::Local => world_rotation,
+        };
+
+        let gizmo_transform = gizmo_transform
+            .clone()
+            .with_translation(world_position)
+            .with_rotation(gizmo_rotation);
+
+        let _ = renderer
+            .transforms
+            .set_local(self.transform_keys.root, gizmo_transform);
+    }
+
+    /// Call this when the gizmo space (local/global) changes in the UI.
+    /// Updates the gizmo rotation to reflect the new space immediately.
+    pub fn set_space(&mut self, renderer: &mut AwsmRenderer, space: GizmoSpace) {
+        self._gizmo_space = space;
+        self.update_gizmo_transform(renderer);
     }
 }
 

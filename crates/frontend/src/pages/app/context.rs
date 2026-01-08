@@ -1,4 +1,4 @@
-use crate::{pages::app::scene::editor::transform_controller::GizmoSpace, prelude::*};
+use crate::prelude::*;
 
 use super::scene::{camera::CameraId, AppScene};
 
@@ -13,7 +13,6 @@ pub struct AppContext {
     pub editor_gizmo_translation_enabled: Mutable<bool>,
     pub editor_gizmo_rotation_enabled: Mutable<bool>,
     pub editor_gizmo_scale_enabled: Mutable<bool>,
-    pub editor_gizmo_space: Arc<RwLock<GizmoSpace>>,
 }
 
 #[derive(Clone)]
@@ -51,7 +50,6 @@ impl Default for AppContext {
             editor_gizmo_translation_enabled: Mutable::new(CONFIG.initial_show_gizmo_translation),
             editor_gizmo_rotation_enabled: Mutable::new(CONFIG.initial_show_gizmo_rotation),
             editor_gizmo_scale_enabled: Mutable::new(CONFIG.initial_show_gizmo_scale),
-            editor_gizmo_space: Arc::new(RwLock::new(GizmoSpace::default())),
         }
     }
 }

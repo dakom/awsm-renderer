@@ -29,7 +29,7 @@ pub struct Config {
 
 #[allow(clippy::option_env_unwrap)]
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
-    Config {
+    let config = Config {
         media_base_url_gltf_samples: option_env!("MEDIA_BASE_URL_GLTF_SAMPLES")
             .expect("MEDIA_BASE_URL_GLTF_SAMPLES must be set")
             .to_string(),
@@ -57,7 +57,11 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         initial_show_gizmo_translation: true,
         initial_show_gizmo_rotation: true,
         initial_show_gizmo_scale: true,
-    }
+    };
+
+    tracing::info!("{:#?}", config);
+
+    config
 });
 
 #[derive(Debug, Clone)]
