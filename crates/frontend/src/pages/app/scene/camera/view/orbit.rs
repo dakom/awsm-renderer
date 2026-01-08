@@ -84,9 +84,9 @@ impl OrbitCamera {
         self.yaw -= delta_x * self.sensitivity;
         self.pitch -= delta_y * self.sensitivity;
 
-        // Clamp pitch to ±90° like most 3D viewers
-        // This prevents flipping and matches Khronos glTF viewer behavior
-        let limit = std::f32::consts::FRAC_PI_2 - 0.01;
+        // Clamp pitch to just under ±90° to prevent flipping
+        // Use a very small epsilon to allow near-perfect top-down/bottom-up views
+        let limit = std::f32::consts::FRAC_PI_2 - 0.0001;
         self.pitch = self.pitch.clamp(-limit, limit);
     }
 

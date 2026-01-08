@@ -51,6 +51,36 @@ impl AwsmRendererWebGpu {
         }
     }
 
+    /// Syncs the canvas backing buffer size with the CSS display size.
+    ///
+    /// This ensures the canvas buffer dimensions match what's displayed,
+    /// preventing rendering artifacts from mismatched sizes.
+    ///
+    /// Returns true if the size was updated, false if it was already in sync
+    /// or the CSS size is invalid (zero or negative).
+    pub fn sync_canvas_buffer_with_css(&self) -> bool {
+        let canvas = self.canvas();
+        let rect = canvas.get_bounding_client_rect();
+        let css_width = rect.width();
+        let css_height = rect.height();
+
+        if css_width <= 0.0 || css_height <= 0.0 {
+            return false;
+        }
+
+        let buffer_width = canvas.width() as f64;
+        let buffer_height = canvas.height() as f64;
+
+        // Check if sizes differ (with small tolerance for floating point)
+        if (buffer_width - css_width).abs() > 0.5 || (buffer_height - css_height).abs() > 0.5 {
+            canvas.set_width(css_width as u32);
+            canvas.set_height(css_height as u32);
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn current_context_format(&self) -> TextureFormat {
         self.context
             .get_configuration()
