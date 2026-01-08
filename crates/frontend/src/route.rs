@@ -25,7 +25,14 @@ impl Route {
         let paths = paths
             .split('/')
             // skip all the roots (1 for the domain, 1 for each part of root path)
-            .skip(CONFIG.root_path.chars().filter(|c| *c == '/').count() + 1)
+            .skip(
+                CONFIG
+                    .root_base_uri_path
+                    .chars()
+                    .filter(|c| *c == '/')
+                    .count()
+                    + 1,
+            )
             .collect::<Vec<_>>();
         let paths = paths.as_slice();
 
@@ -50,7 +57,7 @@ impl Route {
     }
 
     pub fn link(&self) -> String {
-        let s = format!("{}/{}", CONFIG.root_path, self);
+        let s = format!("{}/{}", CONFIG.root_base_uri_path, self);
         let s = s.trim_end_matches(r#"//"#).to_string();
 
         s

@@ -12,7 +12,7 @@ pub async fn load_from_path(path: &str) -> Result<CubemapImage> {
 
     let skybox_cubemap = CubemapImage::load_url_ktx(&format!(
         "{}/{}/{}",
-        CONFIG.additional_assets_url, path, filename
+        CONFIG.media_base_url_additional_assets, path, filename
     ))
     .await?;
 

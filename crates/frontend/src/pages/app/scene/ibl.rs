@@ -18,7 +18,7 @@ pub async fn load_from_path(path: &str) -> Result<IblCubemaps> {
 
         CubemapImage::load_url_ktx(&format!(
             "{}/{}/{}",
-            CONFIG.additional_assets_url, environment_path, filename
+            CONFIG.media_base_url_additional_assets, environment_path, filename
         ))
         .await
     }

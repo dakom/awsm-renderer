@@ -248,8 +248,8 @@ impl std::fmt::Display for GltfId {
 impl GltfId {
     pub fn url(&self) -> String {
         let base_url = match self {
-            Self::AwsmTransformGizmo => &CONFIG.additional_assets_url,
-            _ => &CONFIG.gltf_samples_url,
+            Self::AwsmTransformGizmo => &CONFIG.media_base_url_additional_assets,
+            _ => &CONFIG.media_base_url_gltf_samples,
         };
 
         format!("{}/{}", base_url, self.filepath())

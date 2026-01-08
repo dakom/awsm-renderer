@@ -15,8 +15,8 @@ use awsm_renderer::{
         data::{GltfData, GltfDataHints},
         loader::GltfLoader,
     },
-    mesh::MeshKey,
     render::RenderHooks,
+    transforms::TransformKey,
     AwsmRenderer,
 };
 use dominator_helpers::futures::AsyncLoader;
@@ -32,6 +32,7 @@ pub struct AppSceneEditor {
     pub render_hooks: Arc<std::sync::RwLock<Option<Arc<RenderHooks>>>>,
     pub gizmo_gltf_data: Arc<GltfData>,
     pub transform_controller: Arc<std::sync::Mutex<Option<TransformController>>>,
+    pub selected_object_transform_key: Mutable<Option<TransformKey>>,
     grid_enabled: Mutable<bool>,
     gizmo_translation_enabled: Mutable<bool>,
     gizmo_rotation_enabled: Mutable<bool>,
@@ -62,19 +63,22 @@ impl AppSceneEditor {
 
         let transform_controller: Arc<std::sync::Mutex<Option<TransformController>>> =
             Arc::new(std::sync::Mutex::new(None));
+        let selected_object_transform_key = Mutable::new(None);
+
         let reactor = AsyncLoader::new();
 
-        reactor.load(clone!(grid_enabled, gizmo_translation_enabled, gizmo_rotation_enabled, gizmo_scale_enabled, render_hooks, pipelines, renderer, transform_controller => async move {
+        reactor.load(clone!(grid_enabled, gizmo_translation_enabled, gizmo_rotation_enabled, gizmo_scale_enabled, selected_object_transform_key, render_hooks, pipelines, renderer, transform_controller => async move {
 
             let mut stream = map_ref! {
                 let grid_enabled = grid_enabled.signal(),
                 let gizmo_translation_enabled = gizmo_translation_enabled.signal(),
                 let gizmo_rotation_enabled = gizmo_rotation_enabled.signal(),
                 let gizmo_scale_enabled = gizmo_scale_enabled.signal(),
-                => (*grid_enabled, *gizmo_translation_enabled, *gizmo_rotation_enabled, *gizmo_scale_enabled)
+                let selected_object_transform_key = selected_object_transform_key.signal()
+                => (*grid_enabled, *gizmo_translation_enabled, *gizmo_rotation_enabled, *gizmo_scale_enabled, *selected_object_transform_key)
             }.to_stream();
 
-            while let Some((grid_enabled, gizmo_translation_enabled, gizmo_rotation_enabled, gizmo_scale_enabled)) = stream.next().await {
+            while let Some((grid_enabled, gizmo_translation_enabled, gizmo_rotation_enabled, gizmo_scale_enabled, selected_transform_key)) = stream.next().await {
                 {
                     let mut render_hooks = render_hooks.write().unwrap();
 
@@ -83,7 +87,7 @@ impl AppSceneEditor {
                             #[allow(clippy::single_match)]
                             match (transform_controller.lock().unwrap().as_mut(), camera.lock().unwrap().as_ref()) {
                                 (Some(transform_controller), Some(camera)) => {
-                                    transform_controller.update_transforms(renderer, camera)?;
+                                    transform_controller.zoom_gizmo_transforms(renderer, camera)?;
                                 }
                                 _ => {}
                             }
@@ -118,7 +122,11 @@ impl AppSceneEditor {
                 {
                     let renderer = &mut *renderer.lock().await;
                     if let Some(transform_controller) = transform_controller.lock().unwrap().as_mut() {
-                        if let Err(err) = transform_controller.set_hidden(renderer, !gizmo_translation_enabled, !gizmo_rotation_enabled, !gizmo_scale_enabled) {
+                        if selected_transform_key.is_some() {
+                            if let Err(err) = transform_controller.set_hidden(renderer, !gizmo_translation_enabled, !gizmo_rotation_enabled, !gizmo_scale_enabled) {
+                                tracing::error!("Error setting transform controller enabled state: {}", err);
+                            }
+                        } else if let Err(err) = transform_controller.set_hidden(renderer, true, true, true) {
                             tracing::error!("Error setting transform controller enabled state: {}", err);
                         }
                     }
@@ -133,15 +141,10 @@ impl AppSceneEditor {
             gizmo_translation_enabled,
             gizmo_rotation_enabled,
             gizmo_scale_enabled,
+            selected_object_transform_key,
             reactor,
             gizmo_gltf_data,
             transform_controller,
         })
-    }
-
-    pub fn start_pick(&self, mesh_key: MeshKey, x: i32, y: i32) {
-        if let Some(transform_controller) = self.transform_controller.lock().unwrap().as_mut() {
-            transform_controller.start_pick(mesh_key, x, y);
-        }
     }
 }

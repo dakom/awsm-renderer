@@ -11,11 +11,10 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub root_path: &'static str,
     pub debug: ConfigDebug,
-    pub media_baseurl: String,
-    pub gltf_samples_url: String,
-    pub additional_assets_url: String,
+    pub root_base_uri_path: String,
+    pub media_base_url_gltf_samples: String,
+    pub media_base_url_additional_assets: String,
     pub generate_mipmaps: bool,
     pub initial_sidebar_open: Option<SidebarSection>,
     pub post_processing_enabled: bool,
@@ -28,34 +27,23 @@ pub struct Config {
     pub initial_show_gizmo_scale: bool,
 }
 
+#[allow(clippy::option_env_unwrap)]
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
     Config {
-        root_path: if cfg!(debug_assertions) {
-            ""
-        } else {
-            "/awsm-renderer"
-        },
+        media_base_url_gltf_samples: option_env!("MEDIA_BASE_URL_GLTF_SAMPLES")
+            .expect("MEDIA_BASE_URL_GLTF_SAMPLES must be set")
+            .to_string(),
+        media_base_url_additional_assets: option_env!("MEDIA_BASE_URL_ADDITIONAL_ASSETS")
+            .expect("MEDIA_BASE_URL_ADDITIONAL_ASSETS must be set")
+            .to_string(),
+        root_base_uri_path: option_env!("ROOT_BASE_URI_PATH")
+            .expect("ROOT_BASE_URI_PATH must be set")
+            .to_string(),
         debug: if cfg!(debug_assertions) {
             //ConfigDebug::release_mode()
             ConfigDebug::dev_mode()
         } else {
             ConfigDebug::release_mode()
-        },
-        media_baseurl: if cfg!(debug_assertions) {
-            "http://localhost:9082".to_string()
-        } else {
-            "/awsm-renderer/media".to_string()
-            //format!("{}/media", web_sys::window().unwrap().origin())
-        },
-        gltf_samples_url: if cfg!(debug_assertions) {
-            "http://localhost:9082/glTF-Sample-Assets/Models".to_string()
-        } else {
-            "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/refs/heads/main/Models".to_string()
-        },
-        additional_assets_url: if cfg!(debug_assertions) {
-            "http://localhost:9083".to_string()
-        } else {
-            "https://dakom.github.io/awsm-renderer-assets".to_string()
         },
 
         generate_mipmaps: true,

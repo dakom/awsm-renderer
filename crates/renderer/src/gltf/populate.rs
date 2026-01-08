@@ -24,7 +24,7 @@ pub struct GltfPopulateContext {
         Mutex<HashMap<GltfIndex, Arc<(Vec<TransformKey>, Vec<SkinInverseBindMatrix>)>>>,
     pub transform_is_joint: Mutex<HashSet<TransformKey>>,
     pub transform_is_instanced: Mutex<HashSet<TransformKey>>,
-    pub key_lookups: Mutex<GltfKeyLookups>,
+    pub key_lookups: Arc<Mutex<GltfKeyLookups>>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -124,7 +124,7 @@ impl AwsmRenderer {
             node_to_skin_transform: Mutex::new(HashMap::new()),
             transform_is_joint: Mutex::new(HashSet::new()),
             transform_is_instanced: Mutex::new(HashSet::new()),
-            key_lookups: Mutex::new(GltfKeyLookups::default()),
+            key_lookups: Arc::new(Mutex::new(GltfKeyLookups::default())),
         };
 
         let scene = match scene {

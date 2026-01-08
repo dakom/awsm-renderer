@@ -91,8 +91,9 @@ fn geometry_sort_renderable(
         a.geometry_render_pipeline_key(ctx),
         b.geometry_render_pipeline_key(ctx),
     ) {
-        (Err(_), _) => return std::cmp::Ordering::Greater,
-        (_, Err(_)) => return std::cmp::Ordering::Less,
+        (Err(_), Err(_)) => return std::cmp::Ordering::Equal,
+        (Err(_), Ok(_)) => return std::cmp::Ordering::Greater,
+        (Ok(_), Err(_)) => return std::cmp::Ordering::Less,
         (Ok(key_a), Ok(key_b)) => {
             let pipeline_ordering = key_a.cmp(&key_b);
             if pipeline_ordering != std::cmp::Ordering::Equal {
@@ -116,26 +117,16 @@ fn geometry_sort_renderable(
             if transparent {
                 // Sort back-to-front for transparent objects.
                 // (larger z is further away, and we want that to come first)
-                b_closest_depth
-                    .partial_cmp(&a_closest_depth)
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                b_closest_depth.total_cmp(&a_closest_depth)
             } else {
                 // Sort front-to-back for opaque objects.
                 // (smaller z is closer, and we want that to come first)
-                a_closest_depth
-                    .partial_cmp(&b_closest_depth)
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                a_closest_depth.total_cmp(&b_closest_depth)
             }
         }
-        _ => {
-            // no AABBs, fallback to equality
-            // TODO - maybe try to use the world matrix? Like:
-            // w_axis is the translation vector in the world matrix
-            // We use the z component for depth sorting.
-            // let a_depth = a_world_mat.w_axis.z;
-            // let b_depth = b_world_mat.w_axis.z;
-            std::cmp::Ordering::Equal
-        }
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (None, None) => std::cmp::Ordering::Equal,
     }
 }
 
