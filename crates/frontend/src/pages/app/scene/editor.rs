@@ -1,14 +1,4 @@
-use crate::{
-    models::collections::GltfId,
-    pages::app::scene::{
-        camera::Camera,
-        editor::{
-            pipelines::EditorPipelines, render::render_grid,
-            transform_controller::TransformController,
-        },
-    },
-    prelude::*,
-};
+use crate::{models::collections::GltfId, pages::app::scene::camera::Camera, prelude::*};
 use anyhow::Result;
 use awsm_renderer::{
     gltf::{
@@ -22,9 +12,10 @@ use awsm_renderer::{
 use dominator_helpers::futures::AsyncLoader;
 use futures::StreamExt;
 
-pub mod pipelines;
-pub mod render;
-pub mod transform_controller;
+use awsm_renderer_editor::{
+    grid::{pipelines::EditorPipelines, render::render_grid},
+    transform_controller::TransformController,
+};
 
 #[derive(Clone)]
 pub struct AppSceneEditor {
@@ -87,7 +78,7 @@ impl AppSceneEditor {
                             #[allow(clippy::single_match)]
                             match (transform_controller.lock().unwrap().as_mut(), camera.lock().unwrap().as_ref()) {
                                 (Some(transform_controller), Some(camera)) => {
-                                    transform_controller.zoom_gizmo_transforms(renderer, camera)?;
+                                    transform_controller.zoom_gizmo_transforms(renderer, &camera.matrices())?;
                                 }
                                 _ => {}
                             }

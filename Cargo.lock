@@ -118,6 +118,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "awsm-renderer-editor"
+version = "0.1.0-alpha.3"
+dependencies = [
+ "anyhow",
+ "awsm-renderer",
+ "glam",
+ "web-sys",
+]
+
+[[package]]
 name = "awsm_web"
 version = "0.44.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -370,6 +380,7 @@ version = "0.1.0-alpha.3"
 dependencies = [
  "anyhow",
  "awsm-renderer",
+ "awsm-renderer-editor",
  "awsm_web 0.45.0",
  "cfg-if",
  "dominator",

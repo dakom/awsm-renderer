@@ -5,10 +5,8 @@ use crate::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GltfSetId {
-    Todo,
     Standard,
     Animation,
-    Comparisons,
     Basics,
     Extensions,
 }
@@ -16,20 +14,16 @@ pub enum GltfSetId {
 impl GltfSetId {
     pub fn list() -> Vec<GltfSetId> {
         vec![
-            GltfSetId::Todo,
             GltfSetId::Standard,
             GltfSetId::Animation,
-            GltfSetId::Comparisons,
             GltfSetId::Basics,
             GltfSetId::Extensions,
         ]
     }
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::Todo => "Todo",
             Self::Standard => "Standard",
             Self::Animation => "Animation",
-            Self::Comparisons => "Comparisons",
             Self::Basics => "Basics",
             Self::Extensions => "Extensions",
         }
@@ -39,54 +33,15 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
     let mut h = HashMap::new();
 
     h.insert(
-        GltfSetId::Todo,
-        vec![
-            GltfId::AwsmTransformGizmo,
-            GltfId::BrainStem,
-            GltfId::Fox,
-            GltfId::VertexColor,
-            GltfId::CompareBaseColor,
-            GltfId::CompareAmbientOcclusion,
-            GltfId::CompareEmissiveStrength,
-            GltfId::EmissiveStrength,
-            GltfId::CompareAnisotropy,
-            GltfId::AlphaBlendMode,
-        ],
-    );
-
-    h.insert(
-        GltfSetId::Comparisons,
-        vec![
-            // GltfId::CompareBaseColor,
-            // GltfId::CompareAnisotropy,
-            GltfId::CompareAlphaCoverage,
-            //GltfId::CompareAmbientOcclusion,
-            GltfId::CompareClearcoat,
-            GltfId::CompareDispersion,
-            //GltfId::CompareEmissiveStrength,
-            GltfId::CompareIor,
-            GltfId::CompareIridescence,
-            GltfId::CompareMetallic,
-            GltfId::CompareNormal,
-            GltfId::CompareRoughness,
-            GltfId::CompareSheen,
-            GltfId::CompareSpecular,
-            GltfId::CompareTransmission,
-            GltfId::CompareVolume,
-        ],
-    );
-
-    h.insert(
         GltfSetId::Standard,
-        vec![
-            GltfId::DamagedHelmet,
-            //GltfId::AlphaBlendMode
-        ],
+        vec![GltfId::DamagedHelmet, GltfId::AlphaBlendMode],
     );
 
     h.insert(
         GltfSetId::Animation,
         vec![
+            GltfId::BrainStem,
+            GltfId::Fox,
             GltfId::SimpleSkin,
             GltfId::SimpleMorph,
             GltfId::AnimatedTriangle,
@@ -105,7 +60,7 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
             GltfId::TextureCoordinate,
             GltfId::TextureLinearInterpolation,
             GltfId::TextureSettings,
-            //GltfId::VertexColor,
+            GltfId::VertexColor,
             GltfId::BoomBoxAxes,
             GltfId::TriangleWithoutIndices,
             GltfId::SimpleSparseAccessor,
@@ -128,7 +83,6 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
             GltfId::BoxWithSpaces,
             GltfId::BoxVertexColors,
             GltfId::Cube,
-            //GltfId::EmissiveStrength,
         ],
     );
 
@@ -136,10 +90,27 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
         GltfSetId::Extensions,
         vec![
             GltfId::SimpleInstancing,
+            GltfId::EmissiveStrength,
             GltfId::TextureTransformMultiTest,
             GltfId::TextureTransformTest,
             GltfId::EnvironmentTest,
             GltfId::EnvironmentIblTest,
+            GltfId::CompareBaseColor,
+            GltfId::CompareAnisotropy,
+            GltfId::CompareAlphaCoverage,
+            GltfId::CompareAmbientOcclusion,
+            GltfId::CompareClearcoat,
+            GltfId::CompareDispersion,
+            GltfId::CompareEmissiveStrength,
+            GltfId::CompareIor,
+            GltfId::CompareIridescence,
+            GltfId::CompareMetallic,
+            GltfId::CompareNormal,
+            GltfId::CompareRoughness,
+            GltfId::CompareSheen,
+            GltfId::CompareSpecular,
+            GltfId::CompareTransmission,
+            GltfId::CompareVolume,
         ],
     );
 

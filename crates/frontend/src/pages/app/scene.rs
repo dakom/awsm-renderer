@@ -18,6 +18,9 @@ use awsm_renderer::lights::{ibl::Ibl, Light};
 
 use awsm_renderer::picker::PickResult;
 use awsm_renderer::AwsmRenderer;
+use awsm_renderer_editor::transform_controller::{
+    GizmoSpace, TransformController, TransformTarget,
+};
 use awsm_web::dom::resize::ResizeObserver;
 use camera::{Camera, CameraId};
 use gloo_events::EventListener;
@@ -26,7 +29,6 @@ use web_sys::PointerEvent;
 
 use crate::models::collections::GltfId;
 use crate::pages::app::context::{IblId, SkyboxId};
-use crate::pages::app::scene::editor::transform_controller::TransformController;
 use crate::pages::app::scene::editor::AppSceneEditor;
 use crate::pages::app::sidebar::material::FragmentShaderKind;
 use crate::prelude::*;
@@ -116,8 +118,14 @@ impl AppScene {
                                 if let PickResult::Hit(mesh_key) = res {
                                     if let Some(editor) = state.editor.lock().unwrap().as_ref() {
                                         if let Some(transform_controller) = editor.transform_controller.lock().unwrap().as_mut() {
-                                            if transform_controller.start_pick(&mut renderer, mesh_key, x, y) {
-                                                state.move_action.set(Some(MoveAction::GizmoTransforming));
+                                            match transform_controller.start_pick(&mut renderer, mesh_key, x, y) {
+                                                Some(TransformTarget::GizmoHit(_)) => {
+                                                    state.move_action.set(Some(MoveAction::GizmoTransforming));
+                                                }
+                                                Some(TransformTarget::ObjectHit(transform)) => {
+                                                    editor.selected_object_transform_key.set_neq(Some(transform));
+                                                }
+                                                None => { }
                                             }
                                         }
                                     }
@@ -514,10 +522,8 @@ impl AppScene {
 
             if let Some(editor) = self.editor.lock().unwrap().as_ref() {
                 *editor.transform_controller.lock().unwrap() = Some(TransformController::new(
-                    &mut renderer,
                     ctx.key_lookups.clone(),
-                    editor.selected_object_transform_key.clone(),
-                    self.ctx.editor_gizmo_space.clone(),
+                    GizmoSpace::default(),
                 )?);
             }
         }

@@ -1,0 +1,14 @@
+[package]
+name = "awsm-renderer-editor"
+description = "awsm-renderer-editor"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+awsm-renderer = { version = "0.1.0-alpha.3", path = "../renderer"}
+anyhow = {workspace = true}
+glam = {workspace = true}
+web-sys = { workspace = true}

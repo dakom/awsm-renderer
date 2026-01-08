@@ -48,6 +48,13 @@ impl CameraMatrices {
     pub fn inv_view_projection(&self) -> Mat4 {
         self.view_projection().inverse()
     }
+
+    pub fn is_orthographic(&self) -> bool {
+        // Orthographic projections have m[3][3] = 1.0 (no perspective divide)
+        // Perspective projections have m[3][3] = 0.0 (w' = -z for perspective divide)
+        // This is the definitive check for standard projection matrices.
+        self.projection.w_axis.w.abs() > 0.5
+    }
 }
 
 impl CameraBuffer {

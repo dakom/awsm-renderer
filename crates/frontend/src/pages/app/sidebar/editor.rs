@@ -1,9 +1,9 @@
+use awsm_renderer_editor::transform_controller::GizmoSpace;
+use wasm_bindgen_futures::spawn_local;
+
 use crate::{
     atoms::checkbox::{Checkbox, CheckboxStyle},
-    pages::app::{
-        context::AppContext, scene::editor::transform_controller::GizmoSpace,
-        sidebar::render_dropdown_label,
-    },
+    pages::app::{context::AppContext, sidebar::render_dropdown_label},
     prelude::*,
 };
 
@@ -99,10 +99,20 @@ impl SidebarEditor {
         render_dropdown_label(
             "Gizmo Space",
             Dropdown::new()
-                .with_intial_selected(Some(*state.ctx.editor_gizmo_space.read().unwrap()))
+                .with_intial_selected(Some(GizmoSpace::default()))
                 .with_bg_color(ColorBackground::Dropdown)
                 .with_on_change(clone!(state => move |space| {
-                    *state.ctx.editor_gizmo_space.write().unwrap() = *space;
+                    let space = *space;
+                    spawn_local(clone!(state => async move {
+                        if let Some(scene) = state.ctx.scene.lock_ref().clone() {
+                            let mut renderer = scene.renderer.lock().await;
+                            if let Some(editor) = scene.editor.lock().unwrap().as_ref() {
+                                if let Some(transform_controller) = editor.transform_controller.lock().unwrap().as_mut() {
+                                    transform_controller.set_space(&mut renderer, space);
+                                }
+                            }
+                        }
+                    }));
                 }))
                 .with_options([
                     ("Local".to_string(), GizmoSpace::Local),
