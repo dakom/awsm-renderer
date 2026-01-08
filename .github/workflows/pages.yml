@@ -40,11 +40,11 @@ jobs:
         with:
           version: "latest"
 
-      - name: Install Just
-        uses: extractions/setup-just@v3
+      - name: Install Task
+        uses: go-task/setup-task@v1
 
       - name: Build frontend
-        run: just frontend-build
+        run: task build
         env:
           RUSTFLAGS: '--cfg=web_sys_unstable_apis --cfg=getrandom_backend="wasm_js"'
 

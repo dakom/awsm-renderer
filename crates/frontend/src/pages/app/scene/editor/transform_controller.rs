@@ -216,19 +216,19 @@ impl TransformController {
                         let camera_pos = camera_matrices.position_world;
 
                         // Get parent's world rotation to convert deltas back to parent space
-                        let parent_inverse_rotation =
-                            if let Ok(parent_key) = renderer.transforms.get_parent(selected_key) {
-                                if let Ok(parent_world) = renderer.transforms.get_world(parent_key)
-                                {
-                                    let (_, parent_rot, _) =
-                                        parent_world.to_scale_rotation_translation();
-                                    parent_rot.inverse()
-                                } else {
-                                    Quat::IDENTITY
-                                }
+                        let parent_inverse_rotation = if let Ok(parent_key) =
+                            renderer.transforms.get_parent(selected_key)
+                        {
+                            if let Ok(parent_world) = renderer.transforms.get_world(parent_key) {
+                                let (_, parent_rot, _) =
+                                    parent_world.to_scale_rotation_translation();
+                                parent_rot.inverse()
                             } else {
                                 Quat::IDENTITY
-                            };
+                            }
+                        } else {
+                            Quat::IDENTITY
+                        };
 
                         let gizmo_space = self.gizmo_space();
 
@@ -261,8 +261,8 @@ impl TransformController {
                             | GizmoKind::ScaleY
                             | GizmoKind::ScaleZ => {
                                 let to_camera = (camera_pos - world_position).normalize();
-                                let normal =
-                                    (to_camera - world_axis * to_camera.dot(world_axis)).normalize();
+                                let normal = (to_camera - world_axis * to_camera.dot(world_axis))
+                                    .normalize();
                                 // Handle edge case when camera looks along axis
                                 if normal.length_squared() < 0.001 {
                                     if world_axis.dot(Vec3::Y).abs() < 0.9 {
@@ -423,10 +423,12 @@ impl TransformController {
                 let world_translation_delta = world_axis * movement_along_axis;
 
                 // Convert world delta to parent space
-                let parent_space_delta = drag_state.parent_inverse_rotation * world_translation_delta;
+                let parent_space_delta =
+                    drag_state.parent_inverse_rotation * world_translation_delta;
 
                 // Translation: add the parent-space movement to the initial local translation
-                selected_transform.translation = drag_state.initial_translation + parent_space_delta;
+                selected_transform.translation =
+                    drag_state.initial_translation + parent_space_delta;
             }
             GizmoKind::ScaleX | GizmoKind::ScaleY | GizmoKind::ScaleZ => {
                 // Scale: use ratio of distances from object center along the world axis
@@ -444,9 +446,9 @@ impl TransformController {
                     (current_dist / initial_dist).max(0.01)
                 } else {
                     // Initial click was at center, use linear fallback
-                    let camera_distance =
-                        (camera_matrices.position_world - drag_state.initial_world_position)
-                            .length();
+                    let camera_distance = (camera_matrices.position_world
+                        - drag_state.initial_world_position)
+                        .length();
                     let sensitivity = camera_distance * 0.5;
                     (1.0 + current_dist / sensitivity).max(0.01)
                 };
@@ -491,10 +493,12 @@ impl TransformController {
         // Also update the gizmo position to follow the object's world position
         if let (Ok(world_matrix), Ok(mut gizmo_transform)) = (
             renderer.transforms.get_world(selected_transform_key),
-            renderer.transforms.get_local(self.transform_keys.root).cloned(),
+            renderer
+                .transforms
+                .get_local(self.transform_keys.root)
+                .cloned(),
         ) {
-            let (_, world_rotation, world_position) =
-                world_matrix.to_scale_rotation_translation();
+            let (_, world_rotation, world_position) = world_matrix.to_scale_rotation_translation();
 
             gizmo_transform.translation = world_position;
 

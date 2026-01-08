@@ -5,7 +5,7 @@
 It's really as simple as:
 
 ```bash
-just frontend-dev
+task dev
 ```
 
 However, that assumes you have all the prerequisites installed and media assets downloaded.
@@ -29,11 +29,9 @@ This is used to build and run the frontend demo. Kinda hard to develop if you ca
 
 See https://trunkrs.dev/ for more info 
 
-### Justfile
+### Taskfile
 
 Used to simplify common tasks like building and running the demo
-
-See https://github.com/casey/just for more info
 
 ### Cmgen
 
