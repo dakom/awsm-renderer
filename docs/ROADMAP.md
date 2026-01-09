@@ -1,8 +1,6 @@
 # Next up
 
 - More extensions (see below)
-  - [-] KHR_materials_unlit
-  - [x] KHR_materials_emissive_strength
   - [ ] KHR_materials_clearcoat
   - [ ] KHR_materials_sheen
   - [ ] KHR_materials_specular
@@ -87,7 +85,7 @@ If it's supported here, corresponding core functionality is also supported
 - Extensions
     - [x] EXT_mesh_gpu_instancing
     - Can be done in opaque-only
-      - [ ] KHR_materials_unlit
+      - [x] KHR_materials_unlit
       - [x] KHR_materials_emissive_strength
       - [ ] KHR_materials_clearcoat
       - [ ] KHR_materials_sheen
