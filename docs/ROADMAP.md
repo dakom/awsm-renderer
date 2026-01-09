@@ -14,6 +14,10 @@
       - [ ] Directional
       - [ ] Point
       - [ ] Spot
+      
+  - Post Processing options in frontend sidebar
+  - Make debug normals work again in sidebar
+  - Animation support in sidebar (or get rid of it)
 
 - Support different kinds of Materials
   - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
