@@ -9,12 +9,11 @@
   - [ ] KHR_materials_sheen
   - [ ] KHR_materials_anisotropy
   - [ ] KHR_materials_iridescence
+  - [ ] KHR_materials_dispersion
   - [ ] KHR_lights_punctual
       - [ ] Directional
       - [ ] Point
       - [ ] Spot
-- Requires transparent
-  - [ ] KHR_materials_dispersion
 
 - Support different kinds of Materials
   - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
