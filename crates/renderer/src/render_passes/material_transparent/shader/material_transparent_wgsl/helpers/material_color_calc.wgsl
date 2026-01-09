@@ -32,13 +32,17 @@ fn pbr_get_material_color(
     let normal = pbr_normal(material, world_normal, world_tangent, fragment_input);
     let occlusion = pbr_occlusion(material, fragment_input);
     let emissive = pbr_emissive(material, fragment_input);
+    let specular = pbr_specular(material, fragment_input);
+    let specular_color = pbr_specular_color(material, fragment_input);
 
     return PbrMaterialColor(
         base,
         metallic_roughness,
         normal,
         occlusion,
-        emissive
+        emissive,
+        specular,
+        specular_color
     );
 }
 
@@ -126,5 +130,31 @@ fn pbr_emissive(
         color *= texture_pool_sample(material.emissive_tex_info, uv).rgb;
     }
     color *= material.emissive_strength;
+    return color;
+}
+
+// Sample specular texture (alpha channel) and apply factor
+fn pbr_specular(
+    material: PbrMaterial,
+    fragment_input: FragmentInput
+) -> f32 {
+    var specular = material.specular_factor;
+    if material.has_specular_texture {
+        let uv = texture_uv(material.specular_tex_info, fragment_input);
+        specular *= texture_pool_sample(material.specular_tex_info, uv).a;
+    }
+    return specular;
+}
+
+// Sample specular color texture (RGB) and apply factor
+fn pbr_specular_color(
+    material: PbrMaterial,
+    fragment_input: FragmentInput
+) -> vec3<f32> {
+    var color = material.specular_color_factor;
+    if material.has_specular_color_texture {
+        let uv = texture_uv(material.specular_color_tex_info, fragment_input);
+        color *= texture_pool_sample(material.specular_color_tex_info, uv).rgb;
+    }
     return color;
 }

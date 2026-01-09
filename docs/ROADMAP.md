@@ -2,7 +2,6 @@
 
 - More extensions (see below)
   - https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos
-  - [-] KHR_materials_specular
   - [-] KHR_materials_ior
   - [-] KHR_materials_transmission
   - [-] KHR_materials_volume
@@ -87,7 +86,7 @@ If it's supported here, corresponding core functionality is also supported
     - [x] KHR_materials_emissive_strength
     - [ ] KHR_materials_clearcoat
     - [ ] KHR_materials_sheen
-    - [ ] KHR_materials_specular
+    - [x] KHR_materials_specular
     - [ ] KHR_materials_transmission
     - [ ] KHR_materials_volume
     - [ ] KHR_materials_dispersion

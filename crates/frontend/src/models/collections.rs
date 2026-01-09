@@ -112,6 +112,7 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
             GltfId::CompareTransmission,
             GltfId::CompareVolume,
             GltfId::UnlitTest,
+            GltfId::SpecularTest,
         ],
     );
 
@@ -196,6 +197,7 @@ pub enum GltfId {
     TextureTransformTest,
     TextureTransformMultiTest,
     UnlitTest,
+    SpecularTest,
     AwsmTransformGizmo,
 }
 
@@ -235,6 +237,7 @@ impl GltfId {
     pub fn filepath(&self) -> &'static str {
         match self {
             Self::UnlitTest => "UnlitTest/glTF/UnlitTest.gltf",
+            Self::SpecularTest => "SpecularTest/glTF/SpecularTest.gltf",
             Self::BrainStem => "BrainStem/glTF/BrainStem.gltf",
             Self::Fox => "Fox/glTF/Fox.gltf",
             Self::AlphaBlendMode => "AlphaBlendModeTest/glTF/AlphaBlendModeTest.gltf",
@@ -316,6 +319,7 @@ impl GltfId {
 
     pub fn label(&self) -> &'static str {
         match self {
+            Self::SpecularTest => "Specular test",
             Self::UnlitTest => "Unlit test",
             Self::BrainStem => "Brain stem",
             Self::Fox => "Fox",

@@ -15,6 +15,13 @@ fn fresnel_schlick(cos_theta: f32, F0: vec3<f32>) -> vec3<f32> {
     return F0 + (1.0 - F0) * pow(one_minus, 5.0);
 }
 
+// Fresnel-Schlick with explicit f90 for KHR_materials_specular
+fn fresnel_schlick_f90(cos_theta: f32, F0: vec3<f32>, f90: f32) -> vec3<f32> {
+    let ct = saturate(cos_theta);
+    let one_minus = 1.0 - ct;
+    return F0 + (vec3<f32>(f90) - F0) * pow(one_minus, 5.0);
+}
+
 // GGX/Trowbridge-Reitz normal distribution function
 fn distribution_ggx(n_dot_h: f32, alpha: f32) -> f32 {
     let a  = max(alpha, 0.001);
@@ -99,17 +106,24 @@ fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera
     let n_dot_h = max(dot(n, h), 0.0);
     let v_dot_h = max(dot(v, h), 0.0);
 
-    // F0: base reflectivity at normal incidence (0.04 for dielectrics, base_color for metals)
-    let F0 = mix(vec3<f32>(0.04), base_color, metallic);
+    // F0: base reflectivity at normal incidence
+    // KHR_materials_specular: dielectric_f0 = min(0.04 * specular_color, 1.0) * specular
+    let dielectric_f0 = min(vec3<f32>(0.04) * color.specular_color, vec3<f32>(1.0)) * color.specular;
+    let F0 = mix(dielectric_f0, base_color, metallic);
+
+    // f90: grazing angle reflectivity (specular for dielectrics, 1.0 for metals per spec)
+    let f90 = mix(color.specular, 1.0, metallic);
 
     // Cook-Torrance specular BRDF: DFG / (4 * N·L * N·V)
-    let F = fresnel_schlick(v_dot_h, F0);
+    let F = fresnel_schlick_f90(v_dot_h, F0, f90);
     let D = distribution_ggx(n_dot_h, alpha);
     let G = geometry_smith(n, v, l, alpha);
     let specular = F * (D * G) / max(4.0 * n_dot_l * n_dot_v, EPSILON);
 
-    // Lambertian diffuse (energy-conserving: scaled by (1-F) and non-metallic portion)
-    let k_d = (vec3<f32>(1.0) - F) * (1.0 - metallic);
+    // Lambertian diffuse (energy-conserving: scaled by (1-F_max) and non-metallic portion)
+    // Use max component of F for diffuse attenuation when specular is colored
+    let F_max = max(max(F.r, F.g), F.b);
+    let k_d = (1.0 - F_max) * (1.0 - metallic);
     let diffuse = k_d * base_color * (1.0 / PI);
 
     // Final radiance: (diffuse + specular) * incoming light * N·L * occlusion
@@ -140,20 +154,30 @@ fn brdf_ibl(
     let roughness  = max(clamp(color.metallic_roughness.y, 0.0, 1.0), 0.04);
 
     let n_dot_v = saturate(dot(n, v));
-    let F0 = mix(vec3<f32>(0.04), base_color, metallic);
+
+    // F0: base reflectivity at normal incidence
+    // KHR_materials_specular: dielectric_f0 = min(0.04 * specular_color, 1.0) * specular
+    let dielectric_f0 = min(vec3<f32>(0.04) * color.specular_color, vec3<f32>(1.0)) * color.specular;
+    let F0 = mix(dielectric_f0, base_color, metallic);
+
+    // f90: grazing angle reflectivity (specular for dielectrics, 1.0 for metals per spec)
+    let f90 = mix(color.specular, 1.0, metallic);
 
     // Diffuse IBL: irradiance * Lambertian BRDF * (1 - Fresnel) * (1 - metallic)
     let irradiance = sampleIrradiance(n, ibl_irradiance_tex, ibl_irradiance_sampler);
-    let F_view = fresnel_schlick(n_dot_v, F0);
-    let k_d = (vec3<f32>(1.0) - F_view) * (1.0 - metallic);
+    let F_view = fresnel_schlick_f90(n_dot_v, F0, f90);
+    // Use max component of F for diffuse attenuation when specular is colored
+    let F_view_max = max(max(F_view.r, F_view.g), F_view.b);
+    let k_d = (1.0 - F_view_max) * (1.0 - metallic);
     let diffuse = k_d * base_color * (1.0 / PI) * irradiance * color.occlusion;
 
-    // Specular IBL: prefiltered environment * (F0 * scale + bias) from BRDF LUT
+    // Specular IBL: prefiltered environment * (F0 * scale + f90 * bias) from BRDF LUT
+    // The BRDF LUT encodes: F0 * scale + F90 * bias (where scale=x, bias=y)
     let R = reflect(-v, n);
     let prefiltered = samplePrefilteredEnv(R, roughness, ibl_filtered_env_tex, ibl_filtered_env_sampler, ibl_info);
     let brdf_lut = sampleBRDFLUT(n_dot_v, roughness, brdf_lut_tex, brdf_lut_sampler);
     // Apply occlusion to specular with reduced strength to avoid over-darkening reflections
-    let specular = prefiltered * (F0 * brdf_lut.x + brdf_lut.y) * mix(1.0, color.occlusion, 0.5);
+    let specular = prefiltered * (F0 * brdf_lut.x + vec3<f32>(f90) * brdf_lut.y) * mix(1.0, color.occlusion, 0.5);
 
     return diffuse + specular + color.emissive;
 }
