@@ -11,7 +11,7 @@ use crate::{
         populate::GltfTextureKey,
     },
     materials::{
-        pbr::{PbrMaterial, VertexColorInfo},
+        pbr::{PbrMaterial, PbrMaterialImmutable, VertexColorInfo},
         Material, MaterialAlphaMode,
     },
     mesh::{MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo},
@@ -40,7 +40,11 @@ pub(super) async fn pbr_material_mapper(
             gltf::material::AlphaMode::Blend => (MaterialAlphaMode::Blend, Some(false)),
         },
     };
-    let mut material = PbrMaterial::new(alpha_mode, gltf_material.double_sided());
+    let mut material = PbrMaterial::new(PbrMaterialImmutable {
+        alpha_mode,
+        double_sided: gltf_material.double_sided(),
+        unlit: gltf_material.unlit(),
+    });
 
     let pbr = gltf_material.pbr_metallic_roughness();
 

@@ -1,10 +1,28 @@
 # Next up
 
+- More extensions (see below)
+  - [ ] KHR_materials_clearcoat
+  - [ ] KHR_materials_sheen
+  - [ ] KHR_materials_specular
+  - [ ] KHR_materials_ior (maybe... subtle... mostly transparent)
+  - [ ] KHR_materials_anisotropy
+  - [x] KHR_texture_transform
+  - [ ] KHR_materials_iridescence
+  - [ ] KHR_lights_punctual
+      - [ ] Directional
+      - [ ] Point
+      - [ ] Spot
+- Requires transparent
+  - [ ] KHR_materials_ior
+  - [ ] KHR_materials_transmission
+  - [ ] KHR_materials_volume
+  - [ ] KHR_materials_dispersion
+
 - Support different kinds of Materials
   - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
   - unlit as example?
 
-- More extensions (see below)
+- Shadows
 
 - Frustum culling
 
@@ -67,7 +85,7 @@ If it's supported here, corresponding core functionality is also supported
 - Extensions
     - [x] EXT_mesh_gpu_instancing
     - Can be done in opaque-only
-      - [ ] KHR_materials_unlit
+      - [x] KHR_materials_unlit
       - [x] KHR_materials_emissive_strength
       - [ ] KHR_materials_clearcoat
       - [ ] KHR_materials_sheen

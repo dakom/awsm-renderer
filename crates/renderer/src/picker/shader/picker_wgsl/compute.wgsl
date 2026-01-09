@@ -1,9 +1,9 @@
 /*************** START math.wgsl ******************/
-{% include "utils_wgsl/math.wgsl" %}
+{% include "shared_wgsl/math.wgsl" %}
 /*************** END math.wgsl ******************/
 
 /*************** START mesh_meta.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/material_mesh_meta.wgsl" %}
+{% include "shared_wgsl/material_mesh_meta.wgsl" %}
 /*************** END mesh_meta.wgsl ******************/
 
 struct PickInput {

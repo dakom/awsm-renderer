@@ -111,6 +111,7 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
             GltfId::CompareSpecular,
             GltfId::CompareTransmission,
             GltfId::CompareVolume,
+            GltfId::UnlitTest,
         ],
     );
 
@@ -122,6 +123,10 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
                 panic!("[{:?}] is in multiple sets!", id);
             }
         }
+    }
+
+    for collection in h.values_mut() {
+        collection.sort_by(|a, b| a.label().cmp(b.label()));
     }
 
     h
@@ -190,6 +195,7 @@ pub enum GltfId {
     EmissiveStrength,
     TextureTransformTest,
     TextureTransformMultiTest,
+    UnlitTest,
     AwsmTransformGizmo,
 }
 
@@ -228,6 +234,7 @@ impl GltfId {
 
     pub fn filepath(&self) -> &'static str {
         match self {
+            Self::UnlitTest => "UnlitTest/glTF/UnlitTest.gltf",
             Self::BrainStem => "BrainStem/glTF/BrainStem.gltf",
             Self::Fox => "Fox/glTF/Fox.gltf",
             Self::AlphaBlendMode => "AlphaBlendModeTest/glTF/AlphaBlendModeTest.gltf",
@@ -309,6 +316,7 @@ impl GltfId {
 
     pub fn label(&self) -> &'static str {
         match self {
+            Self::UnlitTest => "Unlit test",
             Self::BrainStem => "Brain stem",
             Self::Fox => "Fox",
             Self::AlphaBlendMode => "Alpha blend mode",

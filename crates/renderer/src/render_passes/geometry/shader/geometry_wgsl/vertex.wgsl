@@ -1,9 +1,9 @@
-{% include "geometry_and_transparency_wgsl/vertex/geometry_mesh_meta.wgsl" %}
-{% include "geometry_and_all_material_wgsl/camera.wgsl" %}
-{% include "geometry_and_transparency_wgsl/vertex/transform.wgsl" %}
-{% include "geometry_and_transparency_wgsl/vertex/morph.wgsl" %}
-{% include "geometry_and_transparency_wgsl/vertex/skin.wgsl" %}
-{% include "geometry_and_transparency_wgsl/vertex/apply_vertex.wgsl" %}
+{% include "shared_wgsl/vertex/geometry_mesh_meta.wgsl" %}
+{% include "shared_wgsl/camera.wgsl" %}
+{% include "shared_wgsl/vertex/transform.wgsl" %}
+{% include "shared_wgsl/vertex/morph.wgsl" %}
+{% include "shared_wgsl/vertex/skin.wgsl" %}
+{% include "shared_wgsl/vertex/apply_vertex.wgsl" %}
 
 
 //***** MAIN *****

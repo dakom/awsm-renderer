@@ -1,29 +1,29 @@
 /*************** START color_space.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/color_space.wgsl" %}
+{% include "shared_wgsl/color_space.wgsl" %}
 /*************** END color_space.wgsl ******************/
 
 /*************** START debug.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/debug.wgsl" %}
+{% include "shared_wgsl/debug.wgsl" %}
 /*************** END debug.wgsl ******************/
 
 /*************** START camera.wgsl ******************/
-{% include "geometry_and_all_material_wgsl/camera.wgsl" %}
+{% include "shared_wgsl/camera.wgsl" %}
 /*************** END camera.wgsl ******************/
 
 /*************** START math.wgsl ******************/
-{% include "utils_wgsl/math.wgsl" %}
+{% include "shared_wgsl/math.wgsl" %}
 /*************** END math.wgsl ******************/
 
 /*************** START mesh_meta.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/material_mesh_meta.wgsl" %}
+{% include "shared_wgsl/material_mesh_meta.wgsl" %}
 /*************** END mesh_meta.wgsl ******************/
 
 /*************** START textures.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/textures.wgsl" %}
+{% include "shared_wgsl/textures.wgsl" %}
 /*************** END textures.wgsl ******************/
 
 /*************** START vertex_color.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/vertex_color.wgsl" %}
+{% include "shared_wgsl/vertex_color.wgsl" %}
 /*************** END vertex_color.wgsl ******************/
 
 /*************** START vertex_color_attrib.wgsl ******************/
@@ -31,28 +31,30 @@
 /*************** END vertex_color_attrib.wgsl ******************/
 
 /*************** START transforms.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/transforms.wgsl" %}
+{% include "shared_wgsl/transforms.wgsl" %}
 /*************** END transforms.wgsl ******************/
 
+{% if !unlit %}
+    /*************** START lights.wgsl ******************/
+    {% include "shared_wgsl/pbr/lighting/lights.wgsl" %}
+    /*************** END lights.wgsl ******************/
 
-/*************** START lights.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/pbr/lighting/lights.wgsl" %}
-/*************** END lights.wgsl ******************/
+    /*************** START brdf.wgsl ******************/
+    {% include "shared_wgsl/pbr/lighting/brdf.wgsl" %}
+    /*************** END brdf.wgsl ******************/
+{% else %}
+    /*************** START unlit.wgsl ******************/
+    {% include "shared_wgsl/pbr/lighting/unlit.wgsl" %}
+    /*************** END unlit.wgsl ******************/
+{% endif %}
 
-/*************** START brdf.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/pbr/lighting/brdf.wgsl" %}
-/*************** END brdf.wgsl ******************/
-
-/*************** START unlit.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/pbr/lighting/unlit.wgsl" %}
-/*************** END unlit.wgsl ******************/
 
 /*************** START material.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/pbr/material.wgsl" %}
+{% include "shared_wgsl/pbr/material.wgsl" %}
 /*************** END material.wgsl ******************/
 
 /*************** START material_color.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/pbr/material_color.wgsl" %}
+{% include "shared_wgsl/pbr/material_color.wgsl" %}
 /*************** END material_color.wgsl ******************/
 
 {% match mipmap %}
@@ -75,10 +77,6 @@
 {% include "material_opaque_wgsl/helpers/material_color_calc.wgsl" %}
 /*************** END material_color.wgsl ******************/
 
-/*************** START material_shading.wgsl ******************/
-{% include "material_opaque_wgsl/helpers/material_shading.wgsl" %}
-/*************** END material_shading.wgsl ******************/
-
 /*************** START positions.wgsl ******************/
 {% include "material_opaque_wgsl/helpers/positions.wgsl" %}
 /*************** END positions.wgsl ******************/
@@ -92,6 +90,10 @@
 {% include "material_opaque_wgsl/helpers/msaa.wgsl" %}
 /*************** END msaa.wgsl ******************/
 {% endif %}
+
+/*************** START material_shading.wgsl ******************/
+{% include "material_opaque_wgsl/helpers/material_shading.wgsl" %}
+/*************** END material_shading.wgsl ******************/
 
 {% if debug.any() %}
 /*************** START debug.wgsl ******************/
@@ -166,7 +168,9 @@ fn main(
             // Count of valid samples (either skybox or geometry)
             var valid_samples = 0u;
 
+            {% if !unlit %}
             let lights_info = get_lights_info();
+            {% endif %}
             let standard_coordinates = get_standard_coordinates(coords, screen_dims);
 
             {% for s in 0..msaa_sample_count %}
@@ -245,12 +249,16 @@ fn main(
                         {% endmatch %}
 
                         // Apply lighting
-                        let sample_color = apply_lighting(
-                            mat_color_{{s}},
-                            standard_coordinates.surface_to_camera,
-                            standard_coordinates.world_position,
-                            lights_info
-                        );
+                        {% if unlit %}
+                            let sample_color = unlit(mat_color_{{s}});
+                        {% else %}
+                            let sample_color = apply_lighting(
+                                mat_color_{{s}},
+                                standard_coordinates.surface_to_camera,
+                                standard_coordinates.world_position,
+                                lights_info
+                            );
+                        {% endif %}
 
                         color_sum += sample_color;
                         alpha_sum += mat_color_{{s}}.base.a;
@@ -316,7 +324,9 @@ fn main(
 
     let os_vertices = get_object_space_vertices(visibility_geometry_data_offset, triangle_index);
 
-    let lights_info = get_lights_info();
+    {% if !unlit %}
+        let lights_info = get_lights_info();
+    {% endif %}
 
     // Compute material color
     {% match mipmap %}
@@ -352,13 +362,17 @@ fn main(
             );
     {% endmatch %}
 
-    // Apply lighting
-    var color = apply_lighting(
-        material_color,
-        standard_coordinates.surface_to_camera,
-        standard_coordinates.world_position,
-        lights_info
-    );
+    {% if !unlit %}
+        // Apply lighting
+        var color = apply_lighting(
+            material_color,
+            standard_coordinates.surface_to_camera,
+            standard_coordinates.world_position,
+            lights_info
+        );
+    {% else %}
+        var color = unlit(material_color);
+    {% endif %}
 
     // If we're not doing MSAA, we're done here, but if we are, we need to check if this is an edge pixel
     {% if multisampled_geometry && !debug.msaa_detect_edges %}
@@ -455,12 +469,16 @@ fn main(
                         {% endmatch %}
 
                         // Apply lighting
-                        let sample_color = apply_lighting(
-                            material_color_{{s}},
-                            standard_coordinates.surface_to_camera,
-                            standard_coordinates.world_position,
-                            lights_info
-                        );
+                        {% if !unlit %}
+                            let sample_color = apply_lighting(
+                                material_color_{{s}},
+                                standard_coordinates.surface_to_camera,
+                                standard_coordinates.world_position,
+                                lights_info
+                            );
+                        {% else %}
+                            let sample_color = unlit(material_color_{{s}});
+                        {% endif %}
 
                         color_sum += sample_color;
                         alpha_sum += material_color_{{s}}.base.a;
