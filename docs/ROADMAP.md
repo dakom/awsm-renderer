@@ -1,21 +1,20 @@
 # Next up
 
 - More extensions (see below)
+  - https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos
+  - [-] KHR_materials_specular
+  - [-] KHR_materials_ior
+  - [-] KHR_materials_transmission
+  - [-] KHR_materials_volume
   - [ ] KHR_materials_clearcoat
   - [ ] KHR_materials_sheen
-  - [ ] KHR_materials_specular
-  - [ ] KHR_materials_ior (maybe... subtle... mostly transparent)
   - [ ] KHR_materials_anisotropy
-  - [x] KHR_texture_transform
   - [ ] KHR_materials_iridescence
   - [ ] KHR_lights_punctual
       - [ ] Directional
       - [ ] Point
       - [ ] Spot
 - Requires transparent
-  - [ ] KHR_materials_ior
-  - [ ] KHR_materials_transmission
-  - [ ] KHR_materials_volume
   - [ ] KHR_materials_dispersion
 
 - Support different kinds of Materials
@@ -84,25 +83,22 @@ If it's supported here, corresponding core functionality is also supported
     - [x] cubic spline interpolation
 - Extensions
     - [x] EXT_mesh_gpu_instancing
-    - Can be done in opaque-only
-      - [x] KHR_materials_unlit
-      - [x] KHR_materials_emissive_strength
-      - [ ] KHR_materials_clearcoat
-      - [ ] KHR_materials_sheen
-      - [ ] KHR_materials_specular
-      - [ ] KHR_materials_ior (maybe... subtle... mostly transparent)
-      - [ ] KHR_materials_anisotropy
-      - [x] KHR_texture_transform
-      - [ ] KHR_materials_iridescence
-      - [ ] KHR_lights_punctual
-          - [ ] Directional
-          - [ ] Point
-          - [ ] Spot
-    - Requires transparent
-      - [ ] KHR_materials_ior
-      - [ ] KHR_materials_transmission
-      - [ ] KHR_materials_volume
-      - [ ] KHR_materials_dispersion
+    - [x] KHR_materials_unlit
+    - [x] KHR_materials_emissive_strength
+    - [ ] KHR_materials_clearcoat
+    - [ ] KHR_materials_sheen
+    - [ ] KHR_materials_specular
+    - [ ] KHR_materials_transmission
+    - [ ] KHR_materials_volume
+    - [ ] KHR_materials_dispersion
+    - [ ] KHR_materials_ior
+    - [ ] KHR_materials_anisotropy
+    - [x] KHR_texture_transform
+    - [ ] KHR_materials_iridescence
+    - [ ] KHR_lights_punctual
+        - [ ] Directional
+        - [ ] Point
+        - [ ] Spot
 - Materials
     - [x] PBR metallic-roughness
         - [x] base color
