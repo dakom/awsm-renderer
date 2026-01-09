@@ -202,15 +202,11 @@ impl AppScene {
 
         spawn_local(clone!(state => async move {
             state.ctx.ibl_id.signal().for_each(clone!(state => move |ibl_id| clone!(state => async move {
-                if let Err(e) = state.load_ibl(ibl_id).await {
-                    tracing::error!("Failed to load IBL {:?}: {:?}", ibl_id, e);
-                }
+                state.load_ibl(ibl_id).await;
 
                 match state.ctx.skybox_id.get() {
                     SkyboxId::SameAsIbl => {
-                        if let Err(e) = state.load_skybox(SkyboxId::SameAsIbl).await {
-                            tracing::error!("Failed to load Skybox {:?}: {:?}", ibl_id, e);
-                        }
+                        state.load_skybox(SkyboxId::SameAsIbl).await;
                     },
                     SkyboxId::None => { /* do nothing */}
                 }
@@ -219,9 +215,7 @@ impl AppScene {
 
         spawn_local(clone!(state => async move {
             state.ctx.skybox_id.signal().for_each(clone!(state => move |skybox_id| clone!(state => async move {
-                if let Err(e) = state.load_skybox(skybox_id).await {
-                    tracing::error!("Failed to load Skybox {:?}: {:?}", skybox_id, e);
-                }
+                state.load_skybox(skybox_id).await;
             }))).await;
         }));
 
@@ -299,97 +293,127 @@ impl AppScene {
         Ok(renderer.render(hooks.as_deref())?)
     }
 
-    pub async fn load_gltf(self: &Arc<Self>, gltf_id: GltfId) -> Result<GltfLoader> {
-        let state = self;
+    pub async fn load_gltf(self: &Arc<Self>, gltf_id: GltfId) -> Option<GltfLoader> {
+        async fn inner(scene: &Arc<AppScene>, gltf_id: GltfId) -> Result<GltfLoader> {
+            if let Some(loader) = scene
+                .gltf_cache
+                .lock()
+                .unwrap()
+                .get(&gltf_id)
+                .map(|loader| loader.heavy_clone())
+            {
+                return Ok(loader);
+            }
 
-        if let Some(loader) = state
-            .gltf_cache
-            .lock()
-            .unwrap()
-            .get(&gltf_id)
-            .map(|loader| loader.heavy_clone())
-        {
-            return Ok(loader);
+            let loader = GltfLoader::load(&gltf_id.url(), None).await?;
+
+            scene
+                .gltf_cache
+                .lock()
+                .unwrap()
+                .insert(gltf_id, loader.heavy_clone());
+
+            Ok(loader)
         }
 
-        let loader = GltfLoader::load(&gltf_id.url(), None).await?;
-
-        state
-            .gltf_cache
-            .lock()
-            .unwrap()
-            .insert(gltf_id, loader.heavy_clone());
-
-        Ok(loader)
+        self.ctx.loading_status.lock_mut().gltf_net = Ok(true);
+        match inner(self, gltf_id).await {
+            Ok(loader) => {
+                self.ctx.loading_status.lock_mut().gltf_net = Ok(false);
+                Some(loader)
+            }
+            Err(err) => {
+                tracing::error!("Failed to load GLTF {:?}: {:?}", gltf_id, err);
+                self.ctx.loading_status.lock_mut().gltf_net = Err(err.to_string());
+                None
+            }
+        }
     }
 
-    async fn load_skybox(self: &Arc<Self>, skybox_id: SkyboxId) -> Result<()> {
-        match skybox_id {
-            SkyboxId::SameAsIbl => {
-                let skybox = {
-                    let ibl_id = self.ctx.ibl_id.get_cloned();
-                    let maybe_cached = {
-                        // need to drop this lock before awaiting
-                        self.skybox_by_ibl_cache
-                            .lock()
-                            .unwrap()
-                            .get(&ibl_id)
-                            .cloned()
-                    };
-                    match maybe_cached {
-                        Some(skybox) => skybox,
-                        None => {
-                            let skybox_cubemap = match ibl_id {
-                                IblId::PhotoStudio => {
-                                    skybox::load_from_path("photo_studio").await?
-                                }
-                                IblId::AllWhite => {
-                                    skybox::load_from_colors(CubemapBitmapColors::all(Color::WHITE))
-                                        .await?
-                                }
-                                IblId::SimpleSky => skybox::load_simple_sky().await?,
-                            };
-
-                            let skybox = {
-                                let (texture, view, mip_count) = {
-                                    let renderer = &mut *self.renderer.lock().await;
-                                    skybox_cubemap
-                                        .create_texture_and_view(&renderer.gpu, Some("Skybox"))
-                                        .await?
-                                };
-
-                                {
-                                    let renderer = &mut *self.renderer.lock().await;
-                                    let key = renderer.textures.insert_cubemap(texture);
-
-                                    let sampler_key = renderer.textures.get_sampler_key(
-                                        &renderer.gpu,
-                                        Skybox::sampler_cache_key(),
-                                    )?;
-
-                                    let sampler =
-                                        renderer.textures.get_sampler(sampler_key)?.clone();
-
-                                    Skybox::new(key, view, sampler, mip_count)
-                                }
-                            };
-
-                            self.skybox_by_ibl_cache
+    async fn load_skybox(self: &Arc<Self>, skybox_id: SkyboxId) {
+        async fn inner(scene: &Arc<AppScene>, skybox_id: SkyboxId) -> Result<()> {
+            match skybox_id {
+                SkyboxId::SameAsIbl => {
+                    let skybox = {
+                        let ibl_id = scene.ctx.ibl_id.get_cloned();
+                        let maybe_cached = {
+                            // need to drop this lock before awaiting
+                            scene
+                                .skybox_by_ibl_cache
                                 .lock()
                                 .unwrap()
-                                .insert(ibl_id, skybox.clone());
+                                .get(&ibl_id)
+                                .cloned()
+                        };
+                        match maybe_cached {
+                            Some(skybox) => skybox,
+                            None => {
+                                let skybox_cubemap = match ibl_id {
+                                    IblId::PhotoStudio => {
+                                        skybox::load_from_path("photo_studio").await?
+                                    }
+                                    IblId::AllWhite => {
+                                        skybox::load_from_colors(CubemapBitmapColors::all(
+                                            Color::WHITE,
+                                        ))
+                                        .await?
+                                    }
+                                    IblId::SimpleSky => skybox::load_simple_sky().await?,
+                                };
 
-                            skybox
+                                let skybox = {
+                                    let (texture, view, mip_count) = {
+                                        let renderer = &mut *scene.renderer.lock().await;
+                                        skybox_cubemap
+                                            .create_texture_and_view(&renderer.gpu, Some("Skybox"))
+                                            .await?
+                                    };
+
+                                    {
+                                        let renderer = &mut *scene.renderer.lock().await;
+                                        let key = renderer.textures.insert_cubemap(texture);
+
+                                        let sampler_key = renderer.textures.get_sampler_key(
+                                            &renderer.gpu,
+                                            Skybox::sampler_cache_key(),
+                                        )?;
+
+                                        let sampler =
+                                            renderer.textures.get_sampler(sampler_key)?.clone();
+
+                                        Skybox::new(key, view, sampler, mip_count)
+                                    }
+                                };
+
+                                scene
+                                    .skybox_by_ibl_cache
+                                    .lock()
+                                    .unwrap()
+                                    .insert(ibl_id, skybox.clone());
+
+                                skybox
+                            }
                         }
-                    }
-                };
+                    };
 
-                self.renderer.lock().await.set_skybox(skybox);
+                    scene.renderer.lock().await.set_skybox(skybox);
+                }
+                SkyboxId::None => {}
+            };
+
+            Ok(())
+        }
+
+        self.ctx.loading_status.lock_mut().skybox = Ok(true);
+        match inner(self, skybox_id).await {
+            Ok(()) => {
+                self.ctx.loading_status.lock_mut().skybox = Ok(false);
             }
-            SkyboxId::None => {}
-        };
-
-        Ok(())
+            Err(err) => {
+                tracing::error!("Failed to load Skybox {:?}: {:?}", skybox_id, err);
+                self.ctx.loading_status.lock_mut().skybox = Err(err.to_string());
+            }
+        }
     }
 
     pub async fn wait_for_skybox_loaded(self: &Arc<Self>) {
@@ -414,64 +438,79 @@ impl AppScene {
         }
     }
 
-    pub async fn load_ibl(self: &Arc<Self>, ibl_id: IblId) -> Result<()> {
-        async fn create_ibl_texture(
-            renderer: &mut AwsmRenderer,
-            cubemap_image: CubemapImage,
-        ) -> Result<IblTexture> {
-            let (texture, view, mip_count) = cubemap_image
-                .create_texture_and_view(&renderer.gpu, Some("IBL Cubemap"))
-                .await?;
+    pub async fn load_ibl(self: &Arc<Self>, ibl_id: IblId) {
+        async fn inner(scene: &Arc<AppScene>, ibl_id: IblId) -> Result<()> {
+            async fn create_ibl_texture(
+                renderer: &mut AwsmRenderer,
+                cubemap_image: CubemapImage,
+            ) -> Result<IblTexture> {
+                let (texture, view, mip_count) = cubemap_image
+                    .create_texture_and_view(&renderer.gpu, Some("IBL Cubemap"))
+                    .await?;
 
-            let texture_key = renderer.textures.insert_cubemap(texture);
+                let texture_key = renderer.textures.insert_cubemap(texture);
 
-            let sampler_key = renderer
-                .textures
-                .get_sampler_key(&renderer.gpu, IblTexture::sampler_cache_key())?;
+                let sampler_key = renderer
+                    .textures
+                    .get_sampler_key(&renderer.gpu, IblTexture::sampler_cache_key())?;
 
-            let sampler = renderer.textures.get_sampler(sampler_key)?.clone();
+                let sampler = renderer.textures.get_sampler(sampler_key)?.clone();
 
-            Ok(IblTexture::new(texture_key, view, sampler, mip_count))
-        }
+                Ok(IblTexture::new(texture_key, view, sampler, mip_count))
+            }
 
-        let ibl = {
-            let maybe_cached = {
-                // need to drop this lock before awaiting
-                self.ibl_cache.lock().unwrap().get(&ibl_id).cloned()
+            let ibl = {
+                let maybe_cached = {
+                    // need to drop this lock before awaiting
+                    scene.ibl_cache.lock().unwrap().get(&ibl_id).cloned()
+                };
+
+                match maybe_cached {
+                    Some(ibl) => ibl.clone(),
+                    None => {
+                        let ibl_cubemaps = match ibl_id {
+                            IblId::PhotoStudio => ibl::load_from_path("photo_studio").await?,
+                            IblId::AllWhite => {
+                                ibl::load_from_colors(CubemapBitmapColors::all(Color::WHITE))
+                                    .await?
+                            }
+                            IblId::SimpleSky => ibl::load_simple_sky().await?,
+                        };
+
+                        let ibl = {
+                            let mut renderer = scene.renderer.lock().await;
+
+                            let prefiltered_env_texture =
+                                create_ibl_texture(&mut renderer, ibl_cubemaps.prefiltered_env)
+                                    .await?;
+                            let irradiance_texture =
+                                create_ibl_texture(&mut renderer, ibl_cubemaps.irradiance).await?;
+
+                            Ibl::new(prefiltered_env_texture, irradiance_texture)
+                        };
+
+                        scene.ibl_cache.lock().unwrap().insert(ibl_id, ibl.clone());
+
+                        ibl
+                    }
+                }
             };
 
-            match maybe_cached {
-                Some(ibl) => ibl.clone(),
-                None => {
-                    let ibl_cubemaps = match ibl_id {
-                        IblId::PhotoStudio => ibl::load_from_path("photo_studio").await?,
-                        IblId::AllWhite => {
-                            ibl::load_from_colors(CubemapBitmapColors::all(Color::WHITE)).await?
-                        }
-                        IblId::SimpleSky => ibl::load_simple_sky().await?,
-                    };
+            scene.renderer.lock().await.set_ibl(ibl.clone());
 
-                    let ibl = {
-                        let mut renderer = self.renderer.lock().await;
+            Ok(())
+        }
 
-                        let prefiltered_env_texture =
-                            create_ibl_texture(&mut renderer, ibl_cubemaps.prefiltered_env).await?;
-                        let irradiance_texture =
-                            create_ibl_texture(&mut renderer, ibl_cubemaps.irradiance).await?;
-
-                        Ibl::new(prefiltered_env_texture, irradiance_texture)
-                    };
-
-                    self.ibl_cache.lock().unwrap().insert(ibl_id, ibl.clone());
-
-                    ibl
-                }
+        self.ctx.loading_status.lock_mut().ibl = Ok(true);
+        match inner(self, ibl_id).await {
+            Ok(()) => {
+                self.ctx.loading_status.lock_mut().ibl = Ok(false);
             }
-        };
-
-        self.renderer.lock().await.set_ibl(ibl.clone());
-
-        Ok(())
+            Err(err) => {
+                tracing::error!("Failed to load IBL {:?}: {:?}", ibl_id, err);
+                self.ctx.loading_status.lock_mut().ibl = Err(err.to_string());
+            }
+        }
     }
 
     pub async fn wait_for_ibl_loaded(self: &Arc<Self>) {
@@ -490,89 +529,106 @@ impl AppScene {
         }
     }
 
-    pub async fn upload_data(self: &Arc<Self>, _gltf_id: GltfId, loader: GltfLoader) -> Result<()> {
-        let data = loader.into_data(None)?;
-
-        *self.latest_gltf_data.lock().unwrap() = Some(data);
-
-        Ok(())
-    }
-
-    pub async fn populate(self: &Arc<Self>) -> Result<()> {
-        let data = {
-            let data = self.latest_gltf_data.lock().unwrap();
-            data.as_ref()
-                .expect("No GLTF data to populate")
-                .heavy_clone()
-        };
-
-        let mut renderer = self.renderer.lock().await;
-
-        renderer.populate_gltf(data, None).await?;
-
-        let editor_gizmo_gltf_data = {
-            let editor_guard = self.editor.lock().unwrap();
-            editor_guard
-                .as_ref()
-                .map(|editor| editor.gizmo_gltf_data.clone())
-        };
-
-        if let Some(editor_gizmo_gltf_data) = editor_gizmo_gltf_data {
-            let ctx = renderer.populate_gltf(editor_gizmo_gltf_data, None).await?;
-
-            if let Some(editor) = self.editor.lock().unwrap().as_ref() {
-                *editor.transform_controller.lock().unwrap() = Some(TransformController::new(
-                    ctx.key_lookups.clone(),
-                    GizmoSpace::default(),
-                )?);
+    pub async fn upload_data(self: &Arc<Self>, _gltf_id: GltfId, loader: GltfLoader) {
+        self.ctx.loading_status.lock_mut().gltf_data = Ok(true);
+        match loader.into_data(None) {
+            Err(err) => {
+                self.ctx.loading_status.lock_mut().gltf_data = Err(err.to_string());
+            }
+            Ok(data) => {
+                self.ctx.loading_status.lock_mut().gltf_data = Ok(false);
+                *self.latest_gltf_data.lock().unwrap() = Some(data);
             }
         }
+    }
 
-        renderer.lights.insert(Light::Directional {
-            color: [1.0, 0.97, 0.92],
-            intensity: 1.4,
-            direction: [0.1, -0.35, -1.0],
-        })?;
+    pub async fn populate(self: &Arc<Self>) {
+        async fn inner(scene: &Arc<AppScene>) -> Result<()> {
+            let data = {
+                let data = scene.latest_gltf_data.lock().unwrap();
+                data.as_ref()
+                    .expect("No GLTF data to populate")
+                    .heavy_clone()
+            };
 
-        renderer.lights.insert(Light::Directional {
-            color: [0.9, 0.95, 1.0],
-            intensity: 0.6,
-            direction: [0.0, -0.2, -1.0],
-        })?;
+            let mut renderer = scene.renderer.lock().await;
 
-        renderer.lights.insert(Light::Directional {
-            color: [0.8, 0.9, 1.0],
-            intensity: 0.7,
-            direction: [-0.05, -0.25, 1.0],
-        })?;
+            renderer.populate_gltf(data, None).await?;
 
-        renderer.lights.insert(Light::Directional {
-            color: [1.0, 0.96, 0.9],
-            intensity: 0.5,
-            direction: [-1.0, -0.2, 0.2],
-        })?;
+            let editor_gizmo_gltf_data = {
+                let editor_guard = scene.editor.lock().unwrap();
+                editor_guard
+                    .as_ref()
+                    .map(|editor| editor.gizmo_gltf_data.clone())
+            };
 
-        if let Some(ibl) = self
-            .ibl_cache
-            .lock()
-            .unwrap()
-            .get(&self.ctx.ibl_id.get())
-            .cloned()
-        {
-            renderer.set_ibl(ibl);
+            if let Some(editor_gizmo_gltf_data) = editor_gizmo_gltf_data {
+                let ctx = renderer.populate_gltf(editor_gizmo_gltf_data, None).await?;
+
+                if let Some(editor) = scene.editor.lock().unwrap().as_ref() {
+                    *editor.transform_controller.lock().unwrap() = Some(TransformController::new(
+                        ctx.key_lookups.clone(),
+                        GizmoSpace::default(),
+                    )?);
+                }
+            }
+
+            renderer.lights.insert(Light::Directional {
+                color: [1.0, 0.97, 0.92],
+                intensity: 1.4,
+                direction: [0.1, -0.35, -1.0],
+            })?;
+
+            renderer.lights.insert(Light::Directional {
+                color: [0.9, 0.95, 1.0],
+                intensity: 0.6,
+                direction: [0.0, -0.2, -1.0],
+            })?;
+
+            renderer.lights.insert(Light::Directional {
+                color: [0.8, 0.9, 1.0],
+                intensity: 0.7,
+                direction: [-0.05, -0.25, 1.0],
+            })?;
+
+            renderer.lights.insert(Light::Directional {
+                color: [1.0, 0.96, 0.9],
+                intensity: 0.5,
+                direction: [-1.0, -0.2, 0.2],
+            })?;
+
+            if let Some(ibl) = scene
+                .ibl_cache
+                .lock()
+                .unwrap()
+                .get(&scene.ctx.ibl_id.get())
+                .cloned()
+            {
+                renderer.set_ibl(ibl);
+            }
+
+            if let Some(skybox) = scene
+                .skybox_by_ibl_cache
+                .lock()
+                .unwrap()
+                .get(&scene.ctx.ibl_id.get())
+                .cloned()
+            {
+                renderer.set_skybox(skybox);
+            }
+
+            Ok(())
         }
 
-        if let Some(skybox) = self
-            .skybox_by_ibl_cache
-            .lock()
-            .unwrap()
-            .get(&self.ctx.ibl_id.get())
-            .cloned()
-        {
-            renderer.set_skybox(skybox);
+        self.ctx.loading_status.lock_mut().populate = Ok(true);
+        match inner(self).await {
+            Ok(()) => {
+                self.ctx.loading_status.lock_mut().populate = Ok(false);
+            }
+            Err(err) => {
+                self.ctx.loading_status.lock_mut().populate = Err(err.to_string());
+            }
         }
-
-        Ok(())
     }
 
     pub async fn setup_all(self: &Arc<Self>) -> Result<()> {
