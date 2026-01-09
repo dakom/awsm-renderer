@@ -9,12 +9,15 @@
   - [ ] KHR_materials_sheen
   - [ ] KHR_materials_anisotropy
   - [ ] KHR_materials_iridescence
+  - [ ] KHR_materials_dispersion
   - [ ] KHR_lights_punctual
       - [ ] Directional
       - [ ] Point
       - [ ] Spot
-- Requires transparent
-  - [ ] KHR_materials_dispersion
+      
+  - Post Processing options in frontend sidebar
+  - Make debug normals work again in sidebar
+  - Animation support in sidebar (or get rid of it)
 
 - Support different kinds of Materials
   - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
