@@ -28,6 +28,8 @@ pub enum MipmapTextureKind {
     MetallicRoughness = 2,
     Occlusion = 3,
     Emissive = 4,
+    Specular = 5,
+    SpecularColor = 6,
 }
 /// Calculate the number of mip levels needed for a texture of the given dimensions.
 ///

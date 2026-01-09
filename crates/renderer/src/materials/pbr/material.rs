@@ -39,6 +39,18 @@ pub struct PbrMaterial {
     pub emissive_strength: f32,
     pub emissive_texture_transform: Option<TextureTransformKey>,
     pub vertex_color_info: Option<VertexColorInfo>,
+    // specular extension
+    pub specular_tex: Option<TextureKey>,
+    pub specular_sampler: Option<SamplerKey>,
+    pub specular_uv_index: Option<u32>,
+    pub specular_texture_transform: Option<TextureTransformKey>,
+    pub specular_factor: f32,
+    pub specular_color_tex: Option<TextureKey>,
+    pub specular_color_sampler: Option<SamplerKey>,
+    pub specular_color_uv_index: Option<u32>,
+    pub specular_color_texture_transform: Option<TextureTransformKey>,
+    pub specular_color_factor: [f32; 3],
+    // things that affect shader generation and therefore can't be changed dynamically (create a new material instead)
     immutable: PbrMaterialImmutable,
 }
 
@@ -60,14 +72,17 @@ impl PbrMaterial {
     pub const INITIAL_ELEMENTS: usize = 32; // 32 elements is a good starting point
                                             // NOTE: keep this in sync with `PbrMaterialRaw` in WGSL. Each texture packs 20 bytes
                                             // (compact format) so 5 textures + 60 byte header + 8 bytes = 168.
-    pub const BYTE_SIZE: usize = 168; // must be under Materials::MAX_SIZE
+    pub const BYTE_SIZE: usize = 224; // must be under Materials::MAX_SIZE
 
+    // Must correspond to bitmask in material.wgsl
     pub const BITMASK_BASE_COLOR: u32 = 1;
     pub const BITMASK_METALIC_ROUGHNESS: u32 = 1 << 1;
     pub const BITMASK_NORMAL: u32 = 1 << 2;
     pub const BITMASK_OCCLUSION: u32 = 1 << 3;
     pub const BITMASK_EMISSIVE: u32 = 1 << 4;
     pub const BITMASK_VERTEX_COLOR: u32 = 1 << 5;
+    pub const BITMASK_SPECULAR: u32 = 1 << 6;
+    pub const BITMASK_SPECULAR_COLOR: u32 = 1 << 7;
 
     pub fn new(immutable: PbrMaterialImmutable) -> Self {
         Self {
@@ -99,6 +114,16 @@ impl PbrMaterial {
             emissive_strength: 1.0,
             emissive_texture_transform: None,
             vertex_color_info: None,
+            specular_tex: None,
+            specular_sampler: None,
+            specular_uv_index: None,
+            specular_texture_transform: None,
+            specular_factor: 1.0,
+            specular_color_tex: None,
+            specular_color_sampler: None,
+            specular_color_uv_index: None,
+            specular_color_texture_transform: None,
+            specular_color_factor: [1.0, 1.0, 1.0],
             immutable,
         }
     }
@@ -270,6 +295,11 @@ impl PbrMaterial {
 
         write(self.emissive_strength.into());
 
+        write(self.specular_factor.into());
+        write(self.specular_color_factor[0].into());
+        write(self.specular_color_factor[1].into());
+        write(self.specular_color_factor[2].into());
+
         // Encode the WebGPU address mode for mipmap selection.
         // The shader uses this to compute correct UV derivatives when textures wrap/repeat.
         let encode_address_mode = |mode: Option<AddressMode>| -> u32 {
@@ -409,6 +439,56 @@ impl PbrMaterial {
         }) {
             write(tex.into());
             bitmask |= Self::BITMASK_EMISSIVE;
+        } else {
+            write(Value::SkipTexture);
+        }
+
+        if let Some(tex) = self.specular_tex.and_then(|texture_key| {
+            let entry_info = textures.get_entry(texture_key).ok()?;
+            let array = textures.pool.array_by_index(entry_info.array_index)?;
+            let sampler_key = self.specular_sampler?;
+            let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
+            let uv_index = self.specular_uv_index?;
+            let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+            Some((
+                array,
+                entry_info,
+                uv_index,
+                sampler_index,
+                encode_address_mode(address_mode_u),
+                encode_address_mode(address_mode_v),
+                self.specular_texture_transform
+                    .and_then(|key| textures.get_texture_transform_offset(key))
+                    .unwrap_or(textures.texture_transform_identity_offset),
+            ))
+        }) {
+            write(tex.into());
+            bitmask |= Self::BITMASK_SPECULAR;
+        } else {
+            write(Value::SkipTexture);
+        }
+
+        if let Some(tex) = self.specular_color_tex.and_then(|texture_key| {
+            let entry_info = textures.get_entry(texture_key).ok()?;
+            let array = textures.pool.array_by_index(entry_info.array_index)?;
+            let sampler_key = self.specular_color_sampler?;
+            let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
+            let uv_index = self.specular_color_uv_index?;
+            let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+            Some((
+                array,
+                entry_info,
+                uv_index,
+                sampler_index,
+                encode_address_mode(address_mode_u),
+                encode_address_mode(address_mode_v),
+                self.specular_color_texture_transform
+                    .and_then(|key| textures.get_texture_transform_offset(key))
+                    .unwrap_or(textures.texture_transform_identity_offset),
+            ))
+        }) {
+            write(tex.into());
+            bitmask |= Self::BITMASK_SPECULAR_COLOR;
         } else {
             write(Value::SkipTexture);
         }

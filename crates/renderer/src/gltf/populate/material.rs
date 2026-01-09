@@ -40,6 +40,7 @@ pub(super) async fn pbr_material_mapper(
             gltf::material::AlphaMode::Blend => (MaterialAlphaMode::Blend, Some(false)),
         },
     };
+
     let mut material = PbrMaterial::new(PbrMaterialImmutable {
         alpha_mode,
         double_sided: gltf_material.double_sided(),
@@ -181,6 +182,59 @@ pub(super) async fn pbr_material_mapper(
     material.base_color_factor = pbr.base_color_factor();
     material.metallic_factor = pbr.metallic_factor();
     material.roughness_factor = pbr.roughness_factor();
+
+    if let Some(specular) = gltf_material.specular() {
+        material.specular_factor = specular.specular_factor();
+        material.specular_color_factor = specular.specular_color_factor();
+
+        if let Some(tex) = specular.specular_texture().map(GltfTextureInfo::from) {
+            let GLtfMaterialCacheKey {
+                uv_index,
+                texture_key,
+                sampler_key,
+                texture_transform_key,
+            } = tex
+                .create_material_cache_key(
+                    renderer,
+                    ctx,
+                    TextureColorInfo {
+                        mipmap_kind: MipmapTextureKind::Specular,
+                        srgb_to_linear: true,
+                        premultiplied_alpha,
+                    },
+                )
+                .await?;
+
+            material.specular_tex = Some(texture_key);
+            material.specular_sampler = Some(sampler_key);
+            material.specular_uv_index = Some(uv_index as u32);
+            material.specular_texture_transform = texture_transform_key;
+        }
+
+        if let Some(tex) = specular.specular_color_texture().map(GltfTextureInfo::from) {
+            let GLtfMaterialCacheKey {
+                uv_index,
+                texture_key,
+                sampler_key,
+                texture_transform_key,
+            } = tex
+                .create_material_cache_key(
+                    renderer,
+                    ctx,
+                    TextureColorInfo {
+                        mipmap_kind: MipmapTextureKind::SpecularColor,
+                        srgb_to_linear: true,
+                        premultiplied_alpha,
+                    },
+                )
+                .await?;
+
+            material.specular_color_tex = Some(texture_key);
+            material.specular_color_sampler = Some(sampler_key);
+            material.specular_color_uv_index = Some(uv_index as u32);
+            material.specular_color_texture_transform = texture_transform_key;
+        }
+    }
 
     material.vertex_color_info = primitive_buffer_info
         .triangles

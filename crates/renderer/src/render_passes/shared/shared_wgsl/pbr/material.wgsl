@@ -8,7 +8,7 @@ const ALPHA_MODE_BLEND: u32 = 2u;
 // This must match PbrMaterial in Rust
 // and the size is PbrMaterial::BYTE_SIZE
 struct PbrMaterialRaw {
-    // Basic properties, 15 * 4 = 60 bytes
+    // Basic properties, 19 * 4 = 76 bytes
     alpha_mode: u32,
     alpha_cutoff: f32,
     double_sided: u32,
@@ -24,13 +24,19 @@ struct PbrMaterialRaw {
     emissive_factor_g: f32,
     emissive_factor_b: f32,
     emissive_strength: f32,
+    specular: f32,
+    specular_color_r: f32,
+    specular_color_g: f32,
+    specular_color_b: f32,
 
-    // Textures, 5 * 20 = 100 bytes (packed format)
+    // Textures, 7 * 20 = 140 bytes (packed format)
     base_color_tex_info: TextureInfoRaw,
     metallic_roughness_tex_info: TextureInfoRaw,
     normal_tex_info: TextureInfoRaw,
     occlusion_tex_info: TextureInfoRaw,
     emissive_tex_info: TextureInfoRaw,
+    specular_tex_info: TextureInfoRaw,
+    specular_color_tex_info: TextureInfoRaw,
 
     // Color info, 4 bytes
     color_info: ColorInfo,
@@ -38,8 +44,8 @@ struct PbrMaterialRaw {
     // this is set last, 4 bytes
     bitmask: u32,
 
-    // Padding to align to 512 bytes (60 + 100 + 4 + 4 = 168, so 512 - 168 = 344 bytes = 86 u32s)
-    padding: array<u32, 86>
+    // Padding to align to 512 bytes (76 + 140 + 4 + 4 = 224, so 512 - 224 = 288 bytes = 72 u32s)
+    padding: array<u32, 72>
 };
 
 struct PbrMaterial {
@@ -70,17 +76,29 @@ struct PbrMaterial {
     emissive_factor: vec3<f32>,
     emissive_strength: f32,
 
+
     has_color_info: bool,
     color_info: ColorInfo,
+
+    has_specular_texture: bool,
+    specular_tex_info: TextureInfo,
+    specular_factor: f32,
+
+    has_specular_color_texture: bool,
+    specular_color_tex_info: TextureInfo,
+    specular_color_factor: vec3<f32>,
 }
 
 fn pbr_get_material(offset: u32) -> PbrMaterial {
-    const MATERIAL_BITMASK_BASE_COLOR: u32 = 1u;
-    const MATERIAL_BITMASK_METALIC_ROUGHNESS: u32 = 1u << 1u;
-    const MATERIAL_BITMASK_NORMAL: u32 = 1u << 2u;
-    const MATERIAL_BITMASK_OCCLUSION: u32 = 1u << 3u;
-    const MATERIAL_BITMASK_EMISSIVE: u32 = 1u << 4u;
-    const MATERIAL_BITMASK_COLOR: u32 = 1u << 5u;
+    // must correspond to material.rs
+    const BITMASK_BASE_COLOR: u32 = 1u;
+    const BITMASK_METALIC_ROUGHNESS: u32 = 1u << 1u;
+    const BITMASK_NORMAL: u32 = 1u << 2u;
+    const BITMASK_OCCLUSION: u32 = 1u << 3u;
+    const BITMASK_EMISSIVE: u32 = 1u << 4u;
+    const BITMASK_COLOR: u32 = 1u << 5u;
+    const BITMASK_SPECULAR: u32 = 1u << 6u;
+    const BITMASK_SPECULAR_COLOR: u32 = 1u << 7u;
 
     let raw = materials[offset / material_alignment];
 
@@ -90,34 +108,45 @@ fn pbr_get_material(offset: u32) -> PbrMaterial {
         raw.double_sided,
 
         // base color
-        (raw.bitmask & MATERIAL_BITMASK_BASE_COLOR) != 0u,
+        (raw.bitmask & BITMASK_BASE_COLOR) != 0u,
         convert_texture_info(raw.base_color_tex_info),
         vec4<f32>(raw.base_color_factor_r, raw.base_color_factor_g, raw.base_color_factor_b, raw.base_color_factor_a),
 
         // metallic roughness
-        (raw.bitmask & MATERIAL_BITMASK_METALIC_ROUGHNESS) != 0u,
+        (raw.bitmask & BITMASK_METALIC_ROUGHNESS) != 0u,
         convert_texture_info(raw.metallic_roughness_tex_info),
         raw.metallic_factor,
         raw.roughness_factor,
 
         // normal
-        (raw.bitmask & MATERIAL_BITMASK_NORMAL) != 0u,
+        (raw.bitmask & BITMASK_NORMAL) != 0u,
         convert_texture_info(raw.normal_tex_info),
         raw.normal_scale,
 
         // occlusion
-        (raw.bitmask & MATERIAL_BITMASK_OCCLUSION) != 0u,
+        (raw.bitmask & BITMASK_OCCLUSION) != 0u,
         convert_texture_info(raw.occlusion_tex_info),
         raw.occlusion_strength,
 
         // emissive
-        (raw.bitmask & MATERIAL_BITMASK_EMISSIVE) != 0u,
+        (raw.bitmask & BITMASK_EMISSIVE) != 0u,
         convert_texture_info(raw.emissive_tex_info),
         vec3<f32>(raw.emissive_factor_r, raw.emissive_factor_g, raw.emissive_factor_b),
         raw.emissive_strength,
 
         // color
-        (raw.bitmask & MATERIAL_BITMASK_COLOR) != 0u,
-        raw.color_info
+        (raw.bitmask & BITMASK_COLOR) != 0u,
+        raw.color_info,
+
+        // specular
+        (raw.bitmask & BITMASK_SPECULAR) != 0u,
+        convert_texture_info(raw.specular_tex_info),
+        raw.specular,
+
+        // specular color
+        (raw.bitmask & BITMASK_SPECULAR_COLOR) != 0u,
+        convert_texture_info(raw.specular_color_tex_info),
+        vec3<f32>(raw.specular_color_r, raw.specular_color_g, raw.specular_color_b)
+
     );
 }
