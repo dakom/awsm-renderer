@@ -46,6 +46,7 @@ pub struct TexturePoolEntryInfo<ID> {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Ord, PartialOrd)]
 pub struct TextureColorInfo {
     pub mipmap_kind: MipmapTextureKind,
+    // Whether to convert from sRGB to linear color space
     pub srgb_to_linear: bool,
     // If None, use image's premultiplied alpha setting
     pub premultiplied_alpha: Option<bool>,

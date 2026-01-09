@@ -289,6 +289,32 @@ fn pbr_get_gradients(
         );
     }
 
+    if (material.has_specular_texture) {
+        out.specular = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            material.specular_tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
+    if (material.has_specular_color_texture) {
+        out.specular_color = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            material.specular_color_tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
     return out;
 }
 

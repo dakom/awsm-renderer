@@ -7,6 +7,8 @@
             normal: UvDerivs,
             occlusion: UvDerivs,
             emissive: UvDerivs,
+            specular: UvDerivs,
+            specular_color: UvDerivs,
         }
 
         // Gradient-based version - enables anisotropic filtering in compute shaders
@@ -109,12 +111,40 @@
                 gradients.emissive,
             );
 
+            let specular = _pbr_specular_grad(
+                material,
+                texture_uv(
+                    attribute_data_offset,
+                    triangle_indices,
+                    barycentric,
+                    material.specular_tex_info,
+                    vertex_attribute_stride,
+                    uv_sets_index,
+                ),
+                gradients.specular,
+            );
+
+            let specular_color = _pbr_specular_color_grad(
+                material,
+                texture_uv(
+                    attribute_data_offset,
+                    triangle_indices,
+                    barycentric,
+                    material.specular_color_tex_info,
+                    vertex_attribute_stride,
+                    uv_sets_index,
+                ),
+                gradients.specular_color,
+            );
+
             return PbrMaterialColor(
                 base,
                 metallic_roughness,
                 normal,
                 occlusion,
                 emissive,
+                specular,
+                specular_color,
             );
         }
 
@@ -230,6 +260,22 @@
             color *= material.emissive_strength;
             return color;
         }
+
+        fn _pbr_specular_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> f32 {
+            var specular = material.specular_factor;
+            if material.has_specular_texture {
+                specular *= texture_pool_sample_grad(material.specular_tex_info, attribute_uv, uv_derivs).a;
+            }
+            return specular;
+        }
+
+        fn _pbr_specular_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> vec3<f32> {
+            var color = material.specular_color_factor;
+            if material.has_specular_color_texture {
+                color *= texture_pool_sample_grad(material.specular_color_tex_info, attribute_uv, uv_derivs).rgb;
+            }
+            return color;
+        }
     {% when MipmapMode::None %}
         // Samples all PBR material textures and computes the final material properties including
         // normal mapping. The returned normal is the perturbed normal (with normal map applied) and
@@ -330,12 +376,38 @@
                 ),
             );
 
+            let specular = _pbr_specular_no_mips(
+                material,
+                texture_uv(
+                    attribute_data_offset,
+                    triangle_indices,
+                    barycentric,
+                    material.specular_tex_info,
+                    vertex_attribute_stride,
+                    uv_sets_index,
+                ),
+            );
+
+            let specular_color = _pbr_specular_color_no_mips(
+                material,
+                texture_uv(
+                    attribute_data_offset,
+                    triangle_indices,
+                    barycentric,
+                    material.specular_color_tex_info,
+                    vertex_attribute_stride,
+                    uv_sets_index,
+                ),
+            );
+
             return PbrMaterialColor(
                 base,
                 metallic_roughness,
                 normal,
                 occlusion,
                 emissive,
+                specular,
+                specular_color,
             );
         }
 
@@ -483,6 +555,28 @@
 
             color *= material.emissive_strength;
 
+            return color;
+        }
+
+        fn _pbr_specular_no_mips(
+            material: PbrMaterial,
+            attribute_uv: vec2<f32>,
+        ) -> f32 {
+            var specular = material.specular_factor;
+            if material.has_specular_texture {
+                specular *= texture_pool_sample_no_mips(material.specular_tex_info, attribute_uv).a;
+            }
+            return specular;
+        }
+
+        fn _pbr_specular_color_no_mips(
+            material: PbrMaterial,
+            attribute_uv: vec2<f32>,
+        ) -> vec3<f32> {
+            var color = material.specular_color_factor;
+            if material.has_specular_color_texture {
+                color *= texture_pool_sample_no_mips(material.specular_color_tex_info, attribute_uv).rgb;
+            }
             return color;
         }
 
