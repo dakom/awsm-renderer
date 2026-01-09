@@ -3,11 +3,11 @@
 /*************** END bind_groups.wgsl ******************/
 
 /*************** START math.wgsl ******************/
-{% include "utils_wgsl/math.wgsl" %}
+{% include "shared_wgsl/math.wgsl" %}
 /*************** END math.wgsl ******************/
 
 /*************** START camera.wgsl ******************/
-{% include "geometry_and_all_material_wgsl/camera.wgsl" %}
+{% include "shared_wgsl/camera.wgsl" %}
 /*************** END camera.wgsl ******************/
 
 /*************** START skybox.wgsl ******************/
@@ -15,24 +15,20 @@
 /*************** END skybox.wgsl ******************/
 
 /*************** START mesh_meta.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/material_mesh_meta.wgsl" %}
+{% include "shared_wgsl/material_mesh_meta.wgsl" %}
 /*************** END mesh_meta.wgsl ******************/
 
 /*************** START textures.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/textures.wgsl" %}
+{% include "shared_wgsl/textures.wgsl" %}
 /*************** END textures.wgsl ******************/
 
 /*************** START material.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/pbr/material.wgsl" %}
+{% include "shared_wgsl/pbr/material.wgsl" %}
 /*************** END material.wgsl ******************/
 
 /*************** START vertex_color.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/vertex_color.wgsl" %}
+{% include "shared_wgsl/vertex_color.wgsl" %}
 /*************** END vertex_color.wgsl ******************/
-
-/*************** START lights.wgsl ******************/
-{% include "opaque_and_transparency_wgsl/pbr/lighting/lights.wgsl" %}
-/*************** END lights.wgsl ******************/
 
 
 

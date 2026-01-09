@@ -7,10 +7,7 @@ use crate::{
     materials::MaterialAlphaMode,
     textures::{SamplerKey, TextureKey, Textures},
 };
-use crate::{
-    materials::{AwsmMaterialError, Result},
-    textures::TextureTransformKey,
-};
+use crate::{materials::Result, textures::TextureTransformKey};
 
 #[derive(Clone, Debug)]
 pub struct PbrMaterial {
@@ -42,10 +39,16 @@ pub struct PbrMaterial {
     pub emissive_strength: f32,
     pub emissive_texture_transform: Option<TextureTransformKey>,
     pub vertex_color_info: Option<VertexColorInfo>,
-    // these come from initial settings which affects bind group, mesh pipeline etc.
-    // so the only way to change them is to create a new material
-    alpha_mode: MaterialAlphaMode,
-    double_sided: bool,
+    immutable: PbrMaterialImmutable,
+}
+
+// these come from initial settings which affects bind group, mesh pipeline etc.
+// so the only way to change them is to create a new material
+#[derive(Clone, Debug)]
+pub struct PbrMaterialImmutable {
+    pub alpha_mode: MaterialAlphaMode,
+    pub double_sided: bool,
+    pub unlit: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -66,10 +69,8 @@ impl PbrMaterial {
     pub const BITMASK_EMISSIVE: u32 = 1 << 4;
     pub const BITMASK_VERTEX_COLOR: u32 = 1 << 5;
 
-    pub fn new(alpha_mode: MaterialAlphaMode, double_sided: bool) -> Self {
+    pub fn new(immutable: PbrMaterialImmutable) -> Self {
         Self {
-            alpha_mode,
-            double_sided,
             base_color_tex: None,
             base_color_sampler: None,
             base_color_uv_index: None,
@@ -98,42 +99,36 @@ impl PbrMaterial {
             emissive_strength: 1.0,
             emissive_texture_transform: None,
             vertex_color_info: None,
+            immutable,
         }
     }
 
     pub fn alpha_mode(&self) -> &MaterialAlphaMode {
-        &self.alpha_mode
+        &self.immutable.alpha_mode
     }
 
     pub fn double_sided(&self) -> bool {
-        self.double_sided
+        self.immutable.double_sided
     }
 
-    pub fn set_alpha_cutoff(&mut self, cutoff: f32) -> Result<()> {
-        if let MaterialAlphaMode::Mask { .. } = self.alpha_mode {
-            self.alpha_mode = MaterialAlphaMode::Mask { cutoff };
-            Ok(())
-        } else {
-            Err(AwsmMaterialError::InvalidAlphaModeForCutoff(
-                self.alpha_mode,
-            ))
-        }
+    pub fn unlit(&self) -> bool {
+        self.immutable.unlit
     }
 
     pub fn alpha_cutoff(&self) -> Option<f32> {
-        match self.alpha_mode {
-            MaterialAlphaMode::Mask { cutoff } => Some(cutoff),
+        match self.alpha_mode() {
+            MaterialAlphaMode::Mask { cutoff } => Some(*cutoff),
             _ => None,
         }
     }
 
     pub fn has_alpha_blend(&self) -> bool {
-        matches!(self.alpha_mode, MaterialAlphaMode::Blend)
+        matches!(self.alpha_mode(), MaterialAlphaMode::Blend)
     }
 
     pub fn alpha_mask(&self) -> Option<f32> {
-        match self.alpha_mode {
-            MaterialAlphaMode::Mask { cutoff } => Some(cutoff),
+        match self.alpha_mode() {
+            MaterialAlphaMode::Mask { cutoff } => Some(*cutoff),
             _ => None,
         }
     }
@@ -251,9 +246,9 @@ impl PbrMaterial {
             offset = write_inner(&mut data, value, offset);
         };
 
-        write(self.alpha_mode.variant_as_u32().into());
+        write(self.alpha_mode().variant_as_u32().into());
         write(self.alpha_cutoff().unwrap_or(0.0f32).into());
-        write(if self.double_sided {
+        write(if self.double_sided() {
             1u32.into()
         } else {
             0u32.into()

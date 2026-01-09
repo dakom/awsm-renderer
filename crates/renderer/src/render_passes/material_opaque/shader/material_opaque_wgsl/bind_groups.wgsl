@@ -30,8 +30,10 @@
 @group(0) @binding(21) var brdf_lut_sampler: sampler;
 @group(0) @binding(22) var opaque_tex: texture_storage_2d<rgba16float, write>;
 
+{% if !unlit %}
 @group(1) @binding(0) var<uniform> lights_info: LightsInfoPacked;
 @group(1) @binding(1) var<storage, read> lights: array<LightPacked>;
+{% endif %}
 
 {% for i in 0..texture_pool_arrays_len %}
     @group(2) @binding({{ i }}u) var pool_tex_{{ i }}: texture_2d_array<f32>;

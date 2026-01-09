@@ -191,6 +191,12 @@ impl Material {
         }
     }
 
+    pub fn unlit(&self) -> bool {
+        match self {
+            Material::Pbr(pbr_material) => pbr_material.unlit(),
+        }
+    }
+
     pub fn alpha_mask(&self) -> Option<f32> {
         match self {
             Material::Pbr(pbr_material) => pbr_material.alpha_mask(),

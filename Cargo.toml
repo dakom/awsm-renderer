@@ -78,7 +78,13 @@ glam = {version = "0.30.4", features = ["bytemuck"]}
 half = "2.6.0"
 
 # Media
-gltf = {version = "1.4.1", features = ["extensions", "KHR_lights_punctual", "KHR_texture_transform", "KHR_materials_emissive_strength"]}
+gltf = {version = "1.4.1", features = [
+    "extensions",
+    "KHR_lights_punctual",
+    "KHR_texture_transform",
+    "KHR_materials_emissive_strength",
+    "KHR_materials_unlit"
+]}
 exr = "1.73.0"
 binpack2d = "1.0.1"
 image = {version = "0.25.6", default-features = false, features = ["png"]}

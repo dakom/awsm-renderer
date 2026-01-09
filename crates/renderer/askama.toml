@@ -1,7 +1,7 @@
 [general]
 # Directories to search for templates, relative to the crate root.
 dirs = [
-    "src/render_passes/shared/shader",
+    "src/render_passes/shared",
     "src/render_passes/geometry/shader",
     "src/render_passes/light_culling/shader",
     "src/render_passes/material_opaque/shader",

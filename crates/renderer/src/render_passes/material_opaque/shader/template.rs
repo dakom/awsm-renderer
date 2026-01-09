@@ -38,6 +38,7 @@ pub struct ShaderTemplateMaterialOpaqueBindGroups {
     pub mipmap: MipmapMode,
     pub multisampled_geometry: bool,
     pub msaa_sample_count: u32, // 0 if no MSAA
+    pub unlit: bool,
 }
 
 #[derive(Template, Debug)]
@@ -62,6 +63,7 @@ pub struct ShaderTemplateMaterialOpaqueCompute {
     pub mipmap: MipmapMode,
     pub multisampled_geometry: bool,
     pub msaa_sample_count: u32, // 0 if no MSAA
+    pub unlit: bool,
 }
 
 impl ShaderTemplateMaterialOpaqueCompute {
@@ -146,6 +148,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
                 mipmap,
                 multisampled_geometry,
                 msaa_sample_count,
+                unlit: value.unlit,
                 debug,
             },
             compute: ShaderTemplateMaterialOpaqueCompute {
@@ -161,6 +164,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
                 multisampled_geometry,
                 msaa_sample_count,
                 debug,
+                unlit: value.unlit,
             },
         };
 
@@ -240,6 +244,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaqueEmpty> for ShaderTemplateMaterialOpaqu
             texture_pool_arrays_len: value.texture_pool_arrays_len,
             texture_pool_samplers_len: value.texture_pool_samplers_len,
             multisampled_geometry: value.msaa_sample_count.is_some(),
+            unlit: true,
         })
     }
 }
@@ -250,6 +255,7 @@ pub struct ShaderTemplateMaterialOpaqueEmpty {
     pub texture_pool_arrays_len: u32,
     pub texture_pool_samplers_len: u32,
     pub multisampled_geometry: bool,
+    pub unlit: bool,
 }
 
 impl ShaderTemplateMaterialOpaqueEmpty {

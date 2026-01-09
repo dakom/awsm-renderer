@@ -39,17 +39,21 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
     // Calculate surface to camera vector for lighting
     let surface_to_camera = normalize(camera.position - input.world_position);
 
-    // Get lighting info and apply all enabled lights
-    let lights_info = get_lights_info();
-    let lit_color = apply_lighting(
-        material_color,
-        surface_to_camera,
-        input.world_position,
-        lights_info
-    );
+    {% if !unlit %}
+        // Get lighting info and apply all enabled lights
+        let lights_info = get_lights_info();
+        let color = apply_lighting(
+            material_color,
+            surface_to_camera,
+            input.world_position,
+            lights_info
+        );
+    {% else %}
+        let color = unlit(material_color);
+    {% endif %}
 
     // Output final color with alpha
-    let premult_rgb = lit_color * material_color.base.a;
+    let premult_rgb = color * material_color.base.a;
     out.color = vec4<f32>(premult_rgb, material_color.base.a);
 
     return out;

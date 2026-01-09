@@ -10,8 +10,10 @@
 @group(0) @binding(6) var<storage, read> skin_joint_index_weights: array<f32>;
 @group(0) @binding(7) var<storage, read> texture_transforms: array<TextureTransform>;
 
-@group(1) @binding(0) var<uniform> lights_info: LightsInfoPacked;
-@group(1) @binding(1) var<storage, read> lights: array<LightPacked>;
+{% if !unlit %}
+    @group(1) @binding(0) var<uniform> lights_info: LightsInfoPacked;
+    @group(1) @binding(1) var<storage, read> lights: array<LightPacked>;
+{% endif %}
 @group(1) @binding(2) var ibl_filtered_env_tex: texture_cube<f32>;
 @group(1) @binding(3) var ibl_filtered_env_sampler: sampler;
 @group(1) @binding(4) var ibl_irradiance_tex: texture_cube<f32>;
