@@ -89,6 +89,8 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
     h.insert(
         GltfSetId::Extensions,
         vec![
+            GltfId::TransmissionRoughness,
+            GltfId::IorTestGrid,
             GltfId::SimpleInstancing,
             GltfId::EmissiveStrength,
             GltfId::TextureTransformMultiTest,
@@ -135,6 +137,7 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GltfId {
+    TransmissionRoughness,
     BrainStem,
     Fox,
     AlphaBlendMode,
@@ -199,6 +202,7 @@ pub enum GltfId {
     UnlitTest,
     SpecularTest,
     AwsmTransformGizmo,
+    IorTestGrid,
 }
 
 impl TryFrom<&str> for GltfId {
@@ -236,6 +240,10 @@ impl GltfId {
 
     pub fn filepath(&self) -> &'static str {
         match self {
+            Self::TransmissionRoughness => {
+                "TransmissionRoughnessTest/glTF/TransmissionRoughnessTest.gltf"
+            }
+            Self::IorTestGrid => "IORTestGrid/glTF/IORTestGrid.gltf",
             Self::UnlitTest => "UnlitTest/glTF/UnlitTest.gltf",
             Self::SpecularTest => "SpecularTest/glTF/SpecularTest.gltf",
             Self::BrainStem => "BrainStem/glTF/BrainStem.gltf",
@@ -319,6 +327,8 @@ impl GltfId {
 
     pub fn label(&self) -> &'static str {
         match self {
+            Self::TransmissionRoughness => "TransmissionRoughnessTest",
+            Self::IorTestGrid => "Ior test grid",
             Self::SpecularTest => "Specular test",
             Self::UnlitTest => "Unlit test",
             Self::BrainStem => "Brain stem",

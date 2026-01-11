@@ -184,6 +184,7 @@ These references should be read in full, as they contain important details about
 We have these setup to test in the renderer, I can provide feedback on how they look once implemented.
 
 - IOR: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CompareIor
+- Also IOR: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/IORTestGrid
 - Transmission: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CompareTransmission
 - Volume: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CompareVolume
 - Specular: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CompareSpecular

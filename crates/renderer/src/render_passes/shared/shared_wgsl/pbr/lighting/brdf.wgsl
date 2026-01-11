@@ -2,7 +2,87 @@
 // PBR (metal/roughness) BRDF with Image-Based Lighting (WGSL)
 // Implements Cook-Torrance specular BRDF with split-sum IBL approximation
 // Safe for HDR workflows (no final saturate - tone mapping applied elsewhere)
+// Supports KHR_materials_ior, KHR_materials_transmission, KHR_materials_volume
 // -------------------------------------------------------------
+
+// -------------------------------------------------------------
+// IOR and Refraction Utilities
+// -------------------------------------------------------------
+
+// Get effective IOR value, defaulting to 1.5 when invalid (< 1.0)
+// IOR = 1.0 is valid (air, no refraction), IOR < 1.0 is physically invalid
+// Note: Rust side should default to 1.5 when KHR_materials_ior extension is absent
+fn effective_ior(ior: f32) -> f32 {
+    return select(ior, 1.5, ior < 1.0);
+}
+
+// Convert index of refraction to F0 (reflectance at normal incidence)
+// Default IOR of 1.5 yields F0 = 0.04 (standard dielectric)
+fn ior_to_f0(ior: f32) -> f32 {
+    let ior_val = effective_ior(ior);
+    let ratio = (ior_val - 1.0) / (ior_val + 1.0);
+    return ratio * ratio;
+}
+
+// Calculate refracted direction using Snell's law
+// Returns vec3(0) if total internal reflection occurs
+fn refract_direction(incident: vec3<f32>, normal: vec3<f32>, eta: f32) -> vec3<f32> {
+    // Optimization: no refraction when eta ≈ 1.0 (same medium)
+    if (abs(eta - 1.0) < 0.001) {
+        return incident;
+    }
+
+    // eta = ior_outside / ior_inside (typically 1.0 / ior for entering)
+    let cos_i = -dot(incident, normal);
+    let sin_t2 = eta * eta * (1.0 - cos_i * cos_i);
+
+    // Total internal reflection check
+    if (sin_t2 > 1.0) {
+        return vec3<f32>(0.0);  // Signal TIR to caller
+    }
+
+    let cos_t = sqrt(1.0 - sin_t2);
+    return eta * incident + (eta * cos_i - cos_t) * normal;
+}
+
+// -------------------------------------------------------------
+// Volume Attenuation (Beer's Law)
+// -------------------------------------------------------------
+
+// Calculate light attenuation through a medium using Beer's Law
+// T(x) = attenuation_color^(distance / attenuation_distance)
+fn volume_attenuation(
+    distance: f32,
+    attenuation_color: vec3<f32>,
+    attenuation_distance: f32
+) -> vec3<f32> {
+    // Early exit: no distance = no attenuation
+    if (distance <= 0.0) {
+        return vec3<f32>(1.0);
+    }
+    // Early exit: infinite distance = no attenuation
+    if (attenuation_distance <= 0.0 || attenuation_distance > 1e10) {
+        return vec3<f32>(1.0);
+    }
+    // Early exit: white = no color shift
+    if (all(attenuation_color >= vec3<f32>(0.999))) {
+        return vec3<f32>(1.0);
+    }
+
+    // Beer's Law: T(x) = c^(x/d)
+    return pow(attenuation_color, vec3<f32>(distance / attenuation_distance));
+}
+
+// Check if volume attenuation should be applied (optimization)
+fn should_apply_volume_attenuation(
+    thickness: f32,
+    attenuation_distance: f32,
+    attenuation_color: vec3<f32>
+) -> bool {
+    return thickness > 0.0
+        && attenuation_distance < 1e10
+        && any(attenuation_color < vec3<f32>(1.0));
+}
 
 // -------------------------------------------------------------
 // Microfacet BRDF Components
@@ -107,8 +187,10 @@ fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera
     let v_dot_h = max(dot(v, h), 0.0);
 
     // F0: base reflectivity at normal incidence
-    // KHR_materials_specular: dielectric_f0 = min(0.04 * specular_color, 1.0) * specular
-    let dielectric_f0 = min(vec3<f32>(0.04) * color.specular_color, vec3<f32>(1.0)) * color.specular;
+    // KHR_materials_ior: dielectric_f0_base = ((ior - 1) / (ior + 1))^2
+    // KHR_materials_specular: dielectric_f0 = min(f0_base * specular_color, 1.0) * specular
+    let dielectric_f0_base = ior_to_f0(color.ior);
+    let dielectric_f0 = min(vec3<f32>(dielectric_f0_base) * color.specular_color, vec3<f32>(1.0)) * color.specular;
     let F0 = mix(dielectric_f0, base_color, metallic);
 
     // f90: grazing angle reflectivity (specular for dielectrics, 1.0 for metals per spec)
@@ -121,7 +203,8 @@ fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera
     let specular = F * (D * G) / max(4.0 * n_dot_l * n_dot_v, EPSILON);
 
     // Lambertian diffuse (energy-conserving: scaled by (1-F_max) and non-metallic portion)
-    // Use max component of F for diffuse attenuation when specular is colored
+    // Note: transmission modifies diffuse in brdf_ibl, but for direct lighting we keep
+    // standard diffuse since punctual lights don't transmit through surfaces
     let F_max = max(max(F.r, F.g), F.b);
     let k_d = (1.0 - F_max) * (1.0 - metallic);
     let diffuse = k_d * base_color * (1.0 / PI);
@@ -133,7 +216,10 @@ fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera
 // -------------------------------------------------------------
 // Image-Based Lighting (IBL) - Split-sum Approximation
 // -------------------------------------------------------------
-fn brdf_ibl(
+
+// IBL with transmission background provided by caller
+// transmission_background: pre-sampled color from behind the surface (screen-space or IBL)
+fn brdf_ibl_with_transmission(
     color: PbrMaterialColor,
     normal: vec3<f32>,
     surface_to_camera: vec3<f32>,
@@ -143,7 +229,8 @@ fn brdf_ibl(
     ibl_irradiance_sampler: sampler,
     brdf_lut_tex: texture_2d<f32>,
     brdf_lut_sampler: sampler,
-    ibl_info: IblInfo
+    ibl_info: IblInfo,
+    transmission_background: vec3<f32>,
 ) -> vec3<f32> {
     let n = safe_normalize(normal);
     let v = safe_normalize(surface_to_camera);
@@ -156,28 +243,129 @@ fn brdf_ibl(
     let n_dot_v = saturate(dot(n, v));
 
     // F0: base reflectivity at normal incidence
-    // KHR_materials_specular: dielectric_f0 = min(0.04 * specular_color, 1.0) * specular
-    let dielectric_f0 = min(vec3<f32>(0.04) * color.specular_color, vec3<f32>(1.0)) * color.specular;
+    // KHR_materials_ior: dielectric_f0_base = ((ior - 1) / (ior + 1))^2
+    // KHR_materials_specular: dielectric_f0 = min(f0_base * specular_color, 1.0) * specular
+    let dielectric_f0_base = ior_to_f0(color.ior);
+    let dielectric_f0 = min(vec3<f32>(dielectric_f0_base) * color.specular_color, vec3<f32>(1.0)) * color.specular;
     let F0 = mix(dielectric_f0, base_color, metallic);
 
     // f90: grazing angle reflectivity (specular for dielectrics, 1.0 for metals per spec)
     let f90 = mix(color.specular, 1.0, metallic);
 
-    // Diffuse IBL: irradiance * Lambertian BRDF * (1 - Fresnel) * (1 - metallic)
-    let irradiance = sampleIrradiance(n, ibl_irradiance_tex, ibl_irradiance_sampler);
+    // Fresnel at view direction
     let F_view = fresnel_schlick_f90(n_dot_v, F0, f90);
-    // Use max component of F for diffuse attenuation when specular is colored
     let F_view_max = max(max(F_view.r, F_view.g), F_view.b);
+
+    // Effective transmission: metals don't transmit
+    let effective_transmission = color.transmission * (1.0 - metallic);
+
+    // Calculate base layer (diffuse or transmission)
+    var base_layer = vec3<f32>(0.0);
+
+    if (effective_transmission > 0.0) {
+        // Diffuse IBL contribution
+        let irradiance = sampleIrradiance(n, ibl_irradiance_tex, ibl_irradiance_sampler);
+        let diffuse_brdf = base_color * (1.0 / PI) * irradiance;
+
+        // Transmission BTDF contribution
+        // Apply volume attenuation if thickness > 0
+        var attenuation = vec3<f32>(1.0);
+        if (should_apply_volume_attenuation(
+            color.volume_thickness,
+            color.volume_attenuation_distance,
+            color.volume_attenuation_color
+        )) {
+            attenuation = volume_attenuation(
+                color.volume_thickness,
+                color.volume_attenuation_color,
+                color.volume_attenuation_distance
+            );
+        }
+
+        // BTDF: transmitted background * base_color * attenuation
+        let transmission_btdf = transmission_background * base_color * attenuation;
+
+        // Mix diffuse and transmission based on transmission factor
+        // Per spec: base = mix(diffuse_brdf, specular_btdf * baseColor, transmission)
+        base_layer = mix(diffuse_brdf, transmission_btdf, effective_transmission);
+    } else {
+        // No transmission - standard diffuse
+        let irradiance = sampleIrradiance(n, ibl_irradiance_tex, ibl_irradiance_sampler);
+        base_layer = base_color * (1.0 / PI) * irradiance;
+    }
+
+    // Apply diffuse/transmission energy conservation
     let k_d = (1.0 - F_view_max) * (1.0 - metallic);
-    let diffuse = k_d * base_color * (1.0 / PI) * irradiance * color.occlusion;
+    let base_contribution = k_d * base_layer * color.occlusion;
 
     // Specular IBL: prefiltered environment * (F0 * scale + f90 * bias) from BRDF LUT
-    // The BRDF LUT encodes: F0 * scale + F90 * bias (where scale=x, bias=y)
     let R = reflect(-v, n);
     let prefiltered = samplePrefilteredEnv(R, roughness, ibl_filtered_env_tex, ibl_filtered_env_sampler, ibl_info);
     let brdf_lut = sampleBRDFLUT(n_dot_v, roughness, brdf_lut_tex, brdf_lut_sampler);
     // Apply occlusion to specular with reduced strength to avoid over-darkening reflections
     let specular = prefiltered * (F0 * brdf_lut.x + vec3<f32>(f90) * brdf_lut.y) * mix(1.0, color.occlusion, 0.5);
 
-    return diffuse + specular + color.emissive;
+    return base_contribution + specular + color.emissive;
+}
+
+// Standard IBL without explicit transmission background (uses IBL for transmission)
+fn brdf_ibl(
+    color: PbrMaterialColor,
+    normal: vec3<f32>,
+    surface_to_camera: vec3<f32>,
+    ibl_filtered_env_tex: texture_cube<f32>,
+    ibl_filtered_env_sampler: sampler,
+    ibl_irradiance_tex: texture_cube<f32>,
+    ibl_irradiance_sampler: sampler,
+    brdf_lut_tex: texture_2d<f32>,
+    brdf_lut_sampler: sampler,
+    ibl_info: IblInfo
+) -> vec3<f32> {
+    // For IBL-only transmission, sample the environment in the refracted direction
+    var transmission_background = vec3<f32>(0.0);
+
+    let effective_transmission = color.transmission * (1.0 - clamp(color.metallic_roughness.x, 0.0, 1.0));
+
+    if (effective_transmission > 0.0) {
+        let n = safe_normalize(normal);
+        let v = safe_normalize(surface_to_camera);
+        let roughness = max(clamp(color.metallic_roughness.y, 0.0, 1.0), 0.04);
+
+        // Determine sample direction for transmission
+        var sample_dir = -v;  // Default: straight through (thin-walled)
+
+        // If volumetric (thickness > 0), apply refraction
+        let ior_val = effective_ior(color.ior);
+        if (color.volume_thickness > 0.0 && ior_val != 1.0) {
+            let refracted = refract_direction(v, n, 1.0 / ior_val);
+            // Use dot product instead of length to avoid sqrt (checking for non-zero)
+            if (dot(refracted, refracted) > 1e-6) {
+                sample_dir = refracted;
+            }
+            // else: TIR occurred, keep straight-through direction
+        }
+
+        // Sample environment with roughness-based blur
+        transmission_background = samplePrefilteredEnv(
+            sample_dir,
+            roughness,
+            ibl_filtered_env_tex,
+            ibl_filtered_env_sampler,
+            ibl_info
+        );
+    }
+
+    return brdf_ibl_with_transmission(
+        color,
+        normal,
+        surface_to_camera,
+        ibl_filtered_env_tex,
+        ibl_filtered_env_sampler,
+        ibl_irradiance_tex,
+        ibl_irradiance_sampler,
+        brdf_lut_tex,
+        brdf_lut_sampler,
+        ibl_info,
+        transmission_background
+    );
 }

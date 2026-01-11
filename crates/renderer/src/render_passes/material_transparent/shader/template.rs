@@ -141,6 +141,8 @@ pub struct ShaderTemplateTransparentMaterialFragment {
     pub texture_pool_arrays_len: u32,
     pub texture_pool_samplers_len: u32,
     pub unlit: bool,
+    pub transmission_blur_rings: u32, // more rings = higher quality = more expensive
+    pub debug: ShaderTemplateMaterialTransparentDebug,
 }
 
 impl ShaderTemplateTransparentMaterialFragment {
@@ -157,7 +159,25 @@ impl ShaderTemplateTransparentMaterialFragment {
             in_color_set_start,
             texture_pool_arrays_len: cache_key.texture_pool_arrays_len,
             texture_pool_samplers_len: cache_key.texture_pool_samplers_len,
+            transmission_blur_rings: 3,
             unlit: cache_key.unlit,
+            debug: ShaderTemplateMaterialTransparentDebug::new(),
+        }
+    }
+
+    pub fn has_lighting_ibl(&self) -> bool {
+        match self.debug.lighting {
+            ShaderTemplateMaterialTransparentDebugLighting::None => true,
+            ShaderTemplateMaterialTransparentDebugLighting::IblOnly => true,
+            ShaderTemplateMaterialTransparentDebugLighting::PunctualOnly => false,
+        }
+    }
+
+    pub fn has_lighting_punctual(&self) -> bool {
+        match self.debug.lighting {
+            ShaderTemplateMaterialTransparentDebugLighting::None => true,
+            ShaderTemplateMaterialTransparentDebugLighting::IblOnly => false,
+            ShaderTemplateMaterialTransparentDebugLighting::PunctualOnly => true,
         }
     }
 }

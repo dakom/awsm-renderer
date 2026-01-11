@@ -165,14 +165,15 @@ impl BindGroups {
                 }
                 BindGroupCreate::BrdfLutTextures => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
-                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                    functions_to_call.insert(FunctionToCall::TransparentLights);
                 }
                 BindGroupCreate::IblTextures => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
-                    functions_to_call.insert(FunctionToCall::TransparentMain);
+                    functions_to_call.insert(FunctionToCall::TransparentLights);
                 }
                 BindGroupCreate::EnvironmentSkyboxCreate => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
+                    functions_to_call.insert(FunctionToCall::TransparentLights);
                 }
                 BindGroupCreate::TransformNormalsResize => {
                     functions_to_call.insert(FunctionToCall::OpaqueMain);

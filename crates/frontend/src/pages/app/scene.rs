@@ -13,8 +13,10 @@ use awsm_renderer::core::cubemap::CubemapImage;
 use awsm_renderer::environment::Skybox;
 use awsm_renderer::gltf::data::GltfData;
 use awsm_renderer::gltf::loader::GltfLoader;
+use awsm_renderer::lights::ibl::Ibl;
 use awsm_renderer::lights::ibl::IblTexture;
-use awsm_renderer::lights::{ibl::Ibl, Light};
+use awsm_renderer::lights::Light;
+use awsm_renderer::lights::LightKey;
 
 use awsm_renderer::picker::PickResult;
 use awsm_renderer::AwsmRenderer;
@@ -48,6 +50,7 @@ pub struct AppScene {
     pub request_animation_frame: Mutex<Option<gloo_render::AnimationFrame>>,
     pub last_request_animation_frame: Cell<Option<f64>>,
     pub event_listeners: Mutex<Vec<EventListener>>,
+    lights: Mutex<Option<Vec<LightKey>>>,
     move_action: Cell<Option<MoveAction>>,
     last_size: Cell<(f64, f64)>,
     last_camera_id: Cell<CameraId>,
@@ -81,6 +84,7 @@ impl AppScene {
             last_shader_kind: Cell::new(None),
             editor: Mutex::new(None),
             move_action: Cell::new(None),
+            lights: Mutex::new(None),
         });
 
         let resize_observer = ResizeObserver::new(
@@ -544,78 +548,60 @@ impl AppScene {
 
     pub async fn populate(self: &Arc<Self>) {
         async fn inner(scene: &Arc<AppScene>) -> Result<()> {
-            let data = {
-                let data = scene.latest_gltf_data.lock().unwrap();
-                data.as_ref()
-                    .expect("No GLTF data to populate")
-                    .heavy_clone()
-            };
+            {
+                let data = {
+                    let data = scene.latest_gltf_data.lock().unwrap();
+                    data.as_ref()
+                        .expect("No GLTF data to populate")
+                        .heavy_clone()
+                };
 
-            let mut renderer = scene.renderer.lock().await;
+                let mut renderer = scene.renderer.lock().await;
 
-            renderer.populate_gltf(data, None).await?;
+                renderer.populate_gltf(data, None).await?;
 
-            let editor_gizmo_gltf_data = {
-                let editor_guard = scene.editor.lock().unwrap();
-                editor_guard
-                    .as_ref()
-                    .map(|editor| editor.gizmo_gltf_data.clone())
-            };
+                let editor_gizmo_gltf_data = {
+                    let editor_guard = scene.editor.lock().unwrap();
+                    editor_guard
+                        .as_ref()
+                        .map(|editor| editor.gizmo_gltf_data.clone())
+                };
 
-            if let Some(editor_gizmo_gltf_data) = editor_gizmo_gltf_data {
-                let ctx = renderer.populate_gltf(editor_gizmo_gltf_data, None).await?;
+                if let Some(editor_gizmo_gltf_data) = editor_gizmo_gltf_data {
+                    let ctx = renderer.populate_gltf(editor_gizmo_gltf_data, None).await?;
 
-                if let Some(editor) = scene.editor.lock().unwrap().as_ref() {
-                    *editor.transform_controller.lock().unwrap() = Some(TransformController::new(
-                        ctx.key_lookups.clone(),
-                        GizmoSpace::default(),
-                    )?);
+                    if let Some(editor) = scene.editor.lock().unwrap().as_ref() {
+                        *editor.transform_controller.lock().unwrap() =
+                            Some(TransformController::new(
+                                ctx.key_lookups.clone(),
+                                GizmoSpace::default(),
+                            )?);
+                    }
+                }
+
+                if let Some(ibl) = scene
+                    .ibl_cache
+                    .lock()
+                    .unwrap()
+                    .get(&scene.ctx.ibl_id.get())
+                    .cloned()
+                {
+                    renderer.set_ibl(ibl);
+                }
+
+                if let Some(skybox) = scene
+                    .skybox_by_ibl_cache
+                    .lock()
+                    .unwrap()
+                    .get(&scene.ctx.ibl_id.get())
+                    .cloned()
+                {
+                    renderer.set_skybox(skybox);
                 }
             }
 
-            renderer.lights.insert(Light::Directional {
-                color: [1.0, 0.97, 0.92],
-                intensity: 1.4,
-                direction: [0.1, -0.35, -1.0],
-            })?;
-
-            renderer.lights.insert(Light::Directional {
-                color: [0.9, 0.95, 1.0],
-                intensity: 0.6,
-                direction: [0.0, -0.2, -1.0],
-            })?;
-
-            renderer.lights.insert(Light::Directional {
-                color: [0.8, 0.9, 1.0],
-                intensity: 0.7,
-                direction: [-0.05, -0.25, 1.0],
-            })?;
-
-            renderer.lights.insert(Light::Directional {
-                color: [1.0, 0.96, 0.9],
-                intensity: 0.5,
-                direction: [-1.0, -0.2, 0.2],
-            })?;
-
-            if let Some(ibl) = scene
-                .ibl_cache
-                .lock()
-                .unwrap()
-                .get(&scene.ctx.ibl_id.get())
-                .cloned()
-            {
-                renderer.set_ibl(ibl);
-            }
-
-            if let Some(skybox) = scene
-                .skybox_by_ibl_cache
-                .lock()
-                .unwrap()
-                .get(&scene.ctx.ibl_id.get())
-                .cloned()
-            {
-                renderer.set_skybox(skybox);
-            }
+            // takes the renderer lock so do it after we freed it
+            scene.reset_punctual_lights().await?;
 
             Ok(())
         }
@@ -629,6 +615,47 @@ impl AppScene {
                 self.ctx.loading_status.lock_mut().populate = Err(err.to_string());
             }
         }
+    }
+
+    pub async fn reset_punctual_lights(self: &Arc<Self>) -> Result<()> {
+        let mut renderer = self.renderer.lock().await;
+
+        if let Some(lights) = self.lights.lock().unwrap().take() {
+            for light_key in lights {
+                renderer.lights.remove(light_key);
+            }
+        }
+
+        if !self.ctx.punctual_lights.get() {
+            return Ok(());
+        }
+
+        let lights = vec![
+            renderer.lights.insert(Light::Directional {
+                color: [1.0, 0.97, 0.92],
+                intensity: 1.4,
+                direction: [0.1, -0.35, -1.0],
+            })?,
+            renderer.lights.insert(Light::Directional {
+                color: [0.9, 0.95, 1.0],
+                intensity: 0.6,
+                direction: [0.0, -0.2, -1.0],
+            })?,
+            renderer.lights.insert(Light::Directional {
+                color: [0.8, 0.9, 1.0],
+                intensity: 0.7,
+                direction: [-0.05, -0.25, 1.0],
+            })?,
+            renderer.lights.insert(Light::Directional {
+                color: [1.0, 0.96, 0.9],
+                intensity: 0.5,
+                direction: [-1.0, -0.2, 0.2],
+            })?,
+        ];
+
+        *self.lights.lock().unwrap() = Some(lights);
+
+        Ok(())
     }
 
     pub async fn setup_all(self: &Arc<Self>) -> Result<()> {

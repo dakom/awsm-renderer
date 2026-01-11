@@ -161,6 +161,17 @@ impl PbrMaterial {
         }
     }
 
+    // this should match `mesh_buffer_geometry_kind()`
+    pub fn is_transparency_pass(&self) -> bool {
+        self.has_alpha_blend() || self.alpha_cutoff().is_some() || self.has_transmission()
+    }
+
+    /// Returns true if the material has any transmission effect
+    /// (either via transmission_factor > 0 or a transmission texture)
+    pub fn has_transmission(&self) -> bool {
+        self.transmission_factor > 0.0 || self.transmission_tex.is_some()
+    }
+
     pub fn alpha_mode(&self) -> &MaterialAlphaMode {
         &self.immutable.alpha_mode
     }

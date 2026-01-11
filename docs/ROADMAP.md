@@ -2,9 +2,6 @@
 
 - More extensions (see below)
   - https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos
-  - [-] KHR_materials_ior
-  - [-] KHR_materials_transmission
-  - [-] KHR_materials_volume
   - [ ] KHR_materials_clearcoat
   - [ ] KHR_materials_sheen
   - [ ] KHR_materials_anisotropy
@@ -14,6 +11,11 @@
       - [ ] Directional
       - [ ] Point
       - [ ] Spot
+      
+- Make transparent meshes pickable
+  - Maybe global "editor_mode" on renderer that toggles some less-efficient behavior
+    - All meshes get both transparent and opaque geometry 
+    - Picking pass samples both and uses alpha test to discard transparent fragments below threshold
       
   - Post Processing options in frontend sidebar
   - Make debug normals work again in sidebar
@@ -91,10 +93,10 @@ If it's supported here, corresponding core functionality is also supported
     - [ ] KHR_materials_clearcoat
     - [ ] KHR_materials_sheen
     - [x] KHR_materials_specular
-    - [ ] KHR_materials_transmission
-    - [ ] KHR_materials_volume
+    - [x] KHR_materials_transmission
+    - [x] KHR_materials_volume
     - [ ] KHR_materials_dispersion
-    - [ ] KHR_materials_ior
+    - [x] KHR_materials_ior
     - [ ] KHR_materials_anisotropy
     - [x] KHR_texture_transform
     - [ ] KHR_materials_iridescence

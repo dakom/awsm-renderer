@@ -11,16 +11,16 @@
 @group(0) @binding(7) var<storage, read> texture_transforms: array<TextureTransform>;
 @group(0) @binding(8) var opaque_tex: texture_2d<f32>;
 
+@group(1) @binding(0) var ibl_filtered_env_tex: texture_cube<f32>;
+@group(1) @binding(1) var ibl_filtered_env_sampler: sampler;
+@group(1) @binding(2) var ibl_irradiance_tex: texture_cube<f32>;
+@group(1) @binding(3) var ibl_irradiance_sampler: sampler;
+@group(1) @binding(4) var brdf_lut_tex: texture_2d<f32>;
+@group(1) @binding(5) var brdf_lut_sampler: sampler;
 {% if !unlit %}
-    @group(1) @binding(0) var<uniform> lights_info: LightsInfoPacked;
-    @group(1) @binding(1) var<storage, read> lights: array<LightPacked>;
+    @group(1) @binding(6) var<uniform> lights_info: LightsInfoPacked;
+    @group(1) @binding(7) var<storage, read> lights: array<LightPacked>;
 {% endif %}
-@group(1) @binding(2) var ibl_filtered_env_tex: texture_cube<f32>;
-@group(1) @binding(3) var ibl_filtered_env_sampler: sampler;
-@group(1) @binding(4) var ibl_irradiance_tex: texture_cube<f32>;
-@group(1) @binding(5) var ibl_irradiance_sampler: sampler;
-@group(1) @binding(6) var brdf_lut_tex: texture_2d<f32>;
-@group(1) @binding(7) var brdf_lut_sampler: sampler;
 
 
 {% for i in 0..texture_pool_arrays_len %}

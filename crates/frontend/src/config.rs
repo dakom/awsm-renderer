@@ -25,6 +25,7 @@ pub struct Config {
     pub initial_show_gizmo_translation: bool,
     pub initial_show_gizmo_rotation: bool,
     pub initial_show_gizmo_scale: bool,
+    pub initial_punctual_lights: bool,
 }
 
 #[allow(clippy::option_env_unwrap)]
@@ -57,6 +58,7 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         initial_show_gizmo_translation: true,
         initial_show_gizmo_rotation: true,
         initial_show_gizmo_scale: true,
+        initial_punctual_lights: true,
     }
 });
 

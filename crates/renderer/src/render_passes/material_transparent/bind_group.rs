@@ -175,26 +175,6 @@ impl MaterialTransparentBindGroups {
             ctx.gpu,
             BindGroupLayoutCacheKey {
                 entries: vec![
-                    // info
-                    BindGroupLayoutCacheKeyEntry {
-                        resource: BindGroupLayoutResource::Buffer(
-                            BufferBindingLayout::new()
-                                .with_binding_type(BufferBindingType::Uniform),
-                        ),
-                        visibility_vertex: true,
-                        visibility_fragment: true,
-                        visibility_compute: false,
-                    },
-                    // punctual lights
-                    BindGroupLayoutCacheKeyEntry {
-                        resource: BindGroupLayoutResource::Buffer(
-                            BufferBindingLayout::new()
-                                .with_binding_type(BufferBindingType::ReadOnlyStorage),
-                        ),
-                        visibility_vertex: true,
-                        visibility_fragment: true,
-                        visibility_compute: false,
-                    },
                     // IBL prefiltered env texture
                     BindGroupLayoutCacheKeyEntry {
                         resource: BindGroupLayoutResource::Texture(
@@ -250,6 +230,26 @@ impl MaterialTransparentBindGroups {
                         resource: BindGroupLayoutResource::Sampler(
                             SamplerBindingLayout::new()
                                 .with_binding_type(SamplerBindingType::Filtering),
+                        ),
+                        visibility_vertex: true,
+                        visibility_fragment: true,
+                        visibility_compute: false,
+                    },
+                    // info
+                    BindGroupLayoutCacheKeyEntry {
+                        resource: BindGroupLayoutResource::Buffer(
+                            BufferBindingLayout::new()
+                                .with_binding_type(BufferBindingType::Uniform),
+                        ),
+                        visibility_vertex: true,
+                        visibility_fragment: true,
+                        visibility_compute: false,
+                    },
+                    // punctual lights
+                    BindGroupLayoutCacheKeyEntry {
+                        resource: BindGroupLayoutResource::Buffer(
+                            BufferBindingLayout::new()
+                                .with_binding_type(BufferBindingType::ReadOnlyStorage),
                         ),
                         visibility_vertex: true,
                         visibility_fragment: true,
@@ -456,17 +456,6 @@ impl MaterialTransparentBindGroups {
     pub fn recreate_lights(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let mut entries = Vec::new();
 
-        // Lights info
-        entries.push(BindGroupEntry::new(
-            entries.len() as u32,
-            BindGroupResource::Buffer(BufferBinding::new(&ctx.lights.gpu_info_buffer)),
-        ));
-
-        entries.push(BindGroupEntry::new(
-            entries.len() as u32,
-            BindGroupResource::Buffer(BufferBinding::new(&ctx.lights.gpu_punctual_buffer)),
-        ));
-
         // IBL filtered env
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
@@ -497,6 +486,17 @@ impl MaterialTransparentBindGroups {
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Sampler(&ctx.lights.brdf_lut.sampler),
+        ));
+
+        // Lights info
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Buffer(BufferBinding::new(&ctx.lights.gpu_info_buffer)),
+        ));
+
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Buffer(BufferBinding::new(&ctx.lights.gpu_punctual_buffer)),
         ));
 
         let descriptor = BindGroupDescriptor::new(

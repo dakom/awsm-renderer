@@ -55,9 +55,7 @@ impl AwsmRenderer {
 
             if mesh.hud {
                 hud.push(renderable.clone());
-            } else if self.materials.has_alpha_blend(mesh.material_key)
-                || self.materials.has_alpha_mask(mesh.material_key)
-            {
+            } else if self.materials.is_transparency_pass(mesh.material_key) {
                 transparent.push(renderable);
             } else {
                 opaque.push(renderable);

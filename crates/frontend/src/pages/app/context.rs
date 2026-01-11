@@ -8,6 +8,7 @@ pub struct AppContext {
     pub scene: Mutable<Option<Arc<AppScene>>>,
     pub material: MutableMaterial,
     pub ibl_id: Mutable<IblId>,
+    pub punctual_lights: Mutable<bool>,
     pub skybox_id: Mutable<SkyboxId>,
     pub editor_grid_enabled: Mutable<bool>,
     pub editor_gizmo_translation_enabled: Mutable<bool>,
@@ -136,6 +137,7 @@ impl Default for AppContext {
             editor_gizmo_rotation_enabled: Mutable::new(CONFIG.initial_show_gizmo_rotation),
             editor_gizmo_scale_enabled: Mutable::new(CONFIG.initial_show_gizmo_scale),
             loading_status: Mutable::new(LoadingStatus::default()),
+            punctual_lights: Mutable::new(CONFIG.initial_punctual_lights),
         }
     }
 }
