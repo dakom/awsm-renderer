@@ -16,6 +16,7 @@ vars:
   PATH_CRATE_FRONTEND: '{{joinPath .PATH_CRATES "frontend"}}'
   PATH_CRATE_RENDERER: '{{joinPath .PATH_CRATES "renderer"}}'
   PATH_CRATE_RENDERER_CORE: '{{joinPath .PATH_CRATES "renderer-core"}}'
+  PATH_CRATE_EDITOR: '{{joinPath .PATH_CRATES "editor"}}'
 
   # Ports
   PORT_MEDIA_LOCAL_DEV: 9082
@@ -58,6 +59,7 @@ tasks:
         --watch "{{.PATH_CRATE_FRONTEND}}"
         --watch "{{.PATH_CRATE_RENDERER}}"
         --watch "{{.PATH_CRATE_RENDERER_CORE}}"
+        --watch "{{.PATH_CRATE_EDITOR}}"
 
   media-local:
     internal: true

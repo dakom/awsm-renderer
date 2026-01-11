@@ -319,6 +319,7 @@ impl RenderTexturesInner {
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
+        // NEVER multisampled, used as a storage texture
         let opaque = gpu
             .create_texture(
                 &TextureDescriptor::new(
@@ -335,6 +336,8 @@ impl RenderTexturesInner {
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
+        // maybe multisampled, but a bit differnt since we need to resolve it later
+        // and it has copy_dst
         let transparent = {
             let mut descriptor = TextureDescriptor::new(
                 render_texture_formats.color,

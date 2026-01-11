@@ -1,6 +1,7 @@
 // Fragment input from vertex shader
 struct FragmentInput {
-    @builtin(position) clip_position: vec4<f32>,
+    @builtin(position) frag_pos: vec4<f32>,
+    @builtin(front_facing) front_facing: bool,
     @location(0) world_position: vec3<f32>,     // World position
     @location(1) world_normal: vec3<f32>,     // Transformed world-space normal
     @location(2) world_tangent: vec4<f32>,    // Transformed world-space tangent (w = handedness)
@@ -18,6 +19,169 @@ struct FragmentOutput {
     @location(0) color: vec4<f32>,
 }
 
+// Sample transmission background from the opaque render with screen-space refraction
+// Falls back to IBL environment when refracted ray goes outside screen bounds
+// Uses the physically-based approach from glTF sample renderer:
+// 1. Compute refracted ray exit point in world space
+// 2. Project to screen space using view/projection matrices
+fn sample_transmission_background(
+    frag_pos: vec4<f32>,
+    world_position: vec3<f32>,
+    normal: vec3<f32>,
+    view_dir: vec3<f32>,
+    ior: f32,
+    roughness: f32,
+    thickness: f32,
+    camera: Camera,
+) -> vec3<f32> {
+    let screen_dims = vec2<f32>(textureDimensions(opaque_tex));
+    var screen_uv = frag_pos.xy / screen_dims;
+    var sample_dir = view_dir;  // Direction for IBL fallback
+
+    // Calculate refraction for volumetric materials (KHR_materials_volume)
+    let ior_val = effective_ior(ior);
+    if (thickness > 0.0 && ior_val != 1.0) {
+        // Snell's law: eta = n_outside / n_inside (air=1.0 -> material)
+        let eta = 1.0 / ior_val;
+        let refracted = refract_direction(view_dir, normal, eta);
+
+        // Use dot product instead of length to avoid sqrt (checking for non-zero)
+        if (dot(refracted, refracted) > 1e-6) {
+            sample_dir = refracted;  // Use refracted direction for IBL fallback
+
+            // Compute world-space exit point of refracted ray
+            // The ray travels through the material for 'thickness' distance
+            let transmission_ray = normalize(refracted) * thickness;
+            let refracted_exit = world_position + transmission_ray;
+
+            // Project exit point to clip space
+            let clip_pos = camera.view_proj * vec4<f32>(refracted_exit, 1.0);
+
+            // Perspective divide to get NDC [-1, 1]
+            let ndc = clip_pos.xy / clip_pos.w;
+
+            // Convert NDC to UV [0, 1], flip Y for texture coordinates
+            screen_uv = vec2<f32>(ndc.x + 1.0, 1.0 - ndc.y) * 0.5;
+        }
+    }
+
+    // Check if UV is outside screen bounds
+    // If so, fall back to IBL environment sampling instead of clamping
+    if (screen_uv.x < 0.0 || screen_uv.x > 1.0 || screen_uv.y < 0.0 || screen_uv.y > 1.0) {
+        // Sample environment in the refracted direction with roughness-based blur
+        {% if has_lighting_ibl() %}
+            let ibl_info = get_lights_info().ibl;
+            let max_mip = f32(ibl_info.prefiltered_env_mip_count - 1u);
+            let mip_level = roughness * max_mip;
+            return textureSampleLevel(ibl_filtered_env_tex, ibl_filtered_env_sampler, sample_dir, mip_level).rgb;
+        {% else %}
+            // No IBL available, return black
+            return vec3<f32>(0.0);
+        {% endif %}
+    }
+
+    // Convert to texel coordinates
+    let texel_coord = vec2<i32>(screen_uv * screen_dims);
+
+    // Apply IOR-adjusted roughness for blur (matches glTF sample renderer formula)
+    // IOR 1.0 = no blur, IOR 1.5+ = full roughness blur
+    // glTF sample viewer uses: framebufferLod = log2(width) * roughness * clamp(ior * 2.0 - 2.0, 0.0, 1.0)
+    let ior_roughness_factor = clamp(ior * 2.0 - 2.0, 0.0, 1.0);
+    let blur_roughness = roughness * ior_roughness_factor;
+
+    // For rough transmission, sample multiple neighbors to approximate mipmap blur
+    // Since we can't generate mipmaps per-frame efficiently, we use multi-sample blur
+    // Quality controlled by transmission_blur_rings: 0=none, 1=9 samples, 2=17 samples, 3=25 samples
+    const BLUR_THRESHOLD: f32 = 0.05;
+
+    {% if transmission_blur_rings > 0 %}
+    if (blur_roughness > BLUR_THRESHOLD) {
+        // Calculate blur radius to approximate mipmap sampling
+        // glTF sample viewer formula: mip = log2(width) * adjusted_roughness
+        // At mip level N, each texel represents 2^N original pixels
+        // We approximate this by sampling a radius proportional to 2^(mip_level)
+        let target_mip = log2(screen_dims.x) * blur_roughness;
+        // Clamp to reasonable range (mip 0-8 gives radius 1-256)
+        let clamped_mip = clamp(target_mip, 0.0, 8.0);
+        let blur_radius = pow(2.0, clamped_mip);
+
+        // Offsets for 8-sample ring (normalized)
+        let ring_offsets = array<vec2<f32>, 8>(
+            vec2<f32>(1.0, 0.0),
+            vec2<f32>(0.707, 0.707),
+            vec2<f32>(0.0, 1.0),
+            vec2<f32>(-0.707, 0.707),
+            vec2<f32>(-1.0, 0.0),
+            vec2<f32>(-0.707, -0.707),
+            vec2<f32>(0.0, -1.0),
+            vec2<f32>(0.707, -0.707),
+        );
+
+        // Gaussian-like weights: center weighted most, outer rings less
+        // sigma roughly = blur_radius / 2
+        let sigma = blur_radius * 0.5;
+        let sigma_sq_2 = 2.0 * sigma * sigma;
+
+        // Screen bounds for out-of-bounds checking
+        let screen_max = vec2<i32>(screen_dims) - 1;
+
+        // Center sample with Gaussian weight (distance = 0)
+        var color_sum = textureLoad(opaque_tex, texel_coord, 0).rgb;
+        var weight_sum = 1.0;
+
+        // Ring 1: radius = blur_radius * 0.33
+        let r1 = blur_radius * 0.33;
+        for (var i = 0u; i < 8u; i = i + 1u) {
+            let offset_px = ring_offsets[i] * r1;
+            let sample_coord = vec2<i32>(screen_uv * screen_dims + offset_px);
+            // Skip samples outside screen bounds to avoid dark edges
+            if (sample_coord.x >= 0 && sample_coord.x <= screen_max.x &&
+                sample_coord.y >= 0 && sample_coord.y <= screen_max.y) {
+                let w = exp(-(r1 * r1) / sigma_sq_2);
+                color_sum += textureLoad(opaque_tex, sample_coord, 0).rgb * w;
+                weight_sum += w;
+            }
+        }
+
+        {% if transmission_blur_rings > 1 %}
+        // Ring 2: radius = blur_radius * 0.67
+        let r2 = blur_radius * 0.67;
+        for (var i = 0u; i < 8u; i = i + 1u) {
+            let offset_px = ring_offsets[i] * r2;
+            let sample_coord = vec2<i32>(screen_uv * screen_dims + offset_px);
+            if (sample_coord.x >= 0 && sample_coord.x <= screen_max.x &&
+                sample_coord.y >= 0 && sample_coord.y <= screen_max.y) {
+                let w = exp(-(r2 * r2) / sigma_sq_2);
+                color_sum += textureLoad(opaque_tex, sample_coord, 0).rgb * w;
+                weight_sum += w;
+            }
+        }
+        {% endif %}
+
+        {% if transmission_blur_rings > 2 %}
+        // Ring 3: radius = blur_radius * 1.0
+        let r3 = blur_radius;
+        for (var i = 0u; i < 8u; i = i + 1u) {
+            let offset_px = ring_offsets[i] * r3;
+            let sample_coord = vec2<i32>(screen_uv * screen_dims + offset_px);
+            if (sample_coord.x >= 0 && sample_coord.x <= screen_max.x &&
+                sample_coord.y >= 0 && sample_coord.y <= screen_max.y) {
+                let w = exp(-(r3 * r3) / sigma_sq_2);
+                color_sum += textureLoad(opaque_tex, sample_coord, 0).rgb * w;
+                weight_sum += w;
+            }
+        }
+        {% endif %}
+
+        return color_sum / weight_sum;
+    }
+    {% endif %}
+
+    // Sharp sample for smooth materials
+    let background = textureLoad(opaque_tex, texel_coord, 0).rgb;
+    return background;
+}
+
 @fragment
 fn fs_main(input: FragmentInput) -> FragmentOutput {
     var out: FragmentOutput;
@@ -28,26 +192,76 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
     // Get material from mesh metadata
     let material = pbr_get_material(material_mesh_meta.material_offset);
 
+    // Handle double-sided materials: flip normal and tangent handedness for back faces
+    // This must be done BEFORE pbr_get_material_color so normal mapping uses the correct orientation
+    var world_normal = input.world_normal;
+    var world_tangent = input.world_tangent;
+    if (!input.front_facing) {
+        world_normal = -world_normal;
+        // Flip tangent handedness to maintain correct TBN orientation
+        world_tangent.w = -world_tangent.w;
+    }
+
     // Sample all PBR material textures and compute material properties
     let material_color = pbr_get_material_color(
         material,
-        input.world_normal,
-        input.world_tangent,
+        world_normal,
+        world_tangent,
         input
     );
 
     // Calculate surface to camera vector for lighting
-    let surface_to_camera = normalize(camera.position - input.world_position);
+    // For orthographic cameras, use camera forward direction (parallel rays)
+    // For perspective cameras, compute per-fragment from camera position
+    // Detect orthographic: proj[3][3] == 1.0 for orthographic, 0.0 for perspective
+    let is_orthographic = abs(camera.proj[3][3] - 1.0) < 0.001;
+    let camera_forward = normalize(camera.inv_view[2].xyz);
+    let surface_to_camera = select(
+        normalize(camera.position - input.world_position),  // perspective
+        camera_forward,                                      // orthographic
+        is_orthographic
+    );
 
     {% if !unlit %}
-        // Get lighting info and apply all enabled lights
+        // Get lighting info
         let lights_info = get_lights_info();
-        let color = apply_lighting(
-            material_color,
-            surface_to_camera,
-            input.world_position,
-            lights_info
-        );
+
+        // Check if we need screen-space transmission
+        let metallic = clamp(material_color.metallic_roughness.x, 0.0, 1.0);
+        let effective_transmission = material_color.transmission * (1.0 - metallic);
+
+        var color: vec3<f32>;
+        if (effective_transmission > 0.0) {
+            // Sample transmission background from opaque render
+            let roughness = max(clamp(material_color.metallic_roughness.y, 0.0, 1.0), 0.04);
+            let transmission_background = sample_transmission_background(
+                input.frag_pos,
+                input.world_position,
+                material_color.normal,
+                -surface_to_camera,  // view direction (towards surface)
+                material_color.ior,
+                roughness,
+                material_color.volume_thickness,
+                camera,
+            );
+
+            // Apply lighting with screen-space transmission
+            color = apply_lighting_with_transmission(
+                material_color,
+                surface_to_camera,
+                input.world_position,
+                lights_info,
+                transmission_background
+            );
+        } else {
+            // Standard lighting without transmission
+            color = apply_lighting(
+                material_color,
+                surface_to_camera,
+                input.world_position,
+                lights_info
+            );
+        }
     {% else %}
         let color = unlit(material_color);
     {% endif %}

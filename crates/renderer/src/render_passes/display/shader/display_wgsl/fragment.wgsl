@@ -4,6 +4,9 @@
 /*************** END msaa.wgsl ******************/
 {% endif %}
 
+/*************** START color_space.wgsl ******************/
+{% include "shared_wgsl/color_space.wgsl" %}
+/*************** END color_space.wgsl ******************/
 
 struct FragmentInput {
     @builtin(position) full_screen_quad_position: vec4<f32>,
@@ -26,14 +29,6 @@ fn frag_main(in: FragmentInput) -> @location(0) vec4<f32> {
 
     return vec4<f32>(mapped, color.a);
 }
-
-fn linear_to_srgb(color: vec3<f32>) -> vec3<f32> {
-    let cutoff = vec3<f32>(0.0031308);
-    let low = color * 12.92;
-    let high = 1.055 * pow(color, vec3<f32>(1.0 / 2.4)) - 0.055;
-    return select(high, low, color <= cutoff);
-}
-
 
 fn aces_tonemap(x: vec3<f32>) -> vec3<f32> {
     // Narkowicz 2015 “ACES Filmic Tone Mapping Curve”

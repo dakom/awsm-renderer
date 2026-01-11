@@ -83,6 +83,7 @@ impl Checkbox {
                 .style("display", "flex")
                 .style("gap", ".5rem")
                 .style("align-items", "center")
+                .style("padding-left", "1rem")
             }
         });
         static SVG: LazyLock<String> = LazyLock::new(|| {

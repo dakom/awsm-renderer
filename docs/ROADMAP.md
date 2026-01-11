@@ -2,9 +2,6 @@
 
 - More extensions (see below)
   - https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos
-  - [-] KHR_materials_ior
-  - [-] KHR_materials_transmission
-  - [-] KHR_materials_volume
   - [ ] KHR_materials_clearcoat
   - [ ] KHR_materials_sheen
   - [ ] KHR_materials_anisotropy
@@ -15,13 +12,22 @@
       - [ ] Point
       - [ ] Spot
       
-  - Post Processing options in frontend sidebar
-  - Make debug normals work again in sidebar
-  - Animation support in sidebar (or get rid of it)
+- Make transparent meshes pickable
+  - Maybe global "editor_mode" on renderer that toggles some less-efficient behavior
+    - All meshes get both transparent and opaque geometry 
+    - Picking pass samples both and uses alpha test to discard transparent fragments below threshold
+    
+- Visual bounding box around selected objects
+      
+- Post Processing options in frontend sidebar
+- Make debug normals work again in sidebar
+- Animation support in sidebar (or get rid of it)
 
 - Support different kinds of Materials
   - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
-  - unlit as example?
+  - create toon shader material, as alternative to PBR
+  - create our own extension
+  - create our own example gltf with different materials
 
 - Shadows
 
@@ -84,16 +90,17 @@ If it's supported here, corresponding core functionality is also supported
     - [x] step interpolation
     - [x] cubic spline interpolation
 - Extensions
+    - https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos
     - [x] EXT_mesh_gpu_instancing
     - [x] KHR_materials_unlit
     - [x] KHR_materials_emissive_strength
     - [ ] KHR_materials_clearcoat
     - [ ] KHR_materials_sheen
     - [x] KHR_materials_specular
-    - [ ] KHR_materials_transmission
-    - [ ] KHR_materials_volume
+    - [x] KHR_materials_transmission
+    - [x] KHR_materials_volume
     - [ ] KHR_materials_dispersion
-    - [ ] KHR_materials_ior
+    - [x] KHR_materials_ior
     - [ ] KHR_materials_anisotropy
     - [x] KHR_texture_transform
     - [ ] KHR_materials_iridescence

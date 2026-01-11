@@ -34,6 +34,8 @@ fn pbr_get_material_color(
     let emissive = pbr_emissive(material, fragment_input);
     let specular = pbr_specular(material, fragment_input);
     let specular_color = pbr_specular_color(material, fragment_input);
+    let transmission = pbr_transmission(material, fragment_input);
+    let volume_thickness = pbr_volume_thickness(material, fragment_input);
 
     return PbrMaterialColor(
         base,
@@ -42,7 +44,12 @@ fn pbr_get_material_color(
         occlusion,
         emissive,
         specular,
-        specular_color
+        specular_color,
+        material.ior,
+        transmission,
+        volume_thickness,
+        material.volume_attenuation_distance,
+        material.volume_attenuation_color
     );
 }
 
@@ -157,4 +164,39 @@ fn pbr_specular_color(
         color *= texture_pool_sample(material.specular_color_tex_info, uv).rgb;
     }
     return color;
+}
+
+// Sample transmission texture (R channel) and apply factor
+fn pbr_transmission(
+    material: PbrMaterial,
+    fragment_input: FragmentInput
+) -> f32 {
+    // Early exit: if no texture and factor is 0, skip entirely
+    if (!material.has_transmission_texture && material.transmission_factor == 0.0) {
+        return 0.0;
+    }
+    var transmission = material.transmission_factor;
+    if material.has_transmission_texture {
+        let uv = texture_uv(material.transmission_tex_info, fragment_input);
+        transmission *= texture_pool_sample(material.transmission_tex_info, uv).r;
+    }
+    return transmission;
+}
+
+// Sample volume thickness texture (G channel) and apply factor
+fn pbr_volume_thickness(
+    material: PbrMaterial,
+    fragment_input: FragmentInput
+) -> f32 {
+    // Early exit: no volume if thickness is 0 and no texture
+    if (!material.has_volume_thickness_texture && material.volume_thickness_factor == 0.0) {
+        return 0.0;
+    }
+    var thickness = material.volume_thickness_factor;
+    if material.has_volume_thickness_texture {
+        let uv = texture_uv(material.volume_thickness_tex_info, fragment_input);
+        // Volume thickness is stored in the G channel per glTF spec
+        thickness *= texture_pool_sample(material.volume_thickness_tex_info, uv).g;
+    }
+    return thickness;
 }

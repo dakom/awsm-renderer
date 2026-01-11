@@ -9,4 +9,12 @@ struct PbrMaterialColor {
     emissive: vec3<f32>,
     specular: f32,           // KHR_materials_specular: strength factor (default 1.0)
     specular_color: vec3<f32>, // KHR_materials_specular: F0 color modifier (default white)
+    // KHR_materials_ior
+    ior: f32,
+    // KHR_materials_transmission
+    transmission: f32,
+    // KHR_materials_volume
+    volume_thickness: f32,
+    volume_attenuation_distance: f32,
+    volume_attenuation_color: vec3<f32>,
 };

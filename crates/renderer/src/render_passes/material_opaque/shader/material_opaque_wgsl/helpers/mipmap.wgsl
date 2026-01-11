@@ -315,6 +315,32 @@ fn pbr_get_gradients(
         );
     }
 
+    if (material.has_transmission_texture) {
+        out.transmission = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            material.transmission_tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
+    if (material.has_volume_thickness_texture) {
+        out.volume_thickness = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            material.volume_thickness_tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
     return out;
 }
 

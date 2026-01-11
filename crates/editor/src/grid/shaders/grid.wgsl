@@ -44,8 +44,8 @@ fn camera_from_raw(raw: CameraRaw) -> Camera {
 
 
 @vertex
-fn vert_main(@builtin(vertex_index) vertex_index: u32) -> FragmentInput {
-    var out: FragmentInput;
+fn vert_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+    var out: VertexOutput;
 
     // Generate oversized triangle vertices using bit manipulation
     // Goal: vertex 0→(-1,-1), vertex 1→(3,-1), vertex 2→(-1,3)
@@ -68,8 +68,12 @@ fn vert_main(@builtin(vertex_index) vertex_index: u32) -> FragmentInput {
     return out;
 }
 
-struct FragmentInput {
+struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
+    @location(0) ndc: vec2<f32>,
+}
+
+struct FragmentInput {
     @location(0) ndc: vec2<f32>,
 }
 

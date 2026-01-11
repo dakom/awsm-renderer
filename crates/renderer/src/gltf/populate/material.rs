@@ -183,6 +183,10 @@ pub(super) async fn pbr_material_mapper(
     material.metallic_factor = pbr.metallic_factor();
     material.roughness_factor = pbr.roughness_factor();
 
+    if let Some(ior) = gltf_material.ior() {
+        material.ior = ior;
+    }
+
     if let Some(specular) = gltf_material.specular() {
         material.specular_factor = specular.specular_factor();
         material.specular_color_factor = specular.specular_color_factor();
@@ -234,6 +238,68 @@ pub(super) async fn pbr_material_mapper(
             material.specular_color_uv_index = Some(uv_index as u32);
             material.specular_color_texture_transform = texture_transform_key;
         }
+    }
+
+    if let Some(transmission) = gltf_material.transmission() {
+        material.transmission_factor = transmission.transmission_factor();
+
+        if let Some(tex) = transmission
+            .transmission_texture()
+            .map(GltfTextureInfo::from)
+        {
+            let GLtfMaterialCacheKey {
+                uv_index,
+                texture_key,
+                sampler_key,
+                texture_transform_key,
+            } = tex
+                .create_material_cache_key(
+                    renderer,
+                    ctx,
+                    TextureColorInfo {
+                        mipmap_kind: MipmapTextureKind::Transmission,
+                        srgb_to_linear: false,
+                        premultiplied_alpha,
+                    },
+                )
+                .await?;
+
+            material.transmission_tex = Some(texture_key);
+            material.transmission_sampler = Some(sampler_key);
+            material.transmission_uv_index = Some(uv_index as u32);
+            material.transmission_texture_transform = texture_transform_key;
+        }
+    }
+
+    if let Some(volume) = gltf_material.volume() {
+        material.volume_thickness_factor = volume.thickness_factor();
+
+        if let Some(tex) = volume.thickness_texture().map(GltfTextureInfo::from) {
+            let GLtfMaterialCacheKey {
+                uv_index,
+                texture_key,
+                sampler_key,
+                texture_transform_key,
+            } = tex
+                .create_material_cache_key(
+                    renderer,
+                    ctx,
+                    TextureColorInfo {
+                        mipmap_kind: MipmapTextureKind::VolumeThickness,
+                        srgb_to_linear: false,
+                        premultiplied_alpha,
+                    },
+                )
+                .await?;
+
+            material.volume_thickness_tex = Some(texture_key);
+            material.volume_thickness_sampler = Some(sampler_key);
+            material.volume_thickness_uv_index = Some(uv_index as u32);
+            material.volume_thickness_texture_transform = texture_transform_key;
+        }
+
+        material.volume_attenuation_distance = volume.attenuation_distance();
+        material.volume_attenuation_color = volume.attenuation_color();
     }
 
     material.vertex_color_info = primitive_buffer_info

@@ -14,9 +14,7 @@ pub mod pbr;
 pub struct Materials {
     lookup: SlotMap<MaterialKey, Material>,
     buffers: MaterialBuffers,
-    // optimization to avoid loading whole material to check for basic properties
-    alpha_blend: SecondaryMap<MaterialKey, ()>,
-    alpha_mask: SecondaryMap<MaterialKey, f32>,
+    _is_transparency_pass: SecondaryMap<MaterialKey, ()>,
 }
 
 struct MaterialBuffers {
@@ -54,8 +52,7 @@ impl Materials {
         Ok(Materials {
             lookup: SlotMap::with_key(),
             buffers: MaterialBuffers::new(gpu)?,
-            alpha_blend: SecondaryMap::new(),
-            alpha_mask: SecondaryMap::new(),
+            _is_transparency_pass: SecondaryMap::new(),
         })
     }
 
@@ -64,16 +61,12 @@ impl Materials {
     }
 
     pub fn insert(&mut self, material: Material, textures: &Textures) -> MaterialKey {
-        let has_alpha_blend = material.has_alpha_blend();
-        let alpha_mask = material.alpha_mask();
+        let is_transparency_pass = material.is_transparency_pass();
         let buffer_kind = material.buffer_kind();
 
         let key = self.lookup.insert(material);
-        if has_alpha_blend {
-            self.alpha_blend.insert(key, ());
-        }
-        if let Some(alpha_mask) = alpha_mask {
-            self.alpha_mask.insert(key, alpha_mask);
+        if is_transparency_pass {
+            self._is_transparency_pass.insert(key, ());
         }
         self.buffers.buffer_kind.insert(key, buffer_kind);
         self.update(key, textures, |_| {});
@@ -111,28 +104,16 @@ impl Materials {
         mut f: impl FnMut(&mut Material),
     ) {
         if let Some(material) = self.lookup.get_mut(key) {
-            let old_has_alpha_blend = material.has_alpha_blend();
-            let old_alpha_mask = material.alpha_mask();
+            let old_is_transparency_pass = material.is_transparency_pass();
             let old_buffer_kind = material.buffer_kind();
             f(material);
-            let new_has_alpha_blend = material.has_alpha_blend();
-            let new_alpha_mask = material.alpha_mask();
+            let new_is_transparency_pass = material.is_transparency_pass();
             let new_buffer_kind = material.buffer_kind();
-            if old_has_alpha_blend != new_has_alpha_blend {
-                if new_has_alpha_blend {
-                    self.alpha_blend.insert(key, ());
+            if old_is_transparency_pass != new_is_transparency_pass {
+                if new_is_transparency_pass {
+                    self._is_transparency_pass.insert(key, ());
                 } else {
-                    self.alpha_blend.remove(key);
-                }
-            }
-            if old_alpha_mask != new_alpha_mask {
-                match new_alpha_mask {
-                    Some(cutoff) => {
-                        self.alpha_mask.insert(key, cutoff);
-                    }
-                    None => {
-                        self.alpha_mask.remove(key);
-                    }
+                    self._is_transparency_pass.remove(key);
                 }
             }
             if old_buffer_kind != new_buffer_kind {
@@ -158,12 +139,9 @@ impl Materials {
             .copied()
             .ok_or(AwsmMaterialError::BufferSlotMissing(key))
     }
-    pub fn has_alpha_blend(&self, key: MaterialKey) -> bool {
-        self.alpha_blend.contains_key(key)
-    }
 
-    pub fn has_alpha_mask(&self, key: MaterialKey) -> bool {
-        self.alpha_mask.contains_key(key)
+    pub fn is_transparency_pass(&self, key: MaterialKey) -> bool {
+        self._is_transparency_pass.contains_key(key)
     }
 
     pub fn write_gpu(
@@ -184,10 +162,10 @@ pub enum Material {
 }
 
 impl Material {
-    // Needed at top-level for renderer to order correctly
-    pub fn has_alpha_blend(&self) -> bool {
+    // this should match `mesh_buffer_geometry_kind()`
+    pub fn is_transparency_pass(&self) -> bool {
         match self {
-            Material::Pbr(pbr_material) => pbr_material.has_alpha_blend(),
+            Material::Pbr(pbr_material) => pbr_material.is_transparency_pass(),
         }
     }
 

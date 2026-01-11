@@ -27,6 +27,7 @@ pub(super) enum GltfMeshBufferGeometryKind {
     Both,
 }
 
+// this should match is_transparency_pass()
 pub(super) fn mesh_buffer_geometry_kind(
     primitive: &gltf::Primitive,
     hints: &GltfDataHints,
@@ -34,10 +35,23 @@ pub(super) fn mesh_buffer_geometry_kind(
     if hints.hud {
         GltfMeshBufferGeometryKind::Both
     } else {
-        match primitive.material().alpha_mode() {
-            AlphaMode::Opaque => GltfMeshBufferGeometryKind::Visibility,
+        let gltf_material = primitive.material();
+
+        match gltf_material.alpha_mode() {
             AlphaMode::Mask => GltfMeshBufferGeometryKind::Transparency,
             AlphaMode::Blend => GltfMeshBufferGeometryKind::Transparency,
+            AlphaMode::Opaque => match gltf_material.transmission() {
+                Some(transmission) => {
+                    if transmission.transmission_factor() > 0.0
+                        || transmission.transmission_texture().is_some()
+                    {
+                        GltfMeshBufferGeometryKind::Transparency
+                    } else {
+                        GltfMeshBufferGeometryKind::Visibility
+                    }
+                }
+                None => GltfMeshBufferGeometryKind::Visibility,
+            },
         }
     }
 }

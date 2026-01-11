@@ -9,6 +9,8 @@
             emissive: UvDerivs,
             specular: UvDerivs,
             specular_color: UvDerivs,
+            transmission: UvDerivs,
+            volume_thickness: UvDerivs,
         }
 
         // Gradient-based version - enables anisotropic filtering in compute shaders
@@ -137,6 +139,32 @@
                 gradients.specular_color,
             );
 
+            let transmission = _pbr_transmission_grad(
+                material,
+                texture_uv(
+                    attribute_data_offset,
+                    triangle_indices,
+                    barycentric,
+                    material.transmission_tex_info,
+                    vertex_attribute_stride,
+                    uv_sets_index,
+                ),
+                gradients.transmission,
+            );
+
+            let volume_thickness = _pbr_volume_thickness_grad(
+                material,
+                texture_uv(
+                    attribute_data_offset,
+                    triangle_indices,
+                    barycentric,
+                    material.volume_thickness_tex_info,
+                    vertex_attribute_stride,
+                    uv_sets_index,
+                ),
+                gradients.volume_thickness,
+            );
+
             return PbrMaterialColor(
                 base,
                 metallic_roughness,
@@ -145,6 +173,11 @@
                 emissive,
                 specular,
                 specular_color,
+                material.ior,
+                transmission,
+                volume_thickness,
+                material.volume_attenuation_distance,
+                material.volume_attenuation_color,
             );
         }
 
@@ -276,6 +309,31 @@
             }
             return color;
         }
+
+        fn _pbr_transmission_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> f32 {
+            // Early exit: if no texture and factor is 0, skip entirely
+            if (!material.has_transmission_texture && material.transmission_factor == 0.0) {
+                return 0.0;
+            }
+            var transmission = material.transmission_factor;
+            if material.has_transmission_texture {
+                transmission *= texture_pool_sample_grad(material.transmission_tex_info, attribute_uv, uv_derivs).r;
+            }
+            return transmission;
+        }
+
+        fn _pbr_volume_thickness_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> f32 {
+            // Early exit: no volume if thickness is 0 and no texture
+            if (!material.has_volume_thickness_texture && material.volume_thickness_factor == 0.0) {
+                return 0.0;
+            }
+            var thickness = material.volume_thickness_factor;
+            if material.has_volume_thickness_texture {
+                // Volume thickness is stored in the G channel per glTF spec
+                thickness *= texture_pool_sample_grad(material.volume_thickness_tex_info, attribute_uv, uv_derivs).g;
+            }
+            return thickness;
+        }
     {% when MipmapMode::None %}
         // Samples all PBR material textures and computes the final material properties including
         // normal mapping. The returned normal is the perturbed normal (with normal map applied) and
@@ -400,6 +458,30 @@
                 ),
             );
 
+            let transmission = _pbr_transmission_no_mips(
+                material,
+                texture_uv(
+                    attribute_data_offset,
+                    triangle_indices,
+                    barycentric,
+                    material.transmission_tex_info,
+                    vertex_attribute_stride,
+                    uv_sets_index,
+                ),
+            );
+
+            let volume_thickness = _pbr_volume_thickness_no_mips(
+                material,
+                texture_uv(
+                    attribute_data_offset,
+                    triangle_indices,
+                    barycentric,
+                    material.volume_thickness_tex_info,
+                    vertex_attribute_stride,
+                    uv_sets_index,
+                ),
+            );
+
             return PbrMaterialColor(
                 base,
                 metallic_roughness,
@@ -408,6 +490,11 @@
                 emissive,
                 specular,
                 specular_color,
+                material.ior,
+                transmission,
+                volume_thickness,
+                material.volume_attenuation_distance,
+                material.volume_attenuation_color,
             );
         }
 
@@ -578,6 +665,37 @@
                 color *= texture_pool_sample_no_mips(material.specular_color_tex_info, attribute_uv).rgb;
             }
             return color;
+        }
+
+        fn _pbr_transmission_no_mips(
+            material: PbrMaterial,
+            attribute_uv: vec2<f32>,
+        ) -> f32 {
+            // Early exit: if no texture and factor is 0, skip entirely
+            if (!material.has_transmission_texture && material.transmission_factor == 0.0) {
+                return 0.0;
+            }
+            var transmission = material.transmission_factor;
+            if material.has_transmission_texture {
+                transmission *= texture_pool_sample_no_mips(material.transmission_tex_info, attribute_uv).r;
+            }
+            return transmission;
+        }
+
+        fn _pbr_volume_thickness_no_mips(
+            material: PbrMaterial,
+            attribute_uv: vec2<f32>,
+        ) -> f32 {
+            // Early exit: no volume if thickness is 0 and no texture
+            if (!material.has_volume_thickness_texture && material.volume_thickness_factor == 0.0) {
+                return 0.0;
+            }
+            var thickness = material.volume_thickness_factor;
+            if material.has_volume_thickness_texture {
+                // Volume thickness is stored in the G channel per glTF spec
+                thickness *= texture_pool_sample_no_mips(material.volume_thickness_tex_info, attribute_uv).g;
+            }
+            return thickness;
         }
 
 {% endmatch %}
