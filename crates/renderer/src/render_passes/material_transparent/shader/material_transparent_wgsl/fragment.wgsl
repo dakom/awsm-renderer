@@ -1,6 +1,6 @@
 // Fragment input from vertex shader
 struct FragmentInput {
-    @builtin(position) clip_position: vec4<f32>,
+    @builtin(position) frag_pos: vec4<f32>,
     @location(0) world_position: vec3<f32>,     // World position
     @location(1) world_normal: vec3<f32>,     // Transformed world-space normal
     @location(2) world_tangent: vec4<f32>,    // Transformed world-space tangent (w = handedness)
@@ -55,6 +55,11 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
     // Output final color with alpha
     let premult_rgb = color * material_color.base.a;
     out.color = vec4<f32>(premult_rgb, material_color.base.a);
+
+    // DEBUGGING - sample from opaque and brighten a bit
+    let icoord = vec2<i32>(input.frag_pos.xy);
+    let opaque_color = textureLoad(opaque_tex, icoord, 0);
+    out.color = vec4<f32>(opaque_color.rgb * 1.5, opaque_color.a);
 
     return out;
 }

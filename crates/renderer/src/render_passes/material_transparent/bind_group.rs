@@ -123,6 +123,15 @@ impl MaterialTransparentBindGroups {
                 visibility_fragment: true,
                 visibility_compute: false,
             },
+            // Opaque texture
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Texture(
+                    TextureBindingLayout::new().with_view_dimension(TextureViewDimension::N2d),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: true,
+                visibility_compute: false,
+            },
         ];
 
         let main_bind_group_layout_key = ctx
@@ -386,12 +395,17 @@ impl MaterialTransparentBindGroups {
                 &ctx.meshes.skins.joint_index_weights_gpu_buffer,
             )),
         ));
-        // texture transofmrs
+        // texture transforms
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
             BindGroupResource::Buffer(BufferBinding::new(
                 &ctx.textures.texture_transforms_gpu_buffer,
             )),
+        ));
+        // opaque texture
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.opaque)),
         ));
 
         let descriptor = BindGroupDescriptor::new(

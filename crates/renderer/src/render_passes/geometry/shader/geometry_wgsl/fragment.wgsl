@@ -2,7 +2,6 @@
 
 // Fragment input from vertex shader
 struct FragmentInput {
-    @builtin(position) clip_position: vec4<f32>,
     @location(0) @interpolate(flat) triangle_index: u32,
     @location(1) barycentric: vec2<f32>,  // Full barycentric coordinates
     @location(2) world_normal: vec3<f32>,     // Transformed world-space normal

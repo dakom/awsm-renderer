@@ -9,6 +9,7 @@
 // Layout: vertex 0: [joints_0, joints_1, ...], vertex 1: [joints_0, joints_1, ...], etc.
 @group(0) @binding(6) var<storage, read> skin_joint_index_weights: array<f32>;
 @group(0) @binding(7) var<storage, read> texture_transforms: array<TextureTransform>;
+@group(0) @binding(8) var opaque_tex: texture_2d<f32>;
 
 {% if !unlit %}
     @group(1) @binding(0) var<uniform> lights_info: LightsInfoPacked;
