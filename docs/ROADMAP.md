@@ -16,14 +16,18 @@
   - Maybe global "editor_mode" on renderer that toggles some less-efficient behavior
     - All meshes get both transparent and opaque geometry 
     - Picking pass samples both and uses alpha test to discard transparent fragments below threshold
+    
+- Visual bounding box around selected objects
       
-  - Post Processing options in frontend sidebar
-  - Make debug normals work again in sidebar
-  - Animation support in sidebar (or get rid of it)
+- Post Processing options in frontend sidebar
+- Make debug normals work again in sidebar
+- Animation support in sidebar (or get rid of it)
 
 - Support different kinds of Materials
   - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
-  - unlit as example?
+  - create toon shader material, as alternative to PBR
+  - create our own extension
+  - create our own example gltf with different materials
 
 - Shadows
 
