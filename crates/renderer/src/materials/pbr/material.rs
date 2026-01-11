@@ -36,9 +36,10 @@ pub struct PbrMaterial {
     pub emissive_sampler: Option<SamplerKey>,
     pub emissive_uv_index: Option<u32>,
     pub emissive_factor: [f32; 3],
-    pub emissive_strength: f32,
     pub emissive_texture_transform: Option<TextureTransformKey>,
     pub vertex_color_info: Option<VertexColorInfo>,
+    // emissive strength extension
+    pub emissive_strength: f32,
     // specular extension
     pub specular_tex: Option<TextureKey>,
     pub specular_sampler: Option<SamplerKey>,
@@ -50,6 +51,22 @@ pub struct PbrMaterial {
     pub specular_color_uv_index: Option<u32>,
     pub specular_color_texture_transform: Option<TextureTransformKey>,
     pub specular_color_factor: [f32; 3],
+    // ior extension
+    pub ior: f32,
+    // transmission extension
+    pub transmission_factor: f32,
+    pub transmission_tex: Option<TextureKey>,
+    pub transmission_sampler: Option<SamplerKey>,
+    pub transmission_uv_index: Option<u32>,
+    pub transmission_texture_transform: Option<TextureTransformKey>,
+    // volume extension
+    pub volume_thickness_factor: f32,
+    pub volume_thickness_tex: Option<TextureKey>,
+    pub volume_thickness_sampler: Option<SamplerKey>,
+    pub volume_thickness_uv_index: Option<u32>,
+    pub volume_thickness_texture_transform: Option<TextureTransformKey>,
+    pub volume_attenuation_distance: f32,
+    pub volume_attenuation_color: [f32; 3],
     // things that affect shader generation and therefore can't be changed dynamically (create a new material instead)
     immutable: PbrMaterialImmutable,
 }
@@ -60,6 +77,7 @@ pub struct PbrMaterial {
 pub struct PbrMaterialImmutable {
     pub alpha_mode: MaterialAlphaMode,
     pub double_sided: bool,
+    // unlit extension
     pub unlit: bool,
 }
 
@@ -72,7 +90,7 @@ impl PbrMaterial {
     pub const INITIAL_ELEMENTS: usize = 32; // 32 elements is a good starting point
                                             // NOTE: keep this in sync with `PbrMaterialRaw` in WGSL. Each texture packs 20 bytes
                                             // (compact format) so 5 textures + 60 byte header + 8 bytes = 168.
-    pub const BYTE_SIZE: usize = 224; // must be under Materials::MAX_SIZE
+    pub const BYTE_SIZE: usize = 292; // must be under Materials::MAX_SIZE
 
     // Must correspond to bitmask in material.wgsl
     pub const BITMASK_BASE_COLOR: u32 = 1;
@@ -83,6 +101,8 @@ impl PbrMaterial {
     pub const BITMASK_VERTEX_COLOR: u32 = 1 << 5;
     pub const BITMASK_SPECULAR: u32 = 1 << 6;
     pub const BITMASK_SPECULAR_COLOR: u32 = 1 << 7;
+    pub const BITMASK_TRANSMISSION: u32 = 1 << 8;
+    pub const BITMASK_VOLUME_THICKNESS: u32 = 1 << 9;
 
     pub fn new(immutable: PbrMaterialImmutable) -> Self {
         Self {
@@ -124,6 +144,19 @@ impl PbrMaterial {
             specular_color_uv_index: None,
             specular_color_texture_transform: None,
             specular_color_factor: [1.0, 1.0, 1.0],
+            ior: 1.5,
+            transmission_factor: 0.0,
+            transmission_tex: None,
+            transmission_sampler: None,
+            transmission_uv_index: None,
+            transmission_texture_transform: None,
+            volume_thickness_factor: 0.0,
+            volume_thickness_tex: None,
+            volume_thickness_sampler: None,
+            volume_thickness_uv_index: None,
+            volume_thickness_texture_transform: None,
+            volume_attenuation_distance: f32::INFINITY,
+            volume_attenuation_color: [1.0, 1.0, 1.0],
             immutable,
         }
     }
@@ -299,6 +332,16 @@ impl PbrMaterial {
         write(self.specular_color_factor[0].into());
         write(self.specular_color_factor[1].into());
         write(self.specular_color_factor[2].into());
+
+        write(self.ior.into());
+
+        write(self.transmission_factor.into());
+
+        write(self.volume_thickness_factor.into());
+        write(self.volume_attenuation_distance.into());
+        write(self.volume_attenuation_color[0].into());
+        write(self.volume_attenuation_color[1].into());
+        write(self.volume_attenuation_color[2].into());
 
         // Encode the WebGPU address mode for mipmap selection.
         // The shader uses this to compute correct UV derivatives when textures wrap/repeat.
@@ -489,6 +532,56 @@ impl PbrMaterial {
         }) {
             write(tex.into());
             bitmask |= Self::BITMASK_SPECULAR_COLOR;
+        } else {
+            write(Value::SkipTexture);
+        }
+
+        if let Some(tex) = self.transmission_tex.and_then(|texture_key| {
+            let entry_info = textures.get_entry(texture_key).ok()?;
+            let array = textures.pool.array_by_index(entry_info.array_index)?;
+            let sampler_key = self.transmission_sampler?;
+            let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
+            let uv_index = self.transmission_uv_index?;
+            let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+            Some((
+                array,
+                entry_info,
+                uv_index,
+                sampler_index,
+                encode_address_mode(address_mode_u),
+                encode_address_mode(address_mode_v),
+                self.transmission_texture_transform
+                    .and_then(|key| textures.get_texture_transform_offset(key))
+                    .unwrap_or(textures.texture_transform_identity_offset),
+            ))
+        }) {
+            write(tex.into());
+            bitmask |= Self::BITMASK_TRANSMISSION;
+        } else {
+            write(Value::SkipTexture);
+        }
+
+        if let Some(tex) = self.volume_thickness_tex.and_then(|texture_key| {
+            let entry_info = textures.get_entry(texture_key).ok()?;
+            let array = textures.pool.array_by_index(entry_info.array_index)?;
+            let sampler_key = self.volume_thickness_sampler?;
+            let sampler_index = sampler_key_list.binary_search(&sampler_key).ok()? as u32;
+            let uv_index = self.volume_thickness_uv_index?;
+            let (address_mode_u, address_mode_v) = textures.sampler_address_modes(sampler_key);
+            Some((
+                array,
+                entry_info,
+                uv_index,
+                sampler_index,
+                encode_address_mode(address_mode_u),
+                encode_address_mode(address_mode_v),
+                self.volume_thickness_texture_transform
+                    .and_then(|key| textures.get_texture_transform_offset(key))
+                    .unwrap_or(textures.texture_transform_identity_offset),
+            ))
+        }) {
+            write(tex.into());
+            bitmask |= Self::BITMASK_VOLUME_THICKNESS;
         } else {
             write(Value::SkipTexture);
         }

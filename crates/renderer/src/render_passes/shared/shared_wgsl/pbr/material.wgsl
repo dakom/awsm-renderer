@@ -8,7 +8,7 @@ const ALPHA_MODE_BLEND: u32 = 2u;
 // This must match PbrMaterial in Rust
 // and the size is PbrMaterial::BYTE_SIZE
 struct PbrMaterialRaw {
-    // Basic properties, 19 * 4 = 76 bytes
+    // Basic properties, 26 * 4 = 104 bytes
     alpha_mode: u32,
     alpha_cutoff: f32,
     double_sided: u32,
@@ -28,8 +28,16 @@ struct PbrMaterialRaw {
     specular_color_r: f32,
     specular_color_g: f32,
     specular_color_b: f32,
+    ior: f32,
+    transmission_factor: f32,
+    volume_thickness_factor: f32,
+    volume_attenuation_distance: f32,
+    volume_attenuation_color_r: f32,
+    volume_attenuation_color_g: f32,
+    volume_attenuation_color_b: f32,
 
-    // Textures, 7 * 20 = 140 bytes (packed format)
+
+    // Textures, 9 * 20 = 180 bytes (packed format)
     base_color_tex_info: TextureInfoRaw,
     metallic_roughness_tex_info: TextureInfoRaw,
     normal_tex_info: TextureInfoRaw,
@@ -37,6 +45,8 @@ struct PbrMaterialRaw {
     emissive_tex_info: TextureInfoRaw,
     specular_tex_info: TextureInfoRaw,
     specular_color_tex_info: TextureInfoRaw,
+    transmission_tex_info: TextureInfoRaw,
+    volume_thickness_tex_info: TextureInfoRaw,
 
     // Color info, 4 bytes
     color_info: ColorInfo,
@@ -44,8 +54,8 @@ struct PbrMaterialRaw {
     // this is set last, 4 bytes
     bitmask: u32,
 
-    // Padding to align to 512 bytes (76 + 140 + 4 + 4 = 224, so 512 - 224 = 288 bytes = 72 u32s)
-    padding: array<u32, 72>
+    // Padding to align to 512 bytes (104 + 180 + 4 + 4 = 292, so 512 - 292 = 220 bytes = 55 u32s)
+    padding: array<u32, 55>
 };
 
 struct PbrMaterial {
@@ -87,6 +97,18 @@ struct PbrMaterial {
     has_specular_color_texture: bool,
     specular_color_tex_info: TextureInfo,
     specular_color_factor: vec3<f32>,
+
+    ior: f32,
+
+    has_transmission_texture: bool,
+    transmission_tex_info: TextureInfo,
+    transmission_factor: f32,
+
+    has_volume_thickness_texture: bool,
+    volume_thickness_tex_info: TextureInfo,
+    volume_thickness_factor: f32,
+    volume_attenuation_distance: f32,
+    volume_attenuation_color: vec3<f32>,
 }
 
 fn pbr_get_material(offset: u32) -> PbrMaterial {
@@ -99,6 +121,8 @@ fn pbr_get_material(offset: u32) -> PbrMaterial {
     const BITMASK_COLOR: u32 = 1u << 5u;
     const BITMASK_SPECULAR: u32 = 1u << 6u;
     const BITMASK_SPECULAR_COLOR: u32 = 1u << 7u;
+    const BITMASK_TRANSMISSION : u32 = 1u << 8u;
+    const BITMASK_VOLUME_THICKNESS : u32 = 1u << 9u;
 
     let raw = materials[offset / material_alignment];
 
@@ -146,7 +170,23 @@ fn pbr_get_material(offset: u32) -> PbrMaterial {
         // specular color
         (raw.bitmask & BITMASK_SPECULAR_COLOR) != 0u,
         convert_texture_info(raw.specular_color_tex_info),
-        vec3<f32>(raw.specular_color_r, raw.specular_color_g, raw.specular_color_b)
+        vec3<f32>(raw.specular_color_r, raw.specular_color_g, raw.specular_color_b),
+
+        // ior
+        raw.ior,
+
+        // transmission
+        (raw.bitmask & BITMASK_TRANSMISSION) != 0u,
+        convert_texture_info(raw.transmission_tex_info),
+        raw.transmission_factor,
+
+        // volume thickness
+        (raw.bitmask & BITMASK_VOLUME_THICKNESS) != 0u,
+        convert_texture_info(raw.volume_thickness_tex_info),
+        raw.volume_thickness_factor,
+        raw.volume_attenuation_distance,
+        vec3<f32>(raw.volume_attenuation_color_r, raw.volume_attenuation_color_g, raw.volume_attenuation_color_b),
+
 
     );
 }

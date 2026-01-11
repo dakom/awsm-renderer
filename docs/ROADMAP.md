@@ -84,6 +84,7 @@ If it's supported here, corresponding core functionality is also supported
     - [x] step interpolation
     - [x] cubic spline interpolation
 - Extensions
+    - https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos
     - [x] EXT_mesh_gpu_instancing
     - [x] KHR_materials_unlit
     - [x] KHR_materials_emissive_strength
