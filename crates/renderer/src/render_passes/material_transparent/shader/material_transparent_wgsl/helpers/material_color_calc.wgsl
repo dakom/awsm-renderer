@@ -10,12 +10,20 @@ fn pbr_get_material_color(
     world_tangent: vec4<f32>,
     fragment_input: FragmentInput
 ) -> PbrMaterialColor {
+    // Load extension data on-demand from indices
+    let emissive_strength = pbr_material_load_emissive_strength(material.emissive_strength_index);
+    let ior = pbr_material_load_ior(material.ior_index);
+    let specular = pbr_material_load_specular(material.specular_index);
+    let transmission = pbr_material_load_transmission(material.transmission_index);
+    let volume = pbr_material_load_volume(material.volume_index);
+
     var base = pbr_material_base_color(material, fragment_input);
 
     // Multiply base color by vertex color if material has color info
     {%- if color_sets.is_some() %}
-        if material.has_color_info {
-            base *= vertex_color(material.color_info, fragment_input);
+        let vertex_color_info = pbr_material_load_vertex_color_info(material.vertex_color_info_index);
+        if vertex_color_info.set_index != 0u {
+            base *= vertex_color(vertex_color_info, fragment_input);
         }
     {% endif %}
 
@@ -31,11 +39,11 @@ fn pbr_get_material_color(
     let metallic_roughness = pbr_material_metallic_roughness(material, fragment_input);
     let normal = pbr_normal(material, world_normal, world_tangent, fragment_input);
     let occlusion = pbr_occlusion(material, fragment_input);
-    let emissive = pbr_emissive(material, fragment_input);
-    let specular = pbr_specular(material, fragment_input);
-    let specular_color = pbr_specular_color(material, fragment_input);
-    let transmission = pbr_transmission(material, fragment_input);
-    let volume_thickness = pbr_volume_thickness(material, fragment_input);
+    let emissive = pbr_emissive(material, emissive_strength, fragment_input);
+    let specular_factor = pbr_specular(specular, fragment_input);
+    let specular_color_factor = pbr_specular_color(specular, fragment_input);
+    let transmission_factor = pbr_transmission(transmission, fragment_input);
+    let volume_thickness = pbr_volume_thickness(volume, fragment_input);
 
     return PbrMaterialColor(
         base,
@@ -43,13 +51,13 @@ fn pbr_get_material_color(
         normal,
         occlusion,
         emissive,
-        specular,
-        specular_color,
-        material.ior,
-        transmission,
+        specular_factor,
+        specular_color_factor,
+        ior,
+        transmission_factor,
         volume_thickness,
-        material.volume_attenuation_distance,
-        material.volume_attenuation_color
+        volume.attenuation_distance,
+        volume.attenuation_color
     );
 }
 
@@ -59,7 +67,7 @@ fn pbr_material_base_color(
     fragment_input: FragmentInput
 ) -> vec4<f32> {
     var color = material.base_color_factor;
-    if material.has_base_color_texture {
+    if material.base_color_tex_info.exists {
         let uv = texture_uv(material.base_color_tex_info, fragment_input);
         color *= texture_pool_sample(material.base_color_tex_info, uv);
     }
@@ -73,7 +81,7 @@ fn pbr_material_metallic_roughness(
     fragment_input: FragmentInput
 ) -> vec2<f32> {
     var color = vec2<f32>(material.metallic_factor, material.roughness_factor);
-    if material.has_metallic_roughness_texture {
+    if material.metallic_roughness_tex_info.exists {
         let uv = texture_uv(material.metallic_roughness_tex_info, fragment_input);
         let tex = texture_pool_sample(material.metallic_roughness_tex_info, uv);
         color *= vec2<f32>(tex.b, tex.g);
@@ -89,7 +97,7 @@ fn pbr_normal(
     world_tangent: vec4<f32>,  // w = handedness (+1 or -1)
     fragment_input: FragmentInput
 ) -> vec3<f32> {
-    if !material.has_normal_texture {
+    if !material.normal_tex_info.exists {
         return normalize(world_normal);
     }
 
@@ -118,7 +126,7 @@ fn pbr_occlusion(
     fragment_input: FragmentInput
 ) -> f32 {
     var occlusion = 1.0;
-    if material.has_occlusion_texture {
+    if material.occlusion_tex_info.exists {
         let uv = texture_uv(material.occlusion_tex_info, fragment_input);
         let tex = texture_pool_sample(material.occlusion_tex_info, uv);
         occlusion = mix(1.0, tex.r, material.occlusion_strength);
@@ -129,74 +137,110 @@ fn pbr_occlusion(
 // Sample emissive texture and apply factors
 fn pbr_emissive(
     material: PbrMaterial,
+    emissive_strength: f32,
     fragment_input: FragmentInput
 ) -> vec3<f32> {
     var color = material.emissive_factor;
-    if material.has_emissive_texture {
+    if material.emissive_tex_info.exists {
         let uv = texture_uv(material.emissive_tex_info, fragment_input);
         color *= texture_pool_sample(material.emissive_tex_info, uv).rgb;
     }
-    color *= material.emissive_strength;
+    color *= emissive_strength;
     return color;
 }
 
 // Sample specular texture (alpha channel) and apply factor
 fn pbr_specular(
-    material: PbrMaterial,
+    specular: PbrSpecular,
     fragment_input: FragmentInput
 ) -> f32 {
-    var specular = material.specular_factor;
-    if material.has_specular_texture {
-        let uv = texture_uv(material.specular_tex_info, fragment_input);
-        specular *= texture_pool_sample(material.specular_tex_info, uv).a;
+    var factor = specular.factor;
+    if specular.tex_info.exists {
+        let uv = texture_uv(specular.tex_info, fragment_input);
+        factor *= texture_pool_sample(specular.tex_info, uv).a;
     }
-    return specular;
+    return factor;
 }
 
 // Sample specular color texture (RGB) and apply factor
 fn pbr_specular_color(
-    material: PbrMaterial,
+    specular: PbrSpecular,
     fragment_input: FragmentInput
 ) -> vec3<f32> {
-    var color = material.specular_color_factor;
-    if material.has_specular_color_texture {
-        let uv = texture_uv(material.specular_color_tex_info, fragment_input);
-        color *= texture_pool_sample(material.specular_color_tex_info, uv).rgb;
+    var color = specular.color_factor;
+    if specular.color_tex_info.exists {
+        let uv = texture_uv(specular.color_tex_info, fragment_input);
+        color *= texture_pool_sample(specular.color_tex_info, uv).rgb;
     }
     return color;
 }
 
 // Sample transmission texture (R channel) and apply factor
 fn pbr_transmission(
-    material: PbrMaterial,
+    transmission: PbrTransmission,
     fragment_input: FragmentInput
 ) -> f32 {
     // Early exit: if no texture and factor is 0, skip entirely
-    if (!material.has_transmission_texture && material.transmission_factor == 0.0) {
+    if (!transmission.tex_info.exists && transmission.factor == 0.0) {
         return 0.0;
     }
-    var transmission = material.transmission_factor;
-    if material.has_transmission_texture {
-        let uv = texture_uv(material.transmission_tex_info, fragment_input);
-        transmission *= texture_pool_sample(material.transmission_tex_info, uv).r;
+    var factor = transmission.factor;
+    if transmission.tex_info.exists {
+        let uv = texture_uv(transmission.tex_info, fragment_input);
+        factor *= texture_pool_sample(transmission.tex_info, uv).r;
     }
-    return transmission;
+    return factor;
 }
 
 // Sample volume thickness texture (G channel) and apply factor
 fn pbr_volume_thickness(
-    material: PbrMaterial,
+    volume: PbrVolume,
     fragment_input: FragmentInput
 ) -> f32 {
     // Early exit: no volume if thickness is 0 and no texture
-    if (!material.has_volume_thickness_texture && material.volume_thickness_factor == 0.0) {
+    if (!volume.thickness_tex_info.exists && volume.thickness_factor == 0.0) {
         return 0.0;
     }
-    var thickness = material.volume_thickness_factor;
-    if material.has_volume_thickness_texture {
-        let uv = texture_uv(material.volume_thickness_tex_info, fragment_input);
+    var thickness = volume.thickness_factor;
+    if volume.thickness_tex_info.exists {
+        let uv = texture_uv(volume.thickness_tex_info, fragment_input);
         // Volume thickness is stored in the G channel per glTF spec
-        thickness *= texture_pool_sample(material.volume_thickness_tex_info, uv).g;
+        thickness *= texture_pool_sample(volume.thickness_tex_info, uv).g;
     }
     return thickness;
+}
+
+// ============================================================================
+// Unlit Material Color Computation
+// ============================================================================
+
+// Compute unlit material color for fragment shader
+fn unlit_get_material_color(
+    material: UnlitMaterial,
+    fragment_input: FragmentInput
+) -> UnlitMaterialColor {
+    // Compute base color
+    var base = material.base_color_factor;
+    if material.base_color_tex_info.exists {
+        let uv = texture_uv(material.base_color_tex_info, fragment_input);
+        base *= texture_pool_sample(material.base_color_tex_info, uv);
+    }
+
+    // Handle alpha modes
+    if material.alpha_mode == ALPHA_MODE_MASK {
+        if base.a < material.alpha_cutoff {
+            discard;
+        } else {
+            base.a = 1.0;
+        }
+    }
+
+    // Compute emissive
+    var emissive = material.emissive_factor;
+    if material.emissive_tex_info.exists {
+        let uv = texture_uv(material.emissive_tex_info, fragment_input);
+        emissive *= texture_pool_sample(material.emissive_tex_info, uv).rgb;
+    }
+
+    return UnlitMaterialColor(base, emissive);
 }

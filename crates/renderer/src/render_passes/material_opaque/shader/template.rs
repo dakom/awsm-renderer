@@ -168,10 +168,33 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MipmapMode {
     None,
     Gradient,
+}
+
+impl MipmapMode {
+    /// Returns the function name suffix for this mipmap mode
+    pub fn suffix(&self) -> &'static str {
+        match self {
+            MipmapMode::Gradient => "_grad",
+            MipmapMode::None => "_no_mips",
+        }
+    }
+
+    /// Returns the texture sampling function name for this mode
+    pub fn sample_fn(&self) -> &'static str {
+        match self {
+            MipmapMode::Gradient => "texture_pool_sample_grad",
+            MipmapMode::None => "texture_pool_sample_no_mips",
+        }
+    }
+
+    /// Returns true if this is gradient mode (for conditional template logic)
+    pub fn is_gradient(&self) -> bool {
+        matches!(self, MipmapMode::Gradient)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]

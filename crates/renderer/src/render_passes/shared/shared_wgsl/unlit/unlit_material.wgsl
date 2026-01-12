@@ -59,3 +59,15 @@ fn unlit_get_material(byte_offset: u32) -> UnlitMaterial {
         vec3<f32>(em_r, em_g, em_b)
     );
 }
+
+// Result of unlit material color computation
+struct UnlitMaterialColor {
+    base: vec4<f32>,     // base color with alpha
+    emissive: vec3<f32>, // emissive color
+}
+
+// Compute final unlit color from UnlitMaterialColor
+// Per glTF KHR_materials_unlit: output = base_color.rgb + emissive
+fn compute_unlit_output(color: UnlitMaterialColor) -> vec3<f32> {
+    return color.base.rgb + color.emissive;
+}

@@ -185,7 +185,7 @@ fn main(
                     if (mesh_matches_variant(material_mesh_meta_{{s}})) {
                         valid_samples++;
                         let material_offset_{{s}} = material_mesh_meta_{{s}}.material_offset;
-                        let pbr_material_{{s}} = pbr_get_material(material_offset_{{s}});
+                        let shader_id_{{s}} = material_load_shader_id(material_offset_{{s}});
 
                         let vertex_attribute_stride_{{s}} = material_mesh_meta_{{s}}.vertex_attribute_stride / 4;
                         let attribute_indices_offset_{{s}} = material_mesh_meta_{{s}}.vertex_attribute_indices_offset / 4;
@@ -209,51 +209,81 @@ fn main(
                         let os_verts_{{s}} = get_object_space_vertices(visibility_geometry_data_offset_{{s}}, tri_{{s}});
                         let transforms_{{s}} = get_transforms(material_mesh_meta_{{s}});
 
-                        // Compute material color
-                        {% match mipmap %}
-                            {% when MipmapMode::Gradient %}
-                                let mat_color_{{s}} = compute_material_color(
-                                    camera,
-                                    tri_indices_{{s}},
-                                    attribute_data_offset_{{s}},
-                                    tri_{{s}},
-                                    pbr_material_{{s}},
-                                    barycentric_{{s}},
-                                    vertex_attribute_stride_{{s}},
-                                    uv_sets_index_{{s}},
-                                    normal_{{s}},
-                                    transforms_{{s}}.world_normal,
-                                    os_verts_{{s}},
-                                    bary_derivs_{{s}},
-                                );
-                            {% when MipmapMode::None %}
-                                let mat_color_{{s}} = compute_material_color(
-                                    camera,
-                                    tri_indices_{{s}},
-                                    attribute_data_offset_{{s}},
-                                    tri_{{s}},
-                                    pbr_material_{{s}},
-                                    barycentric_{{s}},
-                                    vertex_attribute_stride_{{s}},
-                                    uv_sets_index_{{s}},
-                                    normal_{{s}},
-                                    transforms_{{s}}.world_normal,
-                                    os_verts_{{s}},
-                                );
-                        {% endmatch %}
+                        // Compute material color and apply lighting based on shader type
+                        var sample_color_{{s}}: vec3<f32>;
+                        var sample_alpha_{{s}}: f32;
 
-                        // Apply lighting
-                        // TODO - if material is unlit:
-                        //let sample_color = unlit(mat_color_{{s}});
-                        let sample_color = apply_lighting(
-                            mat_color_{{s}},
-                            standard_coordinates.surface_to_camera,
-                            standard_coordinates.world_position,
-                            lights_info
-                        );
+                        if (shader_id_{{s}} == SHADER_ID_UNLIT) {
+                            let unlit_material_{{s}} = unlit_get_material(material_offset_{{s}});
+                            {% match mipmap %}
+                                {% when MipmapMode::Gradient %}
+                                    let unlit_color_{{s}} = compute_unlit_material_color(
+                                        tri_indices_{{s}},
+                                        attribute_data_offset_{{s}},
+                                        unlit_material_{{s}},
+                                        barycentric_{{s}},
+                                        vertex_attribute_stride_{{s}},
+                                        uv_sets_index_{{s}},
+                                        bary_derivs_{{s}},
+                                        normal_{{s}},
+                                        camera.view,
+                                    );
+                                {% when MipmapMode::None %}
+                                    let unlit_color_{{s}} = compute_unlit_material_color(
+                                        tri_indices_{{s}},
+                                        attribute_data_offset_{{s}},
+                                        unlit_material_{{s}},
+                                        barycentric_{{s}},
+                                        vertex_attribute_stride_{{s}},
+                                        uv_sets_index_{{s}},
+                                    );
+                            {% endmatch %}
+                            sample_color_{{s}} = compute_unlit_output(unlit_color_{{s}});
+                            sample_alpha_{{s}} = unlit_color_{{s}}.base.a;
+                        } else {
+                            let pbr_material_{{s}} = pbr_get_material(material_offset_{{s}});
+                            {% match mipmap %}
+                                {% when MipmapMode::Gradient %}
+                                    let mat_color_{{s}} = compute_material_color(
+                                        camera,
+                                        tri_indices_{{s}},
+                                        attribute_data_offset_{{s}},
+                                        tri_{{s}},
+                                        pbr_material_{{s}},
+                                        barycentric_{{s}},
+                                        vertex_attribute_stride_{{s}},
+                                        uv_sets_index_{{s}},
+                                        normal_{{s}},
+                                        transforms_{{s}}.world_normal,
+                                        os_verts_{{s}},
+                                        bary_derivs_{{s}},
+                                    );
+                                {% when MipmapMode::None %}
+                                    let mat_color_{{s}} = compute_material_color(
+                                        camera,
+                                        tri_indices_{{s}},
+                                        attribute_data_offset_{{s}},
+                                        tri_{{s}},
+                                        pbr_material_{{s}},
+                                        barycentric_{{s}},
+                                        vertex_attribute_stride_{{s}},
+                                        uv_sets_index_{{s}},
+                                        normal_{{s}},
+                                        transforms_{{s}}.world_normal,
+                                        os_verts_{{s}},
+                                    );
+                            {% endmatch %}
+                            sample_color_{{s}} = apply_lighting(
+                                mat_color_{{s}},
+                                standard_coordinates.surface_to_camera,
+                                standard_coordinates.world_position,
+                                lights_info
+                            );
+                            sample_alpha_{{s}} = mat_color_{{s}}.base.a;
+                        }
 
-                        color_sum += sample_color;
-                        alpha_sum += mat_color_{{s}}.base.a;
+                        color_sum += sample_color_{{s}};
+                        alpha_sum += sample_alpha_{{s}};
                     }
                 }
             {% endfor %}
@@ -290,7 +320,7 @@ fn main(
     let barycentric = vec3<f32>(barycentric_data.x, barycentric_data.y, 1.0 - barycentric_data.x - barycentric_data.y);
 
     let material_offset = material_mesh_meta.material_offset;
-    let pbr_material = pbr_get_material(material_offset);
+    let shader_id = material_load_shader_id(material_offset);
 
     let vertex_attribute_stride = material_mesh_meta.vertex_attribute_stride / 4; // 4 bytes per float
     let attribute_indices_offset = material_mesh_meta.vertex_attribute_indices_offset / 4;
@@ -318,48 +348,82 @@ fn main(
 
     let lights_info = get_lights_info();
 
-    // Compute material color
-    {% match mipmap %}
-        {% when MipmapMode::Gradient %}
-            let bary_derivs = textureLoad(barycentric_derivatives_tex, coords, 0);
-            let material_color = compute_material_color(
-                camera,
-                triangle_indices,
-                attribute_data_offset,
-                triangle_index,
-                pbr_material,
-                barycentric,
-                vertex_attribute_stride,
-                uv_sets_index,
-                world_normal,
-                transforms.world_normal,
-                os_vertices,
-                bary_derivs,
-            );
-        {% when MipmapMode::None %}
-            let material_color = compute_material_color(
-                camera,
-                triangle_indices,
-                attribute_data_offset,
-                triangle_index,
-                pbr_material,
-                barycentric,
-                vertex_attribute_stride,
-                uv_sets_index,
-                world_normal,
-                transforms.world_normal,
-                os_vertices,
-            );
-    {% endmatch %}
+    // Compute material color and apply lighting based on shader type
+    var color: vec3<f32>;
+    var base_alpha: f32;
 
-    // Apply lighting
-    // TODO: if unlit var color = unlit(material_color);
-    var color = apply_lighting(
-        material_color,
-        standard_coordinates.surface_to_camera,
-        standard_coordinates.world_position,
-        lights_info
-    );
+    if (shader_id == SHADER_ID_UNLIT) {
+        // Unlit material path
+        let unlit_material = unlit_get_material(material_offset);
+        {% match mipmap %}
+            {% when MipmapMode::Gradient %}
+                let bary_derivs = textureLoad(barycentric_derivatives_tex, coords, 0);
+                let unlit_color = compute_unlit_material_color(
+                    triangle_indices,
+                    attribute_data_offset,
+                    unlit_material,
+                    barycentric,
+                    vertex_attribute_stride,
+                    uv_sets_index,
+                    bary_derivs,
+                    world_normal,
+                    camera.view,
+                );
+            {% when MipmapMode::None %}
+                let unlit_color = compute_unlit_material_color(
+                    triangle_indices,
+                    attribute_data_offset,
+                    unlit_material,
+                    barycentric,
+                    vertex_attribute_stride,
+                    uv_sets_index,
+                );
+        {% endmatch %}
+        color = compute_unlit_output(unlit_color);
+        base_alpha = unlit_color.base.a;
+    } else {
+        // PBR material path (default)
+        let pbr_material = pbr_get_material(material_offset);
+        {% match mipmap %}
+            {% when MipmapMode::Gradient %}
+                let bary_derivs = textureLoad(barycentric_derivatives_tex, coords, 0);
+                let material_color = compute_material_color(
+                    camera,
+                    triangle_indices,
+                    attribute_data_offset,
+                    triangle_index,
+                    pbr_material,
+                    barycentric,
+                    vertex_attribute_stride,
+                    uv_sets_index,
+                    world_normal,
+                    transforms.world_normal,
+                    os_vertices,
+                    bary_derivs,
+                );
+            {% when MipmapMode::None %}
+                let material_color = compute_material_color(
+                    camera,
+                    triangle_indices,
+                    attribute_data_offset,
+                    triangle_index,
+                    pbr_material,
+                    barycentric,
+                    vertex_attribute_stride,
+                    uv_sets_index,
+                    world_normal,
+                    transforms.world_normal,
+                    os_vertices,
+                );
+        {% endmatch %}
+        color = apply_lighting(
+            material_color,
+            standard_coordinates.surface_to_camera,
+            standard_coordinates.world_position,
+            lights_info
+        );
+        base_alpha = material_color.base.a;
+    }
 
     // If we're not doing MSAA, we're done here, but if we are, we need to check if this is an edge pixel
     {% if multisampled_geometry && !debug.msaa_detect_edges %}
@@ -395,7 +459,7 @@ fn main(
                     if (mesh_matches_variant(material_mesh_meta_{{s}})) {
                         valid_samples++;
                         let material_offset_{{s}} = material_mesh_meta_{{s}}.material_offset;
-                        let pbr_material_{{s}} = pbr_get_material(material_offset_{{s}});
+                        let shader_id_{{s}} = material_load_shader_id(material_offset_{{s}});
 
                         // Per-sample mesh data
                         let vertex_attribute_stride_{{s}} = material_mesh_meta_{{s}}.vertex_attribute_stride / 4;
@@ -422,50 +486,81 @@ fn main(
                         let os_vertices_{{s}} = get_object_space_vertices(visibility_geometry_data_offset_{{s}}, tri_id_{{s}});
                         let transforms_{{s}} = get_transforms(material_mesh_meta_{{s}});
 
-                        // Compute material color
-                        {% match mipmap %}
-                            {% when MipmapMode::Gradient %}
-                                let material_color_{{s}} = compute_material_color(
-                                    camera,
-                                    triangle_indices_{{s}},
-                                    attribute_data_offset_{{s}},
-                                    tri_id_{{s}},
-                                    pbr_material_{{s}},
-                                    barycentric_{{s}},
-                                    vertex_attribute_stride_{{s}},
-                                    uv_sets_index_{{s}},
-                                    normal_{{s}},
-                                    transforms_{{s}}.world_normal,
-                                    os_vertices_{{s}},
-                                    bary_derivs_{{s}},
-                                );
-                            {% when MipmapMode::None %}
-                                let material_color_{{s}} = compute_material_color(
-                                    camera,
-                                    triangle_indices_{{s}},
-                                    attribute_data_offset_{{s}},
-                                    tri_id_{{s}},
-                                    pbr_material_{{s}},
-                                    barycentric_{{s}},
-                                    vertex_attribute_stride_{{s}},
-                                    uv_sets_index_{{s}},
-                                    normal_{{s}},
-                                    transforms_{{s}}.world_normal,
-                                    os_vertices_{{s}},
-                                );
-                        {% endmatch %}
+                        // Compute material color and apply lighting based on shader type
+                        var sample_color_{{s}}: vec3<f32>;
+                        var sample_alpha_{{s}}: f32;
 
-                        // Apply lighting
-                        // TODO: if unlit let sample_color = unlit(material_color_{{s}});
-                        let sample_color = apply_lighting(
-                            material_color_{{s}},
-                            standard_coordinates.surface_to_camera,
-                            standard_coordinates.world_position,
-                            lights_info
-                        );
+                        if (shader_id_{{s}} == SHADER_ID_UNLIT) {
+                            let unlit_material_{{s}} = unlit_get_material(material_offset_{{s}});
+                            {% match mipmap %}
+                                {% when MipmapMode::Gradient %}
+                                    let unlit_color_{{s}} = compute_unlit_material_color(
+                                        triangle_indices_{{s}},
+                                        attribute_data_offset_{{s}},
+                                        unlit_material_{{s}},
+                                        barycentric_{{s}},
+                                        vertex_attribute_stride_{{s}},
+                                        uv_sets_index_{{s}},
+                                        bary_derivs_{{s}},
+                                        normal_{{s}},
+                                        camera.view,
+                                    );
+                                {% when MipmapMode::None %}
+                                    let unlit_color_{{s}} = compute_unlit_material_color(
+                                        triangle_indices_{{s}},
+                                        attribute_data_offset_{{s}},
+                                        unlit_material_{{s}},
+                                        barycentric_{{s}},
+                                        vertex_attribute_stride_{{s}},
+                                        uv_sets_index_{{s}},
+                                    );
+                            {% endmatch %}
+                            sample_color_{{s}} = compute_unlit_output(unlit_color_{{s}});
+                            sample_alpha_{{s}} = unlit_color_{{s}}.base.a;
+                        } else {
+                            let pbr_material_{{s}} = pbr_get_material(material_offset_{{s}});
+                            {% match mipmap %}
+                                {% when MipmapMode::Gradient %}
+                                    let material_color_{{s}} = compute_material_color(
+                                        camera,
+                                        triangle_indices_{{s}},
+                                        attribute_data_offset_{{s}},
+                                        tri_id_{{s}},
+                                        pbr_material_{{s}},
+                                        barycentric_{{s}},
+                                        vertex_attribute_stride_{{s}},
+                                        uv_sets_index_{{s}},
+                                        normal_{{s}},
+                                        transforms_{{s}}.world_normal,
+                                        os_vertices_{{s}},
+                                        bary_derivs_{{s}},
+                                    );
+                                {% when MipmapMode::None %}
+                                    let material_color_{{s}} = compute_material_color(
+                                        camera,
+                                        triangle_indices_{{s}},
+                                        attribute_data_offset_{{s}},
+                                        tri_id_{{s}},
+                                        pbr_material_{{s}},
+                                        barycentric_{{s}},
+                                        vertex_attribute_stride_{{s}},
+                                        uv_sets_index_{{s}},
+                                        normal_{{s}},
+                                        transforms_{{s}}.world_normal,
+                                        os_vertices_{{s}},
+                                    );
+                            {% endmatch %}
+                            sample_color_{{s}} = apply_lighting(
+                                material_color_{{s}},
+                                standard_coordinates.surface_to_camera,
+                                standard_coordinates.world_position,
+                                lights_info
+                            );
+                            sample_alpha_{{s}} = material_color_{{s}}.base.a;
+                        }
 
-                        color_sum += sample_color;
-                        alpha_sum += material_color_{{s}}.base.a;
+                        color_sum += sample_color_{{s}};
+                        alpha_sum += sample_alpha_{{s}};
                     }
                 }
             {% endfor %}
@@ -491,7 +586,7 @@ fn main(
     {% endif %}
 
     // Write to output texture in the case of no MSAA or non-edge pixel
-    textureStore(opaque_tex, coords, vec4<f32>(color, material_color.base.a));
+    textureStore(opaque_tex, coords, vec4<f32>(color, base_alpha));
 }
 
 // Check if a mesh's attributes match what this shader variant was compiled for.

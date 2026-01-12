@@ -149,6 +149,7 @@ impl Materials {
             match material.uniform_buffer_data(textures) {
                 Ok(data) => {
                     self.buffer.update(key, &data);
+                    self.gpu_dirty = true;
                 }
                 Err(e) => {
                     tracing::error!(

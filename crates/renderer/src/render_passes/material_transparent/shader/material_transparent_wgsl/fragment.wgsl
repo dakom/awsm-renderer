@@ -189,11 +189,8 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
     // Convert raw camera uniform to friendly structure
     let camera = camera_from_raw(camera_raw);
 
-    // Get material from mesh metadata
-    let material = pbr_get_material(material_mesh_meta.material_offset);
-
     // Handle double-sided materials: flip normal and tangent handedness for back faces
-    // This must be done BEFORE pbr_get_material_color so normal mapping uses the correct orientation
+    // This must be done BEFORE material color computation so normal mapping uses the correct orientation
     var world_normal = input.world_normal;
     var world_tangent = input.world_tangent;
     if (!input.front_facing) {
@@ -201,14 +198,6 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
         // Flip tangent handedness to maintain correct TBN orientation
         world_tangent.w = -world_tangent.w;
     }
-
-    // Sample all PBR material textures and compute material properties
-    let material_color = pbr_get_material_color(
-        material,
-        world_normal,
-        world_tangent,
-        input
-    );
 
     // Calculate surface to camera vector for lighting
     // For orthographic cameras, use camera forward direction (parallel rays)
@@ -222,52 +211,76 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
         is_orthographic
     );
 
-    // TODO - branch on unlit
-    //let color = unlit(material_color);
-    // Get lighting info
-    let lights_info = get_lights_info();
-
-    // Check if we need screen-space transmission
-    let metallic = clamp(material_color.metallic_roughness.x, 0.0, 1.0);
-    let effective_transmission = material_color.transmission * (1.0 - metallic);
+    // Get shader_id to determine material type
+    let material_offset = material_mesh_meta.material_offset;
+    let shader_id = material_load_shader_id(material_offset);
 
     var color: vec3<f32>;
-    if (effective_transmission > 0.0) {
-        // Sample transmission background from opaque render
-        let roughness = max(clamp(material_color.metallic_roughness.y, 0.0, 1.0), 0.04);
-        let transmission_background = sample_transmission_background(
-            input.frag_pos,
-            input.world_position,
-            material_color.normal,
-            -surface_to_camera,  // view direction (towards surface)
-            material_color.ior,
-            roughness,
-            material_color.volume_thickness,
-            camera,
+    var base_alpha: f32;
+
+    if (shader_id == SHADER_ID_UNLIT) {
+        // Unlit material path
+        let unlit_material = unlit_get_material(material_offset);
+        let unlit_color = unlit_get_material_color(unlit_material, input);
+        color = compute_unlit_output(unlit_color);
+        base_alpha = unlit_color.base.a;
+    } else {
+        // PBR material path (default)
+        let material = pbr_get_material(material_offset);
+
+        // Sample all PBR material textures and compute material properties
+        let material_color = pbr_get_material_color(
+            material,
+            world_normal,
+            world_tangent,
+            input
         );
 
-        // Apply lighting with screen-space transmission
-        color = apply_lighting_with_transmission(
-            material_color,
-            surface_to_camera,
-            input.world_position,
-            lights_info,
-            transmission_background
-        );
-    } else {
-        // Standard lighting without transmission
-        color = apply_lighting(
-            material_color,
-            surface_to_camera,
-            input.world_position,
-            lights_info
-        );
+        // Get lighting info
+        let lights_info = get_lights_info();
+
+        // Check if we need screen-space transmission
+        let metallic = clamp(material_color.metallic_roughness.x, 0.0, 1.0);
+        let effective_transmission = material_color.transmission * (1.0 - metallic);
+
+        if (effective_transmission > 0.0) {
+            // Sample transmission background from opaque render
+            let roughness = max(clamp(material_color.metallic_roughness.y, 0.0, 1.0), 0.04);
+            let transmission_background = sample_transmission_background(
+                input.frag_pos,
+                input.world_position,
+                material_color.normal,
+                -surface_to_camera,  // view direction (towards surface)
+                material_color.ior,
+                roughness,
+                material_color.volume_thickness,
+                camera,
+            );
+
+            // Apply lighting with screen-space transmission
+            color = apply_lighting_with_transmission(
+                material_color,
+                surface_to_camera,
+                input.world_position,
+                lights_info,
+                transmission_background
+            );
+        } else {
+            // Standard lighting without transmission
+            color = apply_lighting(
+                material_color,
+                surface_to_camera,
+                input.world_position,
+                lights_info
+            );
+        }
+
+        base_alpha = material_color.base.a;
     }
 
-
     // Output final color with alpha
-    let premult_rgb = color * material_color.base.a;
-    out.color = vec4<f32>(premult_rgb, material_color.base.a);
+    let premult_rgb = color * base_alpha;
+    out.color = vec4<f32>(premult_rgb, base_alpha);
 
     return out;
 }
