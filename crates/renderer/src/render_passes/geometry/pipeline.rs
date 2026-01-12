@@ -105,7 +105,7 @@ impl GeometryPipelines {
     ) -> Result<Self> {
         let pipeline_layout_cache_key = PipelineLayoutCacheKey::new(vec![
             bind_groups.camera.bind_group_layout_key,
-            bind_groups.transform_materials.bind_group_layout_key,
+            bind_groups.transforms.bind_group_layout_key,
             bind_groups.meta.bind_group_layout_key,
             bind_groups.animation.bind_group_layout_key,
         ]);

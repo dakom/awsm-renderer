@@ -1,57 +1,92 @@
-use awsm_renderer_core::{error::AwsmCoreError, renderer::AwsmRendererWebGpu};
+use std::sync::LazyLock;
+
+use awsm_renderer_core::{
+    buffers::{BufferDescriptor, BufferUsage},
+    error::AwsmCoreError,
+    renderer::AwsmRendererWebGpu,
+};
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use thiserror::Error;
 
 use crate::{
-    bind_groups::{AwsmBindGroupError, BindGroups},
-    materials::pbr::{PbrMaterial, PbrMaterialBuffers},
-    textures::{AwsmTextureError, Textures},
+    bind_groups::{AwsmBindGroupError, BindGroupCreate, BindGroups},
+    buffer::dynamic_storage::DynamicStorageBuffer,
+    materials::{pbr::PbrMaterial, unlit::UnlitMaterial},
+    textures::{AwsmTextureError, SamplerKey, TextureKey, TextureTransformKey, Textures},
     AwsmRendererLogging,
 };
 
 pub mod pbr;
+pub mod unlit;
+pub mod writer;
 
-pub struct Materials {
-    lookup: SlotMap<MaterialKey, Material>,
-    buffers: MaterialBuffers,
-    _is_transparency_pass: SecondaryMap<MaterialKey, ()>,
+#[derive(Debug, Clone)]
+pub enum Material {
+    Pbr(PbrMaterial),
+    Unlit(UnlitMaterial),
 }
 
-struct MaterialBuffers {
-    pbr: PbrMaterialBuffers,
-    // optimization to avoid loading whole material to find the correct buffer
-    buffer_kind: SecondaryMap<MaterialKey, MaterialBufferKind>,
+impl Material {
+    // this should match `mesh_buffer_geometry_kind()`
+    pub fn is_transparency_pass(&self) -> bool {
+        match self {
+            Material::Pbr(pbr_material) => pbr_material.is_transparency_pass(),
+            Material::Unlit(pbr_material) => pbr_material.is_transparency_pass(),
+        }
+    }
+
+    pub fn alpha_mask(&self) -> Option<f32> {
+        match self {
+            Material::Pbr(pbr_material) => pbr_material.alpha_mask(),
+            Material::Unlit(pbr_material) => pbr_material.alpha_mask(),
+        }
+    }
+
+    pub fn uniform_buffer_data(&self, textures: &Textures) -> Result<Vec<u8>> {
+        match self {
+            Material::Pbr(pbr_material) => pbr_material.uniform_buffer_data(textures),
+            Material::Unlit(pbr_material) => pbr_material.uniform_buffer_data(textures),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MaterialBufferKind {
-    Pbr,
+#[repr(u32)]
+pub enum MaterialShaderId {
+    Pbr = 0,
+    Unlit = 1,
+    // Toon = 2, etc.
 }
 
-impl MaterialBuffers {
-    pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
-        Ok(MaterialBuffers {
-            pbr: PbrMaterialBuffers::new(gpu)?,
-            buffer_kind: SecondaryMap::new(),
-        })
-    }
+const INITIAL_SIZE: usize = 8192; //Why not
+static BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| {
+    BufferUsage::new()
+        .with_uniform()
+        .with_copy_dst()
+        .with_storage()
+});
 
-    pub fn buffer_offset(&self, key: MaterialKey) -> Result<usize> {
-        self.buffer_kind
-            .get(key)
-            .and_then(|kind| match kind {
-                MaterialBufferKind::Pbr => self.pbr.buffer_offset(key),
-            })
-            .ok_or(AwsmMaterialError::BufferSlotMissing(key))
-    }
+pub struct Materials {
+    pub(crate) gpu_buffer: web_sys::GpuBuffer,
+    lookup: SlotMap<MaterialKey, Material>,
+    buffer: DynamicStorageBuffer<MaterialKey>,
+    gpu_dirty: bool,
+    _is_transparency_pass: SecondaryMap<MaterialKey, ()>,
 }
 
 impl Materials {
-    pub const MAX_SIZE: usize = 512; // minUniformBufferOffsetAlignment (also, largest possible material size)
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
+        let gpu_buffer = gpu.create_buffer(
+            &BufferDescriptor::new(Some("Materials"), INITIAL_SIZE, *BUFFER_USAGE).into(),
+        )?;
+
+        let buffer = DynamicStorageBuffer::new(INITIAL_SIZE, Some("Materials".to_string()));
+
         Ok(Materials {
             lookup: SlotMap::with_key(),
-            buffers: MaterialBuffers::new(gpu)?,
+            gpu_buffer,
+            buffer,
+            gpu_dirty: true,
             _is_transparency_pass: SecondaryMap::new(),
         })
     }
@@ -62,20 +97,22 @@ impl Materials {
 
     pub fn insert(&mut self, material: Material, textures: &Textures) -> MaterialKey {
         let is_transparency_pass = material.is_transparency_pass();
-        let buffer_kind = material.buffer_kind();
 
         let key = self.lookup.insert(material);
         if is_transparency_pass {
             self._is_transparency_pass.insert(key, ());
         }
-        self.buffers.buffer_kind.insert(key, buffer_kind);
+
         self.update(key, textures, |_| {});
 
         key
     }
 
     pub fn buffer_offset(&self, key: MaterialKey) -> Result<usize> {
-        let offset = self.buffers.buffer_offset(key)?;
+        let offset = self
+            .buffer
+            .offset(key)
+            .ok_or(AwsmMaterialError::BufferSlotMissing(key))?;
 
         #[cfg(debug_assertions)]
         {
@@ -91,12 +128,6 @@ impl Materials {
         Ok(offset)
     }
 
-    pub fn gpu_buffer(&self, kind: MaterialBufferKind) -> &web_sys::GpuBuffer {
-        match kind {
-            MaterialBufferKind::Pbr => &self.buffers.pbr.gpu_buffer,
-        }
-    }
-
     pub fn update(
         &mut self,
         key: MaterialKey,
@@ -105,10 +136,8 @@ impl Materials {
     ) {
         if let Some(material) = self.lookup.get_mut(key) {
             let old_is_transparency_pass = material.is_transparency_pass();
-            let old_buffer_kind = material.buffer_kind();
             f(material);
             let new_is_transparency_pass = material.is_transparency_pass();
-            let new_buffer_kind = material.buffer_kind();
             if old_is_transparency_pass != new_is_transparency_pass {
                 if new_is_transparency_pass {
                     self._is_transparency_pass.insert(key, ());
@@ -116,28 +145,20 @@ impl Materials {
                     self._is_transparency_pass.remove(key);
                 }
             }
-            if old_buffer_kind != new_buffer_kind {
-                match old_buffer_kind {
-                    MaterialBufferKind::Pbr => {
-                        self.buffers.pbr.remove(key);
-                    }
+
+            match material.uniform_buffer_data(textures) {
+                Ok(data) => {
+                    self.buffer.update(key, &data);
                 }
-                self.buffers.buffer_kind.insert(key, new_buffer_kind);
-            }
-            match material {
-                Material::Pbr(pbr_material) => {
-                    self.buffers.pbr.update(key, pbr_material, textures);
+                Err(e) => {
+                    tracing::error!(
+                        "Failed to get uniform buffer data for material key {:?}: {:?}",
+                        key,
+                        e
+                    );
                 }
             }
         }
-    }
-
-    pub fn buffer_kind(&self, key: MaterialKey) -> Result<MaterialBufferKind> {
-        self.buffers
-            .buffer_kind
-            .get(key)
-            .copied()
-            .ok_or(AwsmMaterialError::BufferSlotMissing(key))
     }
 
     pub fn is_transparency_pass(&self, key: MaterialKey) -> bool {
@@ -150,42 +171,35 @@ impl Materials {
         gpu: &AwsmRendererWebGpu,
         bind_groups: &mut BindGroups,
     ) -> Result<()> {
-        self.buffers.pbr.write_gpu(logging, gpu, bind_groups)?;
+        if self.gpu_dirty {
+            let _maybe_span_guard = if logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Material Buffer GPU write").entered())
+            } else {
+                None
+            };
 
+            if let Some(new_size) = self.buffer.take_gpu_needs_resize() {
+                self.gpu_buffer = gpu.create_buffer(
+                    &BufferDescriptor::new(Some("Material"), new_size, *BUFFER_USAGE).into(),
+                )?;
+
+                bind_groups.mark_create(BindGroupCreate::MaterialResize);
+            }
+
+            gpu.write_buffer(&self.gpu_buffer, None, self.buffer.raw_slice(), None, None)?;
+
+            self.gpu_dirty = false;
+        }
         Ok(())
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Material {
-    Pbr(PbrMaterial),
-}
-
-impl Material {
-    // this should match `mesh_buffer_geometry_kind()`
-    pub fn is_transparency_pass(&self) -> bool {
-        match self {
-            Material::Pbr(pbr_material) => pbr_material.is_transparency_pass(),
-        }
-    }
-
-    pub fn unlit(&self) -> bool {
-        match self {
-            Material::Pbr(pbr_material) => pbr_material.unlit(),
-        }
-    }
-
-    pub fn alpha_mask(&self) -> Option<f32> {
-        match self {
-            Material::Pbr(pbr_material) => pbr_material.alpha_mask(),
-        }
-    }
-
-    pub fn buffer_kind(&self) -> MaterialBufferKind {
-        match self {
-            Material::Pbr(_) => MaterialBufferKind::Pbr,
-        }
-    }
+#[derive(Clone, Debug)]
+pub struct MaterialTexture {
+    pub key: TextureKey,
+    pub sampler_key: Option<SamplerKey>,
+    pub uv_index: Option<u32>,
+    pub transform_key: Option<TextureTransformKey>,
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq)]

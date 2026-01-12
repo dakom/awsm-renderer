@@ -12,10 +12,7 @@ use indexmap::IndexSet;
 use crate::bind_group_layout::{BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry};
 use crate::bind_groups::{AwsmBindGroupError, BindGroupRecreateContext};
 use crate::error::Result;
-use crate::materials::MaterialBufferKind;
-use crate::render_passes::shared::opaque_and_transparency::bind_group::{
-    TexturePoolDeps, TexturePoolVisibility,
-};
+use crate::render_passes::shared::material::bind_group::{TexturePoolDeps, TexturePoolVisibility};
 use crate::textures::SamplerKey;
 use crate::{bind_group_layout::BindGroupLayoutKey, render_passes::RenderPassInitContext};
 
@@ -194,9 +191,7 @@ impl MaterialOpaqueBindGroups {
         // Material data buffer
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
-            BindGroupResource::Buffer(BufferBinding::new(
-                ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
-            )),
+            BindGroupResource::Buffer(BufferBinding::new(&ctx.materials.gpu_buffer)),
         ));
         // Attribute index buffer
         entries.push(BindGroupEntry::new(

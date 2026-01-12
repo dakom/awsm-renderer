@@ -55,7 +55,7 @@ pub enum BindGroupCreate {
     MaterialMeshMetaResize,
     MeshAttributeDataResize,
     MeshAttributeIndexResize,
-    PbrMaterialResize,
+    MaterialResize,
     TextureViewResize,
     TexturePool,
     TextureTransformsResize,
@@ -133,8 +133,9 @@ impl BindGroups {
                     functions_to_call.insert(FunctionToCall::TransparentMain);
                     functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
                 }
-                BindGroupCreate::PbrMaterialResize => {
+                BindGroupCreate::MaterialResize => {
                     functions_to_call.insert(FunctionToCall::GeometryTransformMaterials);
+                    functions_to_call.insert(FunctionToCall::OpaqueMain);
                     functions_to_call.insert(FunctionToCall::TransparentMeshMaterial);
                 }
                 BindGroupCreate::GeometryMeshMetaResize => {
@@ -216,7 +217,7 @@ impl BindGroups {
                     render_passes
                         .geometry
                         .bind_groups
-                        .transform_materials
+                        .transforms
                         .recreate(&ctx)?;
                 }
                 FunctionToCall::GeometryMeta => {

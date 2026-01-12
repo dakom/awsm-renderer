@@ -6,6 +6,7 @@ use awsm_renderer_core::{
     buffers::BufferBinding,
 };
 
+use crate::error::Result;
 use crate::{
     bind_group_layout::{
         BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey,
@@ -14,12 +15,11 @@ use crate::{
     mesh::meta::geometry_meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT,
     render_passes::RenderPassInitContext,
 };
-use crate::{error::Result, materials::MaterialBufferKind};
 
 pub struct GeometryBindGroups {
     pub camera: GeometryBindGroupCamera,
     // these could be be used for multiple meshes
-    pub transform_materials: GeometryBindGroupTransformMaterials,
+    pub transforms: GeometryBindGroupTransforms,
     // These are more specific to the mesh
     pub meta: GeometryBindGroupMeta,
     pub animation: GeometryBindGroupAnimation,
@@ -28,13 +28,13 @@ pub struct GeometryBindGroups {
 impl GeometryBindGroups {
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let camera = GeometryBindGroupCamera::new(ctx).await?;
-        let transform_materials = GeometryBindGroupTransformMaterials::new(ctx).await?;
+        let transforms = GeometryBindGroupTransforms::new(ctx).await?;
         let meta = GeometryBindGroupMeta::new(ctx).await?;
         let animation = GeometryBindGroupAnimation::new(ctx).await?;
 
         Ok(Self {
             camera,
-            transform_materials,
+            transforms,
             meta,
             animation,
         })
@@ -96,26 +96,17 @@ impl GeometryBindGroupCamera {
 }
 
 #[derive(Default)]
-pub struct GeometryBindGroupTransformMaterials {
+pub struct GeometryBindGroupTransforms {
     pub bind_group_layout_key: BindGroupLayoutKey,
     // this is set via `recreate` mechanism
     _bind_group: Option<web_sys::GpuBindGroup>,
 }
 
-impl GeometryBindGroupTransformMaterials {
+impl GeometryBindGroupTransforms {
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
             entries: vec![
                 // Transform
-                BindGroupLayoutCacheKeyEntry {
-                    resource: BindGroupLayoutResource::Buffer(
-                        BufferBindingLayout::new()
-                            .with_binding_type(BufferBindingType::ReadOnlyStorage),
-                    ),
-                    visibility_vertex: true,
-                    visibility_fragment: true,
-                    visibility_compute: false,
-                },
                 BindGroupLayoutCacheKeyEntry {
                     resource: BindGroupLayoutResource::Buffer(
                         BufferBindingLayout::new()
@@ -141,19 +132,11 @@ impl GeometryBindGroupTransformMaterials {
     pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts.get(self.bind_group_layout_key)?,
-            Some("Geometry Transforms (and materials)"),
-            vec![
-                BindGroupEntry::new(
-                    0,
-                    BindGroupResource::Buffer(BufferBinding::new(&ctx.transforms.gpu_buffer)),
-                ),
-                BindGroupEntry::new(
-                    1,
-                    BindGroupResource::Buffer(BufferBinding::new(
-                        ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
-                    )),
-                ),
-            ],
+            Some("Geometry Transforms"),
+            vec![BindGroupEntry::new(
+                0,
+                BindGroupResource::Buffer(BufferBinding::new(&ctx.transforms.gpu_buffer)),
+            )],
         );
 
         let bind_group = ctx.gpu.create_bind_group(&descriptor.into());

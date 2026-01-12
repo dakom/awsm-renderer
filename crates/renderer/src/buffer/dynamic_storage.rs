@@ -112,6 +112,7 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
         }
     }
 
+    // Use update() instead; this always inserts a new allocation.
     fn insert(&mut self, key: K, bytes: &[u8]) -> usize {
         let req = round_pow2(bytes.len().max(MIN_BLOCK));
         let off = self.alloc(req).unwrap_or_else(|| {

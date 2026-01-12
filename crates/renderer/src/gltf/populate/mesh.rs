@@ -151,6 +151,7 @@ impl AwsmRenderer {
 
         let double_sided = match &material {
             Material::Pbr(pbr) => pbr.double_sided(),
+            Material::Unlit(pbr) => pbr.double_sided(),
         };
 
         let material_key = self.materials.insert(material, &self.textures);

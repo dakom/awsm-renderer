@@ -34,28 +34,23 @@
 {% include "shared_wgsl/transforms.wgsl" %}
 /*************** END transforms.wgsl ******************/
 
-{% if !unlit %}
-    /*************** START lights.wgsl ******************/
-    {% include "shared_wgsl/pbr/lighting/lights.wgsl" %}
-    /*************** END lights.wgsl ******************/
+/*************** START lights.wgsl ******************/
+{% include "shared_wgsl/lighting/lights.wgsl" %}
+/*************** END lights.wgsl ******************/
 
-    /*************** START brdf.wgsl ******************/
-    {% include "shared_wgsl/pbr/lighting/brdf.wgsl" %}
-    /*************** END brdf.wgsl ******************/
-{% else %}
-    /*************** START unlit.wgsl ******************/
-    {% include "shared_wgsl/pbr/lighting/unlit.wgsl" %}
-    /*************** END unlit.wgsl ******************/
-{% endif %}
+/*************** START brdf.wgsl ******************/
+{% include "shared_wgsl/lighting/brdf.wgsl" %}
+/*************** END brdf.wgsl ******************/
+
+/*************** START unlit.wgsl ******************/
+{% include "shared_wgsl/lighting/unlit.wgsl" %}
+/*************** END unlit.wgsl ******************/
 
 
 /*************** START material.wgsl ******************/
-{% include "shared_wgsl/pbr/material.wgsl" %}
+{% include "shared_wgsl/material.wgsl" %}
 /*************** END material.wgsl ******************/
 
-/*************** START material_color.wgsl ******************/
-{% include "shared_wgsl/pbr/material_color.wgsl" %}
-/*************** END material_color.wgsl ******************/
 
 {% match mipmap %}
     {% when MipmapMode::Gradient %}
@@ -168,9 +163,8 @@ fn main(
             // Count of valid samples (either skybox or geometry)
             var valid_samples = 0u;
 
-            {% if !unlit %}
             let lights_info = get_lights_info();
-            {% endif %}
+
             let standard_coordinates = get_standard_coordinates(coords, screen_dims);
 
             {% for s in 0..msaa_sample_count %}
@@ -249,16 +243,14 @@ fn main(
                         {% endmatch %}
 
                         // Apply lighting
-                        {% if unlit %}
-                            let sample_color = unlit(mat_color_{{s}});
-                        {% else %}
-                            let sample_color = apply_lighting(
-                                mat_color_{{s}},
-                                standard_coordinates.surface_to_camera,
-                                standard_coordinates.world_position,
-                                lights_info
-                            );
-                        {% endif %}
+                        // TODO - if material is unlit:
+                        //let sample_color = unlit(mat_color_{{s}});
+                        let sample_color = apply_lighting(
+                            mat_color_{{s}},
+                            standard_coordinates.surface_to_camera,
+                            standard_coordinates.world_position,
+                            lights_info
+                        );
 
                         color_sum += sample_color;
                         alpha_sum += mat_color_{{s}}.base.a;
@@ -324,9 +316,7 @@ fn main(
 
     let os_vertices = get_object_space_vertices(visibility_geometry_data_offset, triangle_index);
 
-    {% if !unlit %}
-        let lights_info = get_lights_info();
-    {% endif %}
+    let lights_info = get_lights_info();
 
     // Compute material color
     {% match mipmap %}
@@ -362,17 +352,14 @@ fn main(
             );
     {% endmatch %}
 
-    {% if !unlit %}
-        // Apply lighting
-        var color = apply_lighting(
-            material_color,
-            standard_coordinates.surface_to_camera,
-            standard_coordinates.world_position,
-            lights_info
-        );
-    {% else %}
-        var color = unlit(material_color);
-    {% endif %}
+    // Apply lighting
+    // TODO: if unlit var color = unlit(material_color);
+    var color = apply_lighting(
+        material_color,
+        standard_coordinates.surface_to_camera,
+        standard_coordinates.world_position,
+        lights_info
+    );
 
     // If we're not doing MSAA, we're done here, but if we are, we need to check if this is an edge pixel
     {% if multisampled_geometry && !debug.msaa_detect_edges %}
@@ -469,16 +456,13 @@ fn main(
                         {% endmatch %}
 
                         // Apply lighting
-                        {% if !unlit %}
-                            let sample_color = apply_lighting(
-                                material_color_{{s}},
-                                standard_coordinates.surface_to_camera,
-                                standard_coordinates.world_position,
-                                lights_info
-                            );
-                        {% else %}
-                            let sample_color = unlit(material_color_{{s}});
-                        {% endif %}
+                        // TODO: if unlit let sample_color = unlit(material_color_{{s}});
+                        let sample_color = apply_lighting(
+                            material_color_{{s}},
+                            standard_coordinates.surface_to_camera,
+                            standard_coordinates.world_position,
+                            lights_info
+                        );
 
                         color_sum += sample_color;
                         alpha_sum += material_color_{{s}}.base.a;

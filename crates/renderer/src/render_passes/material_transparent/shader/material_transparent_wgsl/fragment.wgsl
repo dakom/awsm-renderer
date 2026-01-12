@@ -222,49 +222,48 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
         is_orthographic
     );
 
-    {% if !unlit %}
-        // Get lighting info
-        let lights_info = get_lights_info();
+    // TODO - branch on unlit
+    //let color = unlit(material_color);
+    // Get lighting info
+    let lights_info = get_lights_info();
 
-        // Check if we need screen-space transmission
-        let metallic = clamp(material_color.metallic_roughness.x, 0.0, 1.0);
-        let effective_transmission = material_color.transmission * (1.0 - metallic);
+    // Check if we need screen-space transmission
+    let metallic = clamp(material_color.metallic_roughness.x, 0.0, 1.0);
+    let effective_transmission = material_color.transmission * (1.0 - metallic);
 
-        var color: vec3<f32>;
-        if (effective_transmission > 0.0) {
-            // Sample transmission background from opaque render
-            let roughness = max(clamp(material_color.metallic_roughness.y, 0.0, 1.0), 0.04);
-            let transmission_background = sample_transmission_background(
-                input.frag_pos,
-                input.world_position,
-                material_color.normal,
-                -surface_to_camera,  // view direction (towards surface)
-                material_color.ior,
-                roughness,
-                material_color.volume_thickness,
-                camera,
-            );
+    var color: vec3<f32>;
+    if (effective_transmission > 0.0) {
+        // Sample transmission background from opaque render
+        let roughness = max(clamp(material_color.metallic_roughness.y, 0.0, 1.0), 0.04);
+        let transmission_background = sample_transmission_background(
+            input.frag_pos,
+            input.world_position,
+            material_color.normal,
+            -surface_to_camera,  // view direction (towards surface)
+            material_color.ior,
+            roughness,
+            material_color.volume_thickness,
+            camera,
+        );
 
-            // Apply lighting with screen-space transmission
-            color = apply_lighting_with_transmission(
-                material_color,
-                surface_to_camera,
-                input.world_position,
-                lights_info,
-                transmission_background
-            );
-        } else {
-            // Standard lighting without transmission
-            color = apply_lighting(
-                material_color,
-                surface_to_camera,
-                input.world_position,
-                lights_info
-            );
-        }
-    {% else %}
-        let color = unlit(material_color);
-    {% endif %}
+        // Apply lighting with screen-space transmission
+        color = apply_lighting_with_transmission(
+            material_color,
+            surface_to_camera,
+            input.world_position,
+            lights_info,
+            transmission_background
+        );
+    } else {
+        // Standard lighting without transmission
+        color = apply_lighting(
+            material_color,
+            surface_to_camera,
+            input.world_position,
+            lights_info
+        );
+    }
+
 
     // Output final color with alpha
     let premult_rgb = color * material_color.base.a;

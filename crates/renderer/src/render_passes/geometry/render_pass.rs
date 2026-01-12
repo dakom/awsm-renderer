@@ -120,11 +120,7 @@ impl GeometryRenderPass {
 
         render_pass.set_bind_group(0, self.bind_groups.camera.get_bind_group()?, None)?;
 
-        render_pass.set_bind_group(
-            1,
-            self.bind_groups.transform_materials.get_bind_group()?,
-            None,
-        )?;
+        render_pass.set_bind_group(1, self.bind_groups.transforms.get_bind_group()?, None)?;
 
         render_pass.set_bind_group(3, self.bind_groups.animation.get_bind_group()?, None)?;
 

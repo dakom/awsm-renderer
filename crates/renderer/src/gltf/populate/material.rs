@@ -11,8 +11,14 @@ use crate::{
         populate::GltfTextureKey,
     },
     materials::{
-        pbr::{PbrMaterial, PbrMaterialImmutable, VertexColorInfo},
-        Material, MaterialAlphaMode,
+        pbr::{
+            PbrMaterial, PbrMaterialAnisotropy, PbrMaterialClearCoat,
+            PbrMaterialDiffuseTransmission, PbrMaterialDispersion, PbrMaterialEmissiveStrength,
+            PbrMaterialIor, PbrMaterialIridescence, PbrMaterialSheen, PbrMaterialSpecular,
+            PbrMaterialTransmission, PbrMaterialVertexColorInfo, PbrMaterialVolume,
+        },
+        unlit::UnlitMaterial,
+        Material, MaterialAlphaMode, MaterialTexture,
     },
     mesh::{MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo},
     textures::{SamplerCacheKey, SamplerKey, TextureKey, TextureTransform, TextureTransformKey},
@@ -27,6 +33,69 @@ pub(super) async fn pbr_material_mapper(
     primitive_buffer_info: &MeshBufferInfoWithOffset,
     gltf_material: gltf::Material<'_>,
 ) -> Result<Material> {
+    let mut pbr_material = pbr_material_mapper_core(renderer, ctx, &gltf_material).await?;
+
+    if gltf_material.unlit() {
+        let mut unlit_material =
+            UnlitMaterial::new(*pbr_material.alpha_mode(), gltf_material.double_sided());
+        unlit_material.base_color_tex = pbr_material.base_color_tex;
+        unlit_material.base_color_factor = pbr_material.base_color_factor;
+        unlit_material.emissive_tex = pbr_material.emissive_tex;
+        unlit_material.emissive_factor = pbr_material.emissive_factor;
+        return Ok(Material::Unlit(unlit_material));
+    }
+
+    // Not quite an extension, but not really core either
+    pbr_material.vertex_color_info = primitive_buffer_info
+        .triangles
+        .vertex_attributes
+        .iter()
+        .find_map(|attr| {
+            if let &MeshBufferVertexAttributeInfo::Custom(
+                MeshBufferCustomVertexAttributeInfo::Colors { index, .. },
+            ) = attr
+            {
+                // for right now just always use the first one we find
+                Some(PbrMaterialVertexColorInfo { set_index: index })
+            } else {
+                None
+            }
+        });
+
+    let LocalPbrMaterialExtensions {
+        emissive_strength,
+        ior,
+        specular,
+        transmission,
+        diffuse_transmission,
+        volume,
+        clearcoat,
+        sheen,
+        dispersion,
+        anisotropy,
+        iridescence,
+    } = LocalPbrMaterialExtensions::new(renderer, ctx, &gltf_material).await?;
+
+    pbr_material.emissive_strength = emissive_strength;
+    pbr_material.ior = ior;
+    pbr_material.specular = specular;
+    pbr_material.transmission = transmission;
+    pbr_material.diffuse_transmission = diffuse_transmission;
+    pbr_material.volume = volume;
+    pbr_material.clearcoat = clearcoat;
+    pbr_material.sheen = sheen;
+    pbr_material.dispersion = dispersion;
+    pbr_material.anisotropy = anisotropy;
+    pbr_material.iridescence = iridescence;
+
+    Ok(Material::Pbr(pbr_material))
+}
+
+async fn pbr_material_mapper_core(
+    renderer: &mut AwsmRenderer,
+    ctx: &GltfPopulateContext,
+    gltf_material: &gltf::Material<'_>,
+) -> Result<PbrMaterial> {
     let (alpha_mode, premultiplied_alpha) = match ctx.data.hints.hud {
         true => (MaterialAlphaMode::Blend, Some(false)),
         false => match gltf_material.alpha_mode() {
@@ -41,15 +110,11 @@ pub(super) async fn pbr_material_mapper(
         },
     };
 
-    let mut material = PbrMaterial::new(PbrMaterialImmutable {
-        alpha_mode,
-        double_sided: gltf_material.double_sided(),
-        unlit: gltf_material.unlit(),
-    });
+    let mut pbr_material = PbrMaterial::new(alpha_mode, gltf_material.double_sided());
 
-    let pbr = gltf_material.pbr_metallic_roughness();
+    let gltf_pbr = gltf_material.pbr_metallic_roughness();
 
-    if let Some(tex) = pbr.base_color_texture().map(GltfTextureInfo::from) {
+    if let Some(tex) = gltf_pbr.base_color_texture().map(GltfTextureInfo::from) {
         let GLtfMaterialCacheKey {
             uv_index,
             texture_key,
@@ -67,13 +132,19 @@ pub(super) async fn pbr_material_mapper(
             )
             .await?;
 
-        material.base_color_tex = Some(texture_key);
-        material.base_color_sampler = Some(sampler_key);
-        material.base_color_uv_index = Some(uv_index as u32);
-        material.base_color_texture_transform = texture_transform_key;
+        pbr_material.base_color_tex = Some(MaterialTexture {
+            key: texture_key,
+            sampler_key: Some(sampler_key),
+            uv_index: Some(uv_index as u32),
+            transform_key: texture_transform_key,
+        });
     }
+    pbr_material.base_color_factor = gltf_pbr.base_color_factor();
 
-    if let Some(tex) = pbr.metallic_roughness_texture().map(GltfTextureInfo::from) {
+    if let Some(tex) = gltf_pbr
+        .metallic_roughness_texture()
+        .map(GltfTextureInfo::from)
+    {
         let GLtfMaterialCacheKey {
             uv_index,
             texture_key,
@@ -90,11 +161,15 @@ pub(super) async fn pbr_material_mapper(
                 },
             )
             .await?;
-        material.metallic_roughness_tex = Some(texture_key);
-        material.metallic_roughness_sampler = Some(sampler_key);
-        material.metallic_roughness_uv_index = Some(uv_index as u32);
-        material.metallic_roughness_texture_transform = texture_transform_key;
+        pbr_material.metallic_roughness_tex = Some(MaterialTexture {
+            key: texture_key,
+            sampler_key: Some(sampler_key),
+            uv_index: Some(uv_index as u32),
+            transform_key: texture_transform_key,
+        });
     }
+    pbr_material.metallic_factor = gltf_pbr.metallic_factor();
+    pbr_material.roughness_factor = gltf_pbr.roughness_factor();
 
     if let Some(tex) = gltf_material.normal_texture().map(GltfTextureInfo::from) {
         let GLtfMaterialCacheKey {
@@ -114,10 +189,15 @@ pub(super) async fn pbr_material_mapper(
             )
             .await?;
 
-        material.normal_tex = Some(texture_key);
-        material.normal_sampler = Some(sampler_key);
-        material.normal_uv_index = Some(uv_index as u32);
-        material.normal_texture_transform = texture_transform_key;
+        pbr_material.normal_tex = Some(MaterialTexture {
+            key: texture_key,
+            sampler_key: Some(sampler_key),
+            uv_index: Some(uv_index as u32),
+            transform_key: texture_transform_key,
+        });
+    }
+    if let Some(normal_tex) = gltf_material.normal_texture() {
+        pbr_material.normal_scale = normal_tex.scale();
     }
 
     if let Some(tex) = gltf_material.occlusion_texture().map(GltfTextureInfo::from) {
@@ -138,10 +218,15 @@ pub(super) async fn pbr_material_mapper(
             )
             .await?;
 
-        material.occlusion_tex = Some(texture_key);
-        material.occlusion_sampler = Some(sampler_key);
-        material.occlusion_uv_index = Some(uv_index as u32);
-        material.occlusion_texture_transform = texture_transform_key;
+        pbr_material.occlusion_tex = Some(MaterialTexture {
+            key: texture_key,
+            sampler_key: Some(sampler_key),
+            uv_index: Some(uv_index as u32),
+            transform_key: texture_transform_key,
+        });
+    }
+    if let Some(occlusion_tex) = gltf_material.occlusion_texture() {
+        pbr_material.occlusion_strength = occlusion_tex.strength();
     }
 
     if let Some(tex) = gltf_material.emissive_texture().map(GltfTextureInfo::from) {
@@ -162,163 +247,372 @@ pub(super) async fn pbr_material_mapper(
             )
             .await?;
 
-        material.emissive_tex = Some(texture_key);
-        material.emissive_sampler = Some(sampler_key);
-        material.emissive_uv_index = Some(uv_index as u32);
-        material.emissive_texture_transform = texture_transform_key;
+        pbr_material.emissive_tex = Some(MaterialTexture {
+            key: texture_key,
+            sampler_key: Some(sampler_key),
+            uv_index: Some(uv_index as u32),
+            transform_key: texture_transform_key,
+        });
     }
+    pbr_material.emissive_factor = gltf_material.emissive_factor();
 
-    if let Some(normal_tex) = gltf_material.normal_texture() {
-        material.normal_scale = normal_tex.scale();
-    }
+    Ok(pbr_material)
+}
 
-    if let Some(occlusion_tex) = gltf_material.occlusion_texture() {
-        material.occlusion_strength = occlusion_tex.strength();
-    }
-    material.emissive_factor = gltf_material.emissive_factor();
-    material.emissive_strength = gltf_material.emissive_strength().unwrap_or(1.0);
+#[derive(Default)]
+struct LocalPbrMaterialExtensions {
+    pub emissive_strength: Option<PbrMaterialEmissiveStrength>,
+    pub ior: Option<PbrMaterialIor>,
+    pub specular: Option<PbrMaterialSpecular>,
+    pub transmission: Option<PbrMaterialTransmission>,
+    pub diffuse_transmission: Option<PbrMaterialDiffuseTransmission>,
+    pub volume: Option<PbrMaterialVolume>,
+    pub clearcoat: Option<PbrMaterialClearCoat>,
+    pub sheen: Option<PbrMaterialSheen>,
+    pub dispersion: Option<PbrMaterialDispersion>,
+    pub anisotropy: Option<PbrMaterialAnisotropy>,
+    pub iridescence: Option<PbrMaterialIridescence>,
+}
 
-    let pbr = gltf_material.pbr_metallic_roughness();
-    material.base_color_factor = pbr.base_color_factor();
-    material.metallic_factor = pbr.metallic_factor();
-    material.roughness_factor = pbr.roughness_factor();
+impl LocalPbrMaterialExtensions {
+    async fn new(
+        renderer: &mut AwsmRenderer,
+        ctx: &GltfPopulateContext,
+        gltf_material: &gltf::Material<'_>,
+    ) -> Result<Self> {
+        let mut extensions = Self::default();
 
-    if let Some(ior) = gltf_material.ior() {
-        material.ior = ior;
-    }
-
-    if let Some(specular) = gltf_material.specular() {
-        material.specular_factor = specular.specular_factor();
-        material.specular_color_factor = specular.specular_color_factor();
-
-        if let Some(tex) = specular.specular_texture().map(GltfTextureInfo::from) {
-            let GLtfMaterialCacheKey {
-                uv_index,
-                texture_key,
-                sampler_key,
-                texture_transform_key,
-            } = tex
-                .create_material_cache_key(
-                    renderer,
-                    ctx,
-                    TextureColorInfo {
-                        mipmap_kind: MipmapTextureKind::Specular,
-                        srgb_to_linear: true,
-                        premultiplied_alpha,
-                    },
-                )
-                .await?;
-
-            material.specular_tex = Some(texture_key);
-            material.specular_sampler = Some(sampler_key);
-            material.specular_uv_index = Some(uv_index as u32);
-            material.specular_texture_transform = texture_transform_key;
+        if let Some(strength) = gltf_material.emissive_strength() {
+            extensions.emissive_strength = Some(PbrMaterialEmissiveStrength { strength });
         }
 
-        if let Some(tex) = specular.specular_color_texture().map(GltfTextureInfo::from) {
-            let GLtfMaterialCacheKey {
-                uv_index,
-                texture_key,
-                sampler_key,
-                texture_transform_key,
-            } = tex
-                .create_material_cache_key(
-                    renderer,
-                    ctx,
-                    TextureColorInfo {
-                        mipmap_kind: MipmapTextureKind::SpecularColor,
-                        srgb_to_linear: true,
-                        premultiplied_alpha,
-                    },
-                )
-                .await?;
-
-            material.specular_color_tex = Some(texture_key);
-            material.specular_color_sampler = Some(sampler_key);
-            material.specular_color_uv_index = Some(uv_index as u32);
-            material.specular_color_texture_transform = texture_transform_key;
-        }
-    }
-
-    if let Some(transmission) = gltf_material.transmission() {
-        material.transmission_factor = transmission.transmission_factor();
-
-        if let Some(tex) = transmission
-            .transmission_texture()
-            .map(GltfTextureInfo::from)
-        {
-            let GLtfMaterialCacheKey {
-                uv_index,
-                texture_key,
-                sampler_key,
-                texture_transform_key,
-            } = tex
-                .create_material_cache_key(
-                    renderer,
-                    ctx,
-                    TextureColorInfo {
-                        mipmap_kind: MipmapTextureKind::Transmission,
-                        srgb_to_linear: false,
-                        premultiplied_alpha,
-                    },
-                )
-                .await?;
-
-            material.transmission_tex = Some(texture_key);
-            material.transmission_sampler = Some(sampler_key);
-            material.transmission_uv_index = Some(uv_index as u32);
-            material.transmission_texture_transform = texture_transform_key;
-        }
-    }
-
-    if let Some(volume) = gltf_material.volume() {
-        material.volume_thickness_factor = volume.thickness_factor();
-
-        if let Some(tex) = volume.thickness_texture().map(GltfTextureInfo::from) {
-            let GLtfMaterialCacheKey {
-                uv_index,
-                texture_key,
-                sampler_key,
-                texture_transform_key,
-            } = tex
-                .create_material_cache_key(
-                    renderer,
-                    ctx,
-                    TextureColorInfo {
-                        mipmap_kind: MipmapTextureKind::VolumeThickness,
-                        srgb_to_linear: false,
-                        premultiplied_alpha,
-                    },
-                )
-                .await?;
-
-            material.volume_thickness_tex = Some(texture_key);
-            material.volume_thickness_sampler = Some(sampler_key);
-            material.volume_thickness_uv_index = Some(uv_index as u32);
-            material.volume_thickness_texture_transform = texture_transform_key;
+        if let Some(ior) = gltf_material.ior() {
+            extensions.ior = Some(PbrMaterialIor { ior });
         }
 
-        material.volume_attenuation_distance = volume.attenuation_distance();
-        material.volume_attenuation_color = volume.attenuation_color();
-    }
-
-    material.vertex_color_info = primitive_buffer_info
-        .triangles
-        .vertex_attributes
-        .iter()
-        .find_map(|attr| {
-            if let &MeshBufferVertexAttributeInfo::Custom(
-                MeshBufferCustomVertexAttributeInfo::Colors { index, .. },
-            ) = attr
+        if let Some(specular) = gltf_material.specular() {
+            let tex = if let Some(tex_info) = specular.specular_texture().map(GltfTextureInfo::from)
             {
-                // for right now just always use the first one we find
-                Some(VertexColorInfo { set_index: index })
+                let GLtfMaterialCacheKey {
+                    uv_index,
+                    texture_key,
+                    sampler_key,
+                    texture_transform_key,
+                } = tex_info
+                    .create_material_cache_key(
+                        renderer,
+                        ctx,
+                        TextureColorInfo {
+                            mipmap_kind: MipmapTextureKind::Specular,
+                            srgb_to_linear: false,
+                            premultiplied_alpha: None,
+                        },
+                    )
+                    .await?;
+
+                Some(MaterialTexture {
+                    key: texture_key,
+                    sampler_key: Some(sampler_key),
+                    uv_index: Some(uv_index as u32),
+                    transform_key: texture_transform_key,
+                })
             } else {
                 None
-            }
-        });
+            };
 
-    Ok(Material::Pbr(material))
+            let color_tex = if let Some(tex_info) =
+                specular.specular_color_texture().map(GltfTextureInfo::from)
+            {
+                let GLtfMaterialCacheKey {
+                    uv_index,
+                    texture_key,
+                    sampler_key,
+                    texture_transform_key,
+                } = tex_info
+                    .create_material_cache_key(
+                        renderer,
+                        ctx,
+                        TextureColorInfo {
+                            mipmap_kind: MipmapTextureKind::Specular,
+                            srgb_to_linear: true,
+                            premultiplied_alpha: None,
+                        },
+                    )
+                    .await?;
+
+                Some(MaterialTexture {
+                    key: texture_key,
+                    sampler_key: Some(sampler_key),
+                    uv_index: Some(uv_index as u32),
+                    transform_key: texture_transform_key,
+                })
+            } else {
+                None
+            };
+            extensions.specular = Some(PbrMaterialSpecular {
+                tex,
+                factor: specular.specular_factor(),
+                color_tex,
+                color_factor: specular.specular_color_factor(),
+            });
+        }
+
+        if let Some(transmission) = gltf_material.transmission() {
+            let tex = if let Some(tex_info) = transmission
+                .transmission_texture()
+                .map(GltfTextureInfo::from)
+            {
+                let GLtfMaterialCacheKey {
+                    uv_index,
+                    texture_key,
+                    sampler_key,
+                    texture_transform_key,
+                } = tex_info
+                    .create_material_cache_key(
+                        renderer,
+                        ctx,
+                        TextureColorInfo {
+                            mipmap_kind: MipmapTextureKind::Transmission,
+                            srgb_to_linear: false,
+                            premultiplied_alpha: None,
+                        },
+                    )
+                    .await?;
+
+                Some(MaterialTexture {
+                    key: texture_key,
+                    sampler_key: Some(sampler_key),
+                    uv_index: Some(uv_index as u32),
+                    transform_key: texture_transform_key,
+                })
+            } else {
+                None
+            };
+
+            extensions.transmission = Some(PbrMaterialTransmission {
+                tex,
+                factor: transmission.transmission_factor(),
+            });
+        }
+
+        if let Some(volume) = gltf_material.volume() {
+            let thickness_tex =
+                if let Some(tex_info) = volume.thickness_texture().map(GltfTextureInfo::from) {
+                    let GLtfMaterialCacheKey {
+                        uv_index,
+                        texture_key,
+                        sampler_key,
+                        texture_transform_key,
+                    } = tex_info
+                        .create_material_cache_key(
+                            renderer,
+                            ctx,
+                            TextureColorInfo {
+                                mipmap_kind: MipmapTextureKind::VolumeThickness,
+                                srgb_to_linear: false,
+                                premultiplied_alpha: None,
+                            },
+                        )
+                        .await?;
+
+                    Some(MaterialTexture {
+                        key: texture_key,
+                        sampler_key: Some(sampler_key),
+                        uv_index: Some(uv_index as u32),
+                        transform_key: texture_transform_key,
+                    })
+                } else {
+                    None
+                };
+            extensions.volume = Some(PbrMaterialVolume {
+                thickness_factor: volume.thickness_factor(),
+                attenuation_distance: volume.attenuation_distance(),
+                attenuation_color: volume.attenuation_color(),
+                thickness_tex,
+            });
+        }
+
+        if let Some(clearcoat) = gltf_material.clearcoat() {
+            let tex =
+                if let Some(tex_info) = clearcoat.clearcoat_texture().map(GltfTextureInfo::from) {
+                    let GLtfMaterialCacheKey {
+                        uv_index,
+                        texture_key,
+                        sampler_key,
+                        texture_transform_key,
+                    } = tex_info
+                        .create_material_cache_key(
+                            renderer,
+                            ctx,
+                            TextureColorInfo {
+                                mipmap_kind: MipmapTextureKind::Albedo,
+                                srgb_to_linear: false,
+                                premultiplied_alpha: None,
+                            },
+                        )
+                        .await?;
+
+                    Some(MaterialTexture {
+                        key: texture_key,
+                        sampler_key: Some(sampler_key),
+                        uv_index: Some(uv_index as u32),
+                        transform_key: texture_transform_key,
+                    })
+                } else {
+                    None
+                };
+
+            let roughness_tex = if let Some(tex_info) = clearcoat
+                .clearcoat_roughness_texture()
+                .map(GltfTextureInfo::from)
+            {
+                let GLtfMaterialCacheKey {
+                    uv_index,
+                    texture_key,
+                    sampler_key,
+                    texture_transform_key,
+                } = tex_info
+                    .create_material_cache_key(
+                        renderer,
+                        ctx,
+                        TextureColorInfo {
+                            mipmap_kind: MipmapTextureKind::MetallicRoughness,
+                            srgb_to_linear: false,
+                            premultiplied_alpha: None,
+                        },
+                    )
+                    .await?;
+
+                Some(MaterialTexture {
+                    key: texture_key,
+                    sampler_key: Some(sampler_key),
+                    uv_index: Some(uv_index as u32),
+                    transform_key: texture_transform_key,
+                })
+            } else {
+                None
+            };
+
+            let normal_tex = if let Some(tex_info) = clearcoat
+                .clearcoat_normal_texture()
+                .map(GltfTextureInfo::from)
+            {
+                let GLtfMaterialCacheKey {
+                    uv_index,
+                    texture_key,
+                    sampler_key,
+                    texture_transform_key,
+                } = tex_info
+                    .create_material_cache_key(
+                        renderer,
+                        ctx,
+                        TextureColorInfo {
+                            mipmap_kind: MipmapTextureKind::Normal,
+                            srgb_to_linear: false,
+                            premultiplied_alpha: None,
+                        },
+                    )
+                    .await?;
+
+                Some(MaterialTexture {
+                    key: texture_key,
+                    sampler_key: Some(sampler_key),
+                    uv_index: Some(uv_index as u32),
+                    transform_key: texture_transform_key,
+                })
+            } else {
+                None
+            };
+
+            extensions.clearcoat = Some(PbrMaterialClearCoat {
+                tex,
+                factor: clearcoat.clearcoat_factor(),
+                roughness_tex,
+                roughness_factor: clearcoat.clearcoat_roughness_factor(),
+                normal_tex,
+                normal_scale: clearcoat
+                    .clearcoat_normal_texture()
+                    .map(|n| n.scale())
+                    .unwrap_or(1.0),
+            });
+        }
+
+        if let Some(sheen) = gltf_material.sheen() {
+            let color_tex =
+                if let Some(tex_info) = sheen.sheen_color_texture().map(GltfTextureInfo::from) {
+                    let GLtfMaterialCacheKey {
+                        uv_index,
+                        texture_key,
+                        sampler_key,
+                        texture_transform_key,
+                    } = tex_info
+                        .create_material_cache_key(
+                            renderer,
+                            ctx,
+                            TextureColorInfo {
+                                mipmap_kind: MipmapTextureKind::Specular,
+                                srgb_to_linear: true,
+                                premultiplied_alpha: None,
+                            },
+                        )
+                        .await?;
+
+                    Some(MaterialTexture {
+                        key: texture_key,
+                        sampler_key: Some(sampler_key),
+                        uv_index: Some(uv_index as u32),
+                        transform_key: texture_transform_key,
+                    })
+                } else {
+                    None
+                };
+
+            let roughness_tex = if let Some(tex_info) =
+                sheen.sheen_roughness_texture().map(GltfTextureInfo::from)
+            {
+                let GLtfMaterialCacheKey {
+                    uv_index,
+                    texture_key,
+                    sampler_key,
+                    texture_transform_key,
+                } = tex_info
+                    .create_material_cache_key(
+                        renderer,
+                        ctx,
+                        TextureColorInfo {
+                            mipmap_kind: MipmapTextureKind::MetallicRoughness,
+                            srgb_to_linear: false,
+                            premultiplied_alpha: None,
+                        },
+                    )
+                    .await?;
+
+                Some(MaterialTexture {
+                    key: texture_key,
+                    sampler_key: Some(sampler_key),
+                    uv_index: Some(uv_index as u32),
+                    transform_key: texture_transform_key,
+                })
+            } else {
+                None
+            };
+
+            extensions.sheen = Some(PbrMaterialSheen {
+                color_factor: sheen.sheen_color_factor(),
+                roughness_factor: sheen.sheen_roughness_factor(),
+                roughness_tex,
+                color_tex,
+            });
+        }
+
+        // TODO:
+        // pub diffuse_transmission: Option<PbrMaterialDiffuseTransmission>,
+        // pub dispersion: Option<PbrMaterialDispersion>,
+        // pub anisotropy: Option<PbrMaterialAnisotropy>,
+        // pub iridescence: Option<PbrMaterialIridescence>,
+
+        Ok(extensions)
+    }
 }
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]

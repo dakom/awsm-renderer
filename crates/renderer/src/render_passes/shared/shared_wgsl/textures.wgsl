@@ -1,5 +1,8 @@
 // 20-byte packed texture descriptor suitable for uniform/storage buffers.
 //
+// A bit in `extra` indicates whether the texture is actually used at actually
+// (instead of sentinal values or flags on the material)
+//
 // Layout:
 // - size:                width/height in texels (16 bits each)
 // - array_and_layer:     array texture index (12 bits), layer index (20 bits)
@@ -33,8 +36,9 @@ struct TextureInfoRaw {
 
     // packed:
     //   bits  0..7  : flags
-    //                  bit 0 -> has mipmaps
-    //                  bits 1..7 reserved
+    //                  bit 0 -> has texture
+    //                  bit 1 -> has mipmaps
+    //                  bits 2..7 reserved
     //   bits  8..15 : address_mode_u (for mipmap gradient calculation)
     //   bits 16..23 : address_mode_v (for mipmap gradient calculation)
     //   bits 24..31 : padding / reserved
@@ -45,6 +49,7 @@ struct TextureInfoRaw {
 };
 
 struct TextureInfo {
+    exists: bool,
     size: vec2<u32>,   // (width, height)
     array_index: u32,
     layer_index: u32,
@@ -68,6 +73,9 @@ struct TextureTransform {
 };
 
 fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
+    const BITMASK_EXISTS: u32 = 1u;
+    const BITMASK_MIPMAPPED: u32 = 1u << 1u;
+
     // size
     let width:  u32 = raw.size & 0xFFFFu;
     let height: u32 = raw.size >> 16u;
@@ -82,7 +90,8 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
 
     // flags + address modes
     let flags: u32          = raw.extra & 0xFFu;                // bits 0..7
-    let mipmapped: bool     = (flags & 0x1u) != 0u;
+    let exists: bool     = (flags & BITMASK_EXISTS) != 0u;
+    let mipmapped: bool     = (flags & BITMASK_MIPMAPPED) != 0u;
 
     let address_mode_u: u32 = (raw.extra >> 8u)  & 0xFFu;       // bits 8..15
     let address_mode_v: u32 = (raw.extra >> 16u) & 0xFFu;       // bits 16..23
@@ -91,6 +100,7 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
     let uv_transform_index: u32 = raw.transform_offset / 32u;
 
     return TextureInfo(
+        exists,
         vec2<u32>(width, height),
         array_index,
         layer_index,
@@ -100,6 +110,21 @@ fn convert_texture_info(raw: TextureInfoRaw) -> TextureInfo {
         address_mode_u,
         address_mode_v,
         uv_transform_index
+    );
+}
+
+fn texture_info_none() -> TextureInfo {
+    return TextureInfo(
+        false,
+        vec2<u32>(0u, 0u),
+        0u,
+        0u,
+        0u,
+        0u,
+        false,
+        0u,
+        0u,
+        0u
     );
 }
 

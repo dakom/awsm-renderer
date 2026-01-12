@@ -3,7 +3,6 @@ use slotmap::SecondaryMap;
 
 use crate::anti_alias::AntiAliasing;
 use crate::error::Result;
-use crate::materials::Material;
 use crate::mesh::{Mesh, MeshBufferInfos, MeshKey};
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::compute_pipeline::{ComputePipelineCacheKey, ComputePipelineKey};
@@ -134,7 +133,6 @@ impl MaterialOpaquePipelines {
         &mut self,
         gpu: &AwsmRendererWebGpu,
         mesh: &Mesh,
-        material: &Material,
         mesh_key: MeshKey,
         shaders: &mut Shaders,
         pipelines: &mut Pipelines,
@@ -152,7 +150,6 @@ impl MaterialOpaquePipelines {
             texture_pool_samplers_len: material_bind_groups.texture_pool_sampler_keys.len() as u32,
             msaa_sample_count: anti_aliasing.msaa_sample_count,
             mipmaps: anti_aliasing.mipmap,
-            unlit: material.unlit(),
         };
 
         let shader_key = shaders.get_key(gpu, shader_cache_key).await?;

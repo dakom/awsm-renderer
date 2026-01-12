@@ -2,11 +2,12 @@
 
 - More extensions (see below)
   - https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos
-  - [ ] KHR_materials_clearcoat
-  - [ ] KHR_materials_sheen
+  - [-] KHR_materials_clearcoat
+  - [-] KHR_materials_sheen
   - [ ] KHR_materials_anisotropy
   - [ ] KHR_materials_iridescence
   - [ ] KHR_materials_dispersion
+  - [ ] KHR_materials_diffuse_transmission
   - [ ] KHR_lights_punctual
       - [ ] Directional
       - [ ] Point
@@ -100,6 +101,7 @@ If it's supported here, corresponding core functionality is also supported
     - [x] KHR_materials_transmission
     - [x] KHR_materials_volume
     - [ ] KHR_materials_dispersion
+    - [ ] KHR_materials_diffuse_transmission
     - [x] KHR_materials_ior
     - [ ] KHR_materials_anisotropy
     - [x] KHR_texture_transform

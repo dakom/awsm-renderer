@@ -89,6 +89,7 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
     h.insert(
         GltfSetId::Extensions,
         vec![
+            GltfId::ClearCoatTest,
             GltfId::TransmissionRoughness,
             GltfId::IorTestGrid,
             GltfId::SimpleInstancing,
@@ -137,6 +138,7 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GltfId {
+    ClearCoatTest,
     TransmissionRoughness,
     BrainStem,
     Fox,
@@ -240,6 +242,7 @@ impl GltfId {
 
     pub fn filepath(&self) -> &'static str {
         match self {
+            Self::ClearCoatTest => "ClearCoatTest/glTF/ClearCoatTest.gltf",
             Self::TransmissionRoughness => {
                 "TransmissionRoughnessTest/glTF/TransmissionRoughnessTest.gltf"
             }
@@ -327,6 +330,7 @@ impl GltfId {
 
     pub fn label(&self) -> &'static str {
         match self {
+            Self::ClearCoatTest => "ClearCoatTest",
             Self::TransmissionRoughness => "TransmissionRoughnessTest",
             Self::IorTestGrid => "Ior test grid",
             Self::SpecularTest => "Specular test",

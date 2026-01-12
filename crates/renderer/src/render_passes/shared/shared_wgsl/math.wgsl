@@ -114,3 +114,8 @@ fn unpack_normal_tangent(rgba: vec4<f32>) -> TBN {
     let B   = s * normalize(cross(N, T));
     return TBN(N, T, B);
 }
+
+// Convert relative indices to absolute indices (0 stays 0)
+fn abs_index(base_index: u32, relative_index: u32) -> u32 {
+    return select(0u, base_index + relative_index, relative_index != 0u);
+}
