@@ -18,6 +18,7 @@ use awsm_renderer::lights::ibl::IblTexture;
 use awsm_renderer::lights::Light;
 use awsm_renderer::lights::LightKey;
 
+use awsm_renderer::materials::Material;
 use awsm_renderer::picker::PickResult;
 use awsm_renderer::AwsmRenderer;
 use awsm_renderer_editor::transform_controller::{
@@ -602,6 +603,9 @@ impl AppScene {
 
             // takes the renderer lock so do it after we freed it
             scene.reset_punctual_lights().await?;
+            scene.reset_material_debug().await?;
+            scene.reset_anti_aliasing().await?;
+            scene.reset_post_processing().await?;
 
             Ok(())
         }
@@ -654,6 +658,49 @@ impl AppScene {
         ];
 
         *self.lights.lock().unwrap() = Some(lights);
+
+        Ok(())
+    }
+
+    pub async fn reset_material_debug(self: &Arc<Self>) -> Result<()> {
+        let mut renderer = self.renderer.lock().await;
+
+        let material_debug = self.ctx.material_debug.get_cloned();
+
+        let keys = renderer.materials.keys().collect::<Vec<_>>();
+
+        for key in keys {
+            renderer.update_material(key, |mat| {
+                match mat {
+                    Material::Pbr(pbr_material) => {
+                        pbr_material.debug = material_debug;
+                    }
+                    Material::Unlit(_) => {
+                        // TODO
+                    }
+                }
+            });
+        }
+
+        Ok(())
+    }
+
+    pub async fn reset_anti_aliasing(self: &Arc<Self>) -> Result<()> {
+        let mut renderer = self.renderer.lock().await;
+
+        let anti_aliasing = self.ctx.anti_alias.get_cloned();
+
+        renderer.set_anti_aliasing(anti_aliasing).await?;
+
+        Ok(())
+    }
+
+    pub async fn reset_post_processing(self: &Arc<Self>) -> Result<()> {
+        let mut renderer = self.renderer.lock().await;
+
+        let post_processing = self.ctx.post_processing.get_cloned();
+
+        renderer.set_post_processing(post_processing).await?;
 
         Ok(())
     }

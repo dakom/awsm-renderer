@@ -1,11 +1,12 @@
 #![allow(dead_code)]
 use std::sync::{Arc, LazyLock, Mutex};
 
+use awsm_renderer::{
+    anti_alias::AntiAliasing, materials::pbr::PbrMaterialDebug, post_process::PostProcessing,
+};
+
 use crate::{
-    pages::app::{
-        context::{IblId, SkyboxId},
-        sidebar::SidebarSection,
-    },
+    pages::app::context::{IblId, SkyboxId},
     route::{AppRoute, Route},
 };
 
@@ -16,16 +17,18 @@ pub struct Config {
     pub media_base_url_gltf_samples: String,
     pub media_base_url_additional_assets: String,
     pub generate_mipmaps: bool,
-    pub initial_sidebar_open: Option<SidebarSection>,
     pub post_processing_enabled: bool,
     pub initial_ibl: IblId,
     pub initial_skybox: SkyboxId,
     pub cache_buster: bool,
+    pub initial_material_debug: PbrMaterialDebug,
     pub initial_show_grid: bool,
     pub initial_show_gizmo_translation: bool,
     pub initial_show_gizmo_rotation: bool,
     pub initial_show_gizmo_scale: bool,
     pub initial_punctual_lights: bool,
+    pub initial_anti_alias: AntiAliasing,
+    pub initial_post_processing: PostProcessing,
 }
 
 #[allow(clippy::option_env_unwrap)]
@@ -48,17 +51,22 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         },
 
         generate_mipmaps: true,
-        //initial_sidebar_open: Some(SidebarSection::Gltf),
-        initial_sidebar_open: Some(SidebarSection::PostProcessing),
         post_processing_enabled: true,
-        initial_ibl: IblId::default(),
+        initial_ibl: if cfg!(debug_assertions) {
+            IblId::SimpleSky
+        } else {
+            IblId::PhotoStudio
+        },
         initial_skybox: SkyboxId::default(),
         cache_buster: cfg!(debug_assertions),
         initial_show_grid: false,
-        initial_show_gizmo_translation: true,
-        initial_show_gizmo_rotation: true,
-        initial_show_gizmo_scale: true,
+        initial_show_gizmo_translation: false,
+        initial_show_gizmo_rotation: false,
+        initial_show_gizmo_scale: false,
         initial_punctual_lights: true,
+        initial_material_debug: PbrMaterialDebug::None,
+        initial_anti_alias: AntiAliasing::default(),
+        initial_post_processing: PostProcessing::default(),
     }
 });
 

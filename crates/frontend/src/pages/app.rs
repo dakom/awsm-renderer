@@ -35,6 +35,10 @@ impl AppUi {
                 .style("flex", "0 0 auto")  // don't grow, don't shrink, size to content
                 .style("overflow-y", "auto")  // scroll if content overflows
                 .style("height", "100%")
+                .style("display", "flex")
+                .style("flex-direction", "column")
+                .style("position", "relative")
+                .style("z-index", "100")
                 .class(ColorBackground::Sidebar.class())
                 .child(AppSidebar::new(self.context.clone()).render())
             }))

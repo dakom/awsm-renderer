@@ -243,7 +243,9 @@ fn fs_main(input: FragmentInput) -> FragmentOutput {
         let metallic = clamp(material_color.metallic_roughness.x, 0.0, 1.0);
         let effective_transmission = material_color.transmission * (1.0 - metallic);
 
-        if (effective_transmission > 0.0) {
+        if(material.debug_bitmask != 0u) {
+            color = pbr_debug_material_color(material, material_color);
+        } else  if (effective_transmission > 0.0) {
             // Sample transmission background from opaque render
             let roughness = max(clamp(material_color.metallic_roughness.y, 0.0, 1.0), 0.04);
             let transmission_background = sample_transmission_background(

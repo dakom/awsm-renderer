@@ -46,14 +46,11 @@ impl DisplayRenderPass {
 
         render_pass.set_bind_group(0, self.bind_groups.get_bind_group()?, None)?;
 
-        render_pass.set_pipeline(ctx.pipelines.render.get(if ctx.anti_aliasing.smaa {
-            self.pipelines.smaa_render_pipeline_key
-        } else {
-            self.pipelines.no_anti_alias_render_pipeline_key
-        })?);
-
-        // No vertex buffer needed!
-        render_pass.draw(3);
+        if let Some(pipeline_key) = self.pipelines.render_pipeline_key {
+            render_pass.set_pipeline(ctx.pipelines.render.get(pipeline_key)?);
+            // No vertex buffer needed!
+            render_pass.draw(3);
+        }
 
         render_pass.end();
 

@@ -18,6 +18,7 @@ pub mod mesh;
 pub mod picker;
 pub mod pipeline_layouts;
 pub mod pipelines;
+pub mod post_process;
 pub mod render;
 pub mod render_passes;
 pub mod render_textures;
@@ -61,6 +62,7 @@ use crate::{
     lights::ibl::{Ibl, IblTexture},
     picker::Picker,
     pipeline_layouts::PipelineLayouts,
+    post_process::PostProcessing,
     render_passes::{RenderPassInitContext, RenderPasses},
     render_textures::{RenderTextureFormats, RenderTextures},
 };
@@ -84,6 +86,7 @@ pub struct AwsmRenderer {
     pub render_passes: RenderPasses,
     pub environment: Environment,
     pub anti_aliasing: AntiAliasing,
+    pub post_processing: PostProcessing,
     pub picker: Picker,
     // we pick between these on the fly
     _clear_color_perceptual_to_linear: Color,
@@ -123,6 +126,7 @@ pub struct AwsmRendererBuilder {
     ibl_filtered_env_colors: CubemapBitmapColors,
     ibl_irradiance_colors: CubemapBitmapColors,
     anti_aliasing: AntiAliasing,
+    post_processing: PostProcessing,
 }
 
 pub enum AwsmRendererGpuBuilderKind {
@@ -183,6 +187,7 @@ impl AwsmRendererBuilder {
                 y_negative: Color::WHITE,
             },
             anti_aliasing: AntiAliasing::default(),
+            post_processing: PostProcessing::default(),
         }
     }
 
@@ -237,6 +242,7 @@ impl AwsmRendererBuilder {
             ibl_filtered_env_colors,
             ibl_irradiance_colors,
             anti_aliasing,
+            post_processing,
         } = self;
 
         let mut gpu = match gpu {
@@ -328,6 +334,7 @@ impl AwsmRendererBuilder {
             logging,
             render_textures,
             anti_aliasing,
+            post_processing,
             picker,
             #[cfg(feature = "gltf")]
             gltf,

@@ -79,7 +79,7 @@ impl AwsmRenderer {
 
         if render_texture_views.size_changed {
             self.bind_groups
-                .mark_create(BindGroupCreate::TextureViewResize);
+                .mark_create(BindGroupCreate::TextureViewRecreate);
         }
 
         self.bind_groups.recreate(

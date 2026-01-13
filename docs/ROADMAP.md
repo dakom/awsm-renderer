@@ -1,52 +1,11 @@
 # Next up
-
-- More extensions (see below)
-  - https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos
-  - [-] KHR_materials_clearcoat
-  - [-] KHR_materials_sheen
-    - why am I seeing the triangle faces??
-  - [ ] KHR_materials_anisotropy
-  - [ ] KHR_materials_iridescence
-  - [ ] KHR_materials_dispersion
-  - [ ] KHR_materials_diffuse_transmission
-  - [ ] KHR_lights_punctual
-      - [ ] Directional
-      - [ ] Point
-      - [ ] Spot
-      
-### References
-
-These references should be read in full for proper implementation:
-
-- IOR: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_ior
-- Transmission: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_transmission
-- Volume: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_volume
-- Specular: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_specular
-- Clearcoat: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_clearcoat
-- Sheen: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_sheen
-- Unlit: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_unlit
-- Anisotropy: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_anisotropy
-- Dispersion: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_dispersion
-- Iridescence: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_iridescence
-- Diffuse Transmission: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_diffuse_transmission
-
-### Test Scenes
-
-Available in the renderer for testing:
-
-- IOR: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CompareIor
-- Also IOR: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/IORTestGrid
-- Transmission: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CompareTransmission
-- Volume: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CompareVolume
-- Specular: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CompareSpecular
-- Clearcoat: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CompareClearcoat
-- Sheen: https://github.com/KhronosGroup/glTF/tree/main/Models/CompareSheen
-- Unlit: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/UnlitTest
       
 - Make transparent meshes pickable
   - Maybe global "editor_mode" on renderer that toggles some less-efficient behavior
     - All meshes get both transparent and opaque geometry 
     - Picking pass samples both and uses alpha test to discard transparent fragments below threshold
+    
+- More extensions (see below)
     
 - Visual bounding box around selected objects
       
@@ -54,15 +13,11 @@ Available in the renderer for testing:
 - Make debug normals work again in sidebar
 - Animation support in sidebar (or get rid of it)
 
-- Support different kinds of Materials
-  - should just be a simple gate on the material meta, this is the beauty of the compute shader driven approach
-  - create toon shader material, as alternative to PBR
-  - create our own extension
-  - create our own example gltf with different materials
-
 - Shadows
 
 - Frustum culling
+
+- Toon shader
 
 - Get started with light culling pass
   - research best practices
@@ -72,10 +27,6 @@ Available in the renderer for testing:
     - Divides the screen into tiles (e.g., 16x16 pixels)
     - For each tile, build a list of lights that affect that region of the screen.
     - Write list of lights to storage buffer, indexed by tile
-
-- optimize wgsl structs
-  - use FooPacked (or FooRaw) and members should be vec4
-  - e.g. MeshMeta, Lights, etc. (some may already be done)
 
 - make it easier to configure initial sizes for dynamic buffers
   - derive from scanning gltf?
@@ -125,17 +76,17 @@ If it's supported here, corresponding core functionality is also supported
     - [x] EXT_mesh_gpu_instancing
     - [x] KHR_materials_unlit
     - [x] KHR_materials_emissive_strength
-    - [ ] KHR_materials_clearcoat
-    - [ ] KHR_materials_sheen
+    - [x] KHR_materials_clearcoat
+    - [x] KHR_materials_sheen
     - [x] KHR_materials_specular
     - [x] KHR_materials_transmission
     - [x] KHR_materials_volume
     - [ ] KHR_materials_dispersion
     - [ ] KHR_materials_diffuse_transmission
-    - [x] KHR_materials_ior
     - [ ] KHR_materials_anisotropy
-    - [x] KHR_texture_transform
     - [ ] KHR_materials_iridescence
+    - [x] KHR_materials_ior
+    - [x] KHR_texture_transform
     - [ ] KHR_lights_punctual
         - [ ] Directional
         - [ ] Point
