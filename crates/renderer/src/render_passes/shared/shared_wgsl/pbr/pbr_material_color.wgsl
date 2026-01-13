@@ -25,3 +25,36 @@ struct PbrMaterialColor {
     sheen_color: vec3<f32>,      // Sheen color at grazing angles
     sheen_roughness: f32,        // Sheen roughness (affects sheen lobe width)
 };
+
+fn pbr_debug_material_color(material: PbrMaterial, color: PbrMaterialColor) -> vec3<f32> {
+    if(pbr_debug_base_color(material.debug_bitmask)) {
+        return color.base.rgb;
+    }
+    if(pbr_debug_metallic_roughness(material.debug_bitmask)) {
+        // R = metallic, G = roughness, B = 0
+        return vec3<f32>(color.metallic_roughness.x, color.metallic_roughness.y, 0.0);
+    }
+    if(pbr_debug_normals(material.debug_bitmask)) {
+        // Remap normal from [-1,1] to [0,1] for visualization
+        return color.normal * 0.5 + 0.5;
+    }
+    if(pbr_debug_occlusion(material.debug_bitmask)) {
+        // Show occlusion as grayscale
+        return vec3<f32>(color.occlusion, color.occlusion, color.occlusion);
+    }
+    if(pbr_debug_emissive(material.debug_bitmask)) {
+        return color.emissive;
+    }
+    if(pbr_debug_specular(material.debug_bitmask)) {
+        // Show specular color modulated by specular strength
+        return color.specular_color * color.specular;
+    }
+
+    // This function was only called behind a gate, so we should never reach here.
+    // return magenta to signal error
+    return vec3<f32>(
+        1.0,
+        0.0,
+        1.0
+    );
+}

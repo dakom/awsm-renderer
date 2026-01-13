@@ -56,7 +56,7 @@ pub enum BindGroupCreate {
     MeshAttributeDataResize,
     MeshAttributeIndexResize,
     MaterialResize,
-    TextureViewResize,
+    TextureViewRecreate,
     TexturePool,
     TextureTransformsResize,
     AntiAliasingChange,
@@ -149,7 +149,7 @@ impl BindGroups {
                     functions_to_call.insert(FunctionToCall::GeometryAnimation);
                     functions_to_call.insert(FunctionToCall::TransparentMain);
                 }
-                BindGroupCreate::TextureViewResize => {
+                BindGroupCreate::TextureViewRecreate => {
                     functions_to_call.insert(FunctionToCall::LightCulling);
                     functions_to_call.insert(FunctionToCall::Display);
                     functions_to_call.insert(FunctionToCall::OpaqueMain);

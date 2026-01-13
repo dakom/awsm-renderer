@@ -25,7 +25,13 @@ fn frag_main(in: FragmentInput) -> @location(0) vec4<f32> {
     let rgb = linear_to_srgb(color.rgb);
 
     // Apply tone mapping to compress HDR to displayable range
-    let mapped = khronos_pbr_neutral_tonemap(rgb);
+    {% match tonemapping %}
+        {% when ToneMapping::KhronosNeutralPbr %}
+            let mapped = khronos_pbr_neutral_tonemap(rgb);
+        {% when _ %}
+            let mapped = rgb;
+    {% endmatch %}
+
 
     return vec4<f32>(mapped, color.a);
 }

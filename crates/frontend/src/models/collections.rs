@@ -136,7 +136,7 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
     }
 
     for collection in h.values_mut() {
-        collection.sort_by(|a, b| a.label().cmp(b.label()));
+        collection.sort();
     }
 
     h
@@ -217,6 +217,47 @@ pub enum GltfId {
     SpecularTest,
     AwsmTransformGizmo,
     IorTestGrid,
+}
+
+impl PartialOrd for GltfId {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for GltfId {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self == other {
+            return std::cmp::Ordering::Equal;
+        }
+
+        // prioritize some special cases
+        match (self, other) {
+            (GltfId::Fox, _) => return std::cmp::Ordering::Less,
+            (_, GltfId::Fox) => return std::cmp::Ordering::Greater,
+            _ => {}
+        }
+
+        match (self, other) {
+            (GltfId::MorphStressTest, _) => return std::cmp::Ordering::Less,
+            (_, GltfId::MorphStressTest) => return std::cmp::Ordering::Greater,
+            _ => {}
+        }
+
+        match (self, other) {
+            (GltfId::DamagedHelmet, _) => return std::cmp::Ordering::Less,
+            (_, GltfId::DamagedHelmet) => return std::cmp::Ordering::Greater,
+            _ => {}
+        }
+
+        match (self, other) {
+            (GltfId::AlphaBlendMode, _) => return std::cmp::Ordering::Less,
+            (_, GltfId::AlphaBlendMode) => return std::cmp::Ordering::Greater,
+            _ => {}
+        }
+
+        self.label().cmp(other.label())
+    }
 }
 
 impl TryFrom<&str> for GltfId {

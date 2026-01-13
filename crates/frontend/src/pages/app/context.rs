@@ -1,3 +1,7 @@
+use awsm_renderer::{
+    anti_alias::AntiAliasing, materials::pbr::PbrMaterialDebug, post_process::PostProcessing,
+};
+
 use crate::prelude::*;
 
 use super::scene::{camera::CameraId, AppScene};
@@ -6,7 +10,9 @@ use super::scene::{camera::CameraId, AppScene};
 pub struct AppContext {
     pub camera_id: Mutable<CameraId>,
     pub scene: Mutable<Option<Arc<AppScene>>>,
-    pub material: MutableMaterial,
+    pub material_debug: Mutable<PbrMaterialDebug>,
+    pub anti_alias: Mutable<AntiAliasing>,
+    pub post_processing: Mutable<PostProcessing>,
     pub ibl_id: Mutable<IblId>,
     pub punctual_lights: Mutable<bool>,
     pub skybox_id: Mutable<SkyboxId>,
@@ -101,14 +107,8 @@ impl LoadingStatus {
     }
 }
 
-#[derive(Clone)]
-pub struct MutableMaterial {
-    pub debug_normals: Mutable<bool>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum IblId {
-    #[default]
     PhotoStudio,
     SimpleSky,
     AllWhite,
@@ -127,9 +127,7 @@ impl Default for AppContext {
         Self {
             camera_id: Mutable::new(CameraId::default()),
             scene: Mutable::new(None),
-            material: MutableMaterial {
-                debug_normals: Mutable::new(false),
-            },
+            material_debug: Mutable::new(CONFIG.initial_material_debug),
             ibl_id: Mutable::new(CONFIG.initial_ibl),
             skybox_id: Mutable::new(CONFIG.initial_skybox),
             editor_grid_enabled: Mutable::new(CONFIG.initial_show_grid),
@@ -138,6 +136,8 @@ impl Default for AppContext {
             editor_gizmo_scale_enabled: Mutable::new(CONFIG.initial_show_gizmo_scale),
             loading_status: Mutable::new(LoadingStatus::default()),
             punctual_lights: Mutable::new(CONFIG.initial_punctual_lights),
+            anti_alias: Mutable::new(CONFIG.initial_anti_alias.clone()),
+            post_processing: Mutable::new(CONFIG.initial_post_processing.clone()),
         }
     }
 }

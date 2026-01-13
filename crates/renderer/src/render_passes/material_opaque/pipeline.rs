@@ -152,8 +152,6 @@ impl MaterialOpaquePipelines {
             mipmaps: anti_aliasing.mipmap,
         };
 
-        tracing::info!("{:#?}", shader_cache_key);
-
         let shader_key = shaders.get_key(gpu, shader_cache_key).await?;
 
         let compute_pipeline_cache_key = ComputePipelineCacheKey::new(

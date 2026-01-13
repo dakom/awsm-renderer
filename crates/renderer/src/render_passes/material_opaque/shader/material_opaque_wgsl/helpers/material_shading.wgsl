@@ -162,6 +162,11 @@ fn msaa_process_sample(
                 );
         {% endmatch %}
 
+        if(pbr_mat.debug_bitmask != 0u) {
+            let color = pbr_debug_material_color(pbr_mat, mat_color);
+            return MsaaSampleResult(color, mat_color.base.a, true);
+        }
+
         // Use shared standard_coordinates like main branch does
         let color = apply_lighting(
             mat_color,

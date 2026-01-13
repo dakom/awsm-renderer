@@ -24,6 +24,9 @@ pub struct PbrMaterial {
     pub emissive_tex: Option<MaterialTexture>,
     pub emissive_factor: [f32; 3],
 
+    // Debug settings
+    pub debug: PbrMaterialDebug,
+
     // Non-core features and extensions
     pub vertex_color_info: Option<PbrMaterialVertexColorInfo>,
     pub emissive_strength: Option<PbrMaterialEmissiveStrength>,
@@ -41,6 +44,31 @@ pub struct PbrMaterial {
     //
     alpha_mode: MaterialAlphaMode,
     double_sided: bool,
+}
+
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
+pub enum PbrMaterialDebug {
+    None,
+    BaseColor,
+    MetallicRoughness,
+    Normals,
+    Occlusion,
+    Emissive,
+    Specular,
+}
+
+impl PbrMaterialDebug {
+    pub fn bitmask(&self) -> u32 {
+        match self {
+            PbrMaterialDebug::None => 0,
+            PbrMaterialDebug::BaseColor => 1 << 0,
+            PbrMaterialDebug::MetallicRoughness => 1 << 1,
+            PbrMaterialDebug::Normals => 1 << 2,
+            PbrMaterialDebug::Occlusion => 1 << 3,
+            PbrMaterialDebug::Emissive => 1 << 4,
+            PbrMaterialDebug::Specular => 1 << 5,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -156,6 +184,7 @@ impl PbrMaterial {
             dispersion: None,
             anisotropy: None,
             iridescence: None,
+            debug: PbrMaterialDebug::None,
             alpha_mode,
             double_sided,
         }
@@ -203,41 +232,6 @@ impl PbrMaterial {
 
     pub fn uniform_buffer_data(&self, textures: &Textures) -> Result<Vec<u8>> {
         let mut data: Vec<u8> = Vec::with_capacity(256);
-
-        #[derive(Default, Debug)]
-        struct FeatureIndices {
-            pub vertex_color_info: u32,
-            pub emissive_strength: u32,
-            pub ior: u32,
-            pub specular: u32,
-            pub transmission: u32,
-            pub diffuse_transmission: u32,
-            pub volume: u32,
-            pub clearcoat: u32,
-            pub sheen: u32,
-            pub dispersion: u32,
-            pub anisotropy: u32,
-            pub iridescence: u32,
-        }
-
-        impl FeatureIndices {
-            pub fn to_u32_array(&self) -> [u32; 12] {
-                [
-                    self.vertex_color_info,
-                    self.emissive_strength,
-                    self.ior,
-                    self.specular,
-                    self.transmission,
-                    self.diffuse_transmission,
-                    self.volume,
-                    self.clearcoat,
-                    self.sheen,
-                    self.dispersion,
-                    self.anisotropy,
-                    self.iridescence,
-                ]
-            }
-        }
 
         let sampler_key_list: Vec<SamplerKey> = textures.pool_sampler_set.iter().cloned().collect();
         let map_texture = |tex: &MaterialTexture| {
@@ -290,7 +284,44 @@ impl PbrMaterial {
         write(&mut data, self.emissive_factor[1].into());
         write(&mut data, self.emissive_factor[2].into());
 
-        // Write feature indices, as a placeholder
+        write(&mut data, self.debug.bitmask().into());
+
+        // feature indices,
+        #[derive(Default, Debug)]
+        struct FeatureIndices {
+            pub vertex_color_info: u32,
+            pub emissive_strength: u32,
+            pub ior: u32,
+            pub specular: u32,
+            pub transmission: u32,
+            pub diffuse_transmission: u32,
+            pub volume: u32,
+            pub clearcoat: u32,
+            pub sheen: u32,
+            pub dispersion: u32,
+            pub anisotropy: u32,
+            pub iridescence: u32,
+        }
+
+        impl FeatureIndices {
+            pub fn to_u32_array(&self) -> [u32; 12] {
+                [
+                    self.vertex_color_info,
+                    self.emissive_strength,
+                    self.ior,
+                    self.specular,
+                    self.transmission,
+                    self.diffuse_transmission,
+                    self.volume,
+                    self.clearcoat,
+                    self.sheen,
+                    self.dispersion,
+                    self.anisotropy,
+                    self.iridescence,
+                ]
+            }
+        }
+        // first write feature_indices as a placeholder, then we go back and fill them in
         let mut feature_indices = FeatureIndices::default();
         let indices_offset = data.len();
         for value in feature_indices.to_u32_array() {

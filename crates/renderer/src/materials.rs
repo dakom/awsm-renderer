@@ -13,12 +13,18 @@ use crate::{
     buffer::dynamic_storage::DynamicStorageBuffer,
     materials::{pbr::PbrMaterial, unlit::UnlitMaterial},
     textures::{AwsmTextureError, SamplerKey, TextureKey, TextureTransformKey, Textures},
-    AwsmRendererLogging,
+    AwsmRenderer, AwsmRendererLogging,
 };
 
 pub mod pbr;
 pub mod unlit;
 pub mod writer;
+
+impl AwsmRenderer {
+    pub fn update_material(&mut self, key: MaterialKey, f: impl FnMut(&mut Material)) {
+        self.materials.update(key, &self.textures, f);
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum Material {
@@ -91,7 +97,11 @@ impl Materials {
         })
     }
 
-    pub fn list(&self) -> impl Iterator<Item = (MaterialKey, &Material)> {
+    pub fn keys(&self) -> impl Iterator<Item = MaterialKey> + '_ {
+        self.lookup.keys()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (MaterialKey, &Material)> {
         self.lookup.iter()
     }
 

@@ -109,18 +109,16 @@ where
     pub fn render(self) -> Dom {
         static CONTAINER: LazyLock<String> = LazyLock::new(|| {
             class! {
-                .style("display", "inline-flex")
+                .style("display", "flex")
                 .style("flex-direction", "column")
-                .style("gap", "1rem")
             }
         });
 
         static CONTENT: LazyLock<String> = LazyLock::new(|| {
             class! {
-                .style("display", "inline-block")
                 .style("position", "relative")
-                .style("border", "1px solid black")
-                .style("border-radius", "4px")
+                .style("border", "1px solid rgba(0, 0, 0, 0.3)")
+                .style("border-radius", "6px")
                 .style("cursor", "pointer")
             }
         });
@@ -128,31 +126,45 @@ where
         static LABEL_CONTAINER: LazyLock<String> = LazyLock::new(|| {
             class! {
                 .style("display", "flex")
-                .style("gap", "1rem")
+                .style("gap", "0.75rem")
                 .style("justify-content", "space-between")
-                .style("padding", "1rem")
+                .style("align-items", "center")
+                .style("padding", "0.6rem 0.8rem")
             }
         });
 
         static OPTIONS_CONTAINER: LazyLock<String> = LazyLock::new(|| {
             class! {
-                .style("position", "absolute")
-                .style("top", "100%")
-                .style("left", "0")
-                .style("width", "max-content")
+                .style("position", "fixed")
                 .style("z-index", Zindex::DropdownOptions.value())
             }
         });
 
         static OPTIONS_CONTENT: LazyLock<String> = LazyLock::new(|| {
             class! {
-                .style("border", "1px solid black")
-                .style("border-radius", "4px")
+                .style("border", "1px solid rgba(0, 0, 0, 0.3)")
+                .style("border-radius", "6px")
                 .style("display", "flex")
                 .style("flex-direction", "column")
-                .style("gap", "1rem")
-                .style("max-height", "24rem")
+                .style("gap", "0.25rem")
+                .style("padding", "0.5rem")
+                .style("max-height", "20rem")
                 .style("overflow-y", "auto")
+            }
+        });
+
+        static OPTION_ITEM: LazyLock<String> = LazyLock::new(|| {
+            class! {
+                .style("padding", "0.5rem 0.6rem")
+                .style("border-radius", "4px")
+                .style("transition", "background-color 0.15s")
+                .style("transition", "color 0.15s")
+                .style("cursor", "pointer")
+                .style("color", ColorText::Label.value())
+                .pseudo!(":hover", {
+                    .style("background-color", "rgba(255, 255, 255, 0.2)")
+                    .style("color", ColorText::Link.value())
+                })
             }
         });
 
@@ -165,6 +177,7 @@ where
         } = self;
 
         let showing = Mutable::new(false);
+        let dropdown_rect: Mutable<Option<web_sys::DomRect>> = Mutable::new(None);
 
         let selected: Mutable<Option<Arc<DropdownOption<T>>>> =
             Mutable::new(initial_selected.and_then(|initial_selected| {
@@ -188,70 +201,69 @@ where
                 .apply_if(bg_color.is_some(), |dom| {
                     dom.style("background-color", bg_color.unwrap_throw().value())
                 })
-                .child(html!("div", {
-                    .class([&*LABEL_CONTAINER, size.container_class()])
+                .with_node!(trigger_el => {
                     .child(html!("div", {
-                        .class(size.text_size_class())
-                        .text_signal(selected_label)
-                    }))
-                    .child(html!("div", {
-                        .class(size.text_size_class())
-                        .text_signal(showing.signal().map(|showing| {
-                            if showing {
-                                "▲"
-                            } else {
-                                "▼"
-                            }
+                        .class([&*LABEL_CONTAINER, size.container_class()])
+                        .child(html!("div", {
+                            .class(size.text_size_class())
+                            .text_signal(selected_label)
                         }))
-                    }))
-                    .event(clone!(showing => move |_: events::Click| {
-                        showing.set(!showing.get());
-                    }))
-                }))
-                .child_signal(showing.signal().map(clone!(on_change, showing => move |is_showing| {
-                    if is_showing {
-                        Some(html!("div", {
-                            .class(&*OPTIONS_CONTAINER)
-                            .apply_if(bg_color.is_some(), |dom| {
-                                dom.style("background-color", bg_color.unwrap_throw().value())
-                            })
-                            .child(html!("div", {
-                                .class([&*OPTIONS_CONTENT, size.options_class()])
-                                .children(options.iter().map(clone!(on_change, selected, showing => move |option| {
-                                    let hovering = Mutable::new(false);
-                                    html!("div", {
-                                        .class(size.text_size_class())
-
-                                        .text(&option.label)
-                                        .style_signal("color", hovering.signal().map(|hovering| {
-                                            if hovering {
-                                                ColorText::LabelHover.value()
-                                            } else {
-                                                ColorText::Label.value()
-                                            }
-                                        }))
-                                        .event({
-                                            clone!(selected, option, showing, on_change => move |_: events::Click| {
-                                                selected.set(Some(option.clone()));
-                                                showing.set_neq(false);
-                                                if let Some(on_change) = &on_change {
-                                                    on_change(&option.value);
-                                                }
-                                            })
-                                        })
-                                        .apply(set_on_hover(&hovering))
-                                    })
-                                })))
+                        .child(html!("div", {
+                            .class(size.text_size_class())
+                            .text_signal(showing.signal().map(|showing| {
+                                if showing {
+                                    "▲"
+                                } else {
+                                    "▼"
+                                }
                             }))
                         }))
-                    } else {
-                        None
-                    }
-                })))
-                .with_node!(el => {
-                    .global_event(clone!(showing => move |evt: events::Click| {
+                        .event(clone!(showing, dropdown_rect, trigger_el => move |_: events::Click| {
+                            let rect = trigger_el.get_bounding_client_rect();
+                            dropdown_rect.set(Some(rect));
+                            showing.set(!showing.get());
+                        }))
+                    }))
+                    .child_signal(showing.signal().map(clone!(on_change, showing, dropdown_rect => move |is_showing| {
+                        if is_showing {
+                            let rect = dropdown_rect.get_cloned();
+                            Some(html!("div", {
+                                .class(&*OPTIONS_CONTAINER)
+                                .apply_if(rect.is_some(), |dom| {
+                                    let rect = rect.unwrap_throw();
+                                    dom.style("top", format!("{}px", rect.bottom() + 4.0))
+                                       .style("left", format!("{}px", rect.left()))
+                                       .style("min-width", format!("{}px", rect.width()))
+                                })
+                                .apply_if(bg_color.is_some(), |dom| {
+                                    dom.style("background-color", bg_color.unwrap_throw().value())
+                                })
+                                .child(html!("div", {
+                                    .class(&*OPTIONS_CONTENT)
+                                    .children(options.iter().map(clone!(on_change, selected, showing => move |option| {
+                                        html!("div", {
+                                            .class([&*OPTION_ITEM, size.text_size_class()])
+                                            .text(&option.label)
+                                            .event({
+                                                clone!(selected, option, showing, on_change => move |_: events::Click| {
+                                                    selected.set(Some(option.clone()));
+                                                    showing.set_neq(false);
+                                                    if let Some(on_change) = &on_change {
+                                                        on_change(&option.value);
+                                                    }
+                                                })
+                                            })
+                                        })
+                                    })))
+                                }))
+                            }))
+                        } else {
+                            None
+                        }
+                    })))
+                    .global_event(clone!(showing, trigger_el => move |evt: events::Click| {
                         if let Some(target) = evt.target() {
-                            if !el.contains(Some(target.unchecked_ref())) {
+                            if !trigger_el.contains(Some(target.unchecked_ref())) {
                                 showing.set_neq(false);
                             }
                         }

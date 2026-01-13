@@ -13,7 +13,7 @@
 {% endif %}
 @group(0) @binding(5) var<storage, read> visibility_data: array<f32>;
 @group(0) @binding(6) var<storage, read> material_mesh_metas: array<MaterialMeshMeta>;
-@group(0) @binding(7) var<storage, read> materials: array<f32>;
+@group(0) @binding(7) var<storage, read> materials: array<u32>;
 @group(0) @binding(8) var<storage, read> attribute_indices: array<u32>;
 @group(0) @binding(9) var<storage, read> attribute_data: array<f32>;
 @group(0) @binding(10) var<storage, read> model_transforms: array<mat4x4<f32>>;

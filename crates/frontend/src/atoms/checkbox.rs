@@ -80,16 +80,30 @@ impl Checkbox {
     pub fn render(self) -> Dom {
         static CONTAINER: LazyLock<String> = LazyLock::new(|| {
             class! {
-                .style("display", "flex")
-                .style("gap", ".5rem")
+                .style("display", "inline-flex")
+                .style("gap", "0.6rem")
                 .style("align-items", "center")
-                .style("padding-left", "1rem")
+                .style("padding", "0.5rem 0.75rem")
+                .style("border-radius", "6px")
+                .style("transition", "background-color 0.15s")
+                .pseudo!(":hover", {
+                    .style("background-color", "rgba(255, 255, 255, 0.1)")
+                })
             }
         });
+
         static SVG: LazyLock<String> = LazyLock::new(|| {
             class! {
-                .style("width", "1.5rem")
-                .style("height", "1.5rem")
+                .style("width", "20px")
+                .style("height", "20px")
+                .style("flex-shrink", "0")
+            }
+        });
+
+        static LABEL: LazyLock<String> = LazyLock::new(|| {
+            class! {
+                .style("font-size", FontSize::Md.value())
+                .style("transition", "color 0.15s")
             }
         });
 
@@ -110,7 +124,11 @@ impl Checkbox {
                 }))
             })
             .apply_if(content_before.is_some(), |dom| {
-                dom.child(content_before.unwrap_throw())
+                dom.child(html!("span", {
+                    .class(&*LABEL)
+                    .style("color", style.color_value())
+                    .child(content_before.unwrap_throw())
+                }))
             })
             .child(svg!("svg", {
                 .class(&*SVG)
@@ -155,6 +173,7 @@ impl Checkbox {
             }))
             .apply_if(content_after.is_some(), |dom| {
                 dom.child(html!("span", {
+                    .class(&*LABEL)
                     .style("color", style.color_value())
                     .child(content_after.unwrap_throw())
                 }))

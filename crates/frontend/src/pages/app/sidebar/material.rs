@@ -1,6 +1,8 @@
+use awsm_renderer::materials::pbr::PbrMaterialDebug;
+use wasm_bindgen_futures::spawn_local;
+
 use crate::{
-    atoms::checkbox::{Checkbox, CheckboxStyle},
-    pages::app::context::AppContext,
+    pages::app::{context::AppContext, sidebar::render_dropdown_label},
     prelude::*,
 };
 
@@ -24,22 +26,42 @@ impl SidebarMaterial {
 
         html!("div", {
             .class(&*CONTAINER)
-            .child(state.render_debug_normals())
+            .child(state.render_debug_selector())
         })
     }
-
-    fn render_debug_normals(self: &Arc<Self>) -> Dom {
+    fn render_debug_selector(self: &Arc<Self>) -> Dom {
         let state = self;
 
-        Checkbox::new(CheckboxStyle::Dark)
-            .with_content_after(html!("span", {
-                .text("Debug Normals")
-            }))
-            .with_selected_signal(state.ctx.material.debug_normals.signal())
-            .with_on_click(clone!(state => move || {
-                state.ctx.material.debug_normals.set_neq(!state.ctx.material.debug_normals.get());
-            }))
-            .render()
+        render_dropdown_label(
+            "Debug",
+            Dropdown::new()
+                .with_intial_selected(Some(state.ctx.material_debug.get_cloned()))
+                .with_bg_color(ColorBackground::Dropdown)
+                .with_on_change(clone!(state => move |debug| {
+                    state.ctx.material_debug.set_neq(*debug);
+
+                    spawn_local(clone!(state => async move {
+                        if let Some(scene) = state.ctx.scene.get_cloned() {
+                            if let Err(err) = scene.reset_material_debug().await {
+                                tracing::error!("Error resetting material debug: {}", err);
+                            }
+                        }
+                    }));
+                }))
+                .with_options([
+                    ("None".to_string(), PbrMaterialDebug::None),
+                    ("Normals".to_string(), PbrMaterialDebug::Normals),
+                    ("Base Color".to_string(), PbrMaterialDebug::BaseColor),
+                    (
+                        "Metallic Roughness".to_string(),
+                        PbrMaterialDebug::MetallicRoughness,
+                    ),
+                    ("Occlusion".to_string(), PbrMaterialDebug::Occlusion),
+                    ("Emissive".to_string(), PbrMaterialDebug::Emissive),
+                    ("Specular".to_string(), PbrMaterialDebug::Specular),
+                ])
+                .render(),
+        )
     }
 }
 

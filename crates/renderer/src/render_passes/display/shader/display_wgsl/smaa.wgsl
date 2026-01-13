@@ -17,9 +17,7 @@
 // ============================================================================
 
 const SMAA_THRESHOLD: f32 = 0.03;          // Edge detection threshold (lower = more sensitive) - aggressive for thin lines
-const SMAA_LOCAL_CONTRAST_THRESHOLD: f32 = 0.02;  // Even more sensitive for local contrast
-const SMAA_MAX_SEARCH_STEPS: i32 = 8;     // How far to search for edge patterns
-const SMAA_CORNER_ROUNDING: f32 = 0.25;   // Corner smoothing amount
+const SMAA_BLEND_STRENGTH: f32 = 0.6;     // How strongly to blend with neighbors (0-1)
 
 fn apply_smaa(color: vec4<f32>, coords: vec2<i32>) -> vec4<f32> {
     let dimensions = textureDimensions(composite_texture);
@@ -162,7 +160,7 @@ fn calculate_blending_weights_horizontal(
     weight_top /= total;
     weight_bottom /= total;
 
-    return vec2<f32>(weight_top, weight_bottom) * 0.75; // 0.75 = blend 75% with neighbors
+    return vec2<f32>(weight_top, weight_bottom) * SMAA_BLEND_STRENGTH;
 }
 
 fn calculate_blending_weights_vertical(
@@ -196,7 +194,7 @@ fn calculate_blending_weights_vertical(
     weight_left /= total;
     weight_right /= total;
 
-    return vec2<f32>(weight_left, weight_right) * 0.75; // 0.75 = blend 75% with neighbors
+    return vec2<f32>(weight_left, weight_right) * SMAA_BLEND_STRENGTH;
 }
 
 fn diagonal_blending(
@@ -234,15 +232,14 @@ fn diagonal_blending(
     let bottom_left = textureLoad(composite_texture, coords + vec2<i32>(-1, 1), 0);
     let bottom_right = textureLoad(composite_texture, coords + vec2<i32>(1, 1), 0);
 
-    // Blend diagonally with moderate strength
-    let blend_strength = 0.6;
-    var result = center;
-    result = mix(result, top_left, norm_weight_tl * blend_strength);
-    result = mix(result, top_right, norm_weight_tr * blend_strength);
-    result = mix(result, bottom_left, norm_weight_bl * blend_strength);
-    result = mix(result, bottom_right, norm_weight_br * blend_strength);
+    // Compute weighted sum of diagonal neighbors
+    let neighbor_blend = top_left * norm_weight_tl +
+                         top_right * norm_weight_tr +
+                         bottom_left * norm_weight_bl +
+                         bottom_right * norm_weight_br;
 
-    return result;
+    // Blend center with weighted neighbor average
+    return mix(center, neighbor_blend, SMAA_BLEND_STRENGTH);
 }
 
 fn neighborhood_blending(

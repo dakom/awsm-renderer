@@ -282,6 +282,13 @@ fn main(
                 );
         {% endmatch %}
 
+        if(pbr_material.debug_bitmask != 0u) {
+            color = pbr_debug_material_color(pbr_material, material_color);
+            base_alpha = 1.0;
+            textureStore(opaque_tex, coords, vec4<f32>(color, base_alpha));
+            return;
+        }
+
         color = apply_lighting(
             material_color,
             standard_coordinates.surface_to_camera,

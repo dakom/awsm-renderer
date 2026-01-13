@@ -1,6 +1,7 @@
 use askama::Template;
 
 use crate::{
+    post_process::ToneMapping,
     render_passes::display::shader::cache_key::ShaderCacheKeyDisplay,
     shaders::{AwsmShaderError, Result},
 };
@@ -48,6 +49,7 @@ impl ShaderTemplateDisplayVertex {
 #[template(path = "display_wgsl/fragment.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateDisplayFragment {
     pub smaa_anti_alias: bool,
+    pub tonemapping: ToneMapping,
     pub debug: ShaderTemplateDisplayDebug,
 }
 
@@ -55,6 +57,7 @@ impl ShaderTemplateDisplayFragment {
     pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
         Self {
             smaa_anti_alias: cache_key.smaa_anti_alias,
+            tonemapping: cache_key.tonemapping,
             debug: ShaderTemplateDisplayDebug::new(),
         }
     }
