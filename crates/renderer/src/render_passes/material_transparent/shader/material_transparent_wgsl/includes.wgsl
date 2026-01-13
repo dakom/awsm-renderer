@@ -35,30 +35,24 @@
 /*************** END textures.wgsl ******************/
 
 /*************** START material.wgsl ******************/
-{% include "shared_wgsl/pbr/material.wgsl" %}
-/*************** END material.wgsl ******************/
-
-/*************** START material.wgsl ******************/
-{% include "shared_wgsl/pbr/material_color.wgsl" %}
+{% include "shared_wgsl/material.wgsl" %}
 /*************** END material.wgsl ******************/
 
 /*************** START mesh_meta.wgsl ******************/
 {% include "shared_wgsl/material_mesh_meta.wgsl" %}
 /*************** END mesh_meta.wgsl ******************/
 
-{% if !unlit %}
-    /*************** START lights.wgsl ******************/
-    {% include "shared_wgsl/pbr/lighting/lights.wgsl" %}
-    /*************** END lights.wgsl ******************/
+/*************** START lights.wgsl ******************/
+{% include "shared_wgsl/lighting/lights.wgsl" %}
+/*************** END lights.wgsl ******************/
 
-    /*************** START brdf.wgsl ******************/
-    {% include "shared_wgsl/pbr/lighting/brdf.wgsl" %}
-    /*************** END brdf.wgsl ******************/
-{% else %}
-    /*************** START unlit.wgsl ******************/
-    {% include "shared_wgsl/pbr/lighting/unlit.wgsl" %}
-    /*************** END unlit.wgsl ******************/
-{% endif %}
+/*************** START brdf.wgsl ******************/
+{% include "shared_wgsl/lighting/brdf.wgsl" %}
+/*************** END brdf.wgsl ******************/
+
+/*************** START unlit.wgsl ******************/
+{% include "shared_wgsl/lighting/unlit.wgsl" %}
+/*************** END unlit.wgsl ******************/
 
 /*************** START texture_uvs.wgsl ******************/
 {% include "material_transparent_wgsl/helpers/texture_uvs.wgsl" %}

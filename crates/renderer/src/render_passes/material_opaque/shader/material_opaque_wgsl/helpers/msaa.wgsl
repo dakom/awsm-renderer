@@ -124,18 +124,17 @@ fn edge_mask_depth_msaa(
   var dmin =  1e9;
   var dmax = -1e9;
 
-  // Check all MSAA samples for depth variation and triangle IDs (loop unrolled via template)
+  // Check all MSAA samples for depth variation and triangle IDs
   // View-space depth needed here since samples at same screen position but different depths
-  {% for s in 0..msaa_sample_count %}
-    if (sampleCovered(coords, {{ s }})) {
-
+  for (var s = 0u; s < {{ msaa_sample_count }}u; s++) {
+    if (sampleCoveredU(coords, s)) {
       sample_count++;
-      let depth = textureLoad(depth_tex, coords, {{ s }});
+      let depth = loadDepthSample(coords, s);
       let view_depth = viewSpaceDepth(camera, depth, pixel_center, screen_dims_f32);
       dmin = min(dmin, view_depth);
       dmax = max(dmax, view_depth);
     }
-  {% endfor %}
+  }
 
   // If less than 2 samples covered, no edge within pixel
   if (sample_count < 2u) { return false; }
@@ -154,6 +153,33 @@ fn sampleTriangleId(coords: vec2<i32>, s: i32) -> u32 {
 
 fn sampleCovered(coords: vec2<i32>, s: i32) -> bool {
   return sampleTriangleId(coords, s) != U32_MAX;
+}
+
+// Version that takes u32 sample index and uses switch for texture load
+fn sampleTriangleIdU(coords: vec2<i32>, s: u32) -> u32 {
+  var v: vec4<u32>;
+  switch(s) {
+    case 0u: { v = textureLoad(visibility_data_tex, coords, 0); }
+    case 1u: { v = textureLoad(visibility_data_tex, coords, 1); }
+    case 2u: { v = textureLoad(visibility_data_tex, coords, 2); }
+    case 3u, default: { v = textureLoad(visibility_data_tex, coords, 3); }
+  }
+  return join32(v.x, v.y);
+}
+
+fn sampleCoveredU(coords: vec2<i32>, s: u32) -> bool {
+  return sampleTriangleIdU(coords, s) != U32_MAX;
+}
+
+fn loadDepthSample(coords: vec2<i32>, s: u32) -> f32 {
+  var depth: f32;
+  switch(s) {
+    case 0u: { depth = textureLoad(depth_tex, coords, 0); }
+    case 1u: { depth = textureLoad(depth_tex, coords, 1); }
+    case 2u: { depth = textureLoad(depth_tex, coords, 2); }
+    case 3u, default: { depth = textureLoad(depth_tex, coords, 3); }
+  }
+  return depth;
 }
 
 // Convert depth buffer value to view-space depth (negative Z in view space)
@@ -191,11 +217,11 @@ fn msaa_sample_count_for_pixel(
   // If sample 0 is skybox, check if any other sample has geometry
   // This handles silhouette edges where sample 0 might be skybox
   if (center_triangle_id == U32_MAX) {
-    // Check if any sample hit geometry using short-circuit evaluation for efficiency
-    {% for s in 1..msaa_sample_count %}let vis_check_{{s}} = textureLoad(visibility_data_tex, coords, {{s}});
-    {% endfor %}let any_other_sample_hit = {% for s in 1..msaa_sample_count %}join32(vis_check_{{s}}.x, vis_check_{{s}}.y) != U32_MAX{% if loop.last %}{% else %} || {% endif %}{% endfor %};
-    if (any_other_sample_hit) {
-      return MSAA_SAMPLES; // Force MSAA resolve
+    // Check if any sample hit geometry (starting from sample 1)
+    for (var s = 1u; s < {{ msaa_sample_count }}u; s++) {
+      if (sampleCoveredU(coords, s)) {
+        return MSAA_SAMPLES; // Force MSAA resolve
+      }
     }
     return 1u; // All samples are skybox
   }

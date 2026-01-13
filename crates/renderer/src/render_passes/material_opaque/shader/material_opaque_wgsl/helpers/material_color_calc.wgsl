@@ -1,704 +1,591 @@
 
-{% match mipmap %}
-    {% when MipmapMode::Gradient %}
-        struct PbrMaterialGradients {
-            base_color: UvDerivs,
-            metallic_roughness: UvDerivs,
-            normal: UvDerivs,
-            occlusion: UvDerivs,
-            emissive: UvDerivs,
-            specular: UvDerivs,
-            specular_color: UvDerivs,
-            transmission: UvDerivs,
-            volume_thickness: UvDerivs,
-        }
+{% if mipmap.is_gradient() %}
+struct PbrMaterialGradients {
+    base_color: UvDerivs,
+    metallic_roughness: UvDerivs,
+    normal: UvDerivs,
+    occlusion: UvDerivs,
+    emissive: UvDerivs,
+    specular: UvDerivs,
+    specular_color: UvDerivs,
+    transmission: UvDerivs,
+    volume_thickness: UvDerivs,
+    // KHR_materials_clearcoat
+    clearcoat: UvDerivs,
+    clearcoat_roughness: UvDerivs,
+    clearcoat_normal: UvDerivs,
+    // KHR_materials_sheen
+    sheen_color: UvDerivs,
+    sheen_roughness: UvDerivs,
+}
+{% endif %}
 
-        // Gradient-based version - enables anisotropic filtering in compute shaders
-        fn pbr_get_material_color_grad(
-            triangle_indices: vec3<u32>,
-            attribute_data_offset: u32,
-            triangle_index: u32,
-            material: PbrMaterial,
-            barycentric: vec3<f32>,
-            vertex_attribute_stride: u32,
-            uv_sets_index: u32,
-            gradients: PbrMaterialGradients,
-            world_normal: vec3<f32>,
-            normal_matrix: mat3x3<f32>,
-            os_vertices: ObjectSpaceVertices,
-        ) -> PbrMaterialColor {
+// Main PBR material color function - samples all textures and computes final material properties
+// Returns PbrMaterialColor with perturbed normal (use material_color.normal for lighting!)
+fn pbr_get_material_color{{ mipmap.suffix() }}(
+    triangle_indices: vec3<u32>,
+    attribute_data_offset: u32,
+    triangle_index: u32,
+    material: PbrMaterial,
+    barycentric: vec3<f32>,
+    vertex_attribute_stride: u32,
+    uv_sets_index: u32,
+    {% if mipmap.is_gradient() %}gradients: PbrMaterialGradients,{% endif %}
+    geometry_tbn: TBN,
+) -> PbrMaterialColor {
+    // Load extension data on-demand from indices
+    let emissive_strength = pbr_material_load_emissive_strength(material.emissive_strength_index);
+    let ior = pbr_material_load_ior(material.ior_index);
+    let specular = pbr_material_load_specular(material.specular_index);
+    let transmission = pbr_material_load_transmission(material.transmission_index);
+    let volume = pbr_material_load_volume(material.volume_index);
+    let clearcoat = pbr_material_load_clearcoat(material.clearcoat_index);
+    let sheen = pbr_material_load_sheen(material.sheen_index);
 
-            var base = _pbr_material_base_color_grad(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.base_color_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-                gradients.base_color,
-            );
+    var base = _pbr_material_base_color{{ mipmap.suffix() }}(
+        material,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            material.base_color_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.base_color,{% endif %}
+    );
 
-            {%- match color_sets %}
-                {% when Some with (color_sets) %}
-                    base *= vertex_color(
-                        attribute_data_offset,
-                        triangle_indices,
-                        barycentric,
-                        material.color_info,
-                        vertex_attribute_stride,
-                    );
-                {% when _ %}
-            {% endmatch %}
-
-            let metallic_roughness = _pbr_material_metallic_roughness_color_grad (
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.metallic_roughness_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-                gradients.metallic_roughness,
-            );
-
-            let normal = _pbr_normal_color_grad(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.normal_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-                gradients.normal,
-                world_normal,
-                barycentric,
-                triangle_indices,
+    {%- match color_sets %}
+        {% when Some with (color_sets) %}
+            let vertex_color_info = pbr_material_load_vertex_color_info(material.vertex_color_info_index);
+            base *= vertex_color(
                 attribute_data_offset,
-                vertex_attribute_stride,
-                uv_sets_index,
-                normal_matrix,
-                os_vertices,
-            );
-
-            let occlusion = _pbr_occlusion_color_grad(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.occlusion_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-                gradients.occlusion,
-            );
-
-            let emissive = _pbr_material_emissive_color_grad(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.emissive_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-                gradients.emissive,
-            );
-
-            let specular = _pbr_specular_grad(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.specular_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-                gradients.specular,
-            );
-
-            let specular_color = _pbr_specular_color_grad(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.specular_color_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-                gradients.specular_color,
-            );
-
-            let transmission = _pbr_transmission_grad(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.transmission_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-                gradients.transmission,
-            );
-
-            let volume_thickness = _pbr_volume_thickness_grad(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.volume_thickness_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-                gradients.volume_thickness,
-            );
-
-            return PbrMaterialColor(
-                base,
-                metallic_roughness,
-                normal,
-                occlusion,
-                emissive,
-                specular,
-                specular_color,
-                material.ior,
-                transmission,
-                volume_thickness,
-                material.volume_attenuation_distance,
-                material.volume_attenuation_color,
-            );
-        }
-
-        fn _pbr_material_base_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> vec4<f32> {
-            var color = material.base_color_factor;
-            if material.has_base_color_texture {
-                color *= texture_pool_sample_grad(material.base_color_tex_info, attribute_uv, uv_derivs);
-            }
-            color.a = 1.0;
-            return color;
-        }
-
-        fn _pbr_material_metallic_roughness_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs ) -> vec2<f32> {
-            var color = vec2<f32>(material.metallic_factor, material.roughness_factor);
-            if material.has_metallic_roughness_texture {
-                let tex = texture_pool_sample_grad(material.metallic_roughness_tex_info, attribute_uv, uv_derivs);
-                color *= vec2<f32>(tex.b, tex.g);
-            }
-            return color;
-        }
-
-        fn _pbr_normal_color_grad(
-            material: PbrMaterial,
-            attribute_uv: vec2<f32>,
-            uv_derivs: UvDerivs,
-            world_normal: vec3<f32>,
-            barycentric: vec3<f32>,
-            triangle_indices: vec3<u32>,
-            attribute_data_offset: u32,
-            vertex_attribute_stride: u32,
-            uv_sets_index: u32,
-            normal_matrix: mat3x3<f32>,
-            os_vertices: ObjectSpaceVertices,
-        ) -> vec3<f32> {
-            if !material.has_normal_texture {
-                return world_normal;
-            }
-
-            let tex = texture_pool_sample_grad(material.normal_tex_info, attribute_uv, uv_derivs);
-            var tangent_normal = vec3<f32>(
-                (tex.r * 2.0 - 1.0) * material.normal_scale,
-                (tex.g * 2.0 - 1.0) * material.normal_scale,
-                tex.b * 2.0 - 1.0,
-            );
-
-            var T = vec3<f32>(0.0);
-            var B = vec3<f32>(0.0);
-            var basis_valid = false;
-
-            if (vertex_attribute_stride >= 7u) {
-                let tangent = get_vertex_tangent(attribute_data_offset, triangle_indices, barycentric, vertex_attribute_stride);
-                let tangent_len_sq = dot(tangent.xyz, tangent.xyz);
-                if (tangent_len_sq > 0.0) {
-                    var world_tangent = normalize(normal_matrix * tangent.xyz);
-                    world_tangent = normalize(world_tangent - world_normal * dot(world_normal, world_tangent));
-                    let world_bitangent = normalize(cross(world_normal, world_tangent) * tangent.w);
-                    T = world_tangent;
-                    B = world_bitangent;
-                    basis_valid = true;
-                }
-            }
-
-            let set_index = material.normal_tex_info.uv_set_index;
-            let uv0 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.x, vertex_attribute_stride, uv_sets_index);
-            let uv1 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.y, vertex_attribute_stride, uv_sets_index);
-            let uv2 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.z, vertex_attribute_stride, uv_sets_index);
-
-            let delta_pos1 = os_vertices.p1 - os_vertices.p0;
-            let delta_pos2 = os_vertices.p2 - os_vertices.p0;
-            let delta_uv1 = uv1 - uv0;
-            let delta_uv2 = uv2 - uv0;
-            let det = delta_uv1.x * delta_uv2.y - delta_uv1.y * delta_uv2.x;
-
-            if (!basis_valid && abs(det) > 1e-6) {
-                let r = 1.0 / det;
-                let tangent_os = (delta_pos1 * delta_uv2.y - delta_pos2 * delta_uv1.y) * r;
-                var world_tangent = normalize(normal_matrix * tangent_os);
-                world_tangent = normalize(world_tangent - world_normal * dot(world_normal, world_tangent));
-                let world_bitangent = normalize(cross(world_normal, world_tangent));
-                T = world_tangent;
-                B = world_bitangent;
-                basis_valid = true;
-            }
-
-            if (!basis_valid) {
-                let up = vec3<f32>(0.0, 1.0, 0.0);
-                var fallback = normalize(cross(up, world_normal));
-                if (dot(fallback, fallback) < 1e-6) {
-                    fallback = normalize(cross(vec3<f32>(1.0, 0.0, 0.0), world_normal));
-                }
-                T = fallback;
-                B = normalize(cross(world_normal, T));
-            }
-
-            let tbn = mat3x3<f32>(T, B, world_normal);
-            return normalize(tbn * tangent_normal);
-        }
-
-        fn _pbr_occlusion_color_grad( material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs ) -> f32 {
-            var occlusion = 1.0;
-            if material.has_occlusion_texture {
-                let tex = texture_pool_sample_grad(material.occlusion_tex_info, attribute_uv, uv_derivs);
-                occlusion = mix(1.0, tex.r, material.occlusion_strength);
-            }
-            return occlusion;
-        }
-
-        fn _pbr_material_emissive_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs ) -> vec3<f32> {
-            var color = material.emissive_factor;
-            if material.has_emissive_texture {
-                color *= texture_pool_sample_grad(material.emissive_tex_info, attribute_uv, uv_derivs).rgb;
-            }
-            color *= material.emissive_strength;
-            return color;
-        }
-
-        fn _pbr_specular_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> f32 {
-            var specular = material.specular_factor;
-            if material.has_specular_texture {
-                specular *= texture_pool_sample_grad(material.specular_tex_info, attribute_uv, uv_derivs).a;
-            }
-            return specular;
-        }
-
-        fn _pbr_specular_color_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> vec3<f32> {
-            var color = material.specular_color_factor;
-            if material.has_specular_color_texture {
-                color *= texture_pool_sample_grad(material.specular_color_tex_info, attribute_uv, uv_derivs).rgb;
-            }
-            return color;
-        }
-
-        fn _pbr_transmission_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> f32 {
-            // Early exit: if no texture and factor is 0, skip entirely
-            if (!material.has_transmission_texture && material.transmission_factor == 0.0) {
-                return 0.0;
-            }
-            var transmission = material.transmission_factor;
-            if material.has_transmission_texture {
-                transmission *= texture_pool_sample_grad(material.transmission_tex_info, attribute_uv, uv_derivs).r;
-            }
-            return transmission;
-        }
-
-        fn _pbr_volume_thickness_grad(material: PbrMaterial, attribute_uv: vec2<f32>, uv_derivs: UvDerivs) -> f32 {
-            // Early exit: no volume if thickness is 0 and no texture
-            if (!material.has_volume_thickness_texture && material.volume_thickness_factor == 0.0) {
-                return 0.0;
-            }
-            var thickness = material.volume_thickness_factor;
-            if material.has_volume_thickness_texture {
-                // Volume thickness is stored in the G channel per glTF spec
-                thickness *= texture_pool_sample_grad(material.volume_thickness_tex_info, attribute_uv, uv_derivs).g;
-            }
-            return thickness;
-        }
-    {% when MipmapMode::None %}
-        // Samples all PBR material textures and computes the final material properties including
-        // normal mapping. The returned normal is the perturbed normal (with normal map applied) and
-        // should be used for all lighting calculations.
-        fn pbr_get_material_color_no_mips(
-            triangle_indices: vec3<u32>,
-            attribute_data_offset: u32,
-            triangle_index: u32,
-            material: PbrMaterial,
-            barycentric: vec3<f32>,
-            vertex_attribute_stride: u32,
-            uv_sets_index: u32,
-            world_normal: vec3<f32>,
-            normal_matrix: mat3x3<f32>,
-            os_vertices: ObjectSpaceVertices,
-        ) -> PbrMaterialColor {
-
-            var base = _pbr_material_base_color_no_mips(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.base_color_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-            );
-
-            {%- match color_sets %}
-                {% when Some with (color_sets) %}
-                    base *= vertex_color(
-                        attribute_data_offset,
-                        triangle_indices,
-                        barycentric,
-                        material.color_info,
-                        vertex_attribute_stride,
-                    );
-                {% when _ %}
-            {% endmatch %}
-
-
-            let metallic_roughness = _pbr_material_metallic_roughness_color_no_mips (
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.metallic_roughness_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-            );
-
-            // Compute the normal-mapped normal by applying the normal texture to the geometry normal
-            // using either stored tangents or computed tangent space from UVs
-            let normal = _pbr_normal_color_no_mips(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.normal_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-                world_normal,
-                barycentric,
                 triangle_indices,
-                attribute_data_offset,
+                barycentric,
+                vertex_color_info,
                 vertex_attribute_stride,
-                uv_sets_index,
-                normal_matrix,
-                os_vertices,
             );
+        {% when _ %}
+    {% endmatch %}
 
-            let occlusion = _pbr_occlusion_color_no_mips(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.occlusion_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-            );
+    let metallic_roughness = _pbr_material_metallic_roughness_color{{ mipmap.suffix() }}(
+        material,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            material.metallic_roughness_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.metallic_roughness,{% endif %}
+    );
 
-            let emissive = _pbr_material_emissive_color_no_mips(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.emissive_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-            );
+    let normal = _pbr_normal_color{{ mipmap.suffix() }}(
+        material,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            material.normal_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.normal,{% endif %}
+        geometry_tbn,
+    );
 
-            let specular = _pbr_specular_no_mips(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.specular_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-            );
+    let occlusion = _pbr_occlusion_color{{ mipmap.suffix() }}(
+        material,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            material.occlusion_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.occlusion,{% endif %}
+    );
 
-            let specular_color = _pbr_specular_color_no_mips(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.specular_color_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-            );
+    let emissive = _pbr_material_emissive_color{{ mipmap.suffix() }}(
+        material,
+        emissive_strength,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            material.emissive_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.emissive,{% endif %}
+    );
 
-            let transmission = _pbr_transmission_no_mips(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.transmission_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-            );
+    let specular_factor = _pbr_specular{{ mipmap.suffix() }}(
+        specular,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            specular.tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.specular,{% endif %}
+    );
 
-            let volume_thickness = _pbr_volume_thickness_no_mips(
-                material,
-                texture_uv(
-                    attribute_data_offset,
-                    triangle_indices,
-                    barycentric,
-                    material.volume_thickness_tex_info,
-                    vertex_attribute_stride,
-                    uv_sets_index,
-                ),
-            );
+    let specular_color_factor = _pbr_specular_color{{ mipmap.suffix() }}(
+        specular,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            specular.color_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.specular_color,{% endif %}
+    );
 
-            return PbrMaterialColor(
-                base,
-                metallic_roughness,
-                normal,
-                occlusion,
-                emissive,
-                specular,
-                specular_color,
-                material.ior,
-                transmission,
-                volume_thickness,
-                material.volume_attenuation_distance,
-                material.volume_attenuation_color,
-            );
-        }
+    let transmission_factor = _pbr_transmission{{ mipmap.suffix() }}(
+        transmission,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            transmission.tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.transmission,{% endif %}
+    );
 
-        // Base Color
-        fn _pbr_material_base_color_no_mips(material: PbrMaterial, attribute_uv: vec2<f32>) -> vec4<f32> {
-            var color = material.base_color_factor;
+    let volume_thickness = _pbr_volume_thickness{{ mipmap.suffix() }}(
+        volume,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            volume.thickness_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.volume_thickness,{% endif %}
+    );
 
+    // Clearcoat sampling
+    let clearcoat_factor = _pbr_clearcoat{{ mipmap.suffix() }}(
+        clearcoat,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            clearcoat.tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.clearcoat,{% endif %}
+    );
 
-            if material.has_base_color_texture {
-                color *=
-                    texture_pool_sample_no_mips(material.base_color_tex_info, attribute_uv);
-            }
+    let clearcoat_roughness_factor = _pbr_clearcoat_roughness{{ mipmap.suffix() }}(
+        clearcoat,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            clearcoat.roughness_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.clearcoat_roughness,{% endif %}
+    );
 
+    let clearcoat_normal_value = _pbr_clearcoat_normal{{ mipmap.suffix() }}(
+        clearcoat,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            clearcoat.normal_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.clearcoat_normal,{% endif %}
+        geometry_tbn,
+    );
 
-            // compute pass only deals with fully opaque
-            // mask and blend are handled in the fragment shader
-            color.a = 1.0;
+    // Sheen sampling
+    let sheen_color_factor = _pbr_sheen_color{{ mipmap.suffix() }}(
+        sheen,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            sheen.color_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.sheen_color,{% endif %}
+    );
 
-            return color;
-        }
+    let sheen_roughness_factor = _pbr_sheen_roughness{{ mipmap.suffix() }}(
+        sheen,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            sheen.roughness_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.sheen_roughness,{% endif %}
+    );
 
-        fn _pbr_material_metallic_roughness_color_no_mips(
-            material: PbrMaterial,
-            attribute_uv: vec2<f32>,
-        ) -> vec2<f32> {
-            var color = vec2<f32>(material.metallic_factor, material.roughness_factor);
-            if material.has_metallic_roughness_texture {
-                let tex = texture_pool_sample_no_mips(material.metallic_roughness_tex_info, attribute_uv);
-                // glTF uses B channel for metallic, G channel for roughness
-                color *= vec2<f32>(tex.b, tex.g);
-            }
-            return color;
-        }
+    return PbrMaterialColor(
+        base,
+        metallic_roughness,
+        normal,
+        occlusion,
+        emissive,
+        specular_factor,
+        specular_color_factor,
+        ior,
+        transmission_factor,
+        volume_thickness,
+        volume.attenuation_distance,
+        volume.attenuation_color,
+        // Clearcoat
+        clearcoat_factor,
+        clearcoat_roughness_factor,
+        clearcoat_normal_value,
+        // Sheen
+        sheen_color_factor,
+        sheen_roughness_factor,
+    );
+}
 
-        // Applies normal mapping by constructing a TBN (tangent-bitangent-normal) matrix and
-        // transforming the normal texture sample from tangent space to world space.
-        // Falls back through three methods: stored tangents -> computed from UVs -> generated basis
-        fn _pbr_normal_color_no_mips(
-            material: PbrMaterial,
-            attribute_uv: vec2<f32>,
-            world_normal: vec3<f32>,
-            barycentric: vec3<f32>,
-            triangle_indices: vec3<u32>,
-            attribute_data_offset: u32,
-            vertex_attribute_stride: u32,
-            uv_sets_index: u32,
-            normal_matrix: mat3x3<f32>,
-            os_vertices: ObjectSpaceVertices,
-        ) -> vec3<f32> {
-            if !material.has_normal_texture {
-                return world_normal;
-            }
+// Base Color
+fn _pbr_material_base_color{{ mipmap.suffix() }}(
+    material: PbrMaterial,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> vec4<f32> {
+    var color = material.base_color_factor;
+    if material.base_color_tex_info.exists {
+        let tex_sample = {{ mipmap.sample_fn() }}(material.base_color_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %});
+        color *= tex_sample;
+    }
+    // compute pass only deals with fully opaque
+    // mask and blend are handled in the fragment shader
+    color.a = 1.0;
+    return color;
+}
 
-            // Sample normal map and unpack from [0,1] to [-1,1] range
-            // Use mip_level parameter (not forced to 0) to get proper filtering
-            let tex = texture_pool_sample_no_mips(material.normal_tex_info, attribute_uv);
-            var tangent_normal = vec3<f32>(
-                (tex.r * 2.0 - 1.0) * material.normal_scale,
-                (tex.g * 2.0 - 1.0) * material.normal_scale,
-                tex.b * 2.0 - 1.0,
-            );
+// Metallic-Roughness
+fn _pbr_material_metallic_roughness_color{{ mipmap.suffix() }}(
+    material: PbrMaterial,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> vec2<f32> {
+    var color = vec2<f32>(material.metallic_factor, material.roughness_factor);
+    if material.metallic_roughness_tex_info.exists {
+        let tex = {{ mipmap.sample_fn() }}(material.metallic_roughness_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %});
+        // glTF uses B channel for metallic, G channel for roughness
+        color *= vec2<f32>(tex.b, tex.g);
+    }
+    return color;
+}
 
-            var T = vec3<f32>(0.0);
-            var B = vec3<f32>(0.0);
-            var basis_valid = false;
+// Normal mapping - transforms normal texture from tangent to world space using geometry TBN
+// The TBN is passed from the geometry pass (already interpolated and transformed)
+fn _pbr_normal_color{{ mipmap.suffix() }}(
+    material: PbrMaterial,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+    geometry_tbn: TBN,
+) -> vec3<f32> {
+    if !material.normal_tex_info.exists {
+        return geometry_tbn.N;
+    }
 
-            // Method 1: Use stored tangents from glTF TANGENT attribute if available
-            // Stride >= 7 means we have: normal (3 floats) + tangent (4 floats) = 7+ floats per vertex
-            if (vertex_attribute_stride >= 7u) {
-                let tangent = get_vertex_tangent(attribute_data_offset, triangle_indices, barycentric, vertex_attribute_stride);
-                let tangent_len_sq = dot(tangent.xyz, tangent.xyz);
-                if (tangent_len_sq > 0.0) {
-                    var world_tangent = normalize(normal_matrix * tangent.xyz);
-                    // Gram-Schmidt orthogonalization to ensure tangent is perpendicular to normal
-                    world_tangent = normalize(world_tangent - world_normal * dot(world_normal, world_tangent));
-                    // Compute bitangent using handedness sign (tangent.w = ±1)
-                    let world_bitangent = normalize(cross(world_normal, world_tangent) * tangent.w);
-                    T = world_tangent;
-                    B = world_bitangent;
-                    basis_valid = true;
-                }
-            }
+    // Sample normal map and unpack from [0,1] to [-1,1] range
+    let tex = {{ mipmap.sample_fn() }}(material.normal_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %});
+    let tangent_normal = vec3<f32>(
+        (tex.r * 2.0 - 1.0) * material.normal_scale,
+        (tex.g * 2.0 - 1.0) * material.normal_scale,
+        tex.b * 2.0 - 1.0,
+    );
 
-            // Method 2: Compute tangent space from triangle UV derivatives (fallback for missing tangents)
-            // This is used for glTF models that don't include TANGENT attributes (e.g., NormalTangentTest)
-            let set_index = material.normal_tex_info.uv_set_index;
-            let uv0 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.x, vertex_attribute_stride, uv_sets_index);
-            let uv1 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.y, vertex_attribute_stride, uv_sets_index);
-            let uv2 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.z, vertex_attribute_stride, uv_sets_index);
+    // Transform the tangent-space normal to world space using the TBN matrix from geometry pass
+    let tbn_matrix = mat3x3<f32>(geometry_tbn.T, geometry_tbn.B, geometry_tbn.N);
+    return normalize(tbn_matrix * tangent_normal);
+}
 
-            let delta_pos1 = os_vertices.p1 - os_vertices.p0;
-            let delta_pos2 = os_vertices.p2 - os_vertices.p0;
-            let delta_uv1 = uv1 - uv0;
-            let delta_uv2 = uv2 - uv0;
-            let det = delta_uv1.x * delta_uv2.y - delta_uv1.y * delta_uv2.x;
+// Occlusion
+fn _pbr_occlusion_color{{ mipmap.suffix() }}(
+    material: PbrMaterial,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> f32 {
+    var occlusion = 1.0;
+    if material.occlusion_tex_info.exists {
+        let tex = {{ mipmap.sample_fn() }}(material.occlusion_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %});
+        occlusion = mix(1.0, tex.r, material.occlusion_strength);
+    }
+    return occlusion;
+}
 
-            if (!basis_valid && abs(det) > 1e-6) {
-                let r = 1.0 / det;
-                let tangent_os = (delta_pos1 * delta_uv2.y - delta_pos2 * delta_uv1.y) * r;
-                var world_tangent = normalize(normal_matrix * tangent_os);
-                world_tangent = normalize(world_tangent - world_normal * dot(world_normal, world_tangent));
-                let world_bitangent = normalize(cross(world_normal, world_tangent));
-                T = world_tangent;
-                B = world_bitangent;
-                basis_valid = true;
-            }
+// Emissive
+fn _pbr_material_emissive_color{{ mipmap.suffix() }}(
+    material: PbrMaterial,
+    emissive_strength: f32,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> vec3<f32> {
+    var color = material.emissive_factor;
+    if material.emissive_tex_info.exists {
+        color *= {{ mipmap.sample_fn() }}(material.emissive_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).rgb;
+    }
+    color *= emissive_strength;
+    return color;
+}
 
-            // Method 3: Generate a fallback orthonormal basis (last resort)
-            if (!basis_valid) {
-                let up = vec3<f32>(0.0, 1.0, 0.0);
-                var fallback = normalize(cross(up, world_normal));
-                if (dot(fallback, fallback) < 1e-6) {
-                    fallback = normalize(cross(vec3<f32>(1.0, 0.0, 0.0), world_normal));
-                }
-                T = fallback;
-                B = normalize(cross(world_normal, T));
-            }
+// Specular factor
+fn _pbr_specular{{ mipmap.suffix() }}(
+    specular: PbrSpecular,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> f32 {
+    var factor = specular.factor;
+    if specular.tex_info.exists {
+        factor *= {{ mipmap.sample_fn() }}(specular.tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).a;
+    }
+    return factor;
+}
 
-            // Transform the tangent-space normal to world space using the TBN matrix
-            let tbn = mat3x3<f32>(T, B, world_normal);
-            return normalize(tbn * tangent_normal);
-        }
+// Specular color
+fn _pbr_specular_color{{ mipmap.suffix() }}(
+    specular: PbrSpecular,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> vec3<f32> {
+    var color = specular.color_factor;
+    if specular.color_tex_info.exists {
+        color *= {{ mipmap.sample_fn() }}(specular.color_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).rgb;
+    }
+    return color;
+}
 
-        fn _pbr_occlusion_color_no_mips(
-            material: PbrMaterial,
-            attribute_uv: vec2<f32>,
-        ) -> f32 {
-            var occlusion = 1.0;
-            if material.has_occlusion_texture {
-                let tex = texture_pool_sample_no_mips(material.occlusion_tex_info, attribute_uv);
-                occlusion = mix(1.0, tex.r, material.occlusion_strength);
-            }
-            return occlusion;
-        }
+// Transmission
+fn _pbr_transmission{{ mipmap.suffix() }}(
+    transmission: PbrTransmission,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> f32 {
+    // Early exit: if no texture and factor is 0, skip entirely
+    if (!transmission.tex_info.exists && transmission.factor == 0.0) {
+        return 0.0;
+    }
+    var factor = transmission.factor;
+    if transmission.tex_info.exists {
+        factor *= {{ mipmap.sample_fn() }}(transmission.tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).r;
+    }
+    return factor;
+}
 
-        fn _pbr_material_emissive_color_no_mips(
-            material: PbrMaterial,
-            attribute_uv: vec2<f32>,
-        ) -> vec3<f32> {
-            var color = material.emissive_factor;
-            if material.has_emissive_texture {
-                color *=
-                    texture_pool_sample_no_mips(material.emissive_tex_info, attribute_uv).rgb;
-            }
+// Volume thickness
+fn _pbr_volume_thickness{{ mipmap.suffix() }}(
+    volume: PbrVolume,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> f32 {
+    // Early exit: no volume if thickness is 0 and no texture
+    if (!volume.thickness_tex_info.exists && volume.thickness_factor == 0.0) {
+        return 0.0;
+    }
+    var thickness = volume.thickness_factor;
+    if volume.thickness_tex_info.exists {
+        // Volume thickness is stored in the G channel per glTF spec
+        thickness *= {{ mipmap.sample_fn() }}(volume.thickness_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).g;
+    }
+    return thickness;
+}
 
-            color *= material.emissive_strength;
+// ============================================================================
+// Clearcoat (KHR_materials_clearcoat)
+// ============================================================================
 
-            return color;
-        }
+// Clearcoat intensity factor (R channel)
+fn _pbr_clearcoat{{ mipmap.suffix() }}(
+    clearcoat: PbrClearcoat,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> f32 {
+    // Early exit: no clearcoat if factor is 0 and no texture
+    if (!clearcoat.tex_info.exists && clearcoat.factor == 0.0) {
+        return 0.0;
+    }
+    var factor = clearcoat.factor;
+    if clearcoat.tex_info.exists {
+        factor *= {{ mipmap.sample_fn() }}(clearcoat.tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).r;
+    }
+    return factor;
+}
 
-        fn _pbr_specular_no_mips(
-            material: PbrMaterial,
-            attribute_uv: vec2<f32>,
-        ) -> f32 {
-            var specular = material.specular_factor;
-            if material.has_specular_texture {
-                specular *= texture_pool_sample_no_mips(material.specular_tex_info, attribute_uv).a;
-            }
-            return specular;
-        }
+// Clearcoat roughness (G channel)
+fn _pbr_clearcoat_roughness{{ mipmap.suffix() }}(
+    clearcoat: PbrClearcoat,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> f32 {
+    var roughness = clearcoat.roughness_factor;
+    if clearcoat.roughness_tex_info.exists {
+        roughness *= {{ mipmap.sample_fn() }}(clearcoat.roughness_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).g;
+    }
+    return roughness;
+}
 
-        fn _pbr_specular_color_no_mips(
-            material: PbrMaterial,
-            attribute_uv: vec2<f32>,
-        ) -> vec3<f32> {
-            var color = material.specular_color_factor;
-            if material.has_specular_color_texture {
-                color *= texture_pool_sample_no_mips(material.specular_color_tex_info, attribute_uv).rgb;
-            }
-            return color;
-        }
+// Clearcoat normal - transforms clearcoat normal texture from tangent to world space using geometry TBN
+fn _pbr_clearcoat_normal{{ mipmap.suffix() }}(
+    clearcoat: PbrClearcoat,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+    geometry_tbn: TBN,
+) -> vec3<f32> {
+    // If no clearcoat normal texture, use geometry normal
+    if !clearcoat.normal_tex_info.exists {
+        return geometry_tbn.N;
+    }
 
-        fn _pbr_transmission_no_mips(
-            material: PbrMaterial,
-            attribute_uv: vec2<f32>,
-        ) -> f32 {
-            // Early exit: if no texture and factor is 0, skip entirely
-            if (!material.has_transmission_texture && material.transmission_factor == 0.0) {
-                return 0.0;
-            }
-            var transmission = material.transmission_factor;
-            if material.has_transmission_texture {
-                transmission *= texture_pool_sample_no_mips(material.transmission_tex_info, attribute_uv).r;
-            }
-            return transmission;
-        }
+    // Sample clearcoat normal map and unpack from [0,1] to [-1,1] range
+    let tex = {{ mipmap.sample_fn() }}(clearcoat.normal_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %});
+    let tangent_normal = vec3<f32>(
+        (tex.r * 2.0 - 1.0) * clearcoat.normal_scale,
+        (tex.g * 2.0 - 1.0) * clearcoat.normal_scale,
+        tex.b * 2.0 - 1.0,
+    );
 
-        fn _pbr_volume_thickness_no_mips(
-            material: PbrMaterial,
-            attribute_uv: vec2<f32>,
-        ) -> f32 {
-            // Early exit: no volume if thickness is 0 and no texture
-            if (!material.has_volume_thickness_texture && material.volume_thickness_factor == 0.0) {
-                return 0.0;
-            }
-            var thickness = material.volume_thickness_factor;
-            if material.has_volume_thickness_texture {
-                // Volume thickness is stored in the G channel per glTF spec
-                thickness *= texture_pool_sample_no_mips(material.volume_thickness_tex_info, attribute_uv).g;
-            }
-            return thickness;
-        }
+    // Transform the tangent-space normal to world space using the TBN matrix from geometry pass
+    let tbn_matrix = mat3x3<f32>(geometry_tbn.T, geometry_tbn.B, geometry_tbn.N);
+    return normalize(tbn_matrix * tangent_normal);
+}
 
-{% endmatch %}
+// ============================================================================
+// Sheen (KHR_materials_sheen)
+// ============================================================================
+
+// Sheen color (RGB)
+fn _pbr_sheen_color{{ mipmap.suffix() }}(
+    sheen: PbrSheen,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> vec3<f32> {
+    var color = sheen.color_factor;
+    if sheen.color_tex_info.exists {
+        color *= {{ mipmap.sample_fn() }}(sheen.color_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).rgb;
+    }
+    return color;
+}
+
+// Sheen roughness (A channel)
+fn _pbr_sheen_roughness{{ mipmap.suffix() }}(
+    sheen: PbrSheen,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> f32 {
+    var roughness = sheen.roughness_factor;
+    if sheen.roughness_tex_info.exists {
+        roughness *= {{ mipmap.sample_fn() }}(sheen.roughness_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).a;
+    }
+    return roughness;
+}
+
+// ============================================================================
+// Unlit Material Color Computation
+// ============================================================================
+
+// Compute unlit material color
+fn compute_unlit_material_color(
+    triangle_indices: vec3<u32>,
+    attribute_data_offset: u32,
+    material: UnlitMaterial,
+    barycentric: vec3<f32>,
+    vertex_attribute_stride: u32,
+    uv_sets_index: u32,
+    {% if mipmap.is_gradient() %}
+    bary_derivs: vec4<f32>,
+    world_normal: vec3<f32>,
+    view_matrix: mat4x4<f32>,
+    {% endif %}
+) -> UnlitMaterialColor {
+    // Compute base color
+    var base = material.base_color_factor;
+    if material.base_color_tex_info.exists {
+        let uv = texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            material.base_color_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        );
+        {% if mipmap.is_gradient() %}
+        let gradients = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset,
+            vertex_attribute_stride,
+            uv_sets_index,
+            material.base_color_tex_info,
+            world_normal,
+            view_matrix
+        );
+        base *= texture_pool_sample_grad(material.base_color_tex_info, uv, gradients);
+        {% else %}
+        base *= texture_pool_sample_no_mips(material.base_color_tex_info, uv);
+        {% endif %}
+    }
+
+    // Compute emissive
+    var emissive = material.emissive_factor;
+    if material.emissive_tex_info.exists {
+        let uv = texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            material.emissive_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        );
+        {% if mipmap.is_gradient() %}
+        let gradients = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset,
+            vertex_attribute_stride,
+            uv_sets_index,
+            material.emissive_tex_info,
+            world_normal,
+            view_matrix
+        );
+        emissive *= texture_pool_sample_grad(material.emissive_tex_info, uv, gradients).rgb;
+        {% else %}
+        emissive *= texture_pool_sample_no_mips(material.emissive_tex_info, uv).rgb;
+        {% endif %}
+    }
+
+    // Opaque pass forces alpha to 1.0
+    base.a = 1.0;
+
+    return UnlitMaterialColor(base, emissive);
+}
+
+// ============================================================================
+// Tangent Helpers
+// ============================================================================
 
 // Interpolate tangent vectors across a triangle using barycentric coordinates
 fn get_vertex_tangent(

@@ -1,7 +1,7 @@
 use crate::{
     render_passes::{
         shader_cache_key::ShaderCacheKeyRenderPass,
-        shared::opaque_and_transparency::cache_key::ShaderMaterialVertexAttributes,
+        shared::material::cache_key::ShaderMaterialVertexAttributes,
     },
     shaders::ShaderCacheKey,
 };
@@ -14,7 +14,6 @@ pub struct ShaderCacheKeyMaterialTransparent {
     pub texture_pool_samplers_len: u32,
     pub msaa_sample_count: Option<u32>,
     pub mipmaps: bool,
-    pub unlit: bool,
 }
 
 impl From<ShaderCacheKeyMaterialTransparent> for ShaderCacheKey {

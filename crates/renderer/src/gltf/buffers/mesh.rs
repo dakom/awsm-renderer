@@ -10,6 +10,7 @@ use crate::gltf::buffers::mesh::visibility::create_visibility_vertices;
 use crate::gltf::buffers::morph::convert_morph_targets;
 use crate::gltf::buffers::normals::ensure_normals;
 use crate::gltf::buffers::skin::convert_skin;
+use crate::gltf::buffers::tangents::ensure_tangents;
 use crate::gltf::buffers::triangle::pack_triangle_data;
 use crate::gltf::buffers::{
     MeshBufferAttributeIndexInfoWithOffset, MeshBufferInfoWithOffset,
@@ -98,6 +99,14 @@ pub(super) fn convert_to_mesh_buffer(
     // Step 3: Ensure normals exist (compute if missing)
     let attribute_data_by_kind = ensure_normals(
         attribute_data_by_kind,
+        custom_attribute_index,
+        custom_attribute_index_bytes,
+    )?;
+
+    // Step 3b: Ensure tangents exist (generate with MikkTSpace if missing but normal map present)
+    let attribute_data_by_kind = ensure_tangents(
+        attribute_data_by_kind,
+        primitive,
         custom_attribute_index,
         custom_attribute_index_bytes,
     )?;

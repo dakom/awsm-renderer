@@ -1,4 +1,4 @@
-fn vertex_color(attribute_data_offset: u32, triangle_indices: vec3<u32>, barycentric: vec3<f32>, color_info: ColorInfo, vertex_attribute_stride: u32) -> vec4<f32> {
+fn vertex_color(attribute_data_offset: u32, triangle_indices: vec3<u32>, barycentric: vec3<f32>, color_info: VertexColorInfo, vertex_attribute_stride: u32) -> vec4<f32> {
     let color0 = _vertex_color_per_vertex(attribute_data_offset, color_info.set_index, triangle_indices.x, vertex_attribute_stride);
     let color1 = _vertex_color_per_vertex(attribute_data_offset, color_info.set_index, triangle_indices.y, vertex_attribute_stride);
     let color2 = _vertex_color_per_vertex(attribute_data_offset, color_info.set_index, triangle_indices.z, vertex_attribute_stride);

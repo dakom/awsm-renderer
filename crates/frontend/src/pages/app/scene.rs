@@ -712,7 +712,24 @@ impl AppScene {
         // Need to create a new camera - compute scene bounds
         let mut scene_aabb: Option<Aabb> = None;
 
-        for (_, mesh) in renderer.meshes.iter() {
+        for (key, mesh) in renderer.meshes.iter() {
+            if self
+                .editor
+                .lock()
+                .unwrap()
+                .as_ref()
+                .and_then(|editor| {
+                    editor
+                        .transform_controller
+                        .lock()
+                        .unwrap()
+                        .as_ref()
+                        .map(|tc| tc.is_gizmo_mesh_key(key))
+                })
+                .unwrap_or(false)
+            {
+                continue;
+            }
             if let Some(mut mesh_aabb) = mesh.aabb.clone() {
                 if let Ok(world_transform) = renderer.transforms.get_world(mesh.transform_key) {
                     mesh_aabb.transform(world_transform);

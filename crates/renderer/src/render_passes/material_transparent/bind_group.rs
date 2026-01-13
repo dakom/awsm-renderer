@@ -12,12 +12,9 @@ use indexmap::IndexSet;
 use crate::bind_group_layout::{BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry};
 use crate::bind_groups::{AwsmBindGroupError, BindGroupRecreateContext};
 use crate::error::Result;
-use crate::materials::MaterialBufferKind;
 use crate::mesh::meta::geometry_meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT;
 use crate::mesh::meta::material_meta::MATERIAL_MESH_META_BYTE_ALIGNMENT;
-use crate::render_passes::shared::opaque_and_transparency::bind_group::{
-    TexturePoolDeps, TexturePoolVisibility,
-};
+use crate::render_passes::shared::material::bind_group::{TexturePoolDeps, TexturePoolVisibility};
 use crate::textures::SamplerKey;
 use crate::{bind_group_layout::BindGroupLayoutKey, render_passes::RenderPassInitContext};
 
@@ -364,9 +361,7 @@ impl MaterialTransparentBindGroups {
         // materials
         entries.push(BindGroupEntry::new(
             entries.len() as u32,
-            BindGroupResource::Buffer(BufferBinding::new(
-                ctx.materials.gpu_buffer(MaterialBufferKind::Pbr),
-            )),
+            BindGroupResource::Buffer(BufferBinding::new(&ctx.materials.gpu_buffer)),
         ));
 
         // morph weights

@@ -43,13 +43,17 @@ impl Shaders {
             return Ok(*shader_key);
         }
 
-        let shader_module =
-            gpu.compile_shader(&ShaderTemplate::try_from(&cache_key)?.into_descriptor()?);
+        let shader_descriptor = ShaderTemplate::try_from(&cache_key)?.into_descriptor()?;
+        let shader_module = gpu.compile_shader(&shader_descriptor);
 
-        shader_module
+        if let Err(err) = shader_module
             .validate_shader()
             .await
-            .map_err(AwsmShaderError::Compilation)?;
+            .map_err(AwsmShaderError::Compilation)
+        {
+            print_shader_source(&shader_descriptor.get_code(), true);
+            return Err(err);
+        }
 
         let shader_key = self.lookup.insert(shader_module.clone());
 

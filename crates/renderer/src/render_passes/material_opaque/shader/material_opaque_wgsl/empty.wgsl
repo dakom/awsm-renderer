@@ -23,13 +23,16 @@
 /*************** END textures.wgsl ******************/
 
 /*************** START material.wgsl ******************/
-{% include "shared_wgsl/pbr/material.wgsl" %}
+{% include "shared_wgsl/material.wgsl" %}
 /*************** END material.wgsl ******************/
 
 /*************** START vertex_color.wgsl ******************/
 {% include "shared_wgsl/vertex_color.wgsl" %}
 /*************** END vertex_color.wgsl ******************/
 
+/*************** START lights.wgsl ******************/
+{% include "shared_wgsl/lighting/lights.wgsl" %}
+/*************** END lights.wgsl ******************/
 
 
 @compute @workgroup_size(8, 8)

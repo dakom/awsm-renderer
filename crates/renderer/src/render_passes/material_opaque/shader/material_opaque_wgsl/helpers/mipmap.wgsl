@@ -224,7 +224,14 @@ fn pbr_get_gradients(
 
     var out : PbrMaterialGradients;
 
-    if (material.has_base_color_texture) {
+    // Load extension data on-demand for gradient computation
+    let specular = pbr_material_load_specular(material.specular_index);
+    let transmission = pbr_material_load_transmission(material.transmission_index);
+    let volume = pbr_material_load_volume(material.volume_index);
+    let clearcoat = pbr_material_load_clearcoat(material.clearcoat_index);
+    let sheen = pbr_material_load_sheen(material.sheen_index);
+
+    if (material.base_color_tex_info.exists) {
         out.base_color = get_uv_derivatives(
             barycentric,
             bary_derivs,
@@ -237,7 +244,7 @@ fn pbr_get_gradients(
         );
     }
 
-    if (material.has_metallic_roughness_texture) {
+    if (material.metallic_roughness_tex_info.exists) {
         out.metallic_roughness = get_uv_derivatives(
             barycentric,
             bary_derivs,
@@ -250,7 +257,7 @@ fn pbr_get_gradients(
         );
     }
 
-    if (material.has_normal_texture) {
+    if (material.normal_tex_info.exists) {
         out.normal = get_uv_derivatives(
             barycentric,
             bary_derivs,
@@ -263,7 +270,7 @@ fn pbr_get_gradients(
         );
     }
 
-    if (material.has_occlusion_texture) {
+    if (material.occlusion_tex_info.exists) {
         out.occlusion = get_uv_derivatives(
             barycentric,
             bary_derivs,
@@ -276,7 +283,7 @@ fn pbr_get_gradients(
         );
     }
 
-    if (material.has_emissive_texture) {
+    if (material.emissive_tex_info.exists) {
         out.emissive = get_uv_derivatives(
             barycentric,
             bary_derivs,
@@ -289,53 +296,120 @@ fn pbr_get_gradients(
         );
     }
 
-    if (material.has_specular_texture) {
+    if (specular.tex_info.exists) {
         out.specular = get_uv_derivatives(
             barycentric,
             bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
             uv_sets_index,
-            material.specular_tex_info,
+            specular.tex_info,
             world_normal,
             view_matrix
         );
     }
 
-    if (material.has_specular_color_texture) {
+    if (specular.color_tex_info.exists) {
         out.specular_color = get_uv_derivatives(
             barycentric,
             bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
             uv_sets_index,
-            material.specular_color_tex_info,
+            specular.color_tex_info,
             world_normal,
             view_matrix
         );
     }
 
-    if (material.has_transmission_texture) {
+    if (transmission.tex_info.exists) {
         out.transmission = get_uv_derivatives(
             barycentric,
             bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
             uv_sets_index,
-            material.transmission_tex_info,
+            transmission.tex_info,
             world_normal,
             view_matrix
         );
     }
 
-    if (material.has_volume_thickness_texture) {
+    if (volume.thickness_tex_info.exists) {
         out.volume_thickness = get_uv_derivatives(
             barycentric,
             bary_derivs,
             triangle_indices,
             attribute_data_offset, vertex_attribute_stride,
             uv_sets_index,
-            material.volume_thickness_tex_info,
+            volume.thickness_tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
+    // Clearcoat textures
+    if (clearcoat.tex_info.exists) {
+        out.clearcoat = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            clearcoat.tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
+    if (clearcoat.roughness_tex_info.exists) {
+        out.clearcoat_roughness = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            clearcoat.roughness_tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
+    if (clearcoat.normal_tex_info.exists) {
+        out.clearcoat_normal = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            clearcoat.normal_tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
+    // Sheen textures
+    if (sheen.color_tex_info.exists) {
+        out.sheen_color = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            sheen.color_tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
+    if (sheen.roughness_tex_info.exists) {
+        out.sheen_roughness = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            sheen.roughness_tex_info,
             world_normal,
             view_matrix
         );

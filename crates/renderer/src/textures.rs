@@ -82,15 +82,12 @@ impl AwsmRenderer {
                 .is_none()
                 || has_seen_material.insert(mesh.material_key, ()).is_none()
             {
-                let material = self.materials.get(mesh.material_key)?;
-
                 self.render_passes
                     .material_opaque
                     .pipelines
                     .set_compute_pipeline_key(
                         &self.gpu,
                         mesh,
-                        material,
                         key,
                         &mut self.shaders,
                         &mut self.pipelines,
@@ -108,7 +105,6 @@ impl AwsmRenderer {
                     .set_render_pipeline_key(
                         &self.gpu,
                         mesh,
-                        material,
                         key,
                         &mut self.shaders,
                         &mut self.pipelines,

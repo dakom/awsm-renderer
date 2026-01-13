@@ -38,7 +38,6 @@ pub struct ShaderTemplateMaterialOpaqueBindGroups {
     pub mipmap: MipmapMode,
     pub multisampled_geometry: bool,
     pub msaa_sample_count: u32, // 0 if no MSAA
-    pub unlit: bool,
 }
 
 #[derive(Template, Debug)]
@@ -63,7 +62,6 @@ pub struct ShaderTemplateMaterialOpaqueCompute {
     pub mipmap: MipmapMode,
     pub multisampled_geometry: bool,
     pub msaa_sample_count: u32, // 0 if no MSAA
-    pub unlit: bool,
 }
 
 impl ShaderTemplateMaterialOpaqueCompute {
@@ -148,7 +146,6 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
                 mipmap,
                 multisampled_geometry,
                 msaa_sample_count,
-                unlit: value.unlit,
                 debug,
             },
             compute: ShaderTemplateMaterialOpaqueCompute {
@@ -164,7 +161,6 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
                 multisampled_geometry,
                 msaa_sample_count,
                 debug,
-                unlit: value.unlit,
             },
         };
 
@@ -172,10 +168,33 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MipmapMode {
     None,
     Gradient,
+}
+
+impl MipmapMode {
+    /// Returns the function name suffix for this mipmap mode
+    pub fn suffix(&self) -> &'static str {
+        match self {
+            MipmapMode::Gradient => "_grad",
+            MipmapMode::None => "_no_mips",
+        }
+    }
+
+    /// Returns the texture sampling function name for this mode
+    pub fn sample_fn(&self) -> &'static str {
+        match self {
+            MipmapMode::Gradient => "texture_pool_sample_grad",
+            MipmapMode::None => "texture_pool_sample_no_mips",
+        }
+    }
+
+    /// Returns true if this is gradient mode (for conditional template logic)
+    pub fn is_gradient(&self) -> bool {
+        matches!(self, MipmapMode::Gradient)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -271,5 +290,13 @@ impl ShaderTemplateMaterialOpaqueEmpty {
     #[cfg(debug_assertions)]
     pub fn debug_label(&self) -> Option<&str> {
         Some("Material Opaque Empty")
+    }
+
+    pub fn has_lighting_ibl(&self) -> bool {
+        false
+    }
+
+    pub fn has_lighting_punctual(&self) -> bool {
+        false
     }
 }
