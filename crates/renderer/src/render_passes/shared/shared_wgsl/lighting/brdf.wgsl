@@ -224,19 +224,24 @@ fn sheen_brdf_direct(
 }
 
 // Estimate sheen albedo scaling for energy conservation
-// This approximates how much energy the sheen layer absorbs from the base layer
+// Based on KHR_materials_sheen spec: sheen_albedo_scaling = 1.0 - max3(sheenColor) * E(VdotN)
+// E(x) is the directional albedo of the sheen BRDF, approximated here without an LUT
 fn sheen_albedo_scaling(sheen_color: vec3<f32>, sheen_roughness: f32, n_dot_v: f32) -> f32 {
-    // Simplified approximation based on sheen color luminance and roughness
-    // A proper implementation would use a precomputed LUT
-    let sheen_lum = dot(sheen_color, vec3<f32>(0.2126, 0.7152, 0.0722));
-    if (sheen_lum <= 0.0) {
+    // Use max component as per spec (not luminance)
+    let sheen_max = max(max(sheen_color.r, sheen_color.g), sheen_color.b);
+    if (sheen_max <= 0.0) {
         return 1.0;  // No sheen = no scaling
     }
 
-    // Approximate albedo scaling: increases with roughness and sheen intensity
-    // This is a simplified version of the full integral
-    let r = max(sheen_roughness, 0.07);
-    return 1.0 - sheen_lum * max(r, 0.04);
+    // Approximate E(n_dot_v) - the directional albedo of the Charlie sheen BRDF
+    // E increases with roughness and at grazing angles (lower n_dot_v)
+    // This approximation is based on fitting to reference LUT values
+    let alpha = sheen_roughness * sheen_roughness;
+    // E ranges from ~0.0 at roughness=0 to ~0.2 at roughness=1 for normal incidence
+    // And increases at grazing angles
+    let E = alpha * (0.18 + 0.06 * (1.0 - n_dot_v));
+
+    return 1.0 - sheen_max * E;
 }
 
 // -------------------------------------------------------------
@@ -323,9 +328,27 @@ fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera
     let k_d = (1.0 - F_max) * (1.0 - metallic);
     let diffuse = k_d * base_color * (1.0 / PI);
 
-    // TODO: Re-enable sheen/clearcoat once dark edge issue is resolved
-    // Temporarily use simple formula matching main branch
-    return (diffuse + specular) * light_brdf.radiance * n_dot_l * color.occlusion;
+    // Base layer contribution
+    var result = (diffuse + specular) * light_brdf.radiance * n_dot_l * color.occlusion;
+
+    // Sheen contribution (cloth-like rim highlight)
+    let sheen = sheen_brdf_direct(color.sheen_color, color.sheen_roughness, n, v, l);
+    let sheen_scaling = sheen_albedo_scaling(color.sheen_color, color.sheen_roughness, n_dot_v);
+    result = result * sheen_scaling + sheen * light_brdf.radiance * n_dot_l * color.occlusion;
+
+    // Clearcoat contribution (additional specular layer)
+    let clearcoat_spec = clearcoat_brdf_direct(
+        color.clearcoat,
+        color.clearcoat_roughness,
+        color.clearcoat_normal,
+        v,
+        l,
+    );
+    let cc_fresnel = clearcoat_fresnel(color.clearcoat, v_dot_h);
+    // Attenuate base layer by clearcoat Fresnel, then add clearcoat specular
+    result = result * (1.0 - cc_fresnel) + clearcoat_spec * light_brdf.radiance * n_dot_l;
+
+    return result;
 }
 
 // -------------------------------------------------------------
@@ -424,11 +447,14 @@ fn brdf_ibl_with_transmission(
     let sheen_scaling = sheen_albedo_scaling(color.sheen_color, color.sheen_roughness, n_dot_v);
     var base_with_sheen = base_contribution * sheen_scaling;
 
-    // Add sheen IBL (approximate: sheen color * irradiance * N·V for rim effect)
+    // Add sheen IBL (approximate: sheen color * irradiance for rim effect)
     if (any(color.sheen_color > vec3<f32>(0.0))) {
         let irradiance_sheen = sampleIrradiance(n, ibl_irradiance_tex, ibl_irradiance_sampler);
-        // Sheen increases at grazing angles, so we use (1 - N·V) as a simple approximation
-        let sheen_contrib = color.sheen_color * irradiance_sheen * pow(1.0 - n_dot_v, 2.0) * color.occlusion;
+        // Sheen is strongest at grazing angles, scaled by roughness
+        // Using a gentler approximation that factors in roughness
+        let alpha = color.sheen_roughness * color.sheen_roughness;
+        let fresnel_sheen = pow(1.0 - n_dot_v, 3.0); // Softer falloff
+        let sheen_contrib = color.sheen_color * irradiance_sheen * alpha * fresnel_sheen * color.occlusion;
         base_with_sheen += sheen_contrib;
     }
 

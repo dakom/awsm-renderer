@@ -31,9 +31,7 @@ fn pbr_get_material_color{{ mipmap.suffix() }}(
     vertex_attribute_stride: u32,
     uv_sets_index: u32,
     {% if mipmap.is_gradient() %}gradients: PbrMaterialGradients,{% endif %}
-    world_normal: vec3<f32>,
-    normal_matrix: mat3x3<f32>,
-    os_vertices: ObjectSpaceVertices,
+    geometry_tbn: TBN,
 ) -> PbrMaterialColor {
     // Load extension data on-demand from indices
     let emissive_strength = pbr_material_load_emissive_strength(material.emissive_strength_index);
@@ -94,14 +92,7 @@ fn pbr_get_material_color{{ mipmap.suffix() }}(
             uv_sets_index,
         ),
         {% if mipmap.is_gradient() %}gradients.normal,{% endif %}
-        world_normal,
-        barycentric,
-        triangle_indices,
-        attribute_data_offset,
-        vertex_attribute_stride,
-        uv_sets_index,
-        normal_matrix,
-        os_vertices,
+        geometry_tbn,
     );
 
     let occlusion = _pbr_occlusion_color{{ mipmap.suffix() }}(
@@ -221,14 +212,7 @@ fn pbr_get_material_color{{ mipmap.suffix() }}(
             uv_sets_index,
         ),
         {% if mipmap.is_gradient() %}gradients.clearcoat_normal,{% endif %}
-        world_normal,
-        barycentric,
-        triangle_indices,
-        attribute_data_offset,
-        vertex_attribute_stride,
-        uv_sets_index,
-        normal_matrix,
-        os_vertices,
+        geometry_tbn,
     );
 
     // Sheen sampling
@@ -313,91 +297,29 @@ fn _pbr_material_metallic_roughness_color{{ mipmap.suffix() }}(
     return color;
 }
 
-// Normal mapping - constructs TBN matrix and transforms normal texture from tangent to world space
-// Falls back through: stored tangents -> computed from UVs -> generated basis
+// Normal mapping - transforms normal texture from tangent to world space using geometry TBN
+// The TBN is passed from the geometry pass (already interpolated and transformed)
 fn _pbr_normal_color{{ mipmap.suffix() }}(
     material: PbrMaterial,
     attribute_uv: vec2<f32>,
     {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
-    world_normal: vec3<f32>,
-    barycentric: vec3<f32>,
-    triangle_indices: vec3<u32>,
-    attribute_data_offset: u32,
-    vertex_attribute_stride: u32,
-    uv_sets_index: u32,
-    normal_matrix: mat3x3<f32>,
-    os_vertices: ObjectSpaceVertices,
+    geometry_tbn: TBN,
 ) -> vec3<f32> {
     if !material.normal_tex_info.exists {
-        return world_normal;
+        return geometry_tbn.N;
     }
 
     // Sample normal map and unpack from [0,1] to [-1,1] range
     let tex = {{ mipmap.sample_fn() }}(material.normal_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %});
-    var tangent_normal = vec3<f32>(
+    let tangent_normal = vec3<f32>(
         (tex.r * 2.0 - 1.0) * material.normal_scale,
         (tex.g * 2.0 - 1.0) * material.normal_scale,
         tex.b * 2.0 - 1.0,
     );
 
-    var T = vec3<f32>(0.0);
-    var B = vec3<f32>(0.0);
-    var basis_valid = false;
-
-    // Method 1: Use stored tangents from glTF TANGENT attribute if available
-    // Stride >= 7 means we have: normal (3 floats) + tangent (4 floats) = 7+ floats per vertex
-    if (vertex_attribute_stride >= 7u) {
-        let tangent = get_vertex_tangent(attribute_data_offset, triangle_indices, barycentric, vertex_attribute_stride);
-        let tangent_len_sq = dot(tangent.xyz, tangent.xyz);
-        if (tangent_len_sq > 0.0) {
-            var world_tangent = normalize(normal_matrix * tangent.xyz);
-            // Gram-Schmidt orthogonalization to ensure tangent is perpendicular to normal
-            world_tangent = normalize(world_tangent - world_normal * dot(world_normal, world_tangent));
-            // Compute bitangent using handedness sign (tangent.w = ±1)
-            let world_bitangent = normalize(cross(world_normal, world_tangent) * tangent.w);
-            T = world_tangent;
-            B = world_bitangent;
-            basis_valid = true;
-        }
-    }
-
-    // Method 2: Compute tangent space from triangle UV derivatives (fallback for missing tangents)
-    let set_index = material.normal_tex_info.uv_set_index;
-    let uv0 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.x, vertex_attribute_stride, uv_sets_index);
-    let uv1 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.y, vertex_attribute_stride, uv_sets_index);
-    let uv2 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.z, vertex_attribute_stride, uv_sets_index);
-
-    let delta_pos1 = os_vertices.p1 - os_vertices.p0;
-    let delta_pos2 = os_vertices.p2 - os_vertices.p0;
-    let delta_uv1 = uv1 - uv0;
-    let delta_uv2 = uv2 - uv0;
-    let det = delta_uv1.x * delta_uv2.y - delta_uv1.y * delta_uv2.x;
-
-    if (!basis_valid && abs(det) > 1e-6) {
-        let r = 1.0 / det;
-        let tangent_os = (delta_pos1 * delta_uv2.y - delta_pos2 * delta_uv1.y) * r;
-        var world_tangent = normalize(normal_matrix * tangent_os);
-        world_tangent = normalize(world_tangent - world_normal * dot(world_normal, world_tangent));
-        let world_bitangent = normalize(cross(world_normal, world_tangent));
-        T = world_tangent;
-        B = world_bitangent;
-        basis_valid = true;
-    }
-
-    // Method 3: Generate a fallback orthonormal basis (last resort)
-    if (!basis_valid) {
-        let up = vec3<f32>(0.0, 1.0, 0.0);
-        var fallback = normalize(cross(up, world_normal));
-        if (dot(fallback, fallback) < 1e-6) {
-            fallback = normalize(cross(vec3<f32>(1.0, 0.0, 0.0), world_normal));
-        }
-        T = fallback;
-        B = normalize(cross(world_normal, T));
-    }
-
-    // Transform the tangent-space normal to world space using the TBN matrix
-    let tbn = mat3x3<f32>(T, B, world_normal);
-    return normalize(tbn * tangent_normal);
+    // Transform the tangent-space normal to world space using the TBN matrix from geometry pass
+    let tbn_matrix = mat3x3<f32>(geometry_tbn.T, geometry_tbn.B, geometry_tbn.N);
+    return normalize(tbn_matrix * tangent_normal);
 }
 
 // Occlusion
@@ -524,87 +446,29 @@ fn _pbr_clearcoat_roughness{{ mipmap.suffix() }}(
     return roughness;
 }
 
-// Clearcoat normal - similar to base normal mapping but uses clearcoat's own normal texture
+// Clearcoat normal - transforms clearcoat normal texture from tangent to world space using geometry TBN
 fn _pbr_clearcoat_normal{{ mipmap.suffix() }}(
     clearcoat: PbrClearcoat,
     attribute_uv: vec2<f32>,
     {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
-    world_normal: vec3<f32>,
-    barycentric: vec3<f32>,
-    triangle_indices: vec3<u32>,
-    attribute_data_offset: u32,
-    vertex_attribute_stride: u32,
-    uv_sets_index: u32,
-    normal_matrix: mat3x3<f32>,
-    os_vertices: ObjectSpaceVertices,
+    geometry_tbn: TBN,
 ) -> vec3<f32> {
     // If no clearcoat normal texture, use geometry normal
     if !clearcoat.normal_tex_info.exists {
-        return world_normal;
+        return geometry_tbn.N;
     }
 
     // Sample clearcoat normal map and unpack from [0,1] to [-1,1] range
     let tex = {{ mipmap.sample_fn() }}(clearcoat.normal_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %});
-    var tangent_normal = vec3<f32>(
+    let tangent_normal = vec3<f32>(
         (tex.r * 2.0 - 1.0) * clearcoat.normal_scale,
         (tex.g * 2.0 - 1.0) * clearcoat.normal_scale,
         tex.b * 2.0 - 1.0,
     );
 
-    var T = vec3<f32>(0.0);
-    var B = vec3<f32>(0.0);
-    var basis_valid = false;
-
-    // Try stored tangents first
-    if (vertex_attribute_stride >= 7u) {
-        let tangent = get_vertex_tangent(attribute_data_offset, triangle_indices, barycentric, vertex_attribute_stride);
-        let tangent_len_sq = dot(tangent.xyz, tangent.xyz);
-        if (tangent_len_sq > 0.0) {
-            var world_tangent = normalize(normal_matrix * tangent.xyz);
-            world_tangent = normalize(world_tangent - world_normal * dot(world_normal, world_tangent));
-            let world_bitangent = normalize(cross(world_normal, world_tangent) * tangent.w);
-            T = world_tangent;
-            B = world_bitangent;
-            basis_valid = true;
-        }
-    }
-
-    // Compute from UV derivatives if no stored tangents
-    let set_index = clearcoat.normal_tex_info.uv_set_index;
-    let uv0 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.x, vertex_attribute_stride, uv_sets_index);
-    let uv1 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.y, vertex_attribute_stride, uv_sets_index);
-    let uv2 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.z, vertex_attribute_stride, uv_sets_index);
-
-    let delta_pos1 = os_vertices.p1 - os_vertices.p0;
-    let delta_pos2 = os_vertices.p2 - os_vertices.p0;
-    let delta_uv1 = uv1 - uv0;
-    let delta_uv2 = uv2 - uv0;
-    let det = delta_uv1.x * delta_uv2.y - delta_uv1.y * delta_uv2.x;
-
-    if (!basis_valid && abs(det) > 1e-6) {
-        let r = 1.0 / det;
-        let tangent_os = (delta_pos1 * delta_uv2.y - delta_pos2 * delta_uv1.y) * r;
-        var world_tangent = normalize(normal_matrix * tangent_os);
-        world_tangent = normalize(world_tangent - world_normal * dot(world_normal, world_tangent));
-        let world_bitangent = normalize(cross(world_normal, world_tangent));
-        T = world_tangent;
-        B = world_bitangent;
-        basis_valid = true;
-    }
-
-    // Fallback basis
-    if (!basis_valid) {
-        let up = vec3<f32>(0.0, 1.0, 0.0);
-        var fallback = normalize(cross(up, world_normal));
-        if (dot(fallback, fallback) < 1e-6) {
-            fallback = normalize(cross(vec3<f32>(1.0, 0.0, 0.0), world_normal));
-        }
-        T = fallback;
-        B = normalize(cross(world_normal, T));
-    }
-
-    let tbn = mat3x3<f32>(T, B, world_normal);
-    return normalize(tbn * tangent_normal);
+    // Transform the tangent-space normal to world space using the TBN matrix from geometry pass
+    let tbn_matrix = mat3x3<f32>(geometry_tbn.T, geometry_tbn.B, geometry_tbn.N);
+    return normalize(tbn_matrix * tangent_normal);
 }
 
 // ============================================================================

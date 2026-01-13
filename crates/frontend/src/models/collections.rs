@@ -57,6 +57,7 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
     h.insert(
         GltfSetId::Basics,
         vec![
+            GltfId::CompareBaseColor,
             GltfId::TextureCoordinate,
             GltfId::TextureLinearInterpolation,
             GltfId::TextureSettings,
@@ -83,33 +84,38 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
             GltfId::BoxWithSpaces,
             GltfId::BoxVertexColors,
             GltfId::Cube,
+            GltfId::EnvironmentTest,
+            GltfId::EnvironmentIblTest,
+            GltfId::CompareAlphaCoverage,
+            GltfId::CompareMetallic,
+            GltfId::CompareNormal,
+            GltfId::CompareRoughness,
         ],
     );
 
     h.insert(
         GltfSetId::Extensions,
         vec![
+            GltfId::ClearCoatCarPaint,
+            GltfId::ClearCoatWicker,
             GltfId::ClearCoatTest,
+            GltfId::SheenChair,
+            GltfId::SheenCloth,
+            GltfId::SheenTestGrid,
+            GltfId::SheenWoodLeatherSofa,
             GltfId::TransmissionRoughness,
             GltfId::IorTestGrid,
             GltfId::SimpleInstancing,
             GltfId::EmissiveStrength,
             GltfId::TextureTransformMultiTest,
             GltfId::TextureTransformTest,
-            GltfId::EnvironmentTest,
-            GltfId::EnvironmentIblTest,
-            GltfId::CompareBaseColor,
             GltfId::CompareAnisotropy,
-            GltfId::CompareAlphaCoverage,
             GltfId::CompareAmbientOcclusion,
             GltfId::CompareClearcoat,
             GltfId::CompareDispersion,
             GltfId::CompareEmissiveStrength,
             GltfId::CompareIor,
             GltfId::CompareIridescence,
-            GltfId::CompareMetallic,
-            GltfId::CompareNormal,
-            GltfId::CompareRoughness,
             GltfId::CompareSheen,
             GltfId::CompareSpecular,
             GltfId::CompareTransmission,
@@ -139,6 +145,12 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GltfId {
     ClearCoatTest,
+    ClearCoatCarPaint,
+    ClearCoatWicker,
+    SheenChair,
+    SheenCloth,
+    SheenTestGrid,
+    SheenWoodLeatherSofa,
     TransmissionRoughness,
     BrainStem,
     Fox,
@@ -242,6 +254,12 @@ impl GltfId {
 
     pub fn filepath(&self) -> &'static str {
         match self {
+            Self::ClearCoatCarPaint => "ClearCoatCarPaint/glTF/ClearCoatCarPaint.gltf",
+            Self::ClearCoatWicker => "ClearCoatWicker/glTF/ClearCoatWicker.gltf",
+            Self::SheenChair => "SheenChair/glTF/SheenChair.gltf",
+            Self::SheenCloth => "SheenCloth/glTF/SheenCloth.gltf",
+            Self::SheenTestGrid => "SheenTestGrid/glTF/SheenTestGrid.gltf",
+            Self::SheenWoodLeatherSofa => "SheenWoodLeatherSofa/glTF/SheenWoodLeatherSofa.gltf",
             Self::ClearCoatTest => "ClearCoatTest/glTF/ClearCoatTest.gltf",
             Self::TransmissionRoughness => {
                 "TransmissionRoughnessTest/glTF/TransmissionRoughnessTest.gltf"
@@ -330,6 +348,12 @@ impl GltfId {
 
     pub fn label(&self) -> &'static str {
         match self {
+            Self::ClearCoatCarPaint => "Clear Coat Car Paint",
+            Self::ClearCoatWicker => "Clear Coat Wicker",
+            Self::SheenChair => "Sheen Chair",
+            Self::SheenCloth => "Sheen Cloth",
+            Self::SheenTestGrid => "Sheen Test Grid",
+            Self::SheenWoodLeatherSofa => "Sheen Wood Leather Sofa",
             Self::ClearCoatTest => "ClearCoatTest",
             Self::TransmissionRoughness => "TransmissionRoughnessTest",
             Self::IorTestGrid => "Ior test grid",

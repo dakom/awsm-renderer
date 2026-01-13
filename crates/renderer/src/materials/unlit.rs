@@ -72,7 +72,7 @@ impl UnlitMaterial {
         write(&mut data, self.alpha_cutoff().unwrap_or(0.0f32).into());
 
         if let Some(tex) = self.base_color_tex.as_ref().and_then(map_texture) {
-            write(&mut data, tex.into());
+            write(&mut data, tex);
         } else {
             write(&mut data, Value::SkipTexture);
         }
@@ -82,7 +82,7 @@ impl UnlitMaterial {
         write(&mut data, self.base_color_factor[3].into());
 
         if let Some(tex) = self.emissive_tex.as_ref().and_then(map_texture) {
-            write(&mut data, tex.into());
+            write(&mut data, tex);
         } else {
             write(&mut data, Value::SkipTexture);
         }

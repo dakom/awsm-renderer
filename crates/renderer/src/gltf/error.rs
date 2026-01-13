@@ -178,6 +178,9 @@ pub enum AwsmGltfError {
     #[error("[gltf] unable to construct normals: {0}")]
     ConstructNormals(String),
 
+    #[error("[gltf] unable to generate tangents: {0}")]
+    GenerateTangents(String),
+
     #[error("[gltf] unable to get positions: {0}")]
     Positions(String),
 

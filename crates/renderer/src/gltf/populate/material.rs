@@ -88,7 +88,7 @@ pub(super) async fn pbr_material_mapper(
     pbr_material.anisotropy = anisotropy;
     pbr_material.iridescence = iridescence;
 
-    Ok(Material::Pbr(pbr_material))
+    Ok(Material::Pbr(Box::new(pbr_material)))
 }
 
 async fn pbr_material_mapper_core(

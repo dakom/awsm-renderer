@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     bind_groups::{AwsmBindGroupError, BindGroupCreate, BindGroups},
-    buffer::{dynamic_storage::DynamicStorageBuffer, helpers::debug_chunks_to_u32},
+    buffer::dynamic_storage::DynamicStorageBuffer,
     materials::{pbr::PbrMaterial, unlit::UnlitMaterial},
     textures::{AwsmTextureError, SamplerKey, TextureKey, TextureTransformKey, Textures},
     AwsmRendererLogging,
@@ -22,7 +22,7 @@ pub mod writer;
 
 #[derive(Debug, Clone)]
 pub enum Material {
-    Pbr(PbrMaterial),
+    Pbr(Box<PbrMaterial>),
     Unlit(UnlitMaterial),
 }
 

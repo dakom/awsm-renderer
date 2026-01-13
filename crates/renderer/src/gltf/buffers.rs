@@ -7,6 +7,7 @@ pub mod mesh;
 pub mod morph;
 pub mod normals;
 pub mod skin;
+pub mod tangents;
 pub mod triangle;
 
 use awsm_renderer_core::pipeline::primitive::FrontFace;

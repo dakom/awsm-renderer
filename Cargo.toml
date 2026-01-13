@@ -76,6 +76,7 @@ askama = {version = "0.14.0", default-features = false, features = ["config", "d
 # Math
 glam = {version = "0.30.4", features = ["bytemuck"]}
 half = "2.6.0"
+mikktspace = "0.3.0"
 
 # Media
 # https://github.com/gltf-rs/gltf/issues/465

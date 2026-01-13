@@ -101,9 +101,6 @@ fn msaa_process_sample(
         attribute_indices[base_tri + 2u]
     );
 
-    let sample_os_verts = get_object_space_vertices(sample_vis_geom_off, tri_id);
-    let sample_transforms = get_transforms(sample_mesh_meta);
-
     // Check shader type and compute color accordingly
     let sample_shader_id = material_load_shader_id(sample_mat_offset);
 
@@ -148,9 +145,7 @@ fn msaa_process_sample(
                     sample_bary,
                     sample_stride,
                     sample_uv_sets_idx,
-                    sample_normal,
-                    sample_transforms.world_normal,
-                    sample_os_verts,
+                    sample_tbn,
                     textures.bary_derivs,
                 );
             {% when MipmapMode::None %}
@@ -163,9 +158,7 @@ fn msaa_process_sample(
                     sample_bary,
                     sample_stride,
                     sample_uv_sets_idx,
-                    sample_normal,
-                    sample_transforms.world_normal,
-                    sample_os_verts,
+                    sample_tbn,
                 );
         {% endmatch %}
 
@@ -228,9 +221,7 @@ fn msaa_resolve_samples(
             barycentric: vec3<f32>,
             vertex_attribute_stride: u32,
             uv_sets_index: u32,
-            world_normal: vec3<f32>,
-            world_normal_transform: mat3x3<f32>,
-            os_vertices: ObjectSpaceVertices,
+            geometry_tbn: TBN,
             bary_derivs: vec4<f32>,
         ) -> PbrMaterialColor {
             let gradients = pbr_get_gradients(
@@ -241,7 +232,7 @@ fn msaa_resolve_samples(
                 attribute_data_offset,
                 vertex_attribute_stride,
                 uv_sets_index,
-                world_normal,
+                geometry_tbn.N,
                 camera.view
             );
 
@@ -254,9 +245,7 @@ fn msaa_resolve_samples(
                 vertex_attribute_stride,
                 uv_sets_index,
                 gradients,
-                world_normal,
-                world_normal_transform,
-                os_vertices
+                geometry_tbn,
             );
         }
     {% when MipmapMode::None %}
@@ -270,9 +259,7 @@ fn msaa_resolve_samples(
             barycentric: vec3<f32>,
             vertex_attribute_stride: u32,
             uv_sets_index: u32,
-            world_normal: vec3<f32>,
-            world_normal_transform: mat3x3<f32>,
-            os_vertices: ObjectSpaceVertices,
+            geometry_tbn: TBN,
         ) -> PbrMaterialColor {
             return pbr_get_material_color_no_mips(
                 triangle_indices,
@@ -282,9 +269,7 @@ fn msaa_resolve_samples(
                 barycentric,
                 vertex_attribute_stride,
                 uv_sets_index,
-                world_normal,
-                world_normal_transform,
-                os_vertices
+                geometry_tbn,
             );
         }
 {% endmatch %}

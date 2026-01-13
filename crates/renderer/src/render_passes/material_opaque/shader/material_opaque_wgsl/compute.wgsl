@@ -207,16 +207,12 @@ fn main(
         attribute_indices[base_triangle_index + 2]
     );
 
-    let transforms = get_transforms(material_mesh_meta);
-
     let standard_coordinates = get_standard_coordinates(coords, screen_dims);
 
-    // Load world-space normal directly from geometry pass output (already transformed with morphs/skins)
+    // Load world-space TBN directly from geometry pass output (already transformed with morphs/skins)
     let packed_nt = textureLoad(normal_tangent_tex, coords, 0);
     let tbn = unpack_normal_tangent(packed_nt);
     let world_normal = tbn.N;
-
-    let os_vertices = get_object_space_vertices(visibility_geometry_data_offset, triangle_index);
 
     let lights_info = get_lights_info();
 
@@ -269,9 +265,7 @@ fn main(
                     barycentric,
                     vertex_attribute_stride,
                     uv_sets_index,
-                    world_normal,
-                    transforms.world_normal,
-                    os_vertices,
+                    tbn,
                     bary_derivs,
                 );
             {% when MipmapMode::None %}
@@ -284,9 +278,7 @@ fn main(
                     barycentric,
                     vertex_attribute_stride,
                     uv_sets_index,
-                    world_normal,
-                    transforms.world_normal,
-                    os_vertices,
+                    tbn,
                 );
         {% endmatch %}
 

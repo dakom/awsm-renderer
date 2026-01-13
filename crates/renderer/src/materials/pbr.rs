@@ -250,7 +250,7 @@ impl PbrMaterial {
         write(&mut data, self.alpha_cutoff().unwrap_or(0.0f32).into());
 
         if let Some(tex) = self.base_color_tex.as_ref().and_then(map_texture) {
-            write(&mut data, tex.into());
+            write(&mut data, tex);
         } else {
             write(&mut data, Value::SkipTexture);
         }
@@ -260,7 +260,7 @@ impl PbrMaterial {
         write(&mut data, self.base_color_factor[3].into());
 
         if let Some(tex) = self.metallic_roughness_tex.as_ref().and_then(map_texture) {
-            write(&mut data, tex.into());
+            write(&mut data, tex);
         } else {
             write(&mut data, Value::SkipTexture);
         }
@@ -268,21 +268,21 @@ impl PbrMaterial {
         write(&mut data, self.roughness_factor.into());
 
         if let Some(tex) = self.normal_tex.as_ref().and_then(map_texture) {
-            write(&mut data, tex.into());
+            write(&mut data, tex);
         } else {
             write(&mut data, Value::SkipTexture);
         }
         write(&mut data, self.normal_scale.into());
 
         if let Some(tex) = self.occlusion_tex.as_ref().and_then(map_texture) {
-            write(&mut data, tex.into());
+            write(&mut data, tex);
         } else {
             write(&mut data, Value::SkipTexture);
         }
         write(&mut data, self.occlusion_strength.into());
 
         if let Some(tex) = self.emissive_tex.as_ref().and_then(map_texture) {
-            write(&mut data, tex.into());
+            write(&mut data, tex);
         } else {
             write(&mut data, Value::SkipTexture);
         }
@@ -329,7 +329,7 @@ impl PbrMaterial {
             feature_indices.specular = current_index(&data);
 
             if let Some(tex) = tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
@@ -337,7 +337,7 @@ impl PbrMaterial {
             write(&mut data, factor.into());
 
             if let Some(tex) = color_tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
@@ -350,7 +350,7 @@ impl PbrMaterial {
             feature_indices.transmission = current_index(&data);
 
             if let Some(tex) = tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
@@ -368,7 +368,7 @@ impl PbrMaterial {
             feature_indices.diffuse_transmission = current_index(&data);
 
             if let Some(tex) = tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
@@ -376,7 +376,7 @@ impl PbrMaterial {
             write(&mut data, factor.into());
 
             if let Some(tex) = color_tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
@@ -395,7 +395,7 @@ impl PbrMaterial {
             feature_indices.volume = current_index(&data);
 
             if let Some(tex) = thickness_tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
@@ -419,7 +419,7 @@ impl PbrMaterial {
             feature_indices.clearcoat = current_index(&data);
 
             if let Some(tex) = tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
@@ -427,14 +427,14 @@ impl PbrMaterial {
             write(&mut data, factor.into());
 
             if let Some(tex) = roughness_tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
             write(&mut data, roughness_factor.into());
 
             if let Some(tex) = normal_tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
@@ -451,14 +451,14 @@ impl PbrMaterial {
             feature_indices.sheen = current_index(&data);
 
             if let Some(tex) = roughness_tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
             write(&mut data, roughness_factor.into());
 
             if let Some(tex) = color_tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
@@ -481,7 +481,7 @@ impl PbrMaterial {
             feature_indices.anisotropy = current_index(&data);
 
             if let Some(tex) = tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
@@ -502,7 +502,7 @@ impl PbrMaterial {
             feature_indices.iridescence = current_index(&data);
 
             if let Some(tex) = tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }
@@ -511,7 +511,7 @@ impl PbrMaterial {
             write(&mut data, ior.into());
 
             if let Some(tex) = thickness_tex.as_ref().and_then(map_texture) {
-                write(&mut data, tex.into());
+                write(&mut data, tex);
             } else {
                 write(&mut data, Value::SkipTexture);
             }

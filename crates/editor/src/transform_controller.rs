@@ -118,6 +118,10 @@ impl TransformController {
         })
     }
 
+    pub fn is_gizmo_mesh_key(&self, mesh_key: MeshKey) -> bool {
+        self.get_gizmo_mesh_kind(mesh_key).is_some()
+    }
+
     pub fn zoom_gizmo_transforms(
         &self,
         renderer: &mut AwsmRenderer,
