@@ -108,9 +108,9 @@ pub struct MutableMaterial {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Hash)]
 pub enum IblId {
-    #[default]
     PhotoStudio,
     SimpleSky,
+    #[default]
     AllWhite,
 }
 

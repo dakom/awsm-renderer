@@ -228,6 +228,8 @@ fn pbr_get_gradients(
     let specular = pbr_material_load_specular(material.specular_index);
     let transmission = pbr_material_load_transmission(material.transmission_index);
     let volume = pbr_material_load_volume(material.volume_index);
+    let clearcoat = pbr_material_load_clearcoat(material.clearcoat_index);
+    let sheen = pbr_material_load_sheen(material.sheen_index);
 
     if (material.base_color_tex_info.exists) {
         out.base_color = get_uv_derivatives(
@@ -341,6 +343,73 @@ fn pbr_get_gradients(
             attribute_data_offset, vertex_attribute_stride,
             uv_sets_index,
             volume.thickness_tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
+    // Clearcoat textures
+    if (clearcoat.tex_info.exists) {
+        out.clearcoat = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            clearcoat.tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
+    if (clearcoat.roughness_tex_info.exists) {
+        out.clearcoat_roughness = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            clearcoat.roughness_tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
+    if (clearcoat.normal_tex_info.exists) {
+        out.clearcoat_normal = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            clearcoat.normal_tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
+    // Sheen textures
+    if (sheen.color_tex_info.exists) {
+        out.sheen_color = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            sheen.color_tex_info,
+            world_normal,
+            view_matrix
+        );
+    }
+
+    if (sheen.roughness_tex_info.exists) {
+        out.sheen_roughness = get_uv_derivatives(
+            barycentric,
+            bary_derivs,
+            triangle_indices,
+            attribute_data_offset, vertex_attribute_stride,
+            uv_sets_index,
+            sheen.roughness_tex_info,
             world_normal,
             view_matrix
         );

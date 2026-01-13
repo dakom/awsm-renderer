@@ -17,4 +17,11 @@ struct PbrMaterialColor {
     volume_thickness: f32,
     volume_attenuation_distance: f32,
     volume_attenuation_color: vec3<f32>,
+    // KHR_materials_clearcoat
+    clearcoat: f32,              // Clearcoat layer intensity (0.0 = none, 1.0 = full)
+    clearcoat_roughness: f32,    // Roughness of clearcoat layer
+    clearcoat_normal: vec3<f32>, // Normal for clearcoat layer (may differ from base normal)
+    // KHR_materials_sheen
+    sheen_color: vec3<f32>,      // Sheen color at grazing angles
+    sheen_roughness: f32,        // Sheen roughness (affects sheen lobe width)
 };

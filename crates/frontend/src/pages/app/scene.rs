@@ -263,23 +263,23 @@ impl AppScene {
             tracing::error!("Failed to clear renderer: {:?}", err);
         }
 
-        match AppSceneEditor::new(
-            state.renderer.clone(),
-            state.camera.clone(),
-            state.ctx.editor_grid_enabled.clone(),
-            state.ctx.editor_gizmo_translation_enabled.clone(),
-            state.ctx.editor_gizmo_rotation_enabled.clone(),
-            state.ctx.editor_gizmo_scale_enabled.clone(),
-        )
-        .await
-        {
-            Ok(editor) => {
-                *state.editor.lock().unwrap() = Some(editor);
-            }
-            Err(err) => {
-                tracing::error!("Failed to recreate scene editor after clear: {:?}", err);
-            }
-        }
+        // match AppSceneEditor::new(
+        //     state.renderer.clone(),
+        //     state.camera.clone(),
+        //     state.ctx.editor_grid_enabled.clone(),
+        //     state.ctx.editor_gizmo_translation_enabled.clone(),
+        //     state.ctx.editor_gizmo_rotation_enabled.clone(),
+        //     state.ctx.editor_gizmo_scale_enabled.clone(),
+        // )
+        // .await
+        // {
+        //     Ok(editor) => {
+        //         *state.editor.lock().unwrap() = Some(editor);
+        //     }
+        //     Err(err) => {
+        //         tracing::error!("Failed to recreate scene editor after clear: {:?}", err);
+        //     }
+        // }
 
         if let Err(err) = self.render().await {
             tracing::error!("Failed to render after clear: {:?}", err);

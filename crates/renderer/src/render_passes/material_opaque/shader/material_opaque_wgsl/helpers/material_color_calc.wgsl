@@ -10,6 +10,13 @@ struct PbrMaterialGradients {
     specular_color: UvDerivs,
     transmission: UvDerivs,
     volume_thickness: UvDerivs,
+    // KHR_materials_clearcoat
+    clearcoat: UvDerivs,
+    clearcoat_roughness: UvDerivs,
+    clearcoat_normal: UvDerivs,
+    // KHR_materials_sheen
+    sheen_color: UvDerivs,
+    sheen_roughness: UvDerivs,
 }
 {% endif %}
 
@@ -34,6 +41,8 @@ fn pbr_get_material_color{{ mipmap.suffix() }}(
     let specular = pbr_material_load_specular(material.specular_index);
     let transmission = pbr_material_load_transmission(material.transmission_index);
     let volume = pbr_material_load_volume(material.volume_index);
+    let clearcoat = pbr_material_load_clearcoat(material.clearcoat_index);
+    let sheen = pbr_material_load_sheen(material.sheen_index);
 
     var base = _pbr_material_base_color{{ mipmap.suffix() }}(
         material,
@@ -174,6 +183,81 @@ fn pbr_get_material_color{{ mipmap.suffix() }}(
         {% if mipmap.is_gradient() %}gradients.volume_thickness,{% endif %}
     );
 
+    // Clearcoat sampling
+    let clearcoat_factor = _pbr_clearcoat{{ mipmap.suffix() }}(
+        clearcoat,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            clearcoat.tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.clearcoat,{% endif %}
+    );
+
+    let clearcoat_roughness_factor = _pbr_clearcoat_roughness{{ mipmap.suffix() }}(
+        clearcoat,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            clearcoat.roughness_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.clearcoat_roughness,{% endif %}
+    );
+
+    let clearcoat_normal_value = _pbr_clearcoat_normal{{ mipmap.suffix() }}(
+        clearcoat,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            clearcoat.normal_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.clearcoat_normal,{% endif %}
+        world_normal,
+        barycentric,
+        triangle_indices,
+        attribute_data_offset,
+        vertex_attribute_stride,
+        uv_sets_index,
+        normal_matrix,
+        os_vertices,
+    );
+
+    // Sheen sampling
+    let sheen_color_factor = _pbr_sheen_color{{ mipmap.suffix() }}(
+        sheen,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            sheen.color_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.sheen_color,{% endif %}
+    );
+
+    let sheen_roughness_factor = _pbr_sheen_roughness{{ mipmap.suffix() }}(
+        sheen,
+        texture_uv(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            sheen.roughness_tex_info,
+            vertex_attribute_stride,
+            uv_sets_index,
+        ),
+        {% if mipmap.is_gradient() %}gradients.sheen_roughness,{% endif %}
+    );
+
     return PbrMaterialColor(
         base,
         metallic_roughness,
@@ -187,6 +271,13 @@ fn pbr_get_material_color{{ mipmap.suffix() }}(
         volume_thickness,
         volume.attenuation_distance,
         volume.attenuation_color,
+        // Clearcoat
+        clearcoat_factor,
+        clearcoat_roughness_factor,
+        clearcoat_normal_value,
+        // Sheen
+        sheen_color_factor,
+        sheen_roughness_factor,
     );
 }
 
@@ -397,6 +488,153 @@ fn _pbr_volume_thickness{{ mipmap.suffix() }}(
         thickness *= {{ mipmap.sample_fn() }}(volume.thickness_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).g;
     }
     return thickness;
+}
+
+// ============================================================================
+// Clearcoat (KHR_materials_clearcoat)
+// ============================================================================
+
+// Clearcoat intensity factor (R channel)
+fn _pbr_clearcoat{{ mipmap.suffix() }}(
+    clearcoat: PbrClearcoat,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> f32 {
+    // Early exit: no clearcoat if factor is 0 and no texture
+    if (!clearcoat.tex_info.exists && clearcoat.factor == 0.0) {
+        return 0.0;
+    }
+    var factor = clearcoat.factor;
+    if clearcoat.tex_info.exists {
+        factor *= {{ mipmap.sample_fn() }}(clearcoat.tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).r;
+    }
+    return factor;
+}
+
+// Clearcoat roughness (G channel)
+fn _pbr_clearcoat_roughness{{ mipmap.suffix() }}(
+    clearcoat: PbrClearcoat,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> f32 {
+    var roughness = clearcoat.roughness_factor;
+    if clearcoat.roughness_tex_info.exists {
+        roughness *= {{ mipmap.sample_fn() }}(clearcoat.roughness_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).g;
+    }
+    return roughness;
+}
+
+// Clearcoat normal - similar to base normal mapping but uses clearcoat's own normal texture
+fn _pbr_clearcoat_normal{{ mipmap.suffix() }}(
+    clearcoat: PbrClearcoat,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+    world_normal: vec3<f32>,
+    barycentric: vec3<f32>,
+    triangle_indices: vec3<u32>,
+    attribute_data_offset: u32,
+    vertex_attribute_stride: u32,
+    uv_sets_index: u32,
+    normal_matrix: mat3x3<f32>,
+    os_vertices: ObjectSpaceVertices,
+) -> vec3<f32> {
+    // If no clearcoat normal texture, use geometry normal
+    if !clearcoat.normal_tex_info.exists {
+        return world_normal;
+    }
+
+    // Sample clearcoat normal map and unpack from [0,1] to [-1,1] range
+    let tex = {{ mipmap.sample_fn() }}(clearcoat.normal_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %});
+    var tangent_normal = vec3<f32>(
+        (tex.r * 2.0 - 1.0) * clearcoat.normal_scale,
+        (tex.g * 2.0 - 1.0) * clearcoat.normal_scale,
+        tex.b * 2.0 - 1.0,
+    );
+
+    var T = vec3<f32>(0.0);
+    var B = vec3<f32>(0.0);
+    var basis_valid = false;
+
+    // Try stored tangents first
+    if (vertex_attribute_stride >= 7u) {
+        let tangent = get_vertex_tangent(attribute_data_offset, triangle_indices, barycentric, vertex_attribute_stride);
+        let tangent_len_sq = dot(tangent.xyz, tangent.xyz);
+        if (tangent_len_sq > 0.0) {
+            var world_tangent = normalize(normal_matrix * tangent.xyz);
+            world_tangent = normalize(world_tangent - world_normal * dot(world_normal, world_tangent));
+            let world_bitangent = normalize(cross(world_normal, world_tangent) * tangent.w);
+            T = world_tangent;
+            B = world_bitangent;
+            basis_valid = true;
+        }
+    }
+
+    // Compute from UV derivatives if no stored tangents
+    let set_index = clearcoat.normal_tex_info.uv_set_index;
+    let uv0 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.x, vertex_attribute_stride, uv_sets_index);
+    let uv1 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.y, vertex_attribute_stride, uv_sets_index);
+    let uv2 = _texture_uv_per_vertex(attribute_data_offset, set_index, triangle_indices.z, vertex_attribute_stride, uv_sets_index);
+
+    let delta_pos1 = os_vertices.p1 - os_vertices.p0;
+    let delta_pos2 = os_vertices.p2 - os_vertices.p0;
+    let delta_uv1 = uv1 - uv0;
+    let delta_uv2 = uv2 - uv0;
+    let det = delta_uv1.x * delta_uv2.y - delta_uv1.y * delta_uv2.x;
+
+    if (!basis_valid && abs(det) > 1e-6) {
+        let r = 1.0 / det;
+        let tangent_os = (delta_pos1 * delta_uv2.y - delta_pos2 * delta_uv1.y) * r;
+        var world_tangent = normalize(normal_matrix * tangent_os);
+        world_tangent = normalize(world_tangent - world_normal * dot(world_normal, world_tangent));
+        let world_bitangent = normalize(cross(world_normal, world_tangent));
+        T = world_tangent;
+        B = world_bitangent;
+        basis_valid = true;
+    }
+
+    // Fallback basis
+    if (!basis_valid) {
+        let up = vec3<f32>(0.0, 1.0, 0.0);
+        var fallback = normalize(cross(up, world_normal));
+        if (dot(fallback, fallback) < 1e-6) {
+            fallback = normalize(cross(vec3<f32>(1.0, 0.0, 0.0), world_normal));
+        }
+        T = fallback;
+        B = normalize(cross(world_normal, T));
+    }
+
+    let tbn = mat3x3<f32>(T, B, world_normal);
+    return normalize(tbn * tangent_normal);
+}
+
+// ============================================================================
+// Sheen (KHR_materials_sheen)
+// ============================================================================
+
+// Sheen color (RGB)
+fn _pbr_sheen_color{{ mipmap.suffix() }}(
+    sheen: PbrSheen,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> vec3<f32> {
+    var color = sheen.color_factor;
+    if sheen.color_tex_info.exists {
+        color *= {{ mipmap.sample_fn() }}(sheen.color_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).rgb;
+    }
+    return color;
+}
+
+// Sheen roughness (A channel)
+fn _pbr_sheen_roughness{{ mipmap.suffix() }}(
+    sheen: PbrSheen,
+    attribute_uv: vec2<f32>,
+    {% if mipmap.is_gradient() %}uv_derivs: UvDerivs,{% endif %}
+) -> f32 {
+    var roughness = sheen.roughness_factor;
+    if sheen.roughness_tex_info.exists {
+        roughness *= {{ mipmap.sample_fn() }}(sheen.roughness_tex_info, attribute_uv{% if mipmap.is_gradient() %}, uv_derivs{% endif %}).a;
+    }
+    return roughness;
 }
 
 // ============================================================================

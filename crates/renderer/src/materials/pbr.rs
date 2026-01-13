@@ -202,9 +202,9 @@ impl PbrMaterial {
     }
 
     pub fn uniform_buffer_data(&self, textures: &Textures) -> Result<Vec<u8>> {
-        let mut data: Vec<u8> = Vec::with_capacity(256); // meh, probably at least this most of the time
+        let mut data: Vec<u8> = Vec::with_capacity(256);
 
-        #[derive(Default)]
+        #[derive(Default, Debug)]
         struct FeatureIndices {
             pub vertex_color_info: u32,
             pub emissive_strength: u32,

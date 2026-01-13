@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     bind_groups::{AwsmBindGroupError, BindGroupCreate, BindGroups},
-    buffer::dynamic_storage::DynamicStorageBuffer,
+    buffer::{dynamic_storage::DynamicStorageBuffer, helpers::debug_chunks_to_u32},
     materials::{pbr::PbrMaterial, unlit::UnlitMaterial},
     textures::{AwsmTextureError, SamplerKey, TextureKey, TextureTransformKey, Textures},
     AwsmRendererLogging,
@@ -44,8 +44,12 @@ impl Material {
 
     pub fn uniform_buffer_data(&self, textures: &Textures) -> Result<Vec<u8>> {
         match self {
-            Material::Pbr(pbr_material) => pbr_material.uniform_buffer_data(textures),
-            Material::Unlit(pbr_material) => pbr_material.uniform_buffer_data(textures),
+            Material::Pbr(pbr_material) => {
+                let data = pbr_material.uniform_buffer_data(textures)?;
+
+                Ok(data)
+            }
+            Material::Unlit(unlit_material) => unlit_material.uniform_buffer_data(textures),
         }
     }
 }
@@ -53,18 +57,14 @@ impl Material {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum MaterialShaderId {
-    Pbr = 0,
-    Unlit = 1,
-    // Toon = 2, etc.
+    Pbr = 1,
+    Unlit = 2,
+    // Toon = 3, etc.
 }
 
 const INITIAL_SIZE: usize = 8192; //Why not
-static BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| {
-    BufferUsage::new()
-        .with_uniform()
-        .with_copy_dst()
-        .with_storage()
-});
+static BUFFER_USAGE: LazyLock<BufferUsage> =
+    LazyLock::new(|| BufferUsage::new().with_copy_dst().with_storage());
 
 pub struct Materials {
     pub(crate) gpu_buffer: web_sys::GpuBuffer,
@@ -89,6 +89,10 @@ impl Materials {
             gpu_dirty: true,
             _is_transparency_pass: SecondaryMap::new(),
         })
+    }
+
+    pub fn list(&self) -> impl Iterator<Item = (MaterialKey, &Material)> {
+        self.lookup.iter()
     }
 
     pub fn get(&self, key: MaterialKey) -> Result<&Material> {

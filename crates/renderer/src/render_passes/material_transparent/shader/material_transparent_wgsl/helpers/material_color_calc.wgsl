@@ -16,15 +16,15 @@ fn pbr_get_material_color(
     let specular = pbr_material_load_specular(material.specular_index);
     let transmission = pbr_material_load_transmission(material.transmission_index);
     let volume = pbr_material_load_volume(material.volume_index);
+    let clearcoat = pbr_material_load_clearcoat(material.clearcoat_index);
+    let sheen = pbr_material_load_sheen(material.sheen_index);
 
     var base = pbr_material_base_color(material, fragment_input);
 
-    // Multiply base color by vertex color if material has color info
+    // Multiply base color by vertex color if variant has color_sets
     {%- if color_sets.is_some() %}
         let vertex_color_info = pbr_material_load_vertex_color_info(material.vertex_color_info_index);
-        if vertex_color_info.set_index != 0u {
-            base *= vertex_color(vertex_color_info, fragment_input);
-        }
+        base *= vertex_color(vertex_color_info, fragment_input);
     {% endif %}
 
     if material.alpha_mode == ALPHA_MODE_MASK {
@@ -45,6 +45,15 @@ fn pbr_get_material_color(
     let transmission_factor = pbr_transmission(transmission, fragment_input);
     let volume_thickness = pbr_volume_thickness(volume, fragment_input);
 
+    // Clearcoat
+    let clearcoat_factor = pbr_clearcoat(clearcoat, fragment_input);
+    let clearcoat_roughness_factor = pbr_clearcoat_roughness(clearcoat, fragment_input);
+    let clearcoat_normal_value = pbr_clearcoat_normal(clearcoat, world_normal, world_tangent, fragment_input);
+
+    // Sheen
+    let sheen_color_factor = pbr_sheen_color(sheen, fragment_input);
+    let sheen_roughness_factor = pbr_sheen_roughness(sheen, fragment_input);
+
     return PbrMaterialColor(
         base,
         metallic_roughness,
@@ -57,7 +66,14 @@ fn pbr_get_material_color(
         transmission_factor,
         volume_thickness,
         volume.attenuation_distance,
-        volume.attenuation_color
+        volume.attenuation_color,
+        // Clearcoat
+        clearcoat_factor,
+        clearcoat_roughness_factor,
+        clearcoat_normal_value,
+        // Sheen
+        sheen_color_factor,
+        sheen_roughness_factor,
     );
 }
 
@@ -208,6 +224,101 @@ fn pbr_volume_thickness(
         thickness *= texture_pool_sample(volume.thickness_tex_info, uv).g;
     }
     return thickness;
+}
+
+// ============================================================================
+// Clearcoat (KHR_materials_clearcoat)
+// ============================================================================
+
+// Sample clearcoat intensity texture (R channel) and apply factor
+fn pbr_clearcoat(
+    clearcoat: PbrClearcoat,
+    fragment_input: FragmentInput
+) -> f32 {
+    // Early exit: no clearcoat if factor is 0 and no texture
+    if (!clearcoat.tex_info.exists && clearcoat.factor == 0.0) {
+        return 0.0;
+    }
+    var factor = clearcoat.factor;
+    if clearcoat.tex_info.exists {
+        let uv = texture_uv(clearcoat.tex_info, fragment_input);
+        factor *= texture_pool_sample(clearcoat.tex_info, uv).r;
+    }
+    return factor;
+}
+
+// Sample clearcoat roughness texture (G channel) and apply factor
+fn pbr_clearcoat_roughness(
+    clearcoat: PbrClearcoat,
+    fragment_input: FragmentInput
+) -> f32 {
+    var roughness = clearcoat.roughness_factor;
+    if clearcoat.roughness_tex_info.exists {
+        let uv = texture_uv(clearcoat.roughness_tex_info, fragment_input);
+        roughness *= texture_pool_sample(clearcoat.roughness_tex_info, uv).g;
+    }
+    return roughness;
+}
+
+// Sample clearcoat normal texture and apply normal mapping
+fn pbr_clearcoat_normal(
+    clearcoat: PbrClearcoat,
+    world_normal: vec3<f32>,
+    world_tangent: vec4<f32>,
+    fragment_input: FragmentInput
+) -> vec3<f32> {
+    // If no clearcoat normal texture, use geometry normal
+    if !clearcoat.normal_tex_info.exists {
+        return normalize(world_normal);
+    }
+
+    // Sample clearcoat normal map and unpack from [0,1] to [-1,1] range
+    let uv = texture_uv(clearcoat.normal_tex_info, fragment_input);
+    let tex = texture_pool_sample(clearcoat.normal_tex_info, uv);
+    let tangent_normal = vec3<f32>(
+        (tex.r * 2.0 - 1.0) * clearcoat.normal_scale,
+        (tex.g * 2.0 - 1.0) * clearcoat.normal_scale,
+        tex.b * 2.0 - 1.0,
+    );
+
+    // Build TBN matrix from interpolated vertex data
+    let N = normalize(world_normal);
+    let T = normalize(world_tangent.xyz);
+    let B = cross(N, T) * world_tangent.w;
+    let tbn = mat3x3<f32>(T, B, N);
+
+    // Transform tangent-space normal to world space
+    return normalize(tbn * tangent_normal);
+}
+
+// ============================================================================
+// Sheen (KHR_materials_sheen)
+// ============================================================================
+
+// Sample sheen color texture (RGB) and apply factor
+fn pbr_sheen_color(
+    sheen: PbrSheen,
+    fragment_input: FragmentInput
+) -> vec3<f32> {
+    var color = sheen.color_factor;
+    if sheen.color_tex_info.exists {
+        let uv = texture_uv(sheen.color_tex_info, fragment_input);
+        color *= texture_pool_sample(sheen.color_tex_info, uv).rgb;
+    }
+    return color;
+}
+
+// Sample sheen roughness texture (A channel) and apply factor
+fn pbr_sheen_roughness(
+    sheen: PbrSheen,
+    fragment_input: FragmentInput
+) -> f32 {
+    var roughness = sheen.roughness_factor;
+    if sheen.roughness_tex_info.exists {
+        let uv = texture_uv(sheen.roughness_tex_info, fragment_input);
+        roughness *= texture_pool_sample(sheen.roughness_tex_info, uv).a;
+    }
+    return roughness;
 }
 
 // ============================================================================

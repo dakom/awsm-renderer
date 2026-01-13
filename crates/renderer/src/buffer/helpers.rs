@@ -11,6 +11,14 @@ pub fn debug_chunks_to_f32(slice: &[u8], chunk_size: usize) -> Vec<Vec<f32>> {
         .collect()
 }
 
+#[allow(dead_code)]
+pub fn debug_chunks_to_u32(slice: &[u8], chunk_size: usize) -> Vec<Vec<u32>> {
+    u8_to_u32_vec(slice)
+        .chunks(chunk_size)
+        .map(|chunk| chunk.to_vec())
+        .collect()
+}
+
 // From gltf spec:
 // "All buffer data defined in this specification (i.e., geometry attributes, geometry indices, sparse accessor data, animation inputs and outputs, inverse bind matrices)
 // MUST use little endian byte order."

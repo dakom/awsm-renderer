@@ -4,6 +4,7 @@
   - https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos
   - [-] KHR_materials_clearcoat
   - [-] KHR_materials_sheen
+    - why am I seeing the triangle faces??
   - [ ] KHR_materials_anisotropy
   - [ ] KHR_materials_iridescence
   - [ ] KHR_materials_dispersion

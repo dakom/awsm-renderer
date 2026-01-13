@@ -96,6 +96,9 @@ async fn pbr_material_mapper_core(
     ctx: &GltfPopulateContext,
     gltf_material: &gltf::Material<'_>,
 ) -> Result<PbrMaterial> {
+    // Check if this is a real material or a default (no material defined in glTF)
+    let has_material = gltf_material.index().is_some();
+
     let (alpha_mode, premultiplied_alpha) = match ctx.data.hints.hud {
         true => (MaterialAlphaMode::Blend, Some(false)),
         false => match gltf_material.alpha_mode() {
@@ -111,6 +114,14 @@ async fn pbr_material_mapper_core(
     };
 
     let mut pbr_material = PbrMaterial::new(alpha_mode, gltf_material.double_sided());
+
+    // If no material is defined, use practical defaults for visibility.
+    // Note: glTF spec says metallic=1.0, roughness=1.0, but that makes objects
+    // invisible without IBL (diffuse *= 1-metallic = 0). Most viewers use metallic=0.
+    if !has_material {
+        pbr_material.metallic_factor = 0.0;
+        return Ok(pbr_material);
+    }
 
     let gltf_pbr = gltf_material.pbr_metallic_roughness();
 

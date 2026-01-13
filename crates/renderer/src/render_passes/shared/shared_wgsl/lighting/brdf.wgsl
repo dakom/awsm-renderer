@@ -2,7 +2,8 @@
 // PBR (metal/roughness) BRDF with Image-Based Lighting (WGSL)
 // Implements Cook-Torrance specular BRDF with split-sum IBL approximation
 // Safe for HDR workflows (no final saturate - tone mapping applied elsewhere)
-// Supports KHR_materials_ior, KHR_materials_transmission, KHR_materials_volume
+// Supports: KHR_materials_ior, KHR_materials_transmission, KHR_materials_volume,
+//           KHR_materials_clearcoat, KHR_materials_sheen
 // -------------------------------------------------------------
 
 // -------------------------------------------------------------
@@ -127,6 +128,118 @@ fn geometry_smith(n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, alpha: f32) -> f32 {
 }
 
 // -------------------------------------------------------------
+// Clearcoat BRDF (KHR_materials_clearcoat)
+// -------------------------------------------------------------
+
+// Clearcoat uses a fixed F0 of 0.04 (standard dielectric)
+const CLEARCOAT_F0: f32 = 0.04;
+
+// Compute clearcoat specular contribution for direct lighting
+fn clearcoat_brdf_direct(
+    clearcoat: f32,
+    clearcoat_roughness: f32,
+    clearcoat_normal: vec3<f32>,
+    v: vec3<f32>,
+    l: vec3<f32>,
+) -> f32 {
+    // Early exit if no clearcoat
+    if (clearcoat <= 0.0) {
+        return 0.0;
+    }
+
+    let cc_n = safe_normalize(clearcoat_normal);
+    let h = safe_normalize(v + l);
+
+    let cc_n_dot_l = max(dot(cc_n, l), 0.0);
+    let cc_n_dot_v = max(dot(cc_n, v), 1e-4);
+    let cc_n_dot_h = max(dot(cc_n, h), 0.0);
+    let cc_v_dot_h = max(dot(v, h), 0.0);
+
+    // Clearcoat uses squared roughness (alpha)
+    let cc_alpha = max(clearcoat_roughness * clearcoat_roughness, 0.001);
+
+    // GGX specular BRDF for clearcoat
+    let Fc = fresnel_schlick(cc_v_dot_h, vec3<f32>(CLEARCOAT_F0)).r;
+    let Dc = distribution_ggx(cc_n_dot_h, cc_alpha);
+    let Gc = geometry_smith(cc_n, v, l, cc_alpha);
+
+    return clearcoat * Fc * Dc * Gc / max(4.0 * cc_n_dot_l * cc_n_dot_v, EPSILON);
+}
+
+// Compute clearcoat Fresnel for energy conservation (attenuates base layer)
+fn clearcoat_fresnel(clearcoat: f32, v_dot_h: f32) -> f32 {
+    if (clearcoat <= 0.0) {
+        return 0.0;
+    }
+    return clearcoat * fresnel_schlick(v_dot_h, vec3<f32>(CLEARCOAT_F0)).r;
+}
+
+// -------------------------------------------------------------
+// Sheen BRDF (KHR_materials_sheen)
+// Uses Charlie distribution for cloth-like sheen
+// -------------------------------------------------------------
+
+// Charlie distribution function for sheen (inverted Gaussian)
+// This creates a soft, cloth-like highlight at grazing angles
+fn distribution_charlie(n_dot_h: f32, roughness: f32) -> f32 {
+    let alpha = roughness * roughness;
+    let inv_alpha = 1.0 / alpha;
+    let cos2h = n_dot_h * n_dot_h;
+    let sin2h = 1.0 - cos2h;
+    // Charlie distribution: (2 + 1/alpha) * sin^(1/alpha) / (2*PI)
+    return (2.0 + inv_alpha) * pow(sin2h, inv_alpha * 0.5) / (2.0 * PI);
+}
+
+// Visibility function for sheen (Ashikhmin)
+fn visibility_ashikhmin(n_dot_v: f32, n_dot_l: f32) -> f32 {
+    return 1.0 / (4.0 * (n_dot_l + n_dot_v - n_dot_l * n_dot_v));
+}
+
+// Compute sheen contribution for direct lighting
+fn sheen_brdf_direct(
+    sheen_color: vec3<f32>,
+    sheen_roughness: f32,
+    n: vec3<f32>,
+    v: vec3<f32>,
+    l: vec3<f32>,
+) -> vec3<f32> {
+    // Early exit if no sheen
+    if (all(sheen_color <= vec3<f32>(0.0))) {
+        return vec3<f32>(0.0);
+    }
+
+    let h = safe_normalize(v + l);
+
+    let n_dot_l = max(dot(n, l), 0.0);
+    let n_dot_v = max(dot(n, v), 1e-4);
+    let n_dot_h = max(dot(n, h), 0.0);
+
+    // Use minimum roughness to avoid division issues
+    let roughness = max(sheen_roughness, 0.07);
+
+    let D = distribution_charlie(n_dot_h, roughness);
+    let V = visibility_ashikhmin(n_dot_v, n_dot_l);
+
+    return sheen_color * D * V;
+}
+
+// Estimate sheen albedo scaling for energy conservation
+// This approximates how much energy the sheen layer absorbs from the base layer
+fn sheen_albedo_scaling(sheen_color: vec3<f32>, sheen_roughness: f32, n_dot_v: f32) -> f32 {
+    // Simplified approximation based on sheen color luminance and roughness
+    // A proper implementation would use a precomputed LUT
+    let sheen_lum = dot(sheen_color, vec3<f32>(0.2126, 0.7152, 0.0722));
+    if (sheen_lum <= 0.0) {
+        return 1.0;  // No sheen = no scaling
+    }
+
+    // Approximate albedo scaling: increases with roughness and sheen intensity
+    // This is a simplified version of the full integral
+    let r = max(sheen_roughness, 0.07);
+    return 1.0 - sheen_lum * max(r, 0.04);
+}
+
+// -------------------------------------------------------------
 // IBL Sampling Functions
 // -------------------------------------------------------------
 
@@ -167,6 +280,7 @@ fn sampleBRDFLUT(
 
 // -------------------------------------------------------------
 // Direct Lighting BRDF (Cook-Torrance)
+// With clearcoat and sheen extensions
 // -------------------------------------------------------------
 fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera: vec3<f32>) -> vec3<f32> {
     let n = safe_normalize(light_brdf.normal);
@@ -209,7 +323,8 @@ fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera
     let k_d = (1.0 - F_max) * (1.0 - metallic);
     let diffuse = k_d * base_color * (1.0 / PI);
 
-    // Final radiance: (diffuse + specular) * incoming light * N·L * occlusion
+    // TODO: Re-enable sheen/clearcoat once dark edge issue is resolved
+    // Temporarily use simple formula matching main branch
     return (diffuse + specular) * light_brdf.radiance * n_dot_l * color.occlusion;
 }
 
@@ -305,7 +420,42 @@ fn brdf_ibl_with_transmission(
     // Apply occlusion to specular with reduced strength to avoid over-darkening reflections
     let specular = prefiltered * (F0 * brdf_lut.x + vec3<f32>(f90) * brdf_lut.y) * mix(1.0, color.occlusion, 0.5);
 
-    return base_contribution + specular + color.emissive;
+    // Sheen contribution for IBL (approximate using diffuse irradiance)
+    let sheen_scaling = sheen_albedo_scaling(color.sheen_color, color.sheen_roughness, n_dot_v);
+    var base_with_sheen = base_contribution * sheen_scaling;
+
+    // Add sheen IBL (approximate: sheen color * irradiance * N·V for rim effect)
+    if (any(color.sheen_color > vec3<f32>(0.0))) {
+        let irradiance_sheen = sampleIrradiance(n, ibl_irradiance_tex, ibl_irradiance_sampler);
+        // Sheen increases at grazing angles, so we use (1 - N·V) as a simple approximation
+        let sheen_contrib = color.sheen_color * irradiance_sheen * pow(1.0 - n_dot_v, 2.0) * color.occlusion;
+        base_with_sheen += sheen_contrib;
+    }
+
+    var result = base_with_sheen + specular + color.emissive;
+
+    // Clearcoat IBL layer
+    if (color.clearcoat > 0.0) {
+        let cc_n = safe_normalize(color.clearcoat_normal);
+        let cc_n_dot_v = saturate(dot(cc_n, v));
+        let cc_R = reflect(-v, cc_n);
+        let cc_roughness = max(color.clearcoat_roughness, 0.04);
+
+        // Sample prefiltered environment for clearcoat reflection
+        let cc_prefiltered = samplePrefilteredEnv(cc_R, cc_roughness, ibl_filtered_env_tex, ibl_filtered_env_sampler, ibl_info);
+        let cc_brdf_lut = sampleBRDFLUT(cc_n_dot_v, cc_roughness, brdf_lut_tex, brdf_lut_sampler);
+
+        // Clearcoat specular (F0 = 0.04 for dielectric)
+        let cc_specular = cc_prefiltered * (CLEARCOAT_F0 * cc_brdf_lut.x + cc_brdf_lut.y);
+
+        // Clearcoat Fresnel attenuation
+        let cc_fresnel = clearcoat_fresnel(color.clearcoat, n_dot_v);
+
+        // Final: attenuated base + clearcoat
+        result = result * (1.0 - cc_fresnel) + color.clearcoat * cc_specular;
+    }
+
+    return result;
 }
 
 // Standard IBL without explicit transmission background (uses IBL for transmission)
