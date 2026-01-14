@@ -38,6 +38,10 @@ pub struct CameraMatrices {
     pub view: Mat4,
     pub projection: Mat4,
     pub position_world: Vec3,
+    /// Focus distance for depth of field (world units). Default: 10.0
+    pub focus_distance: f32,
+    /// Aperture f-stop for depth of field. Lower = more blur. Default: 5.6
+    pub aperture: f32,
 }
 
 impl CameraMatrices {
@@ -69,7 +73,7 @@ impl CameraBuffer {
     //  frame_count_and_padding (vec4<u32>) 16 bytes
     //  frustum corner rays (4 * vec4) 64 bytes
     //  viewport (vec4) 16 bytes
-    //  padding (vec4) 16 bytes
+    //  dof_params (vec4: focus_distance, aperture, unused, unused) 16 bytes
     // Total = 512 bytes (all members 16-byte aligned, no implicit gaps)
     pub const BYTE_SIZE: usize = 512;
 
@@ -190,8 +194,17 @@ impl CameraBuffer {
             &[0.0, 0.0, screen_width, screen_height],
         );
 
-        // Struct alignment padding (16 bytes at end) - WGSL compute pipeline requirement
-        write_f32_slice(&mut self.raw_data, &mut offset, &[0.0, 0.0, 0.0, 0.0]);
+        // DoF parameters: focus_distance, aperture, and 2 unused floats
+        write_f32_slice(
+            &mut self.raw_data,
+            &mut offset,
+            &[
+                camera_matrices.focus_distance,
+                camera_matrices.aperture,
+                0.0,
+                0.0,
+            ],
+        );
 
         debug_assert_eq!(offset, Self::BYTE_SIZE, "Buffer layout mismatch!");
 

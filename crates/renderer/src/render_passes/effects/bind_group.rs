@@ -12,8 +12,10 @@ use crate::{
 use awsm_renderer_core::{
     bind_groups::{
         BindGroupDescriptor, BindGroupEntry, BindGroupLayoutResource, BindGroupResource,
-        StorageTextureAccess, StorageTextureBindingLayout, TextureBindingLayout,
+        BufferBindingLayout, BufferBindingType, StorageTextureAccess, StorageTextureBindingLayout,
+        TextureBindingLayout,
     },
+    buffers::BufferBinding,
     texture::{TextureSampleType, TextureViewDimension},
 };
 
@@ -22,16 +24,17 @@ pub struct EffectsBindGroups {
     pub multisampled_bind_group_layout_key: BindGroupLayoutKey,
     pub singlesampled_bind_group_layout_key: BindGroupLayoutKey,
     // this is set via `recreate` mechanism
-    _bind_group: Option<web_sys::GpuBindGroup>,
+    _bind_group_a: Option<web_sys::GpuBindGroup>,
+    _bind_group_b: Option<web_sys::GpuBindGroup>,
 }
 
 impl EffectsBindGroups {
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let singlesampled_bind_group_layout_cache_key =
-            bind_group_layout_cache_key(&ctx.render_texture_formats, false);
+            bind_group_layout_cache_key(ctx.render_texture_formats, false);
 
         let multisampled_bind_group_layout_cache_key =
-            bind_group_layout_cache_key(&ctx.render_texture_formats, true);
+            bind_group_layout_cache_key(ctx.render_texture_formats, true);
 
         let singlesampled_bind_group_layout_key = ctx
             .bind_group_layouts
@@ -44,19 +47,50 @@ impl EffectsBindGroups {
         Ok(Self {
             multisampled_bind_group_layout_key,
             singlesampled_bind_group_layout_key,
-            _bind_group: None,
+            _bind_group_a: None,
+            _bind_group_b: None,
         })
     }
 
     pub fn get_bind_group(
         &self,
+        ping_pong: bool,
     ) -> std::result::Result<&web_sys::GpuBindGroup, AwsmBindGroupError> {
-        self._bind_group
-            .as_ref()
-            .ok_or_else(|| AwsmBindGroupError::NotFound("Effects".to_string()))
+        if !ping_pong {
+            self._bind_group_a
+                .as_ref()
+                .ok_or_else(|| AwsmBindGroupError::NotFound("Effects (A)".to_string()))
+        } else {
+            self._bind_group_b
+                .as_ref()
+                .ok_or_else(|| AwsmBindGroupError::NotFound("Effects (B)".to_string()))
+        }
     }
 
     pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
+        let mut entries = Vec::new();
+
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.composite)),
+        ));
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Buffer(BufferBinding::new(&ctx.camera.gpu_buffer)),
+        ));
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.depth)),
+        ));
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.bloom)),
+        ));
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.effects)),
+        ));
+
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts
                 .get(if ctx.anti_aliasing.has_msaa_checked()? {
@@ -64,28 +98,47 @@ impl EffectsBindGroups {
                 } else {
                     self.singlesampled_bind_group_layout_key
                 })?,
-            Some("Effects"),
-            vec![
-                BindGroupEntry::new(
-                    0,
-                    BindGroupResource::TextureView(Cow::Borrowed(
-                        &ctx.render_texture_views.composite,
-                    )),
-                ),
-                BindGroupEntry::new(
-                    1,
-                    BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.depth)),
-                ),
-                BindGroupEntry::new(
-                    2,
-                    BindGroupResource::TextureView(Cow::Borrowed(
-                        &ctx.render_texture_views.effects,
-                    )),
-                ),
-            ],
+            Some("Effects (A)"),
+            entries,
         );
 
-        self._bind_group = Some(ctx.gpu.create_bind_group(&descriptor.into()));
+        self._bind_group_a = Some(ctx.gpu.create_bind_group(&descriptor.into()));
+
+        let mut entries = Vec::new();
+
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.composite)),
+        ));
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::Buffer(BufferBinding::new(&ctx.camera.gpu_buffer)),
+        ));
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.depth)),
+        ));
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.effects)),
+        ));
+        entries.push(BindGroupEntry::new(
+            entries.len() as u32,
+            BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.bloom)),
+        ));
+
+        let descriptor = BindGroupDescriptor::new(
+            ctx.bind_group_layouts
+                .get(if ctx.anti_aliasing.has_msaa_checked()? {
+                    self.multisampled_bind_group_layout_key
+                } else {
+                    self.singlesampled_bind_group_layout_key
+                })?,
+            Some("Effects (B)"),
+            entries,
+        );
+
+        self._bind_group_b = Some(ctx.gpu.create_bind_group(&descriptor.into()));
 
         Ok(())
     }
@@ -108,6 +161,15 @@ fn bind_group_layout_cache_key(
                 visibility_fragment: false,
                 visibility_compute: true,
             },
+            // Camera uniform gives us inverse matrices + frustum rays for depth reprojection.
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Buffer(
+                    BufferBindingLayout::new().with_binding_type(BufferBindingType::Uniform),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
             // Depth texture
             BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::Texture(
@@ -120,7 +182,18 @@ fn bind_group_layout_cache_key(
                 visibility_fragment: false,
                 visibility_compute: true,
             },
-            // Output color render texture (storage texture for compute write)
+            // Bloom or Effects texture (readable - depends on ping-pong which one)
+            BindGroupLayoutCacheKeyEntry {
+                resource: BindGroupLayoutResource::Texture(
+                    TextureBindingLayout::new()
+                        .with_view_dimension(TextureViewDimension::N2d)
+                        .with_sample_type(TextureSampleType::UnfilterableFloat),
+                ),
+                visibility_vertex: false,
+                visibility_fragment: false,
+                visibility_compute: true,
+            },
+            // Bloom or Effects texture (writable - depends on ping-pong which one)
             BindGroupLayoutCacheKeyEntry {
                 resource: BindGroupLayoutResource::StorageTexture(
                     StorageTextureBindingLayout::new(render_texture_formats.color)

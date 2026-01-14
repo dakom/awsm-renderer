@@ -9,6 +9,7 @@ use crate::instances::Instances;
 use crate::materials::Materials;
 use crate::mesh::Meshes;
 use crate::pipelines::Pipelines;
+use crate::post_process::PostProcessing;
 use crate::render_passes::RenderPasses;
 use crate::render_textures::{RenderTextureViews, RenderTextures};
 use crate::transforms::Transforms;
@@ -114,6 +115,7 @@ impl AwsmRenderer {
             bind_groups: &self.bind_groups,
             render_passes: &self.render_passes,
             anti_aliasing: &self.anti_aliasing,
+            post_processing: &self.post_processing,
         };
 
         let renderables = self.collect_renderables(&ctx)?;
@@ -348,4 +350,5 @@ pub struct RenderContext<'a> {
     pub bind_groups: &'a BindGroups,
     pub render_passes: &'a RenderPasses,
     pub anti_aliasing: &'a AntiAliasing,
+    pub post_processing: &'a PostProcessing,
 }

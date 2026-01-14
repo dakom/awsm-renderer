@@ -169,6 +169,7 @@ pub struct RenderTextureViews {
 
     // Output from effects pass
     pub effects: web_sys::GpuTextureView,
+    pub bloom: web_sys::GpuTextureView,
 
     pub depth: web_sys::GpuTextureView,
     pub hud_depth: web_sys::GpuTextureView,
@@ -208,6 +209,7 @@ impl RenderTextureViews {
             depth: inner.depth_view.clone(),
             hud_depth: inner.hud_depth_view.clone(),
             effects: inner.effects_view.clone(),
+            bloom: inner.bloom_view.clone(),
             composite: inner.composite_view.clone(),
             size_changed,
             curr_index,
@@ -255,6 +257,9 @@ pub struct RenderTexturesInner {
 
     pub effects: web_sys::GpuTexture,
     pub effects_view: web_sys::GpuTextureView,
+
+    pub bloom: web_sys::GpuTexture,
+    pub bloom_view: web_sys::GpuTextureView,
 
     pub width: u32,
     pub height: u32,
@@ -409,6 +414,21 @@ impl RenderTexturesInner {
             )
             .map_err(AwsmRenderTextureError::CreateTexture)?;
 
+        let bloom = gpu
+            .create_texture(
+                &TextureDescriptor::new(
+                    render_texture_formats.color,
+                    Extent3d::new(width, Some(height), Some(1)),
+                    TextureUsage::new()
+                        .with_storage_binding()
+                        .with_texture_binding()
+                        .with_render_attachment(),
+                )
+                .with_label("Bloom")
+                .into(),
+            )
+            .map_err(AwsmRenderTextureError::CreateTexture)?;
+
         // 2. Create views for all textures
 
         let visibility_data_view = visibility_data.create_view().map_err(|e| {
@@ -459,6 +479,10 @@ impl RenderTexturesInner {
         let effects_view = effects
             .create_view()
             .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("effects: {e:?}")))?;
+
+        let bloom_view = bloom
+            .create_view()
+            .map_err(|e| AwsmRenderTextureError::CreateTextureView(format!("bloom: {e:?}")))?;
 
         let opaque_to_transparent_blit_bind_group_msaa_4 = blit_get_bind_group(
             gpu,
@@ -518,6 +542,9 @@ impl RenderTexturesInner {
             effects,
             effects_view,
 
+            bloom,
+            bloom_view,
+
             width,
             height,
 
@@ -538,6 +565,7 @@ impl RenderTexturesInner {
         self.depth.destroy();
         self.composite.destroy();
         self.effects.destroy();
+        self.bloom.destroy();
     }
 }
 

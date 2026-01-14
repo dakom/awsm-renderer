@@ -30,11 +30,11 @@ impl SidebarProcessing {
 
         html!("div", {
             .class(&*CONTAINER)
-            .child(state.render_msaa_selector())
-            .child(state.render_smaa_selector())
+            .child(state.render_tonemapping_selector())
             .child(state.render_bloom_selector())
             .child(state.render_dof_selector())
-            .child(state.render_tonemapping_selector())
+            .child(state.render_msaa_selector())
+            .child(state.render_smaa_selector())
         })
     }
 

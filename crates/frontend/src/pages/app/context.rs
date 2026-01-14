@@ -13,6 +13,8 @@ pub struct AppContext {
     pub material_debug: Mutable<PbrMaterialDebug>,
     pub anti_alias: Mutable<AntiAliasing>,
     pub post_processing: Mutable<PostProcessing>,
+    pub camera_aperture: Mutable<f32>,
+    pub camera_focus_distance: Mutable<f32>,
     pub ibl_id: Mutable<IblId>,
     pub punctual_lights: Mutable<bool>,
     pub skybox_id: Mutable<SkyboxId>,
@@ -147,6 +149,8 @@ impl Default for AppContext {
             punctual_lights: Mutable::new(CONFIG.initial_punctual_lights),
             anti_alias: Mutable::new(CONFIG.initial_anti_alias.clone()),
             post_processing: Mutable::new(CONFIG.initial_post_processing.clone()),
+            camera_aperture: Mutable::new(CONFIG.initial_camera_aperture),
+            camera_focus_distance: Mutable::new(CONFIG.initial_camera_focus_distance),
         }
     }
 }

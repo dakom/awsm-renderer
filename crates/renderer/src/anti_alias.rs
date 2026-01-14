@@ -79,7 +79,7 @@ impl AwsmRenderer {
         self.render_passes
             .effects
             .pipelines
-            .set_render_pipeline_key(
+            .set_render_pipeline_keys(
                 &self.anti_aliasing,
                 &self.post_processing,
                 &self.gpu,

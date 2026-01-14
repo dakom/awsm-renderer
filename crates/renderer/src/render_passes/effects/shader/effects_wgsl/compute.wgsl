@@ -1,7 +1,19 @@
+/*************** START camera.wgsl ******************/
+{% include "shared_wgsl/camera.wgsl" %}
+/*************** END camera.wgsl ******************/
+
+/*************** START math.wgsl ******************/
+{% include "shared_wgsl/math.wgsl" %}
+/*************** END math.wgsl ******************/
+
+/*************** START color_space.wgsl ******************/
+{% include "shared_wgsl/color_space.wgsl" %}
+/*************** END color_space.wgsl ******************/
+
 {% if smaa_anti_alias %}
-    /*************** START msaa.wgsl ******************/
+    /*************** START smaa.wgsl ******************/
     {% include "effects_wgsl/helpers/smaa.wgsl" %}
-    /*************** END msaa.wgsl ******************/
+    /*************** END smaa.wgsl ******************/
 {% endif %}
 
 {% if bloom %}
@@ -15,10 +27,6 @@
     {% include "effects_wgsl/helpers/dof.wgsl" %}
     /*************** END dof.wgsl ******************/
 {% endif %}
-
-/*************** START color_space.wgsl ******************/
-{% include "shared_wgsl/color_space.wgsl" %}
-/*************** END color_space.wgsl ******************/
 
 
 
@@ -37,6 +45,8 @@ fn main(
         return;
     }
 
+    let camera = camera_from_raw(camera_raw);
+
     let composite_color = textureLoad(composite_tex, coords, 0);
 
     {% if smaa_anti_alias %}
@@ -46,12 +56,16 @@ fn main(
     {% endif %}
 
     {% if bloom %}
-        rgb = apply_bloom(rgb);
+        rgb = apply_bloom(rgb, coords, screen_dims_i32);
     {% endif %}
 
     {% if dof %}
-        rgb = apply_dof(rgb);
+        rgb = apply_dof(rgb, coords, screen_dims_i32, camera);
     {% endif %}
 
-    textureStore(effects_tex, coords, vec4<f32>(rgb, 1.0));
+    {% if !ping_pong %}
+        textureStore(effects_tex, coords, vec4<f32>(rgb, 1.0));
+    {% else %}
+        textureStore(bloom_tex, coords, vec4<f32>(rgb, 1.0));
+    {% endif %}
 }
