@@ -35,6 +35,7 @@ pub struct Config {
 }
 
 #[allow(clippy::option_env_unwrap)]
+#[allow(clippy::if_same_then_else)]
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
     Config {
         media_base_url_gltf_samples: option_env!("MEDIA_BASE_URL_GLTF_SAMPLES")
