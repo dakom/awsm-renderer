@@ -5,10 +5,12 @@ resolver = "2"
 [workspace.package]
 description = "awsm renderer"
 edition = "2021"
-version = "0.1.0"
+version = "0.1.1"
 license = "MIT"
 authors = ["David Komer"]
 rust-version = "1.80.0"
+repository = "https://github.com/dakom/awsm-renderer"
+homepage = "https://dakom.github.io/awsm-renderer/"
 
 ### Profiles
 
@@ -81,7 +83,7 @@ mikktspace = "0.3.0"
 # Media
 # https://github.com/gltf-rs/gltf/issues/465
 # Note: clearcoat/sheen features require git version until gltf releases them.
-# For local dev with clearcoat/sheen, enable those features in renderer crate.
+# Those features are enabled in frontend/Cargo.toml for local dev only.
 gltf = {version = "1.4.1", git = "https://github.com/gltf-rs/gltf.git", features = [
     "extensions",
     "KHR_lights_punctual",
@@ -92,7 +94,6 @@ gltf = {version = "1.4.1", git = "https://github.com/gltf-rs/gltf.git", features
     "KHR_materials_ior",
     "KHR_materials_transmission",
     "KHR_materials_volume",
-    # KHR_materials_clearcoat and KHR_materials_sheen are enabled via renderer features
 ]}
 exr = "1.73.0"
 binpack2d = "1.0.1"

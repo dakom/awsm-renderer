@@ -99,8 +99,6 @@ pub(super) fn ensure_tangents<'a>(
         Cow::Owned(tangents_bytes),
     );
 
-    tracing::info!("Generated tangents using MikkTSpace algorithm");
-
     Ok(attribute_data)
 }
 

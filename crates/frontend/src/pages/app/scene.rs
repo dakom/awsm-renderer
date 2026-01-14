@@ -210,11 +210,23 @@ impl AppScene {
                 state.load_ibl(ibl_id).await;
 
                 match state.ctx.skybox_id.get() {
-                    SkyboxId::SameAsIbl => {
-                        state.load_skybox(SkyboxId::SameAsIbl).await;
-                    },
                     SkyboxId::None => { /* do nothing */}
+                    id => {
+                        state.load_skybox(id).await;
+                    },
                 }
+            }))).await;
+        }));
+
+        spawn_local(clone!(state => async move {
+            state.ctx.skybox_id.signal().for_each(clone!(state => move |skybox_id| clone!(state => async move {
+                match skybox_id  {
+                    SkyboxId::None => { /* do nothing */}
+                    id => {
+                        state.load_skybox(id).await;
+                    },
+                }
+
             }))).await;
         }));
 
@@ -337,74 +349,67 @@ impl AppScene {
 
     async fn load_skybox(self: &Arc<Self>, skybox_id: SkyboxId) {
         async fn inner(scene: &Arc<AppScene>, skybox_id: SkyboxId) -> Result<()> {
-            match skybox_id {
-                SkyboxId::SameAsIbl => {
-                    let skybox = {
-                        let ibl_id = scene.ctx.ibl_id.get_cloned();
-                        let maybe_cached = {
-                            // need to drop this lock before awaiting
-                            scene
-                                .skybox_by_ibl_cache
-                                .lock()
-                                .unwrap()
-                                .get(&ibl_id)
-                                .cloned()
-                        };
-                        match maybe_cached {
-                            Some(skybox) => skybox,
-                            None => {
-                                let skybox_cubemap = match ibl_id {
-                                    IblId::PhotoStudio => {
-                                        skybox::load_from_path("photo_studio").await?
-                                    }
-                                    IblId::AllWhite => {
-                                        skybox::load_from_colors(CubemapBitmapColors::all(
-                                            Color::WHITE,
-                                        ))
-                                        .await?
-                                    }
-                                    IblId::SimpleSky => skybox::load_simple_sky().await?,
-                                };
-
-                                let skybox = {
-                                    let (texture, view, mip_count) = {
-                                        let renderer = &mut *scene.renderer.lock().await;
-                                        skybox_cubemap
-                                            .create_texture_and_view(&renderer.gpu, Some("Skybox"))
-                                            .await?
-                                    };
-
-                                    {
-                                        let renderer = &mut *scene.renderer.lock().await;
-                                        let key = renderer.textures.insert_cubemap(texture);
-
-                                        let sampler_key = renderer.textures.get_sampler_key(
-                                            &renderer.gpu,
-                                            Skybox::sampler_cache_key(),
-                                        )?;
-
-                                        let sampler =
-                                            renderer.textures.get_sampler(sampler_key)?.clone();
-
-                                        Skybox::new(key, view, sampler, mip_count)
-                                    }
-                                };
-
-                                scene
-                                    .skybox_by_ibl_cache
-                                    .lock()
-                                    .unwrap()
-                                    .insert(ibl_id, skybox.clone());
-
-                                skybox
-                            }
-                        }
-                    };
-
-                    scene.renderer.lock().await.set_skybox(skybox);
-                }
-                SkyboxId::None => {}
+            let ibl_id = match skybox_id {
+                SkyboxId::SameAsIbl => scene.ctx.ibl_id.get_cloned(),
+                SkyboxId::SpecificIbl(ibl_id) => ibl_id,
+                SkyboxId::None => return Ok(()),
             };
+            let skybox = {
+                let maybe_cached = {
+                    // need to drop this lock before awaiting
+                    scene
+                        .skybox_by_ibl_cache
+                        .lock()
+                        .unwrap()
+                        .get(&ibl_id)
+                        .cloned()
+                };
+                match maybe_cached {
+                    Some(skybox) => skybox,
+                    None => {
+                        let skybox_cubemap = match ibl_id {
+                            IblId::PhotoStudio => skybox::load_from_path("photo_studio").await?,
+                            IblId::AllWhite => {
+                                skybox::load_from_colors(CubemapBitmapColors::all(Color::WHITE))
+                                    .await?
+                            }
+                            IblId::SimpleSky => skybox::load_simple_sky().await?,
+                        };
+
+                        let skybox = {
+                            let (texture, view, mip_count) = {
+                                let renderer = &mut *scene.renderer.lock().await;
+                                skybox_cubemap
+                                    .create_texture_and_view(&renderer.gpu, Some("Skybox"))
+                                    .await?
+                            };
+
+                            {
+                                let renderer = &mut *scene.renderer.lock().await;
+                                let key = renderer.textures.insert_cubemap(texture);
+
+                                let sampler_key = renderer
+                                    .textures
+                                    .get_sampler_key(&renderer.gpu, Skybox::sampler_cache_key())?;
+
+                                let sampler = renderer.textures.get_sampler(sampler_key)?.clone();
+
+                                Skybox::new(key, view, sampler, mip_count)
+                            }
+                        };
+
+                        scene
+                            .skybox_by_ibl_cache
+                            .lock()
+                            .unwrap()
+                            .insert(ibl_id, skybox.clone());
+
+                        skybox
+                    }
+                }
+            };
+
+            scene.renderer.lock().await.set_skybox(skybox);
 
             Ok(())
         }
@@ -426,12 +431,16 @@ impl AppScene {
             let skybox_id = self.ctx.skybox_id.get_cloned();
             let skybox_loaded = {
                 match skybox_id {
+                    SkyboxId::None => true,
                     SkyboxId::SameAsIbl => {
                         let ibl_id = self.ctx.ibl_id.get_cloned();
                         let skybox_cache = self.skybox_by_ibl_cache.lock().unwrap();
                         skybox_cache.contains_key(&ibl_id)
                     }
-                    SkyboxId::None => true,
+                    SkyboxId::SpecificIbl(ibl_id) => {
+                        let skybox_cache = self.skybox_by_ibl_cache.lock().unwrap();
+                        skybox_cache.contains_key(&ibl_id)
+                    }
                 }
             };
 
@@ -590,14 +599,24 @@ impl AppScene {
                     renderer.set_ibl(ibl);
                 }
 
-                if let Some(skybox) = scene
-                    .skybox_by_ibl_cache
-                    .lock()
-                    .unwrap()
-                    .get(&scene.ctx.ibl_id.get())
-                    .cloned()
-                {
-                    renderer.set_skybox(skybox);
+                let skybox_id = scene.ctx.skybox_id.get_cloned();
+
+                let ibl_id = match skybox_id {
+                    SkyboxId::SameAsIbl => Some(scene.ctx.ibl_id.get_cloned()),
+                    SkyboxId::SpecificIbl(ibl_id) => Some(ibl_id),
+                    SkyboxId::None => None,
+                };
+
+                if let Some(ibl_id) = ibl_id {
+                    if let Some(skybox) = scene
+                        .skybox_by_ibl_cache
+                        .lock()
+                        .unwrap()
+                        .get(&ibl_id)
+                        .cloned()
+                    {
+                        renderer.set_skybox(skybox);
+                    }
                 }
             }
 

@@ -82,7 +82,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "awsm-renderer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "askama",
@@ -104,7 +104,7 @@ dependencies = [
 
 [[package]]
 name = "awsm-renderer-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "binpack2d",
@@ -129,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "awsm-renderer-editor"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "awsm-renderer",
@@ -386,7 +386,7 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
 name = "frontend"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "awsm-renderer",

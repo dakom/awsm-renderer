@@ -1,11 +1,14 @@
 [package]
 name = "awsm-renderer"
 description = "awsm-renderer"
+readme = "../../README.md"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [features]
 default = ["gltf", "animation"]
@@ -18,8 +21,9 @@ gltf = [
 ]
 animation = []
 # gltf material extensions (clearcoat/sheen require unreleased gltf features, only work with git dep)
-clearcoat = ["gltf", "gltf/KHR_materials_clearcoat"]
-sheen = ["gltf", "gltf/KHR_materials_sheen"]
+# These features gate our code. gltf's KHR_materials_clearcoat/sheen must be enabled separately (see frontend/Cargo.toml)
+clearcoat = ["gltf"]
+sheen = ["gltf"]
 # Optional features to enable optional parts of awsm-renderer-core
 ktx = ["awsm-renderer-core/ktx"]
 serde = ["dep:serde", "awsm-renderer-core/serde"]
@@ -28,7 +32,7 @@ exr = ["awsm-renderer-core/exr"]
 texture-export = ["awsm-renderer-core/texture-export"]
 
 [dependencies]
-awsm-renderer-core = { version = "0.1.0", path = "../renderer-core", features = ["texture-pool"] }
+awsm-renderer-core = { version = "0.1.1", path = "../renderer-core", features = ["texture-pool"] }
 web-sys = {workspace = true}
 tracing = {workspace = true}
 thiserror = {workspace = true}

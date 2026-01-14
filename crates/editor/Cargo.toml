@@ -1,14 +1,17 @@
 [package]
 name = "awsm-renderer-editor"
 description = "awsm-renderer-editor"
+readme = "../../README.md"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [dependencies]
-awsm-renderer = { version = "0.1.0", path = "../renderer"}
+awsm-renderer = { version = "0.1.1", path = "../renderer"}
 anyhow = {workspace = true}
 glam = {workspace = true}
 web-sys = { workspace = true}

@@ -1,6 +1,6 @@
 # Renderer core
 
-This is a core crate for the awsm renderer.
+This is a core crate for [awsm renderer](https://crates.io/crates/awsm-renderer).
 
 At this level, it's just a thin wrapper around the WebGPU API. It is intended to be used as a low-level primitive, without the headache of dealing with the raw `web-sys` bindings directly.
 

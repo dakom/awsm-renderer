@@ -1,7 +1,7 @@
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    pages::app::context::{AppContext, IblId},
+    pages::app::context::{AppContext, IblId, SkyboxId},
     prelude::*,
 };
 
@@ -31,6 +31,7 @@ impl SidebarLighting {
             .class(&*CONTAINER)
             .child(state.render_ibl_selector())
             .child(state.render_punctual_lights_selector())
+            .child(state.render_skybox_selector())
         })
     }
 
@@ -73,6 +74,36 @@ impl SidebarLighting {
                     }));
                 }))
                 .with_options([("On".to_string(), true), ("Off".to_string(), false)])
+                .render(),
+        )
+    }
+
+    fn render_skybox_selector(self: &Arc<Self>) -> Dom {
+        let state = self;
+
+        render_dropdown_label(
+            "Skybox",
+            Dropdown::new()
+                .with_intial_selected(Some(state.ctx.skybox_id.get()))
+                .with_bg_color(ColorBackground::Dropdown)
+                .with_on_change(clone!(state => move |skybox_id| {
+                    state.ctx.skybox_id.set_neq(*skybox_id);
+                }))
+                .with_options([
+                    ("- Same as IBL - ".to_string(), SkyboxId::SameAsIbl),
+                    (
+                        "Photo Studio".to_string(),
+                        SkyboxId::SpecificIbl(IblId::PhotoStudio),
+                    ),
+                    (
+                        "All White".to_string(),
+                        SkyboxId::SpecificIbl(IblId::AllWhite),
+                    ),
+                    (
+                        "Simple Sky".to_string(),
+                        SkyboxId::SpecificIbl(IblId::SimpleSky),
+                    ),
+                ])
                 .render(),
         )
     }

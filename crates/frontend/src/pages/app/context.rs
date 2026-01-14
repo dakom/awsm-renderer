@@ -125,10 +125,10 @@ pub enum IblId {
     AllWhite,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SkyboxId {
-    #[default]
     SameAsIbl,
+    SpecificIbl(IblId),
     // Not a real mode, just for debugging to use original default from renderer
     None,
 }
