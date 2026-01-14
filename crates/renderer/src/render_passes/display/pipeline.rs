@@ -4,7 +4,6 @@ use awsm_renderer_core::{
 };
 
 use crate::{
-    anti_alias::AntiAliasing,
     error::Result,
     pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts},
     pipelines::{
@@ -32,6 +31,7 @@ impl DisplayPipelines {
     ) -> Result<Self> {
         let pipeline_layout_cache_key =
             PipelineLayoutCacheKey::new(vec![bind_groups.bind_group_layout_key]);
+
         let pipeline_layout_key = ctx.pipeline_layouts.get_key(
             ctx.gpu,
             ctx.bind_group_layouts,
@@ -46,7 +46,6 @@ impl DisplayPipelines {
 
     pub async fn set_render_pipeline_key(
         &mut self,
-        anti_aliasing: &AntiAliasing,
         post_processing: &PostProcessing,
         gpu: &AwsmRendererWebGpu,
         shaders: &mut Shaders,
@@ -55,7 +54,6 @@ impl DisplayPipelines {
         _render_texture_formats: &RenderTextureFormats,
     ) -> Result<()> {
         let shader_cache_key = ShaderCacheKeyDisplay {
-            smaa_anti_alias: anti_aliasing.smaa,
             tonemapping: post_processing.tonemapping,
         };
         let shader_key = shaders.get_key(gpu, shader_cache_key).await?;

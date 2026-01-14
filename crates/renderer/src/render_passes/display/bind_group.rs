@@ -62,7 +62,7 @@ impl DisplayBindGroups {
             Some("Display"),
             vec![BindGroupEntry::new(
                 0,
-                BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.composite)),
+                BindGroupResource::TextureView(Cow::Borrowed(&ctx.render_texture_views.effects)),
             )],
         );
 

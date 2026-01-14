@@ -108,6 +108,7 @@ impl BindGroups {
             TransparentLights,
             TransparentTextures,
             LightCulling,
+            Effects,
             Display,
             Picker,
         }
@@ -152,6 +153,7 @@ impl BindGroups {
                 BindGroupCreate::TextureViewRecreate => {
                     functions_to_call.insert(FunctionToCall::LightCulling);
                     functions_to_call.insert(FunctionToCall::Display);
+                    functions_to_call.insert(FunctionToCall::Effects);
                     functions_to_call.insert(FunctionToCall::OpaqueMain);
                     functions_to_call.insert(FunctionToCall::TransparentMain);
                     functions_to_call.insert(FunctionToCall::Picker);
@@ -274,6 +276,9 @@ impl BindGroups {
                 }
                 FunctionToCall::LightCulling => {
                     render_passes.light_culling.bind_groups.recreate(&ctx)?;
+                }
+                FunctionToCall::Effects => {
+                    render_passes.effects.bind_groups.recreate(&ctx)?;
                 }
                 FunctionToCall::Display => {
                     render_passes.display.bind_groups.recreate(&ctx)?;

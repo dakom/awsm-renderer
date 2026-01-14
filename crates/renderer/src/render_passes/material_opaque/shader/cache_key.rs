@@ -1,14 +1,7 @@
-use crate::{
-    render_passes::{
-        shader_cache_key::ShaderCacheKeyRenderPass,
-        shared::material::cache_key::ShaderMaterialVertexAttributes,
-    },
-    shaders::ShaderCacheKey,
-};
+use crate::{render_passes::shader_cache_key::ShaderCacheKeyRenderPass, shaders::ShaderCacheKey};
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyMaterialOpaque {
-    pub attributes: ShaderMaterialVertexAttributes,
     pub texture_pool_arrays_len: u32,
     pub texture_pool_samplers_len: u32,
     pub msaa_sample_count: Option<u32>,

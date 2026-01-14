@@ -29,6 +29,8 @@ pub struct Config {
     pub initial_punctual_lights: bool,
     pub initial_anti_alias: AntiAliasing,
     pub initial_post_processing: PostProcessing,
+    pub initial_camera_aperture: f32,
+    pub initial_camera_focus_distance: f32,
 }
 
 #[allow(clippy::option_env_unwrap)]
@@ -67,6 +69,8 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         initial_material_debug: PbrMaterialDebug::None,
         initial_anti_alias: AntiAliasing::default(),
         initial_post_processing: PostProcessing::default(),
+        initial_camera_aperture: 5.6,
+        initial_camera_focus_distance: 10.0,
     }
 });
 

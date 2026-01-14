@@ -1,25 +1,26 @@
 # Next up
-      
 - Make transparent meshes pickable
   - Maybe global "editor_mode" on renderer that toggles some less-efficient behavior
     - All meshes get both transparent and opaque geometry 
     - Picking pass samples both and uses alpha test to discard transparent fragments below threshold
     
-- More extensions (see below)
-    
-- Visual bounding box around selected objects
-      
-- Post Processing options in frontend sidebar
-- Make debug normals work again in sidebar
-- Animation support in sidebar (or get rid of it)
-
 - Shadows
 
 - Frustum culling
 
-- Toon shader
+- SSAO
+  - Can probably be done in opaque pass 
+  - Should be optional/togglable
 
-- Get started with light culling pass
+- Toon shader
+    
+- More extensions (see below)
+    
+- Visual bounding box around selected objects
+      
+- Animation support in sidebar (or get rid of it)
+
+- Light culling 
   - research best practices
   - should optimize for opaque pass (i.e. only light fragments that made it to the screen?)
   - MAYBE:
@@ -112,12 +113,12 @@ If it's supported here, corresponding core functionality is also supported
 - [x] non-indexed
 - [x] indexed
 - [x] instancing
-- [ ] Early z pre-pass
 - [x] Opaque front to back
 - [x] Transparent back to front
 - [x] Anti-aliasing
   - [x] MSAA
   - [x] SMAA
+- [ ] SSAO
 
 ## Textures
 - [x] 2D textures
@@ -147,10 +148,9 @@ If it's supported here, corresponding core functionality is also supported
 ## Post-processing
 - [x] Basic render-texture support
 - [x] Tonemapping
-- [ ] SSAO
-- [ ] Bloom
+- [x] Bloom
 - [x] TAA
-- [ ] DOF
+- [x] DOF
 
 ## Demo-only
 

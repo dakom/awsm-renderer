@@ -6,6 +6,12 @@ pub static USER_SELECT_NONE: LazyLock<String> = LazyLock::new(|| {
     }
 });
 
+pub static POINTER_EVENTS_NONE: LazyLock<String> = LazyLock::new(|| {
+    class! {
+        .style("pointer-events", "none")
+    }
+});
+
 pub static CURSOR_POINTER: LazyLock<String> = LazyLock::new(|| {
     class! {
         .style("cursor", "pointer")

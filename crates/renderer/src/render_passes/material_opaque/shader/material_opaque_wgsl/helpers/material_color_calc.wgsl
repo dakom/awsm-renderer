@@ -55,18 +55,17 @@ fn pbr_get_material_color{{ mipmap.suffix() }}(
         {% if mipmap.is_gradient() %}gradients.base_color,{% endif %}
     );
 
-    {%- match color_sets %}
-        {% when Some with (color_sets) %}
-            let vertex_color_info = pbr_material_load_vertex_color_info(material.vertex_color_info_index);
-            base *= vertex_color(
-                attribute_data_offset,
-                triangle_indices,
-                barycentric,
-                vertex_color_info,
-                vertex_attribute_stride,
-            );
-        {% when _ %}
-    {% endmatch %}
+    // Multiply base color by vertex color if present (index 0 means absent)
+    if (material.vertex_color_info_index != 0u) {
+        let vertex_color_info = pbr_material_load_vertex_color_info(material.vertex_color_info_index);
+        base *= vertex_color(
+            attribute_data_offset,
+            triangle_indices,
+            barycentric,
+            vertex_color_info,
+            vertex_attribute_stride,
+        );
+    }
 
     let metallic_roughness = _pbr_material_metallic_roughness_color{{ mipmap.suffix() }}(
         material,

@@ -93,7 +93,9 @@ impl AppCanvas {
             }))
             .child(html!("div", {
                 .class(&*FULL_AREA)
-                .style("pointer-events", "none")
+                .class_signal(&*POINTER_EVENTS_NONE, state.ctx.loading_status.signal_ref(|loading_status| {
+                    !loading_status.any_error()
+                }))
                 .child(html!("div", {
                     .style("padding", "1rem")
                     .class([FontSize::H3.class(), ColorText::GltfContent.class(), &*USER_SELECT_NONE])
@@ -128,7 +130,7 @@ impl AppCanvas {
                     } else {
                         Some(html!("div", {
                             .style("padding", "1rem")
-                            .class([FontSize::H3.class(), ColorText::Error.class(), &*USER_SELECT_NONE])
+                            .class([FontSize::H3.class(), ColorText::Error.class()])
                             .children(errors.iter().map(|error| {
                                 html!("div", {
                                     .text(error)

@@ -20,7 +20,7 @@ const SMAA_THRESHOLD: f32 = 0.03;          // Edge detection threshold (lower = 
 const SMAA_BLEND_STRENGTH: f32 = 0.6;     // How strongly to blend with neighbors (0-1)
 
 fn apply_smaa(color: vec4<f32>, coords: vec2<i32>) -> vec4<f32> {
-    let dimensions = textureDimensions(composite_texture);
+    let dimensions = textureDimensions(composite_tex);
     let tex_size = vec2<f32>(f32(dimensions.x), f32(dimensions.y));
     let inv_tex_size = vec2<f32>(1.0 / tex_size.x, 1.0 / tex_size.y);
 
@@ -30,16 +30,16 @@ fn apply_smaa(color: vec4<f32>, coords: vec2<i32>) -> vec4<f32> {
 
 
     // Sample neighbors and convert to perceptual space
-    let left_luma   = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(-1, 0), 0).rgb));
-    let right_luma  = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(1, 0), 0).rgb));
-    let top_luma    = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(0, -1), 0).rgb));
-    let bottom_luma = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(0, 1), 0).rgb));
+    let left_luma   = rgb_to_luma(linear_to_srgb(textureLoad(composite_tex, coords + vec2<i32>(-1, 0), 0).rgb));
+    let right_luma  = rgb_to_luma(linear_to_srgb(textureLoad(composite_tex, coords + vec2<i32>(1, 0), 0).rgb));
+    let top_luma    = rgb_to_luma(linear_to_srgb(textureLoad(composite_tex, coords + vec2<i32>(0, -1), 0).rgb));
+    let bottom_luma = rgb_to_luma(linear_to_srgb(textureLoad(composite_tex, coords + vec2<i32>(0, 1), 0).rgb));
 
     // Sample diagonals for better thin line detection
-    let top_left_luma     = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(-1, -1), 0).rgb));
-    let top_right_luma    = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(1, -1), 0).rgb));
-    let bottom_left_luma  = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(-1, 1), 0).rgb));
-    let bottom_right_luma = rgb_to_luma(linear_to_srgb(textureLoad(composite_texture, coords + vec2<i32>(1, 1), 0).rgb));
+    let top_left_luma     = rgb_to_luma(linear_to_srgb(textureLoad(composite_tex, coords + vec2<i32>(-1, -1), 0).rgb));
+    let top_right_luma    = rgb_to_luma(linear_to_srgb(textureLoad(composite_tex, coords + vec2<i32>(1, -1), 0).rgb));
+    let bottom_left_luma  = rgb_to_luma(linear_to_srgb(textureLoad(composite_tex, coords + vec2<i32>(-1, 1), 0).rgb));
+    let bottom_right_luma = rgb_to_luma(linear_to_srgb(textureLoad(composite_tex, coords + vec2<i32>(1, 1), 0).rgb));
 
     // Calculate luma deltas (edge strength)
     let delta_left   = abs(center_luma - left_luma);
@@ -209,7 +209,7 @@ fn diagonal_blending(
     delta_bottom_left: f32,
     delta_bottom_right: f32
 ) -> vec4<f32> {
-    let center = textureLoad(composite_texture, coords, 0);
+    let center = textureLoad(composite_tex, coords, 0);
 
     // Calculate adaptive weights for each diagonal based on inverse contrast
     // Closer neighbors (lower contrast) get higher weight
@@ -227,10 +227,10 @@ fn diagonal_blending(
     let norm_weight_br = weight_br / total_weight;
 
     // Sample diagonal neighbors
-    let top_left = textureLoad(composite_texture, coords + vec2<i32>(-1, -1), 0);
-    let top_right = textureLoad(composite_texture, coords + vec2<i32>(1, -1), 0);
-    let bottom_left = textureLoad(composite_texture, coords + vec2<i32>(-1, 1), 0);
-    let bottom_right = textureLoad(composite_texture, coords + vec2<i32>(1, 1), 0);
+    let top_left = textureLoad(composite_tex, coords + vec2<i32>(-1, -1), 0);
+    let top_right = textureLoad(composite_tex, coords + vec2<i32>(1, -1), 0);
+    let bottom_left = textureLoad(composite_tex, coords + vec2<i32>(-1, 1), 0);
+    let bottom_right = textureLoad(composite_tex, coords + vec2<i32>(1, 1), 0);
 
     // Compute weighted sum of diagonal neighbors
     let neighbor_blend = top_left * norm_weight_tl +
@@ -247,7 +247,7 @@ fn neighborhood_blending(
     weights: vec2<f32>,
     is_horizontal: bool
 ) -> vec4<f32> {
-    let center = textureLoad(composite_texture, coords, 0);
+    let center = textureLoad(composite_tex, coords, 0);
 
     if (weights.x <= 0.0 && weights.y <= 0.0) {
         return center;
@@ -258,21 +258,21 @@ fn neighborhood_blending(
     if (is_horizontal) {
         // Blend vertically (top/bottom)
         if (weights.x > 0.0) {
-            let top = textureLoad(composite_texture, coords + vec2<i32>(0, -1), 0);
+            let top = textureLoad(composite_tex, coords + vec2<i32>(0, -1), 0);
             result = mix(result, top, weights.x);
         }
         if (weights.y > 0.0) {
-            let bottom = textureLoad(composite_texture, coords + vec2<i32>(0, 1), 0);
+            let bottom = textureLoad(composite_tex, coords + vec2<i32>(0, 1), 0);
             result = mix(result, bottom, weights.y);
         }
     } else {
         // Blend horizontally (left/right)
         if (weights.x > 0.0) {
-            let left = textureLoad(composite_texture, coords + vec2<i32>(-1, 0), 0);
+            let left = textureLoad(composite_tex, coords + vec2<i32>(-1, 0), 0);
             result = mix(result, left, weights.x);
         }
         if (weights.y > 0.0) {
-            let right = textureLoad(composite_texture, coords + vec2<i32>(1, 0), 0);
+            let right = textureLoad(composite_tex, coords + vec2<i32>(1, 0), 0);
             result = mix(result, right, weights.y);
         }
     }

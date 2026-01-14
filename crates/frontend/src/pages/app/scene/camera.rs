@@ -21,6 +21,8 @@ pub struct Camera {
     view: CameraView,
     aabb: Aabb,
     margin: f32,
+    pub focus_distance: f32,
+    pub aperture: f32,
 }
 
 // This is what needs to be implemented to make the camera work with the renderer
@@ -56,6 +58,8 @@ impl Camera {
             view: self.view_matrix(),
             projection: self.projection_matrix(),
             position_world: self.position_world(),
+            focus_distance: self.focus_distance,
+            aperture: self.aperture,
         }
     }
 }
@@ -90,6 +94,8 @@ impl Camera {
         aabb: Option<Aabb>,
         gltf_doc: Option<gltf::Document>,
         aspect: f32,
+        aperture: f32,
+        focus_distance: f32,
     ) -> Self {
         let margin = 1.1;
 
@@ -118,6 +124,8 @@ impl Camera {
             view,
             aabb,
             margin,
+            aperture,
+            focus_distance,
         }
     }
 
@@ -125,6 +133,8 @@ impl Camera {
         aabb: Option<Aabb>,
         gltf_doc: Option<gltf::Document>,
         aspect: f32,
+        aperture: f32,
+        focus_distance: f32,
     ) -> Self {
         let margin = 1.1;
         let aabb = aabb.unwrap_or_else(|| {
@@ -152,6 +162,8 @@ impl Camera {
             view,
             aabb,
             margin,
+            aperture,
+            focus_distance,
         }
     }
 

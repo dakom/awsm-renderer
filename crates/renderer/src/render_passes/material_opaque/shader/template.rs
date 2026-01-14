@@ -19,21 +19,8 @@ pub struct ShaderTemplateMaterialOpaque {
     whitespace = "minimize"
 )]
 pub struct ShaderTemplateMaterialOpaqueBindGroups {
-    /// Offset (in floats) within the packed vertex attribute array
-    /// where the first UV component lives for each vertex.
-    pub uv_sets_index: u32,
     pub texture_pool_arrays_len: u32,
     pub texture_pool_samplers_len: u32,
-    /// Offset (in floats) within the packed vertex attribute array
-    /// where the first vertex color component lives for each vertex.
-    pub color_sets_index: u32,
-    pub normals: bool,
-    pub tangents: bool,
-    pub color_sets: Option<u32>,
-    /// Number of UV sets available on the mesh.
-    /// `None` means the mesh supplied no TEXCOORD attributes, which triggers the
-    /// `pbr_material_has_any_uvs` branch inside `pbr_should_run`.
-    pub uv_sets: Option<u32>,
     pub debug: ShaderTemplateMaterialOpaqueDebug,
     pub mipmap: MipmapMode,
     pub multisampled_geometry: bool,
@@ -43,21 +30,8 @@ pub struct ShaderTemplateMaterialOpaqueBindGroups {
 #[derive(Template, Debug)]
 #[template(path = "material_opaque_wgsl/compute.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateMaterialOpaqueCompute {
-    /// Offset (in floats) within the packed vertex attribute array
-    /// where the first UV component lives for each vertex.
-    pub uv_sets_index: u32,
     pub texture_pool_arrays_len: u32,
     pub texture_pool_samplers_len: u32,
-    /// Offset (in floats) within the packed vertex attribute array
-    /// where the first vertex color component lives for each vertex.
-    pub color_sets_index: u32,
-    pub normals: bool,
-    pub tangents: bool,
-    pub color_sets: Option<u32>,
-    /// Number of UV sets available on the mesh.
-    /// `None` means the mesh supplied no TEXCOORD attributes, which triggers the
-    /// `pbr_material_has_any_uvs` branch inside `pbr_should_run`.
-    pub uv_sets: Option<u32>,
     pub debug: ShaderTemplateMaterialOpaqueDebug,
     pub mipmap: MipmapMode,
     pub multisampled_geometry: bool,
@@ -86,44 +60,8 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
     type Error = AwsmShaderError;
 
     fn try_from(value: &ShaderCacheKeyMaterialOpaque) -> Result<Self> {
-        // Calculate the offset (in floats) to the first UV set within the packed custom attribute data.
-        //
-        // IMPORTANT: Normals and tangents are NO LONGER in attribute_data - they go in the visibility
-        // buffer and geometry textures. Only custom attributes (colors, UVs, joints, weights) are in
-        // attribute_data.
-        //
-        // The ordering follows `impl Ord for MeshBufferCustomVertexAttributeInfo`:
-        // - Positions (0) - visibility attribute, NOT in attribute_data
-        // - Normals (1) - visibility attribute, NOT in attribute_data
-        // - Tangents (2) - visibility attribute, NOT in attribute_data
-        // - Colors (3) - custom attribute, IN attribute_data
-        // - TexCoords (4) - custom attribute, IN attribute_data
-        // - Joints (5) - custom attribute, IN attribute_data
-        // - Weights (6) - custom attribute, IN attribute_data
-        //
-        // However we only care about the `MeshBufferCustomVertexAttributeInfo` ordering here, so that's:
-        //
-        // - Colors (3) - custom attribute, IN attribute_data
-        // - TexCoords (4) - custom attribute, IN attribute_data
-        // - Joints (5) - custom attribute, IN attribute_data
-        // - Weights (6) - custom attribute, IN attribute_data
-        //
-
-        // color sets always starts at 0;
-        let color_sets_index = 0;
-
-        // uv sets might start at 0 if there's no colors
-        // otherwise, it's pushed off by however many color sets there are
-        let mut uv_sets_index = 0;
-        uv_sets_index += value.attributes.color_sets.unwrap_or(0) * 4; // colors use 4 floats each
-
-        // for easy copy/paste
         let texture_pool_arrays_len = value.texture_pool_arrays_len;
         let texture_pool_samplers_len = value.texture_pool_samplers_len;
-        let normals = value.attributes.normals;
-        let tangents = value.attributes.tangents;
-        let color_sets = value.attributes.color_sets;
-        let uv_sets = value.attributes.uv_sets;
         let mipmap = if value.mipmaps {
             MipmapMode::Gradient
         } else {
@@ -137,12 +75,6 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             bind_groups: ShaderTemplateMaterialOpaqueBindGroups {
                 texture_pool_arrays_len,
                 texture_pool_samplers_len,
-                color_sets_index,
-                uv_sets_index,
-                normals,
-                tangents,
-                color_sets,
-                uv_sets,
                 mipmap,
                 multisampled_geometry,
                 msaa_sample_count,
@@ -151,12 +83,6 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
             compute: ShaderTemplateMaterialOpaqueCompute {
                 texture_pool_arrays_len,
                 texture_pool_samplers_len,
-                color_sets_index,
-                uv_sets_index,
-                normals,
-                tangents,
-                color_sets,
-                uv_sets,
                 mipmap,
                 multisampled_geometry,
                 msaa_sample_count,

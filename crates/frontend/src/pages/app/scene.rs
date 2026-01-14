@@ -705,6 +705,18 @@ impl AppScene {
         Ok(())
     }
 
+    pub async fn reset_camera(self: &Arc<Self>) -> Result<()> {
+        let mut renderer = self.renderer.lock().await;
+        if let Some(camera) = self.camera.lock().unwrap().as_mut() {
+            camera.aperture = self.ctx.camera_aperture.get();
+            camera.focus_distance = self.ctx.camera_focus_distance.get();
+
+            renderer.update_camera(camera.matrices())?;
+        }
+
+        Ok(())
+    }
+
     pub async fn setup_all(self: &Arc<Self>) -> Result<()> {
         self.last_shader_kind.set(None);
 
@@ -797,8 +809,20 @@ impl AppScene {
             .map(|data| data.doc.clone());
 
         let new_camera = match camera_id {
-            CameraId::Orthographic => Camera::new_orthographic(scene_aabb, gltf_doc, camera_aspect),
-            CameraId::Perspective => Camera::new_perspective(scene_aabb, gltf_doc, camera_aspect),
+            CameraId::Orthographic => Camera::new_orthographic(
+                scene_aabb,
+                gltf_doc,
+                camera_aspect,
+                self.ctx.camera_aperture.get(),
+                self.ctx.camera_focus_distance.get(),
+            ),
+            CameraId::Perspective => Camera::new_perspective(
+                scene_aabb,
+                gltf_doc,
+                camera_aspect,
+                self.ctx.camera_aperture.get(),
+                self.ctx.camera_focus_distance.get(),
+            ),
         };
 
         // Update renderer's camera matrices immediately so gizmo interactions work correctly

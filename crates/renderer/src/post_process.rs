@@ -3,18 +3,23 @@ use crate::{error::Result, AwsmRenderer};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PostProcessing {
     pub tonemapping: ToneMapping,
+    pub bloom: bool,
+    pub dof: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Copy, Hash)]
 pub enum ToneMapping {
     None,
     KhronosNeutralPbr,
+    Aces,
 }
 
 impl Default for PostProcessing {
     fn default() -> Self {
         Self {
             tonemapping: ToneMapping::KhronosNeutralPbr,
+            bloom: false,
+            dof: false,
         }
     }
 }
@@ -24,10 +29,23 @@ impl AwsmRenderer {
         self.post_processing = pp;
 
         self.render_passes
+            .effects
+            .pipelines
+            .set_render_pipeline_keys(
+                &self.anti_aliasing,
+                &self.post_processing,
+                &self.gpu,
+                &mut self.shaders,
+                &mut self.pipelines,
+                &self.pipeline_layouts,
+                &self.render_textures.formats,
+            )
+            .await?;
+
+        self.render_passes
             .display
             .pipelines
             .set_render_pipeline_key(
-                &self.anti_aliasing,
                 &self.post_processing,
                 &self.gpu,
                 &mut self.shaders,

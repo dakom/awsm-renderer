@@ -5,7 +5,6 @@ use crate::{
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyDisplay {
-    pub smaa_anti_alias: bool,
     pub tonemapping: ToneMapping,
 }
 

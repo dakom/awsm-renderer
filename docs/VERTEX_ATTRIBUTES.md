@@ -1,13 +1,14 @@
-# BUFFER ARCHITECTURE
-
-This document describes the buffer architecture used in the renderer, particularly how GLTF data flows through the system and how buffers are interleaved.
-
 ## OVERVIEW
 
 The renderer uses a **two-tier buffer system** that separates geometry/visibility data from custom vertex attributes:
 
 1. **Visibility Buffers** (exploded, vertex buffers): positions, normals, tangents, triangle_index, barycentric stored per-triangle-vertex
 2. **Attribute Buffers** (indexed, storage buffers): UVs, colors, joints, weights stored per-original-vertex with indexed access
+
+Meshes can exist in both buffers simultaneously, or just one. 
+
+The determination is done in the GLTF loading stage based on which attributes are present. Specifically, [`mesh_buffer_geometry_kind()` in `gltf/buffers/mesh.rs`](../renderer/src/gltf/buffers/mesh.rs)
+
 
 This architecture is specifically designed for **deferred/visibility buffer rendering** where:
 - The geometry pass writes triangle IDs to a G-buffer

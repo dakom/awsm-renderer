@@ -75,11 +75,6 @@ fn msaa_process_sample(
 
     let sample_mesh_meta = material_mesh_metas[mat_meta_off / META_SIZE_IN_BYTES];
 
-    // Skip if variant doesn't match (like main branch)
-    if (!mesh_matches_variant(sample_mesh_meta)) {
-        return MsaaSampleResult(vec3<f32>(0.0), 0.0, false);
-    }
-
     // Process barycentrics (no clamping - matches main)
     let sample_bary = vec3<f32>(textures.bary.x, textures.bary.y, 1.0 - textures.bary.x - textures.bary.y);
 
