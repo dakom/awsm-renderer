@@ -10,8 +10,11 @@ rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[package.metadata.docs.rs]
+default-target = "wasm32-unknown-unknown"
+
 [dependencies]
-awsm-renderer = { version = "0.1.1", path = "../renderer"}
+awsm-renderer = { version = "0.1.2", path = "../renderer"}
 anyhow = {workspace = true}
 glam = {workspace = true}
 web-sys = { workspace = true}

@@ -10,6 +10,9 @@ rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[package.metadata.docs.rs]
+default-target = "wasm32-unknown-unknown"
+
 [features]
 all = ["ktx", "exr", "image", "mega-texture", "texture-pool", "serde", "texture-export"]
 ktx = ["dep:ktx2", "dep:gloo-net"]
