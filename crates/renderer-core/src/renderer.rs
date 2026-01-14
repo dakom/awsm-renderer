@@ -165,6 +165,12 @@ impl DeviceRequestLimits {
         }
     }
 
+    pub fn typical() -> Self {
+        Self::default()
+            .with_max_storage_buffer_binding_size()
+            .with_max_storage_buffers_per_shader_stage()
+    }
+
     pub fn with_max_storage_buffer_binding_size(mut self) -> Self {
         self.max_storage_buffer_binding_size = true;
         self

@@ -11,6 +11,8 @@ use thiserror::Error;
 pub struct BindGroupLayouts {
     lookup: SlotMap<BindGroupLayoutKey, web_sys::GpuBindGroupLayout>,
     cache: HashMap<BindGroupLayoutCacheKey, BindGroupLayoutKey>,
+    #[cfg(debug_assertions)]
+    pub max: BindGroupLayoutCounter,
 }
 
 impl BindGroupLayouts {
@@ -18,6 +20,8 @@ impl BindGroupLayouts {
         Self {
             lookup: SlotMap::with_key(),
             cache: HashMap::new(),
+            #[cfg(debug_assertions)]
+            max: BindGroupLayoutCounter::default(),
         }
     }
 
@@ -29,6 +33,9 @@ impl BindGroupLayouts {
         if let Some(key) = self.cache.get(&cache_key) {
             return Ok(*key);
         }
+
+        #[cfg(debug_assertions)]
+        self.update_max_counter(&cache_key);
 
         let entries = cache_key
             .entries
@@ -62,8 +69,68 @@ impl BindGroupLayouts {
             .get(key)
             .ok_or(AwsmBindGroupLayoutError::NotFound(key))
     }
+
+    #[cfg(debug_assertions)]
+    fn update_max_counter(&mut self, cache_key: &BindGroupLayoutCacheKey) {
+        use crate::COMPATIBITLIY_REQUIREMENTS;
+
+        let mut counter = BindGroupLayoutCounter::default();
+
+        for entry in &cache_key.entries {
+            match entry.resource {
+                BindGroupLayoutResource::Buffer { .. } => {
+                    counter.buffers += 1;
+                }
+                BindGroupLayoutResource::Sampler { .. } => {
+                    counter.samplers += 1;
+                }
+                BindGroupLayoutResource::Texture { .. } => {
+                    counter.textures += 1;
+                }
+                BindGroupLayoutResource::StorageTexture { .. } => {
+                    counter.storage_textures += 1;
+                }
+                BindGroupLayoutResource::ExternalTexture => {
+                    counter.external_textures += 1;
+                }
+            }
+        }
+
+        let before = self.max.clone();
+
+        self.max.buffers = self.max.buffers.max(counter.buffers);
+        self.max.samplers = self.max.samplers.max(counter.samplers);
+        self.max.textures = self.max.textures.max(counter.textures);
+        self.max.storage_textures = self.max.storage_textures.max(counter.storage_textures);
+        self.max.external_textures = self.max.external_textures.max(counter.external_textures);
+
+        if before != self.max {
+            tracing::debug!("Updated BindGroupLayout max counts: {:#?}", self.max);
+        }
+
+        if let Some(required) = COMPATIBITLIY_REQUIREMENTS.storage_buffers {
+            if self.max.buffers > required {
+                tracing::warn!(
+                    "Max bind group layout buffers {} exceeds compatibility requirement {}",
+                    self.max.buffers,
+                    required
+                );
+            }
+        }
+    }
 }
 
+#[cfg(debug_assertions)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+pub struct BindGroupLayoutCounter {
+    pub buffers: u32,
+    pub samplers: u32,
+    pub textures: u32,
+    pub storage_textures: u32,
+    pub external_textures: u32,
+}
+
+#[cfg(debug_assertions)]
 impl Default for BindGroupLayouts {
     fn default() -> Self {
         Self::new()

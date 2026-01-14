@@ -31,6 +31,7 @@ pub struct Config {
     pub initial_post_processing: PostProcessing,
     pub initial_camera_aperture: f32,
     pub initial_camera_focus_distance: f32,
+    pub repo_url: &'static str,
 }
 
 #[allow(clippy::option_env_unwrap)]
@@ -55,9 +56,9 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         generate_mipmaps: true,
         post_processing_enabled: true,
         initial_ibl: if cfg!(debug_assertions) {
-            IblId::SimpleSky
-        } else {
             IblId::PhotoStudio
+        } else {
+            IblId::SimpleSky
         },
         initial_skybox: SkyboxId::default(),
         cache_buster: cfg!(debug_assertions),
@@ -71,6 +72,7 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         initial_post_processing: PostProcessing::default(),
         initial_camera_aperture: 5.6,
         initial_camera_focus_distance: 10.0,
+        repo_url: "https://github.com/dakom/awsm-renderer",
     }
 });
 

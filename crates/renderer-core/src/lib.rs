@@ -4,6 +4,7 @@ pub mod brdf_lut;
 pub mod buffers;
 pub mod command;
 pub mod compare;
+pub mod compatibility;
 pub mod configuration;
 pub mod cubemap;
 pub mod data;
