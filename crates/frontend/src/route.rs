@@ -36,8 +36,6 @@ impl Route {
             .collect::<Vec<_>>();
         let paths = paths.as_slice();
 
-        tracing::info!("paths: {:?}", paths);
-
         // if we need, we can get query params like:
         //let uid = url.search_params().get("uid");
 

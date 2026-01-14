@@ -443,6 +443,7 @@ impl LocalPbrMaterialExtensions {
             });
         }
 
+        #[cfg(feature = "clearcoat")]
         if let Some(clearcoat) = gltf_material.clearcoat() {
             let tex =
                 if let Some(tex_info) = clearcoat.clearcoat_texture().map(GltfTextureInfo::from) {
@@ -548,6 +549,7 @@ impl LocalPbrMaterialExtensions {
             });
         }
 
+        #[cfg(feature = "sheen")]
         if let Some(sheen) = gltf_material.sheen() {
             let color_tex =
                 if let Some(tex_info) = sheen.sheen_color_texture().map(GltfTextureInfo::from) {

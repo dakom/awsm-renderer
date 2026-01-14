@@ -9,7 +9,7 @@ rust-version.workspace = true
 
 [features]
 default = ["gltf", "animation"]
-all = ["gltf", "animation", "awsm-renderer-core/all"]
+all = ["gltf", "animation", "clearcoat", "sheen", "awsm-renderer-core/all"]
 # specifics
 gltf = [
     "dep:gltf",
@@ -17,6 +17,9 @@ gltf = [
     "awsm-renderer-core/image",
 ]
 animation = []
+# gltf material extensions (clearcoat/sheen require unreleased gltf features, only work with git dep)
+clearcoat = ["gltf", "gltf/KHR_materials_clearcoat"]
+sheen = ["gltf", "gltf/KHR_materials_sheen"]
 # Optional features to enable optional parts of awsm-renderer-core
 ktx = ["awsm-renderer-core/ktx"]
 serde = ["dep:serde", "awsm-renderer-core/serde"]

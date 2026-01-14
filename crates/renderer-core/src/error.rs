@@ -83,6 +83,9 @@ pub enum AwsmCoreError {
     #[error("[gpu] failed write texture: {0}")]
     TextureWrite(String),
 
+    #[error("[gpu] Failed to copy external image to texture: {0}")]
+    CopyExternalImageToTexture(String),
+
     #[cfg(feature = "image")]
     #[error("[gpu] Image load: {0}")]
     ImageLoad(String),
@@ -94,10 +97,6 @@ pub enum AwsmCoreError {
     #[cfg(feature = "image")]
     #[error("[gpu] Failed to parse url: {0}")]
     UrlParse(String),
-
-    #[cfg(feature = "image")]
-    #[error("[gpu] Failed to copy external image to texture: {0}")]
-    CopyExternalImageToTexture(String),
 
     #[cfg(feature = "exr")]
     #[error("[gpu] Failed to create js value from exr image data: {0}")]
@@ -316,6 +315,10 @@ impl AwsmCoreError {
         Self::TextureWrite(format_err(err))
     }
 
+    pub fn copy_external_image_to_texture(err: JsValue) -> Self {
+        Self::CopyExternalImageToTexture(format_err(err))
+    }
+
     #[cfg(feature = "image")]
     pub fn image_load(err: JsValue) -> Self {
         Self::ImageLoad(format_err(err))
@@ -329,11 +332,6 @@ impl AwsmCoreError {
     #[cfg(feature = "image")]
     pub fn url_parse(err: JsValue) -> Self {
         Self::UrlParse(format_err(err))
-    }
-
-    #[cfg(feature = "image")]
-    pub fn copy_external_image_to_texture(err: JsValue) -> Self {
-        Self::CopyExternalImageToTexture(format_err(err))
     }
 
     #[cfg(feature = "exr")]

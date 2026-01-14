@@ -15,6 +15,7 @@ thread_local! {
 
 // let options = web_sys::ImageBitmapOptions::new();
 // options.set_premultiply_alpha(web_sys::PremultiplyAlpha::None);
+#[cfg(feature = "image")]
 pub async fn load(
     url: String,
     options: Option<ImageBitmapOptions>,
@@ -62,7 +63,7 @@ pub async fn load_js_value(
         &js_sys::Array::of1(data).into(),
         &blob_opts,
     )
-    .map_err(AwsmCoreError::url_parse)?;
+    .map_err(AwsmCoreError::create_image_bitmap)?;
 
     load_blob(&blob, options).await
 }
@@ -286,6 +287,7 @@ pub async fn create_vertical_gradient(
     Ok(js_value.unchecked_into())
 }
 
+#[cfg(feature = "image")]
 fn _same_origin(url: &str) -> Result<bool> {
     if url.starts_with("http://") || url.starts_with("https://") {
         let location_origin = WINDOW

@@ -84,7 +84,7 @@ tasks:
       # no need to copy media, it's referenced remotely in production
       - mkdir -p {{.PATH_BUILD_ARTIFACTS_FRONTEND}}
       - cp -r {{joinPath .PATH_CRATE_FRONTEND "dist" }}/* {{.PATH_BUILD_ARTIFACTS_FRONTEND}}/
-      - cp {{joinPath .PATH_CRATE_FRONTEND "index.html" }} {{joinPath .PATH_BUILD_ARTIFACTS_FRONTEND "404.html"}}
+      - cp {{.PATH_BUILD_ARTIFACTS_FRONTEND}}/index.html {{.PATH_BUILD_ARTIFACTS_FRONTEND}}/404.html
 
   trunk-build-release:
     internal: true
@@ -98,9 +98,17 @@ tasks:
         cd {{.PATH_CRATE_FRONTEND}} &&
         trunk build --release --public-url "{{.URL_TRUNK}}"
 
-  package:
-    desc: "Package crates for distribution"
+  publish:
+    desc: "Publish crates to crates.io (must be run in order: renderer-core, then renderer, then editor)"
     cmds:
-      - cd {{.PATH_CRATE_RENDERER_CORE}} && cargo package --target wasm32-unknown-unknown
-      - cd {{.PATH_CRATE_RENDERER}} && cargo package --target wasm32-unknown-unknown
-      - cd {{.PATH_CRATE_EDITOR}} && cargo package --target wasm32-unknown-unknown
+      - echo "Publishing awsm-renderer-core..."
+      - cd {{.PATH_CRATE_RENDERER_CORE}} && cargo publish --target wasm32-unknown-unknown
+      - echo "Waiting for crates.io to index awsm-renderer-core..."
+      - sleep 5
+      - echo "Publishing awsm-renderer..."
+      - cd {{.PATH_CRATE_RENDERER}} && cargo publish --target wasm32-unknown-unknown
+      - echo "Waiting for crates.io to index awsm-renderer..."
+      - sleep 5
+      - echo "Publishing awsm-renderer-editor..."
+      - cd {{.PATH_CRATE_EDITOR}} && cargo publish --target wasm32-unknown-unknown
+      - echo "All crates published!"

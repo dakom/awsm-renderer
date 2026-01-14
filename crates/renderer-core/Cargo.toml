@@ -9,7 +9,7 @@ rust-version.workspace = true
 
 [features]
 all = ["ktx", "exr", "image", "mega-texture", "texture-pool", "serde", "texture-export"]
-ktx = ["dep:ktx2"]
+ktx = ["dep:ktx2", "dep:gloo-net"]
 exr = ["dep:exr", "image"]
 image = ["dep:gloo-net"]
 mega-texture = ["dep:binpack2d"]
