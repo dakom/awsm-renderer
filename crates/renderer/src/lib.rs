@@ -102,11 +102,10 @@ pub struct AwsmRenderer {
     pub animations: animation::Animations,
 }
 
-pub static COMPATIBITLIY_REQUIREMENTS: LazyLock<CompatibilityRequirements> = LazyLock::new(|| {
-    CompatibilityRequirements {
+pub static COMPATIBITLIY_REQUIREMENTS: LazyLock<CompatibilityRequirements> =
+    LazyLock::new(|| CompatibilityRequirements {
         storage_buffers: Some(9),
-    }
-});
+    });
 
 impl AwsmRenderer {
     pub async fn remove_all(&mut self) -> crate::error::Result<()> {
