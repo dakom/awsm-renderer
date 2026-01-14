@@ -36,11 +36,14 @@ impl Route {
             .collect::<Vec<_>>();
         let paths = paths.as_slice();
 
+        tracing::info!("paths: {:?}", paths);
+
         // if we need, we can get query params like:
         //let uid = url.search_params().get("uid");
 
         match paths {
-            [""] => Self::App(AppRoute::Init),
+            //[""] => Self::App(AppRoute::Init),
+            [""] => Self::App(AppRoute::Model(GltfId::default())),
             ["app", app_route @ ..] => match *app_route {
                 ["init"] => Self::App(AppRoute::Init),
                 ["model", model] => Self::App(AppRoute::Model(match GltfId::try_from(model) {

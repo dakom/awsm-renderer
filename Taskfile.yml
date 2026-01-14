@@ -31,7 +31,7 @@ vars:
   URL_TRUNK: "https://dakom.github.io/awsm-renderer/"
 
   # Misc
-  PROD_ROOT_BASE_URI_PATH: "awsm-renderer"
+  PROD_ROOT_BASE_URI_PATH: "/awsm-renderer"
   DEV_ROOT_BASE_URI_PATH: ""
 
 tasks:
@@ -97,3 +97,10 @@ tasks:
       - >
         cd {{.PATH_CRATE_FRONTEND}} &&
         trunk build --release --public-url "{{.URL_TRUNK}}"
+
+  package:
+    desc: "Package crates for distribution"
+    cmds:
+      - cd {{.PATH_CRATE_RENDERER_CORE}} && cargo package --target wasm32-unknown-unknown
+      - cd {{.PATH_CRATE_RENDERER}} && cargo package --target wasm32-unknown-unknown
+      - cd {{.PATH_CRATE_EDITOR}} && cargo package --target wasm32-unknown-unknown

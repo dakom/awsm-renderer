@@ -8,7 +8,7 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-awsm-renderer = { version = "0.1.0-alpha.3", path = "../renderer"}
+awsm-renderer = { version = "0.1.0", path = "../renderer"}
 anyhow = {workspace = true}
 glam = {workspace = true}
 web-sys = { workspace = true}

@@ -142,8 +142,11 @@ pub static GLTF_SETS: LazyLock<HashMap<GltfSetId, Vec<GltfId>>> = LazyLock::new(
     h
 });
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum GltfId {
+    #[default]
+    Fox,
+    DamagedHelmet,
     ClearCoatTest,
     ClearCoatCarPaint,
     ClearCoatWicker,
@@ -153,7 +156,6 @@ pub enum GltfId {
     SheenWoodLeatherSofa,
     TransmissionRoughness,
     BrainStem,
-    Fox,
     AlphaBlendMode,
     BoomBoxAxes,
     MetalRoughSpheres,
@@ -207,7 +209,6 @@ pub enum GltfId {
     CompareVolume,
     RiggedFigure,
     RiggedSimple,
-    DamagedHelmet,
     EnvironmentTest,
     EnvironmentIblTest,
     EmissiveStrength,
