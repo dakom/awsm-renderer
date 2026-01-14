@@ -101,10 +101,10 @@ tasks:
   publish:
     desc: "Publish crates to crates.io (must be run in order: renderer-core, then renderer, then editor)"
     cmds:
-      - echo "Publishing awsm-renderer-core..."
-      - cd {{.PATH_CRATE_RENDERER_CORE}} && cargo publish --target wasm32-unknown-unknown
-      - echo "Waiting for crates.io to index awsm-renderer-core..."
-      - sleep 5
+      # - echo "Publishing awsm-renderer-core..."
+      # - cd {{.PATH_CRATE_RENDERER_CORE}} && cargo publish --target wasm32-unknown-unknown
+      # - echo "Waiting for crates.io to index awsm-renderer-core..."
+      # - sleep 5
       - echo "Publishing awsm-renderer..."
       - cd {{.PATH_CRATE_RENDERER}} && cargo publish --target wasm32-unknown-unknown
       - echo "Waiting for crates.io to index awsm-renderer..."
