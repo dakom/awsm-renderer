@@ -6,7 +6,10 @@ use crate::{
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyDisplay {
     pub smaa_anti_alias: bool,
+    pub multisampled_geometry: bool,
     pub tonemapping: ToneMapping,
+    pub bloom: bool,
+    pub dof: bool,
 }
 
 impl From<ShaderCacheKeyDisplay> for ShaderCacheKey {

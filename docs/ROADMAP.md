@@ -1,7 +1,6 @@
 # Next up
 - Bloom Post Processing
 - More Tonemappig options
-- SSAO Post Processing
 - Depth of Field Post Processing
 
 - Make transparent meshes pickable
@@ -12,6 +11,10 @@
 - Shadows
 
 - Frustum culling
+
+- SSAO
+  - Can probably be done in opaque pass 
+  - Should be optional/togglable
 
 - Toon shader
     
@@ -115,7 +118,6 @@ If it's supported here, corresponding core functionality is also supported
 - [x] non-indexed
 - [x] indexed
 - [x] instancing
-- [ ] Early z pre-pass
 - [x] Opaque front to back
 - [x] Transparent back to front
 - [x] Anti-aliasing

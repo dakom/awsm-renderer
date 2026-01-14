@@ -17,6 +17,8 @@ pub struct ShaderTemplateDisplay {
 #[template(path = "display_wgsl/bind_groups.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateDisplayBindGroups {
     pub smaa_anti_alias: bool,
+    pub multisampled_geometry: bool,
+    pub dof: bool,
     pub debug: ShaderTemplateDisplayDebug,
 }
 
@@ -24,6 +26,8 @@ impl ShaderTemplateDisplayBindGroups {
     pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
         Self {
             smaa_anti_alias: cache_key.smaa_anti_alias,
+            multisampled_geometry: cache_key.multisampled_geometry,
+            dof: cache_key.dof,
             debug: ShaderTemplateDisplayDebug::new(),
         }
     }
@@ -50,6 +54,8 @@ impl ShaderTemplateDisplayVertex {
 pub struct ShaderTemplateDisplayFragment {
     pub smaa_anti_alias: bool,
     pub tonemapping: ToneMapping,
+    pub bloom: bool,
+    pub dof: bool,
     pub debug: ShaderTemplateDisplayDebug,
 }
 
@@ -58,6 +64,8 @@ impl ShaderTemplateDisplayFragment {
         Self {
             smaa_anti_alias: cache_key.smaa_anti_alias,
             tonemapping: cache_key.tonemapping,
+            bloom: cache_key.bloom,
+            dof: cache_key.dof,
             debug: ShaderTemplateDisplayDebug::new(),
         }
     }

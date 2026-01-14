@@ -1,7 +1,6 @@
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    atoms::checkbox::{Checkbox, CheckboxStyle},
     pages::app::context::{AppContext, IblId},
     prelude::*,
 };
@@ -57,23 +56,24 @@ impl SidebarLighting {
 
     fn render_punctual_lights_selector(self: &Arc<Self>) -> Dom {
         let state = self;
+        render_dropdown_label(
+            "Punctual Lights",
+            Dropdown::new()
+                .with_intial_selected(Some(state.ctx.punctual_lights.get()))
+                .with_bg_color(ColorBackground::Dropdown)
+                .with_on_change(clone!(state => move |value| {
+                    state.ctx.punctual_lights.set_neq(*value);
 
-        Checkbox::new(CheckboxStyle::Dark)
-            .with_content_after(html!("span", {
-                .text("Punctual Lights")
-            }))
-            .with_selected_signal(state.ctx.punctual_lights.signal())
-            .with_on_click(clone!(state => move || {
-                state.ctx.punctual_lights.set_neq(!state.ctx.punctual_lights.get());
-
-                spawn_local(clone!(state => async move {
-                    if let Some(scene) = state.ctx.scene.get_cloned() {
-                        if let Err(err) = scene.reset_punctual_lights().await {
-                            tracing::error!("Error resetting punctual lights: {}", err);
+                    spawn_local(clone!(state => async move {
+                        if let Some(scene) = state.ctx.scene.get_cloned() {
+                            if let Err(err) = scene.reset_punctual_lights().await {
+                                tracing::error!("Error resetting punctual lights: {}", err);
+                            }
                         }
-                    }
-                }));
-            }))
-            .render()
+                    }));
+                }))
+                .with_options([("On".to_string(), true), ("Off".to_string(), false)])
+                .render(),
+        )
     }
 }

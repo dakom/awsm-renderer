@@ -3,18 +3,23 @@ use crate::{error::Result, AwsmRenderer};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PostProcessing {
     pub tonemapping: ToneMapping,
+    pub bloom: bool,
+    pub dof: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Copy, Hash)]
 pub enum ToneMapping {
     None,
     KhronosNeutralPbr,
+    Aces,
 }
 
 impl Default for PostProcessing {
     fn default() -> Self {
         Self {
             tonemapping: ToneMapping::KhronosNeutralPbr,
+            bloom: false,
+            dof: false,
         }
     }
 }
