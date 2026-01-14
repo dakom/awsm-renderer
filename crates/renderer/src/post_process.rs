@@ -29,10 +29,23 @@ impl AwsmRenderer {
         self.post_processing = pp;
 
         self.render_passes
-            .display
+            .effects
             .pipelines
             .set_render_pipeline_key(
                 &self.anti_aliasing,
+                &self.post_processing,
+                &self.gpu,
+                &mut self.shaders,
+                &mut self.pipelines,
+                &self.pipeline_layouts,
+                &self.render_textures.formats,
+            )
+            .await?;
+
+        self.render_passes
+            .display
+            .pipelines
+            .set_render_pipeline_key(
                 &self.post_processing,
                 &self.gpu,
                 &mut self.shaders,

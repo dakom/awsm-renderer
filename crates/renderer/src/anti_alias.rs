@@ -77,7 +77,7 @@ impl AwsmRenderer {
         }
 
         self.render_passes
-            .display
+            .effects
             .pipelines
             .set_render_pipeline_key(
                 &self.anti_aliasing,

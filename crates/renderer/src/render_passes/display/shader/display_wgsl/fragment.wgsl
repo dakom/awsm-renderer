@@ -1,24 +1,6 @@
-{% if smaa_anti_alias %}
-    /*************** START msaa.wgsl ******************/
-    {% include "display_wgsl/helpers/smaa.wgsl" %}
-    /*************** END msaa.wgsl ******************/
-{% endif %}
-
 /*************** START tonemap.wgsl ******************/
 {% include "display_wgsl/helpers/tonemap.wgsl" %}
 /*************** END tonemap.wgsl ******************/
-
-{% if bloom %}
-    /*************** START bloom.wgsl ******************/
-    {% include "display_wgsl/helpers/bloom.wgsl" %}
-    /*************** END bloom.wgsl ******************/
-{% endif %}
-
-{% if dof %}
-    /*************** START bloom.wgsl ******************/
-    {% include "display_wgsl/helpers/dof.wgsl" %}
-    /*************** END bloom.wgsl ******************/
-{% endif %}
 
 /*************** START color_space.wgsl ******************/
 {% include "shared_wgsl/color_space.wgsl" %}
@@ -34,30 +16,15 @@ fn frag_main(in: FragmentInput) -> @location(0) vec4<f32> {
 
     var color: vec4<f32> = textureLoad(composite_texture, coords, 0);
 
-    {% if smaa_anti_alias %}
-        color = apply_smaa(color, coords);
-    {% endif %}
-
-    var rgb = color.rgb;
-
-    {% if bloom %}
-        rgb = apply_bloom(rgb);
-    {% endif %}
-
-    {% if dof %}
-        rgb = apply_dof(rgb);
-    {% endif %}
-
-    rgb = linear_to_srgb(rgb);
-
     // Apply tone mapping to compress HDR to displayable range
     {% match tonemapping %}
         {% when ToneMapping::KhronosNeutralPbr %}
-            rgb = khronos_pbr_neutral_tonemap(rgb);
+            let rgb = khronos_pbr_neutral_tonemap(color.rgb);
         {% when ToneMapping::Aces %}
-            rgb = aces_tonemap(rgb);
+            let rgb = aces_tonemap(color.rgb);
         {% when _ %}
+            let rgb = color.rgb;
     {% endmatch %}
 
-    return vec4<f32>(rgb, color.a);
+    return vec4<f32>(linear_to_srgb(rgb), color.a);
 }

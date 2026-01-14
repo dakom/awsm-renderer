@@ -289,6 +289,16 @@ impl AwsmRenderer {
 
         {
             let _maybe_span_guard = if self.logging.render_timings {
+                Some(tracing::span!(tracing::Level::INFO, "Effects RenderPass").entered())
+            } else {
+                None
+            };
+
+            self.render_passes.effects.render(&ctx)?;
+        }
+
+        {
+            let _maybe_span_guard = if self.logging.render_timings {
                 Some(tracing::span!(tracing::Level::INFO, "Display RenderPass").entered())
             } else {
                 None

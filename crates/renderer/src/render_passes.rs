@@ -1,4 +1,5 @@
 pub mod display;
+pub mod effects;
 pub mod geometry;
 pub mod light_culling;
 pub mod material_opaque;
@@ -10,6 +11,7 @@ pub mod shared;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 
 use crate::error::Result;
+use crate::render_passes::effects::render_pass::EffectsRenderPass;
 use crate::{
     bind_group_layout::BindGroupLayouts,
     pipeline_layouts::PipelineLayouts,
@@ -30,6 +32,7 @@ pub struct RenderPasses {
     pub light_culling: LightCullingRenderPass,
     pub material_opaque: MaterialOpaqueRenderPass,
     pub material_transparent: MaterialTransparentRenderPass,
+    pub effects: EffectsRenderPass,
     pub display: DisplayRenderPass,
 }
 
@@ -40,6 +43,7 @@ impl RenderPasses {
             light_culling: LightCullingRenderPass::new(ctx).await?,
             material_opaque: MaterialOpaqueRenderPass::new(ctx).await?,
             material_transparent: MaterialTransparentRenderPass::new(ctx).await?,
+            effects: EffectsRenderPass::new(ctx).await?,
             display: DisplayRenderPass::new(ctx).await?,
         })
     }

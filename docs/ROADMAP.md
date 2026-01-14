@@ -1,8 +1,4 @@
 # Next up
-- Bloom Post Processing
-- More Tonemappig options
-- Depth of Field Post Processing
-
 - Make transparent meshes pickable
   - Maybe global "editor_mode" on renderer that toggles some less-efficient behavior
     - All meshes get both transparent and opaque geometry 
@@ -24,8 +20,7 @@
       
 - Animation support in sidebar (or get rid of it)
 
-
-- Get started with light culling pass
+- Light culling 
   - research best practices
   - should optimize for opaque pass (i.e. only light fragments that made it to the screen?)
   - MAYBE:
@@ -123,6 +118,7 @@ If it's supported here, corresponding core functionality is also supported
 - [x] Anti-aliasing
   - [x] MSAA
   - [x] SMAA
+- [ ] SSAO
 
 ## Textures
 - [x] 2D textures
@@ -152,10 +148,9 @@ If it's supported here, corresponding core functionality is also supported
 ## Post-processing
 - [x] Basic render-texture support
 - [x] Tonemapping
-- [ ] SSAO
-- [ ] Bloom
+- [x] Bloom
 - [x] TAA
-- [ ] DOF
+- [x] DOF
 
 ## Demo-only
 

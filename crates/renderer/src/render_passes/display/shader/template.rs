@@ -15,58 +15,34 @@ pub struct ShaderTemplateDisplay {
 
 #[derive(Template, Debug)]
 #[template(path = "display_wgsl/bind_groups.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateDisplayBindGroups {
-    pub smaa_anti_alias: bool,
-    pub multisampled_geometry: bool,
-    pub dof: bool,
-    pub debug: ShaderTemplateDisplayDebug,
-}
+pub struct ShaderTemplateDisplayBindGroups {}
 
 impl ShaderTemplateDisplayBindGroups {
-    pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
-        Self {
-            smaa_anti_alias: cache_key.smaa_anti_alias,
-            multisampled_geometry: cache_key.multisampled_geometry,
-            dof: cache_key.dof,
-            debug: ShaderTemplateDisplayDebug::new(),
-        }
+    pub fn new(_cache_key: &ShaderCacheKeyDisplay) -> Self {
+        Self {}
     }
 }
 
 #[derive(Template, Debug)]
 #[template(path = "display_wgsl/vertex.wgsl", whitespace = "minimize")]
-pub struct ShaderTemplateDisplayVertex {
-    pub smaa_anti_alias: bool,
-    pub debug: ShaderTemplateDisplayDebug,
-}
+pub struct ShaderTemplateDisplayVertex {}
 
 impl ShaderTemplateDisplayVertex {
-    pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
-        Self {
-            smaa_anti_alias: cache_key.smaa_anti_alias,
-            debug: ShaderTemplateDisplayDebug::new(),
-        }
+    pub fn new(_cache_key: &ShaderCacheKeyDisplay) -> Self {
+        Self {}
     }
 }
 
 #[derive(Template, Debug)]
 #[template(path = "display_wgsl/fragment.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateDisplayFragment {
-    pub smaa_anti_alias: bool,
     pub tonemapping: ToneMapping,
-    pub bloom: bool,
-    pub dof: bool,
-    pub debug: ShaderTemplateDisplayDebug,
 }
 
 impl ShaderTemplateDisplayFragment {
     pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
         Self {
-            smaa_anti_alias: cache_key.smaa_anti_alias,
             tonemapping: cache_key.tonemapping,
-            bloom: cache_key.bloom,
-            dof: cache_key.dof,
-            debug: ShaderTemplateDisplayDebug::new(),
         }
     }
 }
@@ -97,16 +73,5 @@ impl ShaderTemplateDisplay {
     #[cfg(debug_assertions)]
     pub fn debug_label(&self) -> Option<&str> {
         Some("Display")
-    }
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct ShaderTemplateDisplayDebug {
-    pub smaa_edges: bool,
-}
-
-impl ShaderTemplateDisplayDebug {
-    pub fn new() -> Self {
-        Self { smaa_edges: false }
     }
 }

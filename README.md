@@ -23,7 +23,9 @@ The core rendering is done in these main passes:
 
 3. **Transparent Pass**: Renders all transparent geometry via traditional forward rendering, on top of the opaque pass result. This is necessary since the opaque pipeline needs to know the exact identifer of a given pixel, and alpha blending breaks that. However, the transparent pass can still take advantage of early-z testing by using the same depth buffer from visibility pass, pipeline sorting to minimize state changes, etc. Also, the majority of renderables are typically opaque, so this is still a minor tradeoff overall.
 
-4. **Post-Processing Pass**: Applies any post-processing effects (bloom, tone-mapping, color grading, etc.) to the final image before presenting it to the screen.
+4. **Effects**: Applies several post-processing effects (bloom, dof, etc.) to the final image.
+
+5. **Display Pass**: Applies tone-mapping to the final image before presenting it to the screen.
 
 There's a few more implmentation details around msaa, hooks, and hud rendering as well, but those are the main passes.
 

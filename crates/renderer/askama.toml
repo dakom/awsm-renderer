@@ -7,7 +7,7 @@ dirs = [
     "src/render_passes/material_opaque/shader",
     "src/render_passes/material_transparent/shader",
     "src/render_passes/display/shader",
-    "src/render_passes/composite/shader",
+    "src/render_passes/effects/shader",
     "src/picker/shader",
 ]
 # Unless you add a `-` in a block, whitespace characters won't be trimmed.
