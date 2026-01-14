@@ -1,11 +1,14 @@
 [package]
 name = "awsm-renderer-core"
 description = "awsm-renderer core"
+readme = "../../README.md"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [features]
 all = ["ktx", "exr", "image", "mega-texture", "texture-pool", "serde", "texture-export"]

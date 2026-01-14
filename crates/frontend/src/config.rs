@@ -58,9 +58,13 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         initial_ibl: if cfg!(debug_assertions) {
             IblId::PhotoStudio
         } else {
-            IblId::SimpleSky
+            IblId::PhotoStudio
         },
-        initial_skybox: SkyboxId::default(),
+        initial_skybox: if cfg!(debug_assertions) {
+            SkyboxId::SpecificIbl(IblId::SimpleSky)
+        } else {
+            SkyboxId::SameAsIbl
+        },
         cache_buster: cfg!(debug_assertions),
         initial_show_grid: false,
         initial_show_gizmo_translation: false,

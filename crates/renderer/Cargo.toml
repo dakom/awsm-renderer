@@ -7,6 +7,8 @@ version.workspace = true
 license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [features]
 default = ["gltf", "animation"]
@@ -30,7 +32,7 @@ exr = ["awsm-renderer-core/exr"]
 texture-export = ["awsm-renderer-core/texture-export"]
 
 [dependencies]
-awsm-renderer-core = { version = "0.1.0", path = "../renderer-core", features = ["texture-pool"] }
+awsm-renderer-core = { version = "0.1.1", path = "../renderer-core", features = ["texture-pool"] }
 web-sys = {workspace = true}
 tracing = {workspace = true}
 thiserror = {workspace = true}

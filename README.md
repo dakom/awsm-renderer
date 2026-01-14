@@ -1,5 +1,8 @@
 # AwsmRenderer
-# [Live Demo](https://dakom.github.io/awsm-renderer)
+
+[![Crates.io](https://img.shields.io/crates/v/awsm-renderer.svg)](https://crates.io/crates/awsm-renderer)
+[![Docs.rs](https://docs.rs/awsm-renderer/badge.svg)](https://docs.rs/awsm-renderer)
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://dakom.github.io/awsm-renderer)
 
 Rust/WASM/WebGPU renderer for the web.
 

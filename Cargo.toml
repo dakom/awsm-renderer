@@ -5,10 +5,12 @@ resolver = "2"
 [workspace.package]
 description = "awsm renderer"
 edition = "2021"
-version = "0.1.0"
+version = "0.1.1"
 license = "MIT"
 authors = ["David Komer"]
 rust-version = "1.80.0"
+repository = "https://github.com/dakom/awsm-renderer"
+homepage = "https://dakom.github.io/awsm-renderer/"
 
 ### Profiles
 
