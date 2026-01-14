@@ -18,8 +18,9 @@ gltf = [
 ]
 animation = []
 # gltf material extensions (clearcoat/sheen require unreleased gltf features, only work with git dep)
-clearcoat = ["gltf", "gltf/KHR_materials_clearcoat"]
-sheen = ["gltf", "gltf/KHR_materials_sheen"]
+# These features gate our code. gltf's KHR_materials_clearcoat/sheen must be enabled separately (see frontend/Cargo.toml)
+clearcoat = ["gltf"]
+sheen = ["gltf"]
 # Optional features to enable optional parts of awsm-renderer-core
 ktx = ["awsm-renderer-core/ktx"]
 serde = ["dep:serde", "awsm-renderer-core/serde"]
