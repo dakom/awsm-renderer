@@ -31,7 +31,7 @@ vars:
   URL_TRUNK: "https://dakom.github.io/awsm-renderer/"
 
   # Misc
-  PROD_ROOT_BASE_URI_PATH: "/awsm-renderer"
+  PROD_ROOT_BASE_URI_PATH: "awsm-renderer"
   DEV_ROOT_BASE_URI_PATH: ""
 
 tasks:

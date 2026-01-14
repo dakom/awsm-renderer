@@ -37,9 +37,12 @@ pub mod gltf;
 #[cfg(feature = "animation")]
 pub mod animation;
 
+use std::sync::LazyLock;
+
 use awsm_renderer_core::{
     brdf_lut::generate::{BrdfLut, BrdfLutOptions},
     command::color::Color,
+    compatibility::CompatibilityRequirements,
     cubemap::images::CubemapBitmapColors,
     renderer::{AwsmRendererWebGpu, AwsmRendererWebGpuBuilder},
 };
@@ -98,6 +101,12 @@ pub struct AwsmRenderer {
     #[cfg(feature = "animation")]
     pub animations: animation::Animations,
 }
+
+pub static COMPATIBITLIY_REQUIREMENTS: LazyLock<CompatibilityRequirements> = LazyLock::new(|| {
+    CompatibilityRequirements {
+        storage_buffers: Some(9),
+    }
+});
 
 impl AwsmRenderer {
     pub async fn remove_all(&mut self) -> crate::error::Result<()> {

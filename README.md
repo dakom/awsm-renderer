@@ -3,11 +3,15 @@
 
 Rust/WASM/WebGPU renderer for the web.
 
-It's specifically for the web in that it does *not* use the (wonderful) wgpu crate abstraction, but rather uses the WebGPU API directly via the `web-sys` bindings. While this is somewhat unconventional in the Rust ecosystem, it allows for a more direct mapping to the WebGPU API for precise control and understanding of how things work under the hood in a web context. 
+It's specifically for the web in that it does uses the WebGPU API directly via the `web-sys` bindings as opposed to wgpu. While this is somewhat unconventional in the Rust ecosystem, it allows for a more direct mapping to the WebGPU API for precise control and understanding of how things work under the hood in a web context.
 
 # STATUS
 
 See [ROADMAP](docs/ROADMAP.md) for details.
+
+# PERFORMANCE
+
+Should be pretty fast! Detailed performance annotations can be seen in the browser's devtools performance tab after recording a session.
 
 # ARCHITECTURE
 

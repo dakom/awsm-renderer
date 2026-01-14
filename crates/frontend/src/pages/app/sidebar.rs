@@ -110,8 +110,7 @@ impl AppSidebar {
             .class(&*FOOTER)
             .child(html!("a", {
                 .class(&*GITHUB_LINK)
-                .attr("href", "https://github.com/dakom/awsm-renderer")
-                .attr("target", "_blank")
+                .attr("href", CONFIG.repo_url)
                 .attr("rel", "noopener noreferrer")
                 .child(svg!("svg", {
                     .class(&*GITHUB_SVG)
