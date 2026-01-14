@@ -36,11 +36,17 @@ pub(super) fn ensure_tangents<'a>(
     }
 
     // Check if this primitive needs tangents (has a normal map)
-    let needs_tangents = primitive.material().normal_texture().is_some()
-        || primitive
-            .material()
-            .clearcoat()
-            .is_some_and(|cc| cc.clearcoat_normal_texture().is_some());
+    let needs_tangents = primitive.material().normal_texture().is_some() || {
+        #[cfg(feature = "clearcoat")]
+        {
+            primitive
+                .material()
+                .clearcoat()
+                .is_some_and(|cc| cc.clearcoat_normal_texture().is_some())
+        }
+        #[cfg(not(feature = "clearcoat"))]
+        false
+    };
 
     if !needs_tangents {
         return Ok(attribute_data);

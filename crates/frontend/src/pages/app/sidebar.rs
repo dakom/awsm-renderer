@@ -123,7 +123,7 @@ impl AppSidebar {
                     }))
                 }))
                 .child(html!("span", {
-                    .text("GitHub")
+                    .text("Repository on GitHub")
                 }))
             }))
         })

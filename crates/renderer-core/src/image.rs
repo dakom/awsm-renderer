@@ -51,7 +51,7 @@ impl ImageData {
                     Ok(Self::Bitmap{image, options})
                 }
             }
-        } else {
+        } else if #[cfg(feature = "image")] {
             pub async fn load_url(url:&str, options: Option<ImageBitmapOptions>) -> Result<Self> {
                 let image = bitmap::load(url.to_string(), options.clone()).await?;
                 Ok(Self::Bitmap{image, options})
