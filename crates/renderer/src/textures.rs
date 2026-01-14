@@ -54,12 +54,15 @@ impl AwsmRenderer {
 
             self.bind_groups.mark_create(BindGroupCreate::TexturePool);
 
-            // Update all the things that depend on opaque materials changing due to textures
-
-            // First, that's the render pass itself - necessary because the actual number of bindings
-            // may have changed due to new texture pool arrays being created and this affects the bind group layout
-            // and thus the pipeline layout as well, requiring a full recreation of the render pass
-            // however, internally, it will clone the bind groups and layouts that aren't affected
+            // Update render passes that depend on texture pool size (affects bind group layouts
+            // and pipeline layouts due to dynamically generated texture array/sampler bindings).
+            //
+            // OPAQUE: Pipelines are based only on global parameters (MSAA, mipmaps, texture pool size),
+            // so texture_pool_changed() fully recreates all pipeline variants. No per-mesh iteration needed.
+            //
+            // TRANSPARENT: Pipelines depend on per-mesh attributes, so texture_pool_changed() only
+            // updates bind groups and creates a new pipeline layout. The actual per-mesh pipelines
+            // must be recreated separately below using the new layout.
             self.render_passes
                 .material_opaque
                 .texture_pool_changed(&mut render_pass_ctx)
@@ -71,9 +74,10 @@ impl AwsmRenderer {
                 .await?;
         }
 
-        // Either way, gotta also deal with all the meshes that need their shader/pipelines (re)created
-        // because the texture pool change may have affected the dynamically generated number of bindings etc.
-        // This isn't so bad, it's okay if it's the same container as before, actual heavy creation uses cache
+        // Recreate transparent pass pipelines for each mesh (and _only_ transparent!)
+        // These depend on per-mesh attributes (unlike opaque which uses only global parameters),
+        // so we must iterate through meshes to create pipelines with the (potentially new) layout.
+        // Caching ensures this is efficient when pipelines already exist.
         let mut has_seen_buffer_info = SecondaryMap::new();
         let mut has_seen_material = SecondaryMap::new();
         for (key, mesh) in self.meshes.iter() {
@@ -82,23 +86,6 @@ impl AwsmRenderer {
                 .is_none()
                 || has_seen_material.insert(mesh.material_key, ()).is_none()
             {
-                self.render_passes
-                    .material_opaque
-                    .pipelines
-                    .set_compute_pipeline_key(
-                        &self.gpu,
-                        mesh,
-                        key,
-                        &mut self.shaders,
-                        &mut self.pipelines,
-                        &self.render_passes.material_opaque.bind_groups,
-                        &self.pipeline_layouts,
-                        &self.meshes.buffer_infos,
-                        &self.anti_aliasing,
-                        &self.textures,
-                    )
-                    .await?;
-
                 self.render_passes
                     .material_transparent
                     .pipelines

@@ -82,6 +82,15 @@ impl LoadingStatus {
         statuses
     }
 
+    pub fn any_error(&self) -> bool {
+        self.renderer.is_err()
+            || self.ibl.is_err()
+            || self.skybox.is_err()
+            || self.gltf_net.is_err()
+            || self.gltf_data.is_err()
+            || self.populate.is_err()
+    }
+
     pub fn err_strings(&self) -> Vec<String> {
         let mut errors = Vec::new();
 

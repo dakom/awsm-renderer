@@ -182,12 +182,6 @@ fn main(
     }
 
 
-    // Early exit if the main sample doesn't match this mesh's attributes
-    // (even if other MSAA samples might match - those will be handled by _some_ main sample matching)
-    if (!mesh_matches_variant(material_mesh_meta)) {
-        return;
-    }
-
     let barycentric_data = textureLoad(barycentric_tex, coords, 0);
     let barycentric = vec3<f32>(barycentric_data.x, barycentric_data.y, 1.0 - barycentric_data.x - barycentric_data.y);
 
@@ -325,37 +319,6 @@ fn main(
 
     // Write to output texture for non-edge pixel
     textureStore(opaque_tex, coords, vec4<f32>(color, base_alpha));
-}
-
-// Check if a mesh's attributes match what this shader variant was compiled for.
-// Each variant is compiled for specific uv_sets/color_sets counts.
-// In the future, this will also check material type (pbr, toon, etc).
-fn mesh_matches_variant(material_mesh_meta: MaterialMeshMeta) -> bool {
-    // Check UV set count
-    {%- match uv_sets %}
-        {% when Some with (variant_uv_sets) %}
-            if (material_mesh_meta.uv_set_count != {{ variant_uv_sets }}u) {
-                return false;
-            }
-        {% when None %}
-            if (material_mesh_meta.uv_set_count != 0u) {
-                return false;
-            }
-    {% endmatch %}
-
-    // Check color set count
-    {%- match color_sets %}
-        {% when Some with (variant_color_sets) %}
-            if (material_mesh_meta.color_set_count != {{ variant_color_sets }}u) {
-                return false;
-            }
-        {% when None %}
-            if (material_mesh_meta.color_set_count != 0u) {
-                return false;
-            }
-    {% endmatch %}
-
-    return true;
 }
 
 fn get_triangle_indices(attribute_indices_offset: u32, triangle_index: u32) -> vec3<u32> {

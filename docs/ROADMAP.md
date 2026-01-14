@@ -1,23 +1,26 @@
 # Next up
-      
+- Bloom Post Processing
+- More Tonemappig options
+- SSAO Post Processing
+- Depth of Field Post Processing
+
 - Make transparent meshes pickable
   - Maybe global "editor_mode" on renderer that toggles some less-efficient behavior
     - All meshes get both transparent and opaque geometry 
     - Picking pass samples both and uses alpha test to discard transparent fragments below threshold
     
-- More extensions (see below)
-    
-- Visual bounding box around selected objects
-      
-- Post Processing options in frontend sidebar
-- Make debug normals work again in sidebar
-- Animation support in sidebar (or get rid of it)
-
 - Shadows
 
 - Frustum culling
 
 - Toon shader
+    
+- More extensions (see below)
+    
+- Visual bounding box around selected objects
+      
+- Animation support in sidebar (or get rid of it)
+
 
 - Get started with light culling pass
   - research best practices

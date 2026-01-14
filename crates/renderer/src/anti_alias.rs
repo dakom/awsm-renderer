@@ -41,7 +41,13 @@ impl AwsmRenderer {
         self.bind_groups
             .mark_create(BindGroupCreate::TextureViewRecreate);
 
-        // This isn't so bad, it's okay if it's the same container as before, actual heavy creation uses cache
+        // OPAQUE: No pipeline updates needed here. All MSAA/mipmap variants are pre-created at init,
+        // and the correct one is selected at render time via get_compute_pipeline_key(&anti_aliasing).
+        //
+        // TRANSPARENT: Pipelines depend on per-mesh attributes AND anti-aliasing settings,
+        // so we must recreate them when anti-aliasing changes.
+        //
+        // DISPLAY: Pipelines depend on anti-aliasing settings, so we must recreate them when anti-aliasing changes.
         let mut has_seen_buffer_info = SecondaryMap::new();
         let mut has_seen_material = SecondaryMap::new();
         for (key, mesh) in self.meshes.iter() {
@@ -50,23 +56,6 @@ impl AwsmRenderer {
                 .is_none()
                 || has_seen_material.insert(mesh.material_key, ()).is_none()
             {
-                self.render_passes
-                    .material_opaque
-                    .pipelines
-                    .set_compute_pipeline_key(
-                        &self.gpu,
-                        mesh,
-                        key,
-                        &mut self.shaders,
-                        &mut self.pipelines,
-                        &self.render_passes.material_opaque.bind_groups,
-                        &self.pipeline_layouts,
-                        &self.meshes.buffer_infos,
-                        &self.anti_aliasing,
-                        &self.textures,
-                    )
-                    .await?;
-
                 self.render_passes
                     .material_transparent
                     .pipelines

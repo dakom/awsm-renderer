@@ -14,10 +14,12 @@ However, that assumes you have all the prerequisites installed and media assets 
 
 For the sake of keeping the repo clean, media files are referenced remotely on the release build, and can be downloaded locally to gitignored directories for dev builds.
 
-Currently, these need to be manually cloned/downloaded (not via git submodules). Clone into `media` the following repos:
+Currently, these need to be manually cloned/downloaded (not via git submodules):
 
 1. https://github.com/KhronosGroup/glTF-Sample-Assets.git
+  - cloned into media/glTF-Sample-Assets
 2. https://github.com/dakom/awsm-renderer-assets.git
+  - assumed to exist in ../awsm-renderer-assets
 
 ## Prerequisites 
 
@@ -51,6 +53,7 @@ Use the releases: https://github.com/KhronosGroup/KTX-Software/releases
 
 * [awsm-renderer](crates/renderer): The renderer in all its glory 
 * [awsm-renderer-core](crates/renderer-core): Wraps the WebGPU API with very little opinion, just a nicer Rust API
+* [awsm-renderer-editor](crates/editor): Helper crate for transform gizmo, grid, etc. 
 * [frontend](crates/frontend): Just for demo and debugging purposes 
 * [docs](docs): Documentation
 * [media](media): Media assets for the demo scenes

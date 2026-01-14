@@ -1,26 +1,78 @@
-# awsm-renderer
+# AwsmRenderer
+# [Live Demo](https://dakom.github.io/awsm-renderer)
 
-[Live Demo](https://dakom.github.io/awsm-renderer)
+Rust/WASM/WebGPU renderer for the web.
 
-# OVERVIEW
-
-**`awsmrenderer`** is a browser-based Rust/WASM/WebGPU renderer
-
-It's specifically for the browser in that it does *not* use wgpu, but rather uses the WebGPU API directly via the web-sys bindings. While this is somewhat unconventional in the Rust ecosystem, it allows for a more direct mapping to the WebGPU API and potentially better performance, control, and easier debugging.
-
-That said, it's not unthinkable for a future version to support native binaries as well ;)
-
-# ARCHITECTURE
-
-This renderer uses a **visibility buffer+ hybrid** approach, enabling efficient shading without the drawbacks of classic deferred or forward+ rendering.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for insight into how this all works and where the tradeoffs are made. 
+It's specifically for the web in that it does *not* use the (wonderful) wgpu crate abstraction, but rather uses the WebGPU API directly via the `web-sys` bindings. While this is somewhat unconventional in the Rust ecosystem, it allows for a more direct mapping to the WebGPU API for precise control and understanding of how things work under the hood in a web context. 
 
 # STATUS
 
-Nothing much to see here yet, early days, slow-moving hobby and learning in progress :)
-
 See [ROADMAP](docs/ROADMAP.md) for details.
+
+# ARCHITECTURE
+
+There's a lot to unpack here: render passes, buffers, shaders, pipelines... for the sake of brevity, here's the high-level overview of some of the key tradeoffs and design decisions:
+
+## Render Passes
+
+The core rendering is done in these main passes:
+
+1. **Geometry Pass**: Renders all opaque geometry into a few targets with a minimal set of data needed for the next step. It's a draw call per mesh, but still _extremely_ fast: no texture lookups, no shading, no material-specific logic. Just geometry transformations (including morphs/skins) and writing out a few values per-pixel. Depth testing/writing is enabled here so it benefits from occlusion culling too. One of the key mechanics is that we pass barycentric coordinates per-texel, which allows us to reconstruct interpolated values in the next pass.
+
+2. **Opaque Pass**: Uses the data from the geometry pass, along with all the other available data (texture bindings, material info, etc.) to shade all the pixels in _one draw call_. Since this only shades visible pixels, it's much faster than traditional forward rendering. Since the "g-buffer" only contains geometry info, it's also much more flexible than traditional deferred rendering since it supports any number of materials in the single draw call.
+
+3. **Transparent Pass**: Renders all transparent geometry via traditional forward rendering, on top of the opaque pass result. This is necessary since the opaque pipeline needs to know the exact identifer of a given pixel, and alpha blending breaks that. However, the transparent pass can still take advantage of early-z testing by using the same depth buffer from visibility pass, pipeline sorting to minimize state changes, etc. Also, the majority of renderables are typically opaque, so this is still a minor tradeoff overall.
+
+4. **Post-Processing Pass**: Applies any post-processing effects (bloom, tone-mapping, color grading, etc.) to the final image before presenting it to the screen.
+
+There's a few more implmentation details around msaa, hooks, and hud rendering as well, but those are the main passes.
+
+## Buffers
+
+The overall idea is that we load all the data we need for rendering into GPU buffers ahead of time, and then reference that data via offsets when issuing draw calls. 
+
+Updating the data is easy, using "keys" (TransformKey, MeshKey, MaterialKey, etc.) and Rust-friendly structs. Under the hood, updates mark the GPU buffers as "dirty" so they get re-uploaded at the start of the next frame via one big memcpy per-buffer. This makes it very efficient to update data many times per-frame if needed (e.g. for physics).
+
+Nearly all the data goes through one of two mechanisms:
+
+  - **DyanmicUniformBuffer**: not just for uniforms, but rather for any data of a predetermined size. We take advantage of that property to more efficiently manage the buffer. 
+  - **DynamicStorageBuffer**: similar to above, but for heterogeneous data of varying size. We use more advanced techniques to manager the buffer efficiently while still keeping the API easy to use.
+
+As the data grows, an occasional re-allocation is needed, but this is infrequent and handled automatically.
+
+## Attributes
+
+This is a bit involved since we explode the triangle vertices in the geometry pass and need to access the original per-vertex attributes in different ways throughout the renderer. For more info on how vertex attributes are handled and split into different buffers, see [Vertex Attributes](docs/VERTEX_ATTRIBUTES.md).
+
+## Texture Pools
+
+Textures are managed in texture pools, which are essentially arrays of textures of the same size and format. This allows for easy binding and staying under limits in shaders.
+
+The pool can grow as needed, but it requires signaling the changes to shader generation, and so it's typically done infrequently like right after all images are downloaded.
+
+## Bind Groups
+
+Many things can cause a bind group to need to be re-created: resized buffers, new render views, texture pool changes, etc.
+
+Instead of wiring all that logic directly, we broadcast various "events" that indicate what changed, and the relevant systems listen for those events and update their bind groups as needed at the start of the next frame.
+
+## Shaders
+
+Shaders are written with Askama templates, allowing for code reuse and easy-to-reason-about caching based on different variables exposed to the template. 
+
+## Caching
+
+Speaking of caching many things are cached to avoid redundant work and state changes, including pipelines, layouts, shaders, etc.
+
+## GLTF Support
+
+GLTF is supported as a first-class citizen, with support for PBR materials, skins, morphs, animations, and more.
+
+It's de-facto _the_ format for AwsmRenderer assets, and extensions are used where appropriate to support features not in the core spec (e.g. texture transforms, unlit materials, etc.)
+
+## Picking
+
+Because the geometry pass writes out unique identifiers per-mesh, picking opaque meshes is as simple as reading back the pixel under the mouse cursor from that target, and mapping it back to the corresponding mesh. This makes picking opaque meshes extremely fast and efficient, even with complex scenes, without significant overhead during rendering.
 
 # DEVELOPMENT
 
@@ -36,23 +88,15 @@ However, there is a transform-based scene graph, and all the data structures are
 
 Feel free to think of these keys as components and assign them to some EntityId of your choice.
 
-It's _very fast_ to update any data in the system many times per-tick (e.g. for physics), it's almost just a memcpy, and the data is only uploaded to the GPU once per tick if needed. Ultimately you can have a very dynamic scene without worrying about overhead (especially when just transforming objects - inserting/removing may hit some very small burps when bind groups need to be recreated. See [ARCHITECTURE](docs/ARCHITECTURE.md) for more details)
-
 ### Physics
 
 The renderer does include transformation, morphs, skins, and animation support, but does not include any physics engine or collision detection.
 
 It's expected that another subsystem using this renderer would handle physics/collision detection separately, and provide the resulting transforms/animations to the renderer.
 
-### Material system
-
-There is no easy-to-work-with material system, shader graph, or node-based editor. Instead, materials are hardcoded structures with a specific memory alignment and size, with code on both the Rust and WGSL side that must be in sync. 
-
-However, the foundation is there to allow building a higher-level abstraction, and material tooling could be built on top of this renderer.
-
 ### Game world culling
 
-This really depends on the specific needs of a project. Some examples:
+This really depends on the specific needs of the project. Some examples:
 
 * no culling at all (e.g. a fighting game)
 * portal-based (e.g. a first-person shooter in an interior)
@@ -60,7 +104,6 @@ This really depends on the specific needs of a project. Some examples:
 * quadtrees (e.g. in top-down view)
 
 However, due to the visibility buffer optimization, the impact of rendering unnecessary geometry does not reach the shading stage. Also, frustum culling will eliminate other game world objects... so the only optimization would really be to reduce the frustum culling tests which are already very cheap.
-
 
 # GRAVEYARD
 

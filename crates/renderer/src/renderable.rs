@@ -44,8 +44,7 @@ impl AwsmRenderer {
                     .render_passes
                     .material_opaque
                     .pipelines
-                    // CHANGE to key too?
-                    .get_compute_pipeline_key(mesh_key),
+                    .get_compute_pipeline_key(&self.anti_aliasing),
                 material_transparent_render_pipeline_key: self
                     .render_passes
                     .material_transparent
