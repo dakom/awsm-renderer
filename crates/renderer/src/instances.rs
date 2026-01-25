@@ -3,6 +3,7 @@ use awsm_renderer_core::{
     error::AwsmCoreError,
     renderer::AwsmRendererWebGpu,
 };
+use glam::Mat4;
 use slotmap::SecondaryMap;
 use thiserror::Error;
 
@@ -82,6 +83,31 @@ impl Instances {
 
     pub fn transform_instance_count(&self, key: TransformKey) -> Option<usize> {
         self.transform_count.get(key).copied()
+    }
+
+    pub fn get_transform(&self, key: TransformKey, index: usize) -> Option<Transform> {
+        self.transform_buffer.get(key).map(|bytes| {
+            let offset = index * Transforms::BYTE_SIZE;
+            let slice = &bytes[offset..offset + Transforms::BYTE_SIZE];
+            let values_f32 = unsafe {
+                std::slice::from_raw_parts(slice.as_ptr() as *const f32, Transforms::BYTE_SIZE / 4)
+            };
+            let mat = Mat4::from_cols_slice(values_f32);
+
+            Transform::from_matrix(mat)
+        })
+    }
+
+    pub fn get_transforms(&self, key: TransformKey) -> Option<Vec<Transform>> {
+        let count = self.transform_instance_count(key)?;
+        let mut transforms = Vec::with_capacity(count);
+
+        for index in 0..count {
+            if let Some(transform) = self.get_transform(key, index) {
+                transforms.push(transform);
+            }
+        }
+        Some(transforms)
     }
 
     // This *does* write to the gpu, should be called only once per frame

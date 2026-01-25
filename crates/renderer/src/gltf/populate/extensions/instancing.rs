@@ -152,20 +152,6 @@ impl AwsmRenderer {
                 self.instances.transform_insert(key, &transforms);
                 ctx.transform_is_instanced.lock().unwrap().insert(key);
             }
-        } else if ctx.data.hints.instanced {
-            let key = *ctx
-                .key_lookups
-                .lock()
-                .unwrap()
-                .node_index_to_transform
-                .get(&gltf_node.index())
-                .ok_or(AwsmGltfError::ExtInstancing(anyhow!(
-                    "no transform key for node {}",
-                    gltf_node.index()
-                )))?;
-
-            self.instances.transform_insert(key, &[Transform::IDENTITY]);
-            ctx.transform_is_instanced.lock().unwrap().insert(key);
         }
 
         for child in gltf_node.children() {

@@ -6,7 +6,6 @@ use awsm_renderer::{
         loader::GltfLoader,
     },
     render::RenderHooks,
-    transforms::TransformKey,
     AwsmRenderer,
 };
 use dominator_helpers::futures::AsyncLoader;
@@ -14,7 +13,7 @@ use futures::StreamExt;
 
 use awsm_renderer_editor::{
     grid::{pipelines::EditorPipelines, render::render_grid},
-    transform_controller::TransformController,
+    transform_controller::{TransformController, TransformObject},
 };
 
 #[derive(Clone)]
@@ -23,7 +22,7 @@ pub struct AppSceneEditor {
     pub render_hooks: Arc<std::sync::RwLock<Option<Arc<RenderHooks>>>>,
     pub gizmo_gltf_data: Arc<GltfData>,
     pub transform_controller: Arc<std::sync::Mutex<Option<TransformController>>>,
-    pub selected_object_transform_key: Mutable<Option<TransformKey>>,
+    pub selected_object: Mutable<Option<TransformObject>>,
     grid_enabled: Mutable<bool>,
     gizmo_translation_enabled: Mutable<bool>,
     gizmo_rotation_enabled: Mutable<bool>,
@@ -54,19 +53,19 @@ impl AppSceneEditor {
 
         let transform_controller: Arc<std::sync::Mutex<Option<TransformController>>> =
             Arc::new(std::sync::Mutex::new(None));
-        let selected_object_transform_key = Mutable::new(None);
+        let selected_object = Mutable::new(None);
 
         let reactor = AsyncLoader::new();
 
-        reactor.load(clone!(grid_enabled, gizmo_translation_enabled, gizmo_rotation_enabled, gizmo_scale_enabled, selected_object_transform_key, render_hooks, pipelines, renderer, transform_controller => async move {
+        reactor.load(clone!(grid_enabled, gizmo_translation_enabled, gizmo_rotation_enabled, gizmo_scale_enabled, selected_object, render_hooks, pipelines, renderer, transform_controller => async move {
 
             let mut stream = map_ref! {
                 let grid_enabled = grid_enabled.signal(),
                 let gizmo_translation_enabled = gizmo_translation_enabled.signal(),
                 let gizmo_rotation_enabled = gizmo_rotation_enabled.signal(),
                 let gizmo_scale_enabled = gizmo_scale_enabled.signal(),
-                let selected_object_transform_key = selected_object_transform_key.signal()
-                => (*grid_enabled, *gizmo_translation_enabled, *gizmo_rotation_enabled, *gizmo_scale_enabled, *selected_object_transform_key)
+                let selected_object = selected_object.signal()
+                => (*grid_enabled, *gizmo_translation_enabled, *gizmo_rotation_enabled, *gizmo_scale_enabled, *selected_object)
             }.to_stream();
 
             while let Some((grid_enabled, gizmo_translation_enabled, gizmo_rotation_enabled, gizmo_scale_enabled, selected_transform_key)) = stream.next().await {
@@ -132,7 +131,7 @@ impl AppSceneEditor {
             gizmo_translation_enabled,
             gizmo_rotation_enabled,
             gizmo_scale_enabled,
-            selected_object_transform_key,
+            selected_object,
             reactor,
             gizmo_gltf_data,
             transform_controller,

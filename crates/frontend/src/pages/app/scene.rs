@@ -128,7 +128,7 @@ impl AppScene {
                                                     state.move_action.set(Some(MoveAction::GizmoTransforming));
                                                 }
                                                 Some(TransformTarget::ObjectHit(transform)) => {
-                                                    editor.selected_object_transform_key.set_neq(Some(transform));
+                                                    editor.selected_object.set_neq(Some(transform));
                                                 }
                                                 None => { }
                                             }
