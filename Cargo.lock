@@ -134,6 +134,7 @@ dependencies = [
  "anyhow",
  "awsm-renderer",
  "glam",
+ "tracing",
  "web-sys",
 ]
 

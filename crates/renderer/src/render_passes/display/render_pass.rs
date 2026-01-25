@@ -38,7 +38,8 @@ impl DisplayRenderPass {
                     &ctx.gpu.current_context_texture_view()?,
                     LoadOp::Clear,
                     StoreOp::Store,
-                )],
+                )
+                .with_clear_color(ctx.clear_color)],
                 ..Default::default()
             }
             .into(),

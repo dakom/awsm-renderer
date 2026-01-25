@@ -1,4 +1,6 @@
 # Next up
+- Instancing transform support for transforms
+  - disambiguate regular transform vs. instancing
 - Make transparent meshes pickable
   - Maybe global "editor_mode" on renderer that toggles some less-efficient behavior
     - All meshes get both transparent and opaque geometry 

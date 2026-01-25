@@ -350,6 +350,12 @@ impl AwsmRendererBuilder {
             animations,
         };
 
+        // need to call these to create pipelines
+        _self.set_anti_aliasing(_self.anti_aliasing.clone()).await?;
+        _self
+            .set_post_processing(_self.post_processing.clone())
+            .await?;
+
         Ok(_self)
     }
 }

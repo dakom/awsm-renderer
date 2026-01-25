@@ -1,3 +1,4 @@
+use awsm_renderer_core::command::color::Color;
 use awsm_renderer_core::command::CommandEncoder;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use awsm_renderer_core::texture::blit::blit_tex;
@@ -116,6 +117,7 @@ impl AwsmRenderer {
             render_passes: &self.render_passes,
             anti_aliasing: &self.anti_aliasing,
             post_processing: &self.post_processing,
+            clear_color: &self._clear_color,
         };
 
         let renderables = self.collect_renderables(&ctx)?;
@@ -351,4 +353,5 @@ pub struct RenderContext<'a> {
     pub render_passes: &'a RenderPasses,
     pub anti_aliasing: &'a AntiAliasing,
     pub post_processing: &'a PostProcessing,
+    pub clear_color: &'a Color,
 }

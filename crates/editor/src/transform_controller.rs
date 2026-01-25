@@ -713,6 +713,7 @@ fn ray_plane_intersection(
 
     // If denom is close to zero, ray is parallel to plane
     if denom.abs() < 1e-6 {
+        tracing::info!("Ray is parallel to plane");
         return None;
     }
 
@@ -720,6 +721,7 @@ fn ray_plane_intersection(
 
     // If t is negative, intersection is behind the camera
     if t < 0.0 {
+        tracing::info!("Intersection is behind the camera");
         return None;
     }
 

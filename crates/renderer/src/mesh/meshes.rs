@@ -162,7 +162,7 @@ impl Meshes {
     ) -> Result<MeshKey> {
         let transform_key = mesh.transform_key;
         let buffer_info_key = mesh.buffer_info_key;
-        let key = self.list.insert(mesh.clone());
+        let mesh_key = self.list.insert(mesh.clone());
 
         let buffer_info = self.buffer_infos.get(buffer_info_key)?;
 
@@ -170,7 +170,7 @@ impl Meshes {
             .entry(transform_key)
             .unwrap()
             .or_default()
-            .push(key);
+            .push(mesh_key);
 
         // geometry
 
@@ -183,7 +183,7 @@ impl Meshes {
                         geometry_index.extend_from_slice(&(i as u32).to_le_bytes());
                     }
                     self.visibility_geometry_index_buffers
-                        .update(key, &geometry_index);
+                        .update(mesh_key, &geometry_index);
                 } else {
                     return Err(AwsmMeshError::VisibilityGeometryBufferInfoNotFound(
                         buffer_info_key,
@@ -193,7 +193,7 @@ impl Meshes {
                 self.visibility_geometry_index_dirty = true;
                 let offset = self
                     .visibility_geometry_data_buffers
-                    .update(key, geometry_data);
+                    .update(mesh_key, geometry_data);
                 self.visibility_geometry_data_dirty = true;
 
                 Some(offset)
@@ -205,7 +205,7 @@ impl Meshes {
             Some(geometry_data) => {
                 let offset = self
                     .transparency_geometry_data_buffers
-                    .update(key, geometry_data);
+                    .update(mesh_key, geometry_data);
                 self.transparency_geometry_data_dirty = true;
 
                 Some(offset)
@@ -216,13 +216,13 @@ impl Meshes {
         // attributes - index
         let custom_attribute_indices_offset = self
             .custom_attribute_index_buffers
-            .update(key, attribute_index);
+            .update(mesh_key, attribute_index);
         self.custom_attribute_index_dirty = true;
 
         // attributes - data
         let custom_attribute_data_offset = self
             .custom_attribute_data_buffers
-            .update(key, attribute_data);
+            .update(mesh_key, attribute_data);
         self.custom_attribute_data_dirty = true;
 
         // KEEP THIS AROUND FOR DEBUGGING
@@ -261,7 +261,7 @@ impl Meshes {
         //     }
         // }
         self.meta.insert(
-            key,
+            mesh_key,
             &mesh,
             buffer_info,
             visibility_geometry_data_offset,
@@ -274,7 +274,7 @@ impl Meshes {
             &self.skins,
         )?;
 
-        Ok(key)
+        Ok(mesh_key)
     }
 
     pub fn update_world(&mut self, dirty_transforms: HashMap<TransformKey, &Mat4>) {
@@ -295,6 +295,10 @@ impl Meshes {
 
         // This does update the GPU as dirty, bit skins manage their own GPU dirty state
         self.skins.update_transforms(dirty_transforms);
+    }
+
+    pub fn keys_by_transform_key(&self, transform_key: TransformKey) -> Option<&Vec<MeshKey>> {
+        self.transform_to_meshes.get(transform_key)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = MeshKey> + '_ {
@@ -371,6 +375,19 @@ impl Meshes {
             .ok_or(AwsmMeshError::MeshNotFound(mesh_key))
     }
 
+    pub fn remove_by_transform_key(&mut self, transform_key: TransformKey) -> Option<Vec<Mesh>> {
+        if let Some(mesh_keys) = self.transform_to_meshes.get(transform_key).cloned() {
+            let mut removed_meshes = Vec::with_capacity(mesh_keys.capacity());
+            for mesh_key in mesh_keys.iter() {
+                if let Some(mesh) = self.remove(*mesh_key) {
+                    removed_meshes.push(mesh);
+                }
+            }
+            Some(removed_meshes)
+        } else {
+            None
+        }
+    }
     pub fn remove(&mut self, mesh_key: MeshKey) -> Option<Mesh> {
         if let Some(mesh) = self.list.remove(mesh_key) {
             self.visibility_geometry_data_buffers.remove(mesh_key);

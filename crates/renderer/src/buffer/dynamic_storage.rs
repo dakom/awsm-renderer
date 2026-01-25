@@ -141,6 +141,12 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
             .sum::<usize>()
     }
 
+    /// Gets an immutable view into the slice
+    pub fn get(&self, key: K) -> Option<&[u8]> {
+        let (off, size) = self.slot_indices.get(key)?;
+        Some(&self.raw_data[*off..*off + *size])
+    }
+
     /* ------------------------------------------------------------------ */
     /*                GPU write                                           */
     /* ------------------------------------------------------------------ */

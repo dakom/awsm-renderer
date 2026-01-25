@@ -17,6 +17,16 @@ pub struct Renderables<'a> {
     pub hud: Vec<Renderable<'a>>,
 }
 
+impl Renderables<'_> {
+    pub fn is_empty(&self) -> bool {
+        self.opaque.is_empty() && self.transparent.is_empty() && self.hud.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.opaque.len() + self.transparent.len() + self.hud.len()
+    }
+}
+
 impl AwsmRenderer {
     pub fn collect_renderables<'a>(&'a self, ctx: &RenderContext) -> Result<Renderables<'a>> {
         let _maybe_span_guard = if self.logging.render_timings {

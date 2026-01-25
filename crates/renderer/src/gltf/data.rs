@@ -24,6 +24,7 @@ impl GltfData {
 pub struct GltfDataHints {
     pub hud: bool,
     pub hidden: bool,
+    pub instanced: bool,
 }
 
 impl GltfDataHints {
@@ -34,6 +35,11 @@ impl GltfDataHints {
 
     pub fn with_hidden(mut self, hidden: bool) -> Self {
         self.hidden = hidden;
+        self
+    }
+
+    pub fn with_instanced(mut self, instanced: bool) -> Self {
+        self.instanced = instanced;
         self
     }
 }

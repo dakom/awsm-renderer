@@ -106,7 +106,7 @@ pub fn blit_tex(
             label: Some("Blit Render Pass"),
             color_attachments: vec![
                 ColorAttachment::new(dst_view, LoadOp::Clear, StoreOp::Store)
-                    .with_clear_color(Color::ZERO),
+                    .with_clear_color(&Color::ZERO),
             ],
             depth_stencil_attachment: None,
             ..Default::default()

@@ -101,8 +101,8 @@ impl Deref for RenderPassEncoder {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct RenderPassDescriptor<'a> {
-    pub color_attachments: Vec<ColorAttachment<'a>>,
+pub struct RenderPassDescriptor<'a, 'b> {
+    pub color_attachments: Vec<ColorAttachment<'a, 'b>>,
     pub depth_stencil_attachment: Option<DepthStencilAttachment<'a>>,
     pub label: Option<&'a str>,
     pub max_draw_count: Option<u64>,
@@ -111,10 +111,10 @@ pub struct RenderPassDescriptor<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ColorAttachment<'a> {
+pub struct ColorAttachment<'a, 'b> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginRenderPass#color_attachment_object_structure
     // https://docs.rs/web-sys/latest/web_sys/struct.GpuRenderPassColorAttachment.html
-    pub clear_color: Option<Color>,
+    pub clear_color: Option<&'b Color>,
     pub depth_slice: Option<u32>,
     pub resolve_target: Option<&'a web_sys::GpuTextureView>,
     pub load_op: LoadOp,
@@ -122,7 +122,7 @@ pub struct ColorAttachment<'a> {
     pub view: &'a web_sys::GpuTextureView,
 }
 
-impl<'a> ColorAttachment<'a> {
+impl<'a, 'b> ColorAttachment<'a, 'b> {
     pub fn new(view: &'a web_sys::GpuTextureView, load_op: LoadOp, store_op: StoreOp) -> Self {
         Self {
             view,
@@ -134,7 +134,7 @@ impl<'a> ColorAttachment<'a> {
         }
     }
 
-    pub fn with_clear_color(mut self, clear_color: Color) -> Self {
+    pub fn with_clear_color(mut self, clear_color: &'b Color) -> Self {
         self.clear_color = Some(clear_color);
         self
     }
@@ -222,7 +222,7 @@ pub struct RenderTimestampWrites<'a> {
 
 // js conversions
 
-impl From<RenderPassDescriptor<'_>> for web_sys::GpuRenderPassDescriptor {
+impl<'a, 'b> From<RenderPassDescriptor<'a, 'b>> for web_sys::GpuRenderPassDescriptor {
     fn from(pass: RenderPassDescriptor) -> web_sys::GpuRenderPassDescriptor {
         let color_attachments = js_sys::Array::new();
         for attachment in pass.color_attachments {
@@ -259,7 +259,7 @@ impl From<RenderPassDescriptor<'_>> for web_sys::GpuRenderPassDescriptor {
     }
 }
 
-impl From<ColorAttachment<'_>> for web_sys::GpuRenderPassColorAttachment {
+impl<'a, 'b> From<ColorAttachment<'a, 'b>> for web_sys::GpuRenderPassColorAttachment {
     fn from(attachment: ColorAttachment) -> web_sys::GpuRenderPassColorAttachment {
         let attachment_js = web_sys::GpuRenderPassColorAttachment::new(
             attachment.load_op,

@@ -56,7 +56,7 @@ impl GeometryRenderPass {
                     LoadOp::Load,
                     StoreOp::Store,
                 )
-                .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
+                .with_clear_color(&VISIBILITY_CLEAR_COLOR),
                 ColorAttachment::new(
                     &ctx.render_texture_views.barycentric,
                     LoadOp::Load,
@@ -80,7 +80,7 @@ impl GeometryRenderPass {
                     LoadOp::Clear,
                     StoreOp::Store,
                 )
-                .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
+                .with_clear_color(&VISIBILITY_CLEAR_COLOR),
                 ColorAttachment::new(
                     &ctx.render_texture_views.barycentric,
                     LoadOp::Clear,

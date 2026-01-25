@@ -78,7 +78,7 @@ impl MeshMeta {
     }
     pub fn insert(
         &mut self,
-        key: MeshKey,
+        mesh_key: MeshKey,
         mesh: &Mesh,
         buffer_info: &MeshBufferInfo,
         visibility_geometry_data_offset: Option<usize>,
@@ -99,7 +99,7 @@ impl MeshMeta {
         let normal_matrix_offset = transforms.normals_buffer_offset(transform_key)?;
 
         let meta_data = MaterialMeshMeta {
-            mesh_key: key,
+            mesh_key,
             material_morph_key,
             material_key,
             buffer_info,
@@ -113,11 +113,11 @@ impl MeshMeta {
             mesh,
         }
         .to_bytes()?;
-        self.material_buffers.update(key, &meta_data);
+        self.material_buffers.update(mesh_key, &meta_data);
         self.material_dirty = true;
 
         let meta_data = GeometryMeshMeta {
-            mesh_key: key,
+            mesh_key,
             material_key,
             transform_key,
             geometry_morph_key,
@@ -130,7 +130,7 @@ impl MeshMeta {
         }
         .to_bytes()?;
 
-        self.geometry_buffers.update(key, &meta_data);
+        self.geometry_buffers.update(mesh_key, &meta_data);
         self.geometry_dirty = true;
 
         Ok(())

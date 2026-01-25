@@ -42,7 +42,7 @@ pub struct Transforms {
     // not every transform here is definitely a mesh, just in potential
     dirty_meshes: Vec<TransformKey>,
     gpu_dirty: bool,
-    root_node: TransformKey,
+    pub root_node: TransformKey,
     buffer: DynamicUniformBuffer<TransformKey>,
     normals_buffer: DynamicUniformBuffer<TransformKey>,
     pub(crate) gpu_buffer: web_sys::GpuBuffer,

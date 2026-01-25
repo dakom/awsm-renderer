@@ -140,6 +140,13 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         })
     }
 
+    /// Gets an immutable view into the slice
+    pub fn get(&self, key: K) -> Option<&[u8]> {
+        let slot = self.slot_indices.get(key)?;
+        let offset_bytes = slot * self.aligned_slice_size;
+        Some(&self.raw_data[offset_bytes..offset_bytes + self.byte_size])
+    }
+
     /// Updates a portion of an existing slot starting at the given offset.
     ///
     /// # Panics
