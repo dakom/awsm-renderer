@@ -1,21 +1,28 @@
+//! Interpolation helpers for animation sampling.
+
 use glam::{Quat, Vec3};
 
+/// Linearly interpolates two Vec3 values.
 pub fn interpolate_linear_vec3(first: Vec3, second: Vec3, t: f64) -> Vec3 {
     first.lerp(second, t as f32)
 }
 
+/// Linearly interpolates two quaternions.
 pub fn interpolate_linear_quat(first: Quat, second: Quat, t: f64) -> Quat {
     first.slerp(second, t as f32)
 }
 
+/// Linearly interpolates two f32 values.
 pub fn interpolate_linear_f32(first: f32, second: f32, t: f64) -> f32 {
     first + t as f32 * (second - first)
 }
 
+/// Linearly interpolates two f64 values.
 pub fn interpolate_linear_f64(first: f64, second: f64, t: f64) -> f64 {
     first + t * (second - first)
 }
 
+/// Cubic spline interpolation for Vec3 values.
 pub fn interpolate_cubic_spline_vec3(
     first_value: Vec3,
     first_tangent: Vec3,
@@ -41,6 +48,7 @@ pub fn interpolate_cubic_spline_vec3(
         + (h11 * second_tangent * delta_time)
 }
 
+/// Cubic spline interpolation for quaternions.
 pub fn interpolate_cubic_spline_quat(
     first_value: Quat,
     first_tangent: Quat,
@@ -80,6 +88,7 @@ pub fn interpolate_cubic_spline_quat(
     blended.normalize()
 }
 
+/// Cubic spline interpolation for f32 values.
 pub fn interpolate_cubic_spline_f32(
     first_value: f32,
     first_tangent: f32,
@@ -104,6 +113,7 @@ pub fn interpolate_cubic_spline_f32(
         + (h11 * second_tangent * delta_time)
 }
 
+/// Cubic spline interpolation for f64 values.
 pub fn interpolate_cubic_spline_f64(
     first_value: f64,
     first_tangent: f64,

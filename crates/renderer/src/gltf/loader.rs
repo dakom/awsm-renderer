@@ -1,35 +1,37 @@
+//! Loads glTF assets independently of the renderer.
+//!
+//! This is a web-specific adaptation of https://github.com/gltf-rs/gltf/blob/master/src/import.rs.
+//! Main differences:
+//! 1. Everything is async.
+//! 2. Uses web APIs (via the internal `ImageData` helper).
+//! 3. No image_data_reference feature (avoids base64/image crate dependencies).
+//! 4. Some error checks are omitted because the web APIs enforce them (for example, mime type).
+
 use awsm_renderer_core::image::{
     ColorSpaceConversion, ImageBitmapOptions, ImageData, PremultiplyAlpha,
 };
 use futures::future::try_join_all;
-/// Loads a GltfResource, independently of the renderer
-/// the loaded resource can then be passed into renderer.populate_gltf()
-///
-/// This is merely a web-specific adaptation of https://github.com/gltf-rs/gltf/blob/master/src/import.rs
-/// Main differences:
-/// 1. Everything is async
-/// 2. Uses web api (by way of internal ImageData helper)
-/// 3. No image_data_reference feature (hence no base64/image crate dependencies)
-/// 4. Some error checking is removed since the web api does it inherently (e.g. mime type)
-///
 use gltf::{buffer, image, Document, Error as GltfError, Gltf};
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 
 use super::error::AwsmGltfError;
 
+/// Loaded glTF document plus buffer and image data.
 pub struct GltfLoader {
     pub doc: Document,
     pub buffers: Vec<Vec<u8>>,
     pub images: Vec<ImageData>,
 }
 
+/// Supported glTF file types.
 pub enum GltfFileType {
     Json,
     Glb,
     Draco, //TODO
 }
 
+/// Determines the glTF file type based on a filename extension.
 pub fn get_type_from_filename(url: &str) -> Option<GltfFileType> {
     match url.rsplit('.').next() {
         Some("gltf") => Some(GltfFileType::Json),
@@ -40,6 +42,7 @@ pub fn get_type_from_filename(url: &str) -> Option<GltfFileType> {
 }
 
 impl GltfLoader {
+    /// Loads a glTF asset from a URL.
     pub async fn load(url: &str, file_type: Option<GltfFileType>) -> anyhow::Result<Self> {
         let url = url.to_owned();
         let file_type = match file_type {
@@ -87,6 +90,7 @@ impl GltfLoader {
         })
     }
 
+    /// Clones the loaded glTF data and buffers.
     pub fn heavy_clone(&self) -> Self {
         Self {
             doc: self.doc.clone(),

@@ -1,3 +1,5 @@
+//! High-level renderer API and shared modules.
+
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::match_like_matches_macro)]
@@ -71,6 +73,7 @@ use crate::{
     render_textures::{RenderTextureFormats, RenderTextures},
 };
 
+/// Main renderer state and GPU resources.
 pub struct AwsmRenderer {
     pub gpu: core::renderer::AwsmRendererWebGpu,
     pub bind_group_layouts: BindGroupLayouts,
@@ -103,12 +106,14 @@ pub struct AwsmRenderer {
     pub animations: animation::Animations,
 }
 
+/// Compatibility requirements for this renderer.
 pub static COMPATIBITLIY_REQUIREMENTS: LazyLock<CompatibilityRequirements> =
     LazyLock::new(|| CompatibilityRequirements {
         storage_buffers: Some(9),
     });
 
 impl AwsmRenderer {
+    /// Removes all scene data by rebuilding the renderer state.
     pub async fn remove_all(&mut self) -> crate::error::Result<()> {
         // meh, just recreate the renderer, it's fine
         let renderer = AwsmRendererBuilder::new(self.gpu.clone())
@@ -122,6 +127,7 @@ impl AwsmRenderer {
         Ok(())
     }
 
+    /// Clones a mesh and its current transform under the same parent.
     pub fn clone_mesh(&mut self, mesh_key: mesh::MeshKey) -> crate::error::Result<mesh::MeshKey> {
         let transform_key = self.meshes.get(mesh_key)?.transform_key;
         let local_transform = self.transforms.get_local(transform_key)?.clone();
@@ -143,6 +149,57 @@ impl AwsmRenderer {
         Ok(new_mesh_key)
     }
 
+    /// Duplicates all meshes that share a transform, returning the new transform and mesh keys.
+    pub fn duplicate_meshes_by_transform_key(
+        &mut self,
+        transform_key: transforms::TransformKey,
+    ) -> crate::error::Result<(transforms::TransformKey, Vec<mesh::MeshKey>)> {
+        Ok(self.meshes.duplicate_by_transform_key(
+            transform_key,
+            &self.materials,
+            &mut self.transforms,
+        )?)
+    }
+
+    /// Splits a mesh out to a new transform key.
+    pub fn split_mesh(
+        &mut self,
+        mesh_key: mesh::MeshKey,
+    ) -> crate::error::Result<transforms::TransformKey> {
+        Ok(self.meshes.split_mesh(
+            mesh_key,
+            &mut self.transforms,
+            &self.materials,
+        )?)
+    }
+
+    /// Splits all meshes under a transform into new transform keys.
+    pub fn split_meshes_by_transform_key(
+        &mut self,
+        transform_key: transforms::TransformKey,
+    ) -> crate::error::Result<Vec<(mesh::MeshKey, transforms::TransformKey)>> {
+        Ok(self.meshes.split_meshes_by_transform_key(
+            transform_key,
+            &mut self.transforms,
+            &self.materials,
+        )?)
+    }
+
+    /// Joins meshes under a shared transform, optionally overriding the transform.
+    pub fn join_meshes(
+        &mut self,
+        mesh_keys: &[mesh::MeshKey],
+        transform_override: Option<transforms::Transform>,
+    ) -> crate::error::Result<(transforms::TransformKey, Vec<mesh::MeshKey>)> {
+        Ok(self.meshes.join_meshes(
+            mesh_keys,
+            &mut self.transforms,
+            &self.materials,
+            transform_override,
+        )?)
+    }
+
+    /// Enables GPU instancing for a mesh with explicit instance transforms.
     pub async fn enable_mesh_instancing(
         &mut self,
         mesh_key: mesh::MeshKey,
@@ -186,6 +243,7 @@ impl AwsmRenderer {
         Ok(())
     }
 
+    /// Replaces all instance transforms for an instanced mesh.
     pub fn set_mesh_instances(
         &mut self,
         mesh_key: mesh::MeshKey,
@@ -205,6 +263,7 @@ impl AwsmRenderer {
         Ok(())
     }
 
+    /// Appends a single instance transform to an instanced mesh.
     pub fn append_mesh_instance(
         &mut self,
         mesh_key: mesh::MeshKey,
@@ -214,6 +273,7 @@ impl AwsmRenderer {
         Ok(start_index)
     }
 
+    /// Appends instance transforms to an instanced mesh.
     pub fn append_mesh_instances(
         &mut self,
         mesh_key: mesh::MeshKey,
@@ -238,6 +298,7 @@ impl AwsmRenderer {
         Ok(self.instances.transform_extend(mesh.transform_key, transforms)?)
     }
 
+    /// Reserves additional instance slots for an instanced mesh.
     pub fn reserve_mesh_instances(
         &mut self,
         mesh_key: mesh::MeshKey,
@@ -261,6 +322,7 @@ impl AwsmRenderer {
     }
 }
 
+/// Builder for `AwsmRenderer`.
 pub struct AwsmRendererBuilder {
     gpu: AwsmRendererGpuBuilderKind,
     logging: AwsmRendererLogging,
@@ -276,8 +338,11 @@ pub struct AwsmRendererBuilder {
     post_processing: PostProcessing,
 }
 
+/// WebGPU builder input for `AwsmRendererBuilder`.
 pub enum AwsmRendererGpuBuilderKind {
+    /// Build from a WebGPU builder.
     WebGpuBuilder(AwsmRendererWebGpuBuilder),
+    /// Use an already-built WebGPU context.
     WebGpuBuilt(AwsmRendererWebGpu),
 }
 
@@ -294,6 +359,7 @@ impl From<AwsmRendererWebGpu> for AwsmRendererGpuBuilderKind {
 }
 
 impl AwsmRendererBuilder {
+    /// Creates a new renderer builder from a WebGPU builder or context.
     pub fn new(gpu: impl Into<AwsmRendererGpuBuilderKind>) -> Self {
         Self {
             gpu: gpu.into(),
@@ -338,46 +404,55 @@ impl AwsmRendererBuilder {
         }
     }
 
+    /// Sets BRDF LUT generation options.
     pub fn with_brdf_lut_options(mut self, options: BrdfLutOptions) -> Self {
         self.brdf_lut_options = options;
         self
     }
 
+    /// Sets the filtered environment colors for IBL.
     pub fn with_ibl_filtered_env_colors(mut self, colors: CubemapBitmapColors) -> Self {
         self.ibl_filtered_env_colors = colors;
         self
     }
 
+    /// Sets the anti-aliasing configuration.
     pub fn with_anti_aliasing(mut self, anti_aliasing: AntiAliasing) -> Self {
         self.anti_aliasing = anti_aliasing;
         self
     }
 
+    /// Sets the irradiance colors for IBL.
     pub fn with_ibl_irradiance_colors(mut self, colors: CubemapBitmapColors) -> Self {
         self.ibl_irradiance_colors = colors;
         self
     }
 
+    /// Sets the skybox colors.
     pub fn with_skybox_colors(mut self, colors: CubemapBitmapColors) -> Self {
         self.skybox_colors = colors;
         self
     }
 
+    /// Sets logging options for the renderer.
     pub fn with_logging(mut self, logging: AwsmRendererLogging) -> Self {
         self.logging = logging;
         self
     }
 
+    /// Sets render texture formats.
     pub fn with_render_texture_formats(mut self, formats: RenderTextureFormats) -> Self {
         self.render_texture_formats = Some(formats);
         self
     }
 
+    /// Sets the clear color used for the main render pass.
     pub fn with_clear_color(mut self, color: Color) -> Self {
         self.clear_color = color;
         self
     }
 
+    /// Builds the renderer and initializes GPU resources.
     pub async fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
         let Self {
             gpu,

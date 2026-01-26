@@ -1,3 +1,5 @@
+//! Render entry points and render context.
+
 use awsm_renderer_core::command::color::Color;
 use awsm_renderer_core::command::CommandEncoder;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
@@ -16,6 +18,7 @@ use crate::render_textures::{RenderTextureViews, RenderTextures};
 use crate::transforms::Transforms;
 use crate::{AwsmRenderer, AwsmRendererLogging};
 
+/// Optional callbacks around render passes.
 #[derive(Default)]
 pub struct RenderHooks {
     pub pre_render: Option<Box<dyn Fn(&mut AwsmRenderer) -> Result<()>>>,
@@ -29,6 +32,7 @@ impl AwsmRenderer {
     // this should only be called once per frame
     // the various underlying raw data can be updated on their own cadence
     // or just call .update_all() right before .render() for convenience
+    /// Executes a full render with optional hooks.
     pub fn render(&mut self, hooks: Option<&RenderHooks>) -> Result<()> {
         if let Some(hook) = hooks.and_then(|h| h.pre_render.as_ref()) {
             {
@@ -338,6 +342,7 @@ impl AwsmRenderer {
     }
 }
 
+/// Context passed to render passes during a frame.
 pub struct RenderContext<'a> {
     pub gpu: &'a AwsmRendererWebGpu,
     pub command_encoder: CommandEncoder,

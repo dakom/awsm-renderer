@@ -1,5 +1,8 @@
+//! Texel copy descriptors for buffer and texture copies.
+
 use crate::texture::TextureAspect;
 
+/// Source buffer info for texel copy operations.
 #[derive(Debug, Clone)]
 pub struct TexelCopyBufferInfo<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/copyBufferToTexture#source
@@ -11,6 +14,7 @@ pub struct TexelCopyBufferInfo<'a> {
 }
 
 impl<'a> TexelCopyBufferInfo<'a> {
+    /// Creates a buffer copy source.
     pub fn new(buffer: &'a web_sys::GpuBuffer) -> Self {
         Self {
             buffer,
@@ -20,22 +24,26 @@ impl<'a> TexelCopyBufferInfo<'a> {
         }
     }
 
+    /// Sets bytes per row.
     pub fn with_bytes_per_row(mut self, bytes_per_row: u32) -> Self {
         self.bytes_per_row = Some(bytes_per_row);
         self
     }
 
+    /// Sets the byte offset.
     pub fn with_offset(mut self, offset: u64) -> Self {
         self.offset = Some(offset);
         self
     }
 
+    /// Sets rows per image.
     pub fn with_rows_per_image(mut self, rows_per_image: u32) -> Self {
         self.rows_per_image = Some(rows_per_image);
         self
     }
 }
 
+/// Destination texture info for texel copy operations.
 #[derive(Debug, Clone)]
 pub struct TexelCopyTextureInfo<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/copyBufferToTexture#destination
@@ -47,6 +55,7 @@ pub struct TexelCopyTextureInfo<'a> {
 }
 
 impl<'a> TexelCopyTextureInfo<'a> {
+    /// Creates a texture copy destination.
     pub fn new(texture: &'a web_sys::GpuTexture) -> Self {
         Self {
             texture,
@@ -56,22 +65,26 @@ impl<'a> TexelCopyTextureInfo<'a> {
         }
     }
 
+    /// Sets the texture aspect.
     pub fn with_aspect(mut self, aspect: TextureAspect) -> Self {
         self.aspect = Some(aspect);
         self
     }
 
+    /// Sets the mip level.
     pub fn with_mip_level(mut self, mip_level: u32) -> Self {
         self.mip_level = Some(mip_level);
         self
     }
 
+    /// Sets the copy origin.
     pub fn with_origin(mut self, origin: Origin3d) -> Self {
         self.origin = Some(origin);
         self
     }
 }
 
+/// Layout info for texture data stored in a buffer.
 #[derive(Debug, Clone, Default)]
 pub struct TexelCopyBufferLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/writeTexture#datalayout
@@ -82,26 +95,31 @@ pub struct TexelCopyBufferLayout {
 }
 
 impl TexelCopyBufferLayout {
+    /// Creates a default buffer layout.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets bytes per row.
     pub fn with_bytes_per_row(mut self, bytes_per_row: u32) -> Self {
         self.bytes_per_row = Some(bytes_per_row);
         self
     }
 
+    /// Sets rows per image.
     pub fn with_rows_per_image(mut self, rows_per_image: u32) -> Self {
         self.rows_per_image = Some(rows_per_image);
         self
     }
 
+    /// Sets the byte offset.
     pub fn with_offset(mut self, offset: u64) -> Self {
         self.offset = Some(offset);
         self
     }
 }
 
+/// 3D origin for texture copies.
 #[derive(Debug, Clone, Default)]
 pub struct Origin3d {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/copyBufferToTexture#origin
@@ -112,20 +130,24 @@ pub struct Origin3d {
 }
 
 impl Origin3d {
+    /// Creates an origin at (0, 0, 0).
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the x coordinate.
     pub fn with_x(mut self, x: u32) -> Self {
         self.x = Some(x);
         self
     }
 
+    /// Sets the y coordinate.
     pub fn with_y(mut self, y: u32) -> Self {
         self.y = Some(y);
         self
     }
 
+    /// Sets the z coordinate.
     pub fn with_z(mut self, z: u32) -> Self {
         self.z = Some(z);
         self

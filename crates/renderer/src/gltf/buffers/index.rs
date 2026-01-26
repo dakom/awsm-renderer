@@ -1,3 +1,5 @@
+//! Index buffer extraction helpers for glTF.
+
 use crate::{
     buffer::helpers::{u8_to_f32_vec, u8_to_i16_vec, u8_to_u16_vec},
     gltf::buffers::MeshBufferAttributeIndexInfoWithOffset,
@@ -5,6 +7,7 @@ use crate::{
 
 use super::{accessor::accessor_to_bytes, AwsmGltfError, Result};
 
+/// Index buffer info extracted from a glTF primitive.
 #[derive(Debug, Clone)]
 pub struct GltfMeshBufferIndexInfo {
     // offset in index_bytes where this primitive starts
@@ -15,6 +18,7 @@ pub struct GltfMeshBufferIndexInfo {
 
 impl GltfMeshBufferIndexInfo {
     // the size in bytes of the index buffer for this primitive
+    /// Returns the total size in bytes for this index buffer.
     pub fn total_size(&self) -> usize {
         self.count * 4 // guaranteed u32
     }
@@ -30,6 +34,7 @@ impl From<GltfMeshBufferIndexInfo> for MeshBufferAttributeIndexInfoWithOffset {
 }
 
 impl GltfMeshBufferIndexInfo {
+    /// Creates index info from a primitive if indices are provided.
     pub fn maybe_new(
         primitive: &gltf::Primitive<'_>,
         buffers: &[Vec<u8>],
@@ -99,6 +104,7 @@ impl GltfMeshBufferIndexInfo {
     }
 }
 
+/// Generates sequential indices for a primitive without indices.
 pub fn generate_fresh_indices_from_primitive(
     primitive: &gltf::Primitive,
     index_bytes: &mut Vec<u8>,

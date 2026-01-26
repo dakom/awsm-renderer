@@ -1,3 +1,5 @@
+//! Render texture allocation and management.
+
 use awsm_renderer_core::{
     error::AwsmCoreError,
     renderer::AwsmRendererWebGpu,
@@ -11,6 +13,7 @@ use thiserror::Error;
 
 use crate::anti_alias::AntiAliasing;
 
+/// Render textures and cached views for the renderer.
 pub struct RenderTextures {
     pub formats: RenderTextureFormats,
     pub opaque_to_transparent_blit_pipeline_msaa_4: BlitPipeline,
@@ -20,6 +23,7 @@ pub struct RenderTextures {
     inner: Option<RenderTexturesInner>,
 }
 
+/// Formats used for render textures.
 #[derive(Clone, Debug)]
 pub struct RenderTextureFormats {
     // Output from geometry pass
@@ -39,6 +43,7 @@ pub struct RenderTextureFormats {
 }
 
 impl RenderTextureFormats {
+    /// Chooses default render texture formats for the device.
     pub async fn new(_device: &web_sys::GpuDevice) -> Self {
         Self {
             visiblity_data: TextureFormat::Rgba16uint,
@@ -52,6 +57,7 @@ impl RenderTextureFormats {
 }
 
 impl RenderTextures {
+    /// Creates render texture managers and blit pipelines.
     pub async fn new(gpu: &AwsmRendererWebGpu, formats: RenderTextureFormats) -> Result<Self> {
         let opaque_to_transparent_blit_pipeline_no_anti_alias =
             blit_get_pipeline(gpu, formats.color, None)
@@ -78,18 +84,22 @@ impl RenderTextures {
         })
     }
 
+    /// Advances the internal frame counter.
     pub fn next_frame(&mut self) {
         self.frame_count = self.frame_count.wrapping_add(1);
     }
 
+    /// Returns the current frame counter.
     pub fn frame_count(&self) -> u32 {
         self.frame_count
     }
 
+    /// Returns true on even frames for ping-pong usage.
     pub fn ping_pong(&self) -> bool {
         self.frame_count() % 2 == 0
     }
 
+    /// Returns render texture views, recreating if size or AA changed.
     pub fn views(
         &mut self,
         gpu: &AwsmRendererWebGpu,
@@ -136,6 +146,7 @@ impl RenderTextures {
         ))
     }
 
+    /// Clears the opaque render texture when initialized.
     pub fn clear_opaque(&self, gpu: &AwsmRendererWebGpu) -> Result<()> {
         if let Some(inner) = self.inner.as_ref() {
             inner
@@ -148,6 +159,7 @@ impl RenderTextures {
     }
 }
 
+/// Collection of texture views used by render passes.
 pub struct RenderTextureViews {
     // Output from geometry pass
     pub visibility_data: web_sys::GpuTextureView,
@@ -181,6 +193,7 @@ pub struct RenderTextureViews {
 }
 
 impl RenderTextureViews {
+    /// Builds view handles for the current render textures.
     pub fn new(
         inner: &RenderTexturesInner,
         ping_pong: bool,
@@ -220,6 +233,7 @@ impl RenderTextureViews {
     }
 }
 
+/// Internal texture storage and GPU objects.
 #[allow(dead_code)]
 pub struct RenderTexturesInner {
     pub visibility_data: web_sys::GpuTexture,
@@ -268,6 +282,7 @@ pub struct RenderTexturesInner {
 }
 
 impl RenderTexturesInner {
+    /// Creates render textures and views for the given size.
     pub fn new(
         gpu: &AwsmRendererWebGpu,
         render_texture_formats: RenderTextureFormats,
@@ -552,6 +567,7 @@ impl RenderTexturesInner {
         })
     }
 
+    /// Destroys all GPU textures.
     pub fn destroy(self) {
         self.visibility_data.destroy();
         self.barycentric.destroy();
@@ -569,7 +585,9 @@ impl RenderTexturesInner {
     }
 }
 
+/// Result type for render texture operations.
 type Result<T> = std::result::Result<T, AwsmRenderTextureError>;
+/// Render texture related errors.
 #[derive(Debug, Error)]
 pub enum AwsmRenderTextureError {
     #[error("[render_texture] Error creating texture: {0:?}")]

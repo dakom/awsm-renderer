@@ -1,21 +1,33 @@
+//! WebGPU compatibility checks and reporting.
+
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
 use crate::renderer::DeviceRequestLimits;
 
+/// Summary of WebGPU compatibility or failure reason.
 #[derive(Clone, Debug)]
 pub enum Compatibility {
+    /// WebGPU is available and meets requirements.
     Compatible,
+    /// The browser does not expose WebGPU.
     MissingGpu,
+    /// Failed to request a GPU adapter.
     AdapterError(String),
+    /// No adapter was returned by the browser.
     MissingAdapter,
+    /// Failed to create a GPU device.
     DeviceError(String),
+    /// No device was returned by the adapter.
     MissingDevice,
+    /// Failed to fetch adapter limits.
     MissingLimits,
+    /// The adapter does not meet required storage buffer limits.
     NotEnoughStorageBuffers { required: u32, available: u32 },
 }
 
 impl Compatibility {
+    /// Returns a primary user-facing message describing the status.
     pub fn main_text(&self) -> String {
         match self {
             Compatibility::Compatible => "Compatible".to_string(),
@@ -35,6 +47,7 @@ impl Compatibility {
         }
     }
 
+    /// Returns extra guidance for certain failure cases.
     pub fn extra_text(&self) -> Option<String> {
         match self {
             Compatibility::AdapterError(_) | Compatibility::MissingAdapter => {
@@ -48,12 +61,15 @@ impl Compatibility {
     }
 }
 
+/// Requirements used when evaluating compatibility.
 #[derive(Clone, Debug, Default)]
 pub struct CompatibilityRequirements {
+    /// Required number of storage buffers per shader stage.
     pub storage_buffers: Option<u32>,
 }
 
 impl Compatibility {
+    /// Runs compatibility checks against the current browser and adapter.
     pub async fn check(requirements: Option<CompatibilityRequirements>) -> Self {
         let requirements = requirements.unwrap_or_default();
 

@@ -1,3 +1,5 @@
+//! Render pipeline cache.
+
 use std::collections::{BTreeMap, HashMap};
 
 use awsm_renderer_core::{
@@ -23,12 +25,14 @@ use crate::{
     shaders::{ShaderKey, Shaders},
 };
 
+/// Cache of render pipelines by key.
 pub struct RenderPipelines {
     lookup: SlotMap<RenderPipelineKey, web_sys::GpuRenderPipeline>,
     cache: HashMap<RenderPipelineCacheKey, RenderPipelineKey>,
 }
 
 impl RenderPipelines {
+    /// Creates an empty render pipeline cache.
     pub fn new() -> Self {
         Self {
             lookup: SlotMap::with_key(),
@@ -36,6 +40,7 @@ impl RenderPipelines {
         }
     }
 
+    /// Returns a pipeline key, creating the pipeline if needed.
     pub async fn get_key(
         &mut self,
         gpu: &AwsmRendererWebGpu,
@@ -81,6 +86,7 @@ impl RenderPipelines {
         Ok(key)
     }
 
+    /// Returns a render pipeline for a key.
     pub fn get(&self, key: RenderPipelineKey) -> Result<&web_sys::GpuRenderPipeline> {
         self.lookup
             .get(key)
@@ -94,7 +100,7 @@ impl Default for RenderPipelines {
     }
 }
 
-// merely a key to hash ad-hoc pipeline generation
+/// Cache key for render pipeline creation.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct RenderPipelineCacheKey {
     pub shader_key: ShaderKey,
@@ -108,6 +114,7 @@ pub struct RenderPipelineCacheKey {
 }
 
 impl RenderPipelineCacheKey {
+    /// Creates a cache key with shader and layout keys.
     pub fn new(shader_key: ShaderKey, layout_key: PipelineLayoutKey) -> Self {
         Self {
             shader_key,
@@ -121,11 +128,13 @@ impl RenderPipelineCacheKey {
         }
     }
 
+    /// Sets the multisample state for the pipeline.
     pub fn with_multisample(mut self, multisample: MultisampleState) -> Self {
         self.multisample = Some(multisample);
         self
     }
 
+    /// Appends a vertex buffer layout to the pipeline.
     pub fn with_push_vertex_buffer_layout(
         mut self,
         vertex_buffer_layout: VertexBufferLayout,
@@ -134,11 +143,13 @@ impl RenderPipelineCacheKey {
         self
     }
 
+    /// Appends a single fragment target to the pipeline.
     pub fn with_push_fragment_target(mut self, target: ColorTargetState) -> Self {
         self.fragment_targets.push(target);
         self
     }
 
+    /// Appends multiple fragment targets to the pipeline.
     pub fn with_push_fragment_targets(
         mut self,
         targets: impl IntoIterator<Item = ColorTargetState>,
@@ -149,17 +160,20 @@ impl RenderPipelineCacheKey {
         self
     }
 
+    /// Sets the primitive state for the pipeline.
     pub fn with_primitive(mut self, primitive: PrimitiveState) -> Self {
         self.primitive = primitive;
         self
     }
 
+    /// Sets the depth-stencil state for the pipeline.
     pub fn with_depth_stencil(mut self, depth_stencil: DepthStencilState) -> Self {
         self.depth_stencil = Some(depth_stencil);
         self
     }
 
     #[allow(dead_code)]
+    /// Sets a vertex constant override for the pipeline.
     pub fn with_vertex_constant(
         mut self,
         key: ConstantOverrideKey,
@@ -171,11 +185,14 @@ impl RenderPipelineCacheKey {
 }
 
 new_key_type! {
+    /// Opaque key for render pipelines.
     pub struct RenderPipelineKey;
 }
 
+/// Result type for render pipeline operations.
 type Result<T> = std::result::Result<T, AwsmRenderPipelineError>;
 
+/// Render pipeline errors.
 #[derive(Error, Debug)]
 pub enum AwsmRenderPipelineError {
     #[error("[render pipeline] missing pipeline: {0:?}")]

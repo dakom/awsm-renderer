@@ -1,7 +1,10 @@
+//! Anti-aliasing configuration.
+
 use slotmap::SecondaryMap;
 
 use crate::{bind_groups::BindGroupCreate, error::Result, AwsmRenderer};
 
+/// Anti-aliasing configuration for the renderer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AntiAliasing {
     // if None, no MSAA
@@ -12,6 +15,7 @@ pub struct AntiAliasing {
 }
 
 impl AntiAliasing {
+    /// Returns whether MSAA is enabled and supported.
     pub fn has_msaa_checked(&self) -> crate::error::Result<bool> {
         match self.msaa_sample_count {
             Some(4) => Ok(true),
@@ -34,6 +38,7 @@ impl Default for AntiAliasing {
 }
 
 impl AwsmRenderer {
+    /// Updates the anti-aliasing settings and rebuilds dependent pipelines.
     pub async fn set_anti_aliasing(&mut self, aa: AntiAliasing) -> Result<()> {
         self.anti_aliasing = aa;
         self.bind_groups

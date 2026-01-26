@@ -1,9 +1,12 @@
+//! Vertex state descriptors.
+
 use std::collections::BTreeMap;
 
 use wasm_bindgen::prelude::*;
 
 use super::constants::{ConstantOverrideKey, ConstantOverrideValue};
 
+/// Vertex stage descriptor.
 #[derive(Debug, Clone)]
 pub struct VertexState<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#vertex_object_structure
@@ -14,6 +17,7 @@ pub struct VertexState<'a> {
     pub buffer_layouts: Vec<VertexBufferLayout>,
 }
 
+/// Vertex buffer layout descriptor.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct VertexBufferLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#buffers
@@ -31,6 +35,7 @@ impl std::hash::Hash for VertexBufferLayout {
     }
 }
 
+/// Vertex attribute descriptor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VertexAttribute {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#attributes
@@ -49,14 +54,17 @@ impl std::hash::Hash for VertexAttribute {
 }
 
 // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#stepmode
+/// WebGPU vertex step mode.
 pub type VertexStepMode = web_sys::GpuVertexStepMode;
 
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuVertexFormat.html
+/// WebGPU vertex format.
 pub type VertexFormat = web_sys::GpuVertexFormat;
 
 // JS conversion
 
 impl<'a> VertexState<'a> {
+    /// Creates a vertex state for a module and entry point.
     pub fn new(module: &'a web_sys::GpuShaderModule, entry_point: Option<&'a str>) -> Self {
         Self {
             constants: BTreeMap::new(),
@@ -66,11 +74,13 @@ impl<'a> VertexState<'a> {
         }
     }
 
+    /// Adds a vertex buffer layout.
     pub fn with_buffer_layout(mut self, buffer_layout: VertexBufferLayout) -> Self {
         self.buffer_layouts.push(buffer_layout);
         self
     }
 
+    /// Adds a constant override.
     pub fn with_constant(mut self, key: ConstantOverrideKey, value: ConstantOverrideValue) -> Self {
         self.constants.insert(key, value);
         self

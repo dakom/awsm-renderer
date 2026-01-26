@@ -1,9 +1,14 @@
+//! Pipeline layout helpers.
+
 use wasm_bindgen::prelude::*;
 
+/// Pipeline layout selection for pipeline descriptors.
 #[derive(Default, Debug, Clone)]
 pub enum PipelineLayoutKind<'a> {
+    /// Let WebGPU infer layout.
     #[default]
     Auto,
+    /// Use an explicit pipeline layout.
     Custom(&'a web_sys::GpuPipelineLayout),
 }
 
@@ -16,6 +21,7 @@ impl From<PipelineLayoutKind<'_>> for JsValue {
     }
 }
 
+/// Builder for a pipeline layout descriptor.
 #[derive(Debug, Clone)]
 pub struct PipelineLayoutDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createPipelineLayout
@@ -24,6 +30,7 @@ pub struct PipelineLayoutDescriptor<'a> {
 }
 
 impl<'a> PipelineLayoutDescriptor<'a> {
+    /// Creates a pipeline layout descriptor.
     pub fn new(
         label: Option<&'a str>,
         bind_group_layouts: Vec<web_sys::GpuBindGroupLayout>,

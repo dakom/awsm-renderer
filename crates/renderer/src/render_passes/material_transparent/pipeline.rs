@@ -1,3 +1,5 @@
+//! Transparent material pass pipeline setup.
+
 use awsm_renderer_core::compare::CompareFunction;
 use awsm_renderer_core::pipeline::depth_stencil::DepthStencilState;
 use awsm_renderer_core::pipeline::fragment::{
@@ -34,12 +36,14 @@ use crate::render_textures::RenderTextureFormats;
 use crate::shaders::{ShaderKey, Shaders};
 use crate::textures::Textures;
 
+/// Render pipeline cache for transparent materials.
 pub struct MaterialTransparentPipelines {
     pipeline_layout_key: PipelineLayoutKey,
     render_pipeline_keys: SecondaryMap<MeshKey, RenderPipelineKey>,
 }
 
 impl MaterialTransparentPipelines {
+    /// Creates pipeline layout state for transparent materials.
     pub async fn new(
         ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &MaterialTransparentBindGroups,
@@ -63,6 +67,7 @@ impl MaterialTransparentPipelines {
         })
     }
 
+    /// Creates and caches a render pipeline for a mesh.
     pub async fn set_render_pipeline_key(
         &mut self,
         gpu: &AwsmRendererWebGpu,
@@ -130,10 +135,12 @@ impl MaterialTransparentPipelines {
         Ok(render_pipeline_key)
     }
 
+    /// Returns the cached render pipeline key for a mesh, if present.
     pub fn get_render_pipeline_key(&self, mesh_key: MeshKey) -> Option<RenderPipelineKey> {
         self.render_pipeline_keys.get(mesh_key).cloned()
     }
 
+    /// Copies a cached pipeline key from one mesh to another.
     pub fn clone_render_pipeline_key(&mut self, from: MeshKey, to: MeshKey) {
         if let Some(key) = self.render_pipeline_keys.get(from).cloned() {
             self.render_pipeline_keys.insert(to, key);

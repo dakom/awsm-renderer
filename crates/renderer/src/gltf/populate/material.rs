@@ -801,6 +801,7 @@ impl<'a> From<gltf::texture::TextureTransform<'a>> for GltfTextureTransform {
     }
 }
 
+/// Cache key for glTF material textures and samplers.
 pub struct GLtfMaterialCacheKey {
     pub uv_index: usize,
     pub texture_key: TextureKey,

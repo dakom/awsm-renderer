@@ -1,3 +1,5 @@
+//! GPU instancing data and buffers.
+
 use awsm_renderer_core::{
     buffers::{BufferDescriptor, BufferUsage},
     error::AwsmCoreError,
@@ -16,6 +18,7 @@ use crate::{
     AwsmRendererLogging,
 };
 
+/// Instance transform storage and GPU buffers.
 pub struct Instances {
     transform_buffer: DynamicStorageBuffer<TransformKey>,
     transform_count: SecondaryMap<TransformKey, usize>,
@@ -26,8 +29,10 @@ pub struct Instances {
 }
 
 impl Instances {
+    /// Initial byte size for instance transforms.
     pub const TRANSFORM_INITIAL_SIZE: usize = Transforms::BYTE_SIZE * 32; // 32 elements is a good starting point
 
+    /// Creates instance buffers.
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let transform_buffer = DynamicStorageBuffer::new(
             Self::TRANSFORM_INITIAL_SIZE,
@@ -44,6 +49,7 @@ impl Instances {
         })
     }
 
+    /// Inserts instance transforms for a key.
     pub fn transform_insert(&mut self, key: TransformKey, transforms: &[Transform]) {
         self.cpu_transforms.insert(key, transforms.to_vec());
         let bytes = Self::transforms_to_bytes(transforms);
@@ -53,6 +59,7 @@ impl Instances {
         self.transform_dirty.insert(key);
     }
 
+    /// Updates a single instance transform.
     pub fn transform_update(&mut self, key: TransformKey, index: usize, transform: &Transform) {
         if let Some(list) = self.cpu_transforms.get_mut(key) {
             list[index] = transform.clone();
@@ -73,6 +80,7 @@ impl Instances {
         self.transform_dirty.insert(key);
     }
 
+    /// Appends instance transforms and returns the start index.
     pub fn transform_extend(&mut self, key: TransformKey, transforms: &[Transform]) -> Result<usize> {
         if transforms.is_empty() {
             return Ok(self.transform_instance_count(key).unwrap_or(0));
@@ -118,24 +126,29 @@ impl Instances {
         Ok(start_index)
     }
 
+    /// Returns the GPU buffer offset for instance transforms.
     pub fn transform_buffer_offset(&self, key: TransformKey) -> Result<usize> {
         self.transform_buffer
             .offset(key)
             .ok_or(AwsmInstanceError::TransformNotFound(key))
     }
 
+    /// Returns the GPU buffer storing instance transforms.
     pub fn gpu_transform_buffer(&self) -> &web_sys::GpuBuffer {
         &self.gpu_transform_buffer
     }
 
+    /// Returns the instance count for a key.
     pub fn transform_instance_count(&self, key: TransformKey) -> Option<usize> {
         self.transform_count.get(key).copied()
     }
 
+    /// Returns the list of transforms for a key.
     pub fn transform_list(&self, key: TransformKey) -> Option<&[Transform]> {
         self.cpu_transforms.get(key).map(|list| list.as_slice())
     }
 
+    /// Returns a single transform by index.
     pub fn get_transform(&self, key: TransformKey, index: usize) -> Option<Transform> {
         if let Some(list) = self.cpu_transforms.get(key) {
             return list.get(index).cloned();
@@ -153,6 +166,7 @@ impl Instances {
         })
     }
 
+    /// Returns a copy of all transforms for a key.
     pub fn get_transforms(&self, key: TransformKey) -> Option<Vec<Transform>> {
         if let Some(list) = self.cpu_transforms.get(key) {
             return Some(list.clone());
@@ -177,12 +191,14 @@ impl Instances {
         Some(transforms)
     }
 
+    /// Takes and clears dirty transform keys.
     pub fn take_dirty_transforms(&mut self) -> HashSet<TransformKey> {
         std::mem::take(&mut self.transform_dirty)
     }
 
     // This *does* write to the gpu, should be called only once per frame
     // just write the entire buffer in one fell swoop
+    /// Writes instance transforms to the GPU.
     pub fn write_gpu(
         &mut self,
         logging: &AwsmRendererLogging,
@@ -238,6 +254,7 @@ impl Instances {
         bytes
     }
 
+    /// Ensures capacity for additional instances and returns new capacity.
     pub fn transform_reserve(&mut self, key: TransformKey, additional: usize) -> Result<usize> {
         let count = self
             .transform_instance_count(key)
@@ -282,8 +299,10 @@ fn gpu_create_vertex_buffer(gpu: &AwsmRendererWebGpu, size: usize) -> Result<web
     )?)
 }
 
+/// Result type for instance operations.
 type Result<T> = std::result::Result<T, AwsmInstanceError>;
 
+/// Instance-related errors.
 #[derive(Error, Debug)]
 pub enum AwsmInstanceError {
     #[error("[instance] {0:?}")]

@@ -1,5 +1,8 @@
+//! Animation playback state and controls.
+
 use super::{clip::AnimationClip, data::AnimationData};
 
+/// Animation player for a clip.
 #[derive(Debug, Clone)]
 pub struct AnimationPlayer<T = AnimationData> {
     pub speed: f64,
@@ -11,6 +14,7 @@ pub struct AnimationPlayer<T = AnimationData> {
     local_time: f64,
 }
 
+/// Playback state for an animation player.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnimationState {
     Playing,
@@ -18,12 +22,14 @@ pub enum AnimationState {
     Ended,
 }
 
+/// Looping behavior for animation playback.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnimationLoopStyle {
     Loop,
     PingPong,
 }
 
+/// Playback direction for an animation player.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnimationPlayDirection {
     Forward,
@@ -31,6 +37,7 @@ pub enum AnimationPlayDirection {
 }
 
 impl<T> AnimationPlayer<T> {
+    /// Creates a new animation player for a clip.
     pub fn new(clip: AnimationClip<T>) -> Self {
         Self {
             speed: 1.0 / 1000.0,
@@ -42,6 +49,7 @@ impl<T> AnimationPlayer<T> {
         }
     }
 
+    /// Advances the animation by the given global time delta.
     pub fn update(&mut self, global_time_delta: f64) {
         if self.state != AnimationState::Playing {
             return;
@@ -93,6 +101,7 @@ impl<T> AnimationPlayer<T> {
 }
 
 impl AnimationPlayer<AnimationData> {
+    /// Samples the animation at the current local time.
     pub fn sample(&self) -> AnimationData {
         self.clip.sampler.sample(self.local_time)
     }

@@ -1,3 +1,5 @@
+//! Render pass orchestration and initialization.
+
 pub mod display;
 pub mod effects;
 pub mod geometry;
@@ -27,6 +29,7 @@ use crate::{
     textures::Textures,
 };
 
+/// Collection of render passes used by the renderer.
 pub struct RenderPasses {
     pub geometry: GeometryRenderPass,
     pub light_culling: LightCullingRenderPass,
@@ -37,6 +40,7 @@ pub struct RenderPasses {
 }
 
 impl RenderPasses {
+    /// Creates all render passes for the renderer.
     pub async fn new<'a>(ctx: &mut RenderPassInitContext<'a>) -> Result<Self> {
         Ok(Self {
             geometry: GeometryRenderPass::new(ctx).await?,
@@ -49,6 +53,7 @@ impl RenderPasses {
     }
 }
 
+/// Shared context used to initialize render passes.
 pub struct RenderPassInitContext<'a> {
     pub gpu: &'a mut AwsmRendererWebGpu,
     pub bind_group_layouts: &'a mut BindGroupLayouts,

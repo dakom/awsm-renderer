@@ -1,3 +1,5 @@
+//! Pipeline descriptor wrappers and helpers.
+
 pub mod constants;
 pub mod depth_stencil;
 pub mod fragment;
@@ -17,6 +19,7 @@ use primitive::PrimitiveState;
 use vertex::VertexState;
 use wasm_bindgen::prelude::*;
 
+/// Builder for a render pipeline descriptor.
 #[derive(Debug, Clone)]
 pub struct RenderPipelineDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#descriptor
@@ -32,6 +35,7 @@ pub struct RenderPipelineDescriptor<'a> {
 }
 
 impl<'a> RenderPipelineDescriptor<'a> {
+    /// Creates a descriptor with the required vertex state.
     pub fn new(vertex: VertexState<'a>, label: Option<&'a str>) -> Self {
         Self {
             depth_stencil: None,
@@ -44,29 +48,35 @@ impl<'a> RenderPipelineDescriptor<'a> {
         }
     }
 
+    /// Sets the depth/stencil state.
     pub fn with_depth_stencil(mut self, depth_stencil: DepthStencilState) -> Self {
         self.depth_stencil = Some(depth_stencil);
         self
     }
+    /// Sets the fragment state.
     pub fn with_fragment(mut self, fragment: FragmentState<'a>) -> Self {
         self.fragment = Some(fragment);
         self
     }
 
+    /// Sets the pipeline layout.
     pub fn with_layout(mut self, layout: PipelineLayoutKind<'a>) -> Self {
         self.layout = layout;
         self
     }
+    /// Sets the multisample state.
     pub fn with_multisample(mut self, multisample: MultisampleState) -> Self {
         self.multisample = Some(multisample);
         self
     }
+    /// Sets the primitive state.
     pub fn with_primitive(mut self, primitive: PrimitiveState) -> Self {
         self.primitive = Some(primitive);
         self
     }
 }
 
+/// Builder for a compute pipeline descriptor.
 pub struct ComputePipelineDescriptor<'a, 'b> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createComputePipeline#descriptor
     compute: ProgrammableStage<'a, 'b>,
@@ -75,6 +85,7 @@ pub struct ComputePipelineDescriptor<'a, 'b> {
 }
 
 impl<'a, 'b> ComputePipelineDescriptor<'a, 'b> {
+    /// Creates a compute pipeline descriptor.
     pub fn new(
         compute: ProgrammableStage<'a, 'b>,
         layout: PipelineLayoutKind<'a>,
@@ -88,6 +99,7 @@ impl<'a, 'b> ComputePipelineDescriptor<'a, 'b> {
     }
 }
 
+/// Describes a programmable shader stage.
 pub struct ProgrammableStage<'a, 'b> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createComputePipeline#descriptor
     pub module: &'a web_sys::GpuShaderModule,
@@ -96,6 +108,7 @@ pub struct ProgrammableStage<'a, 'b> {
 }
 
 impl<'a, 'b> ProgrammableStage<'a, 'b> {
+    /// Creates a programmable stage with an optional entry point.
     pub fn new(module: &'a web_sys::GpuShaderModule, entry_point: Option<&'b str>) -> Self {
         Self {
             module,
@@ -104,6 +117,7 @@ impl<'a, 'b> ProgrammableStage<'a, 'b> {
         }
     }
 
+    /// Adds a constant override for the stage.
     pub fn with_push_constant_override(
         mut self,
         key: ConstantOverrideKey,

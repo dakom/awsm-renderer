@@ -1,3 +1,5 @@
+//! Transform hierarchy and GPU upload.
+
 use glam::{Mat4, Quat, Vec3};
 use thiserror::Error;
 
@@ -23,6 +25,7 @@ use crate::{
 };
 
 impl AwsmRenderer {
+    /// Updates world transforms and mesh bounds from dirty transforms.
     pub fn update_transforms(&mut self) {
         self.transforms.update_world();
         let dirty_transforms = self.transforms.take_dirty_meshes();
@@ -36,6 +39,7 @@ impl AwsmRenderer {
     }
 }
 
+/// Transform hierarchy with GPU buffers.
 pub struct Transforms {
     locals: SlotMap<TransformKey, Transform>,
     world_matrices: SecondaryMap<TransformKey, glam::Mat4>,
@@ -60,10 +64,14 @@ static BUFFER_USAGE: LazyLock<BufferUsage> =
     LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
 
 impl Transforms {
+    /// Initial transform slot capacity.
     pub const INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
+    /// Byte size of a transform matrix.
     pub const BYTE_SIZE: usize = 64; // 4x4 matrix of f32 is 64 bytes
+    /// Byte size of a normal matrix.
     pub const NORMALS_BYTE_SIZE: usize = 36; // 3x3 matrix of f32 is 36 bytes
 
+    /// Creates transform storage and GPU buffers.
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let gpu_buffer = gpu.create_buffer(
             &BufferDescriptor::new(
@@ -120,6 +128,7 @@ impl Transforms {
         })
     }
 
+    /// Inserts a transform and returns its key.
     pub fn insert(&mut self, transform: Transform, parent: Option<TransformKey>) -> TransformKey {
         let world_matrix = transform.to_matrix();
 
@@ -138,6 +147,14 @@ impl Transforms {
         key
     }
 
+    /// Duplicates a transform and returns the new key.
+    pub fn duplicate(&mut self, key: TransformKey) -> Result<TransformKey> {
+        let local_transform = self.get_local(key)?.clone();
+        let parent_transform = self.get_parent(key).ok();
+        Ok(self.insert(local_transform, parent_transform))
+    }
+
+    /// Removes a transform and its buffers.
     pub fn remove(&mut self, key: TransformKey) {
         if key == self.root_node {
             return;
@@ -158,6 +175,7 @@ impl Transforms {
 
     // This is the only way to modify the matrices (since it must manage the dirty flags)
     // world transforms are updated by calling update()
+    /// Sets the local transform for a key.
     pub fn set_local(&mut self, key: TransformKey, transform: Transform) -> Result<()> {
         if key == self.root_node {
             return Err(AwsmTransformError::CannotModifyRootNode);
@@ -173,6 +191,7 @@ impl Transforms {
     }
 
     // if parent is None then the parent is the root node
+    /// Sets the parent of a transform.
     pub fn set_parent(&mut self, child: TransformKey, parent: Option<TransformKey>) {
         if child == self.root_node {
             return;
@@ -194,6 +213,7 @@ impl Transforms {
         self.parents.insert(child, parent);
     }
 
+    /// Returns the parent key for a transform.
     pub fn get_parent(&self, child: TransformKey) -> Result<TransformKey> {
         if child == self.root_node {
             return Err(AwsmTransformError::CannotGetParentOfRootNode);
@@ -205,12 +225,14 @@ impl Transforms {
             .ok_or(AwsmTransformError::CannotGetParent(child))
     }
 
+    /// Returns the local transform for a key.
     pub fn get_local(&self, key: TransformKey) -> Result<&Transform> {
         self.locals
             .get(key)
             .ok_or(AwsmTransformError::LocalNotFound(key))
     }
 
+    /// Returns the world matrix for a key.
     pub fn get_world(&self, key: TransformKey) -> Result<&glam::Mat4> {
         self.world_matrices
             .get(key)
@@ -229,6 +251,7 @@ impl Transforms {
 
     // This *does* write to the gpu, should be called only once per frame
     // just write the entire buffer in one fell swoop
+    /// Writes dirty transform data to the GPU.
     pub fn write_gpu(
         &mut self,
         logging: &AwsmRendererLogging,
@@ -304,6 +327,7 @@ impl Transforms {
         Ok(())
     }
 
+    /// Takes and clears the list of dirty mesh transforms.
     pub fn take_dirty_meshes(&mut self) -> HashMap<TransformKey, Mat4> {
         self.dirty_meshes
             .drain(..)
@@ -315,23 +339,27 @@ impl Transforms {
             .collect()
     }
 
+    /// Returns the GPU buffer offset for a transform.
     pub fn buffer_offset(&self, key: TransformKey) -> Result<usize> {
         self.buffer
             .offset(key)
             .ok_or(AwsmTransformError::TransformBufferSlotMissing(key))
     }
 
+    /// Returns the GPU buffer offset for the normal matrix.
     pub fn normals_buffer_offset(&self, key: TransformKey) -> Result<usize> {
         self.normals_buffer
             .offset(key)
             .ok_or(AwsmTransformError::TransformBufferNormalsSlotMissing(key))
     }
 
+    /// Returns a reference to world matrices.
     pub fn world_matrices_ref(&self) -> &SecondaryMap<TransformKey, glam::Mat4> {
         &self.world_matrices
     }
 
     // should only be used for debugging really
+    /// Returns a tree of transforms for debugging.
     pub fn get_tree(&self) -> TransformTreeNode {
         fn build_node(transforms: &Transforms, key: TransformKey) -> TransformTreeNode {
             let children = transforms.children.get(key).unwrap();
@@ -417,6 +445,7 @@ impl Transforms {
     }
 }
 
+/// Tree node for transform hierarchy debugging.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransformTreeNode {
@@ -424,6 +453,7 @@ pub struct TransformTreeNode {
     pub children: Vec<TransformTreeNode>,
 }
 
+/// Transform with translation, rotation, and scale.
 #[derive(Clone, Debug)]
 pub struct Transform {
     pub translation: Vec3,
@@ -438,25 +468,30 @@ impl Default for Transform {
 }
 
 impl Transform {
+    /// Identity transform.
     pub const IDENTITY: Self = Self {
         translation: Vec3::ZERO,
         rotation: Quat::IDENTITY,
         scale: Vec3::ONE,
     };
 
+    /// Sets translation.
     pub fn with_translation(mut self, translation: Vec3) -> Self {
         self.translation = translation;
         self
     }
+    /// Sets rotation.
     pub fn with_rotation(mut self, rotation: Quat) -> Self {
         self.rotation = rotation;
         self
     }
+    /// Sets scale.
     pub fn with_scale(mut self, scale: Vec3) -> Self {
         self.scale = scale;
         self
     }
 
+    /// Creates a transform from a matrix.
     pub fn from_matrix(matrix: Mat4) -> Self {
         let (scale, rotation, translation) = matrix.to_scale_rotation_translation();
         Self {
@@ -466,10 +501,12 @@ impl Transform {
         }
     }
 
+    /// Converts the transform to a matrix.
     pub fn to_matrix(&self) -> Mat4 {
         Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
     }
 
+    /// Returns the winding order implied by the transform.
     pub fn winding_order(&self) -> FrontFace {
         /*
         Staying consistent with gltf spec: "When a mesh primitive uses any triangle-based topology (i.e., triangles, triangle strip, or triangle fan),
@@ -486,11 +523,14 @@ impl Transform {
 }
 
 new_key_type! {
+    /// Opaque key for transforms.
     pub struct TransformKey;
 }
 
+/// Result type for transform operations.
 pub type Result<T> = std::result::Result<T, AwsmTransformError>;
 
+/// Transform-related errors.
 #[derive(Error, Debug)]
 pub enum AwsmTransformError {
     #[error("[transform] local transform does not exist {0:?}")]

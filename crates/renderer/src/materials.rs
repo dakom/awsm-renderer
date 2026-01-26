@@ -1,3 +1,5 @@
+//! Material definitions and GPU uploads.
+
 use std::sync::LazyLock;
 
 use awsm_renderer_core::{
@@ -22,11 +24,13 @@ pub mod unlit;
 pub mod writer;
 
 impl AwsmRenderer {
+    /// Updates a material in place.
     pub fn update_material(&mut self, key: MaterialKey, f: impl FnMut(&mut Material)) {
         self.materials.update(key, &self.textures, f);
     }
 }
 
+/// Material variants supported by the renderer.
 #[derive(Debug, Clone)]
 pub enum Material {
     Pbr(Box<PbrMaterial>),
@@ -35,6 +39,7 @@ pub enum Material {
 
 impl Material {
     // this should match `mesh_buffer_geometry_kind()`
+    /// Returns true if the material renders in the transparency pass.
     pub fn is_transparency_pass(&self) -> bool {
         match self {
             Material::Pbr(pbr_material) => pbr_material.is_transparency_pass(),
@@ -42,6 +47,7 @@ impl Material {
         }
     }
 
+    /// Returns the alpha mask cutoff if applicable.
     pub fn alpha_mask(&self) -> Option<f32> {
         match self {
             Material::Pbr(pbr_material) => pbr_material.alpha_mask(),
@@ -49,6 +55,7 @@ impl Material {
         }
     }
 
+    /// Returns the packed uniform buffer data for the material.
     pub fn uniform_buffer_data(&self, textures: &Textures) -> Result<Vec<u8>> {
         match self {
             Material::Pbr(pbr_material) => {
@@ -61,6 +68,7 @@ impl Material {
     }
 }
 
+/// Material shader identifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum MaterialShaderId {
@@ -73,6 +81,7 @@ const INITIAL_SIZE: usize = 8192; //Why not
 static BUFFER_USAGE: LazyLock<BufferUsage> =
     LazyLock::new(|| BufferUsage::new().with_copy_dst().with_storage());
 
+/// Material storage and GPU buffer manager.
 pub struct Materials {
     pub(crate) gpu_buffer: web_sys::GpuBuffer,
     lookup: SlotMap<MaterialKey, Material>,
@@ -82,6 +91,7 @@ pub struct Materials {
 }
 
 impl Materials {
+    /// Creates material storage and GPU buffers.
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let gpu_buffer = gpu.create_buffer(
             &BufferDescriptor::new(Some("Materials"), INITIAL_SIZE, *BUFFER_USAGE).into(),
@@ -98,18 +108,22 @@ impl Materials {
         })
     }
 
+    /// Iterates over material keys.
     pub fn keys(&self) -> impl Iterator<Item = MaterialKey> + '_ {
         self.lookup.keys()
     }
 
+    /// Iterates over materials.
     pub fn iter(&self) -> impl Iterator<Item = (MaterialKey, &Material)> {
         self.lookup.iter()
     }
 
+    /// Returns a material by key.
     pub fn get(&self, key: MaterialKey) -> Result<&Material> {
         self.lookup.get(key).ok_or(AwsmMaterialError::NotFound(key))
     }
 
+    /// Inserts a material and returns its key.
     pub fn insert(&mut self, material: Material, textures: &Textures) -> MaterialKey {
         let is_transparency_pass = material.is_transparency_pass();
 
@@ -123,6 +137,7 @@ impl Materials {
         key
     }
 
+    /// Returns the GPU buffer offset for a material.
     pub fn buffer_offset(&self, key: MaterialKey) -> Result<usize> {
         let offset = self
             .buffer
@@ -143,6 +158,7 @@ impl Materials {
         Ok(offset)
     }
 
+    /// Updates a material and refreshes GPU data.
     pub fn update(
         &mut self,
         key: MaterialKey,
@@ -177,10 +193,12 @@ impl Materials {
         }
     }
 
+    /// Returns true if the material uses the transparency pass.
     pub fn is_transparency_pass(&self, key: MaterialKey) -> bool {
         self._is_transparency_pass.contains_key(key)
     }
 
+    /// Writes material data to the GPU.
     pub fn write_gpu(
         &mut self,
         logging: &AwsmRendererLogging,
@@ -223,6 +241,7 @@ impl Materials {
     }
 }
 
+/// Texture reference used by materials.
 #[derive(Clone, Debug)]
 pub struct MaterialTexture {
     pub key: TextureKey,
@@ -231,6 +250,7 @@ pub struct MaterialTexture {
     pub transform_key: Option<TextureTransformKey>,
 }
 
+/// Alpha mode for materials.
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub enum MaterialAlphaMode {
     #[default]
@@ -242,6 +262,7 @@ pub enum MaterialAlphaMode {
 }
 
 impl MaterialAlphaMode {
+    /// Returns the numeric shader variant value.
     pub fn variant_as_u32(&self) -> u32 {
         match self {
             Self::Opaque => 0,
@@ -252,11 +273,14 @@ impl MaterialAlphaMode {
 }
 
 new_key_type! {
+    /// Opaque key for materials.
     pub struct MaterialKey;
 }
 
+/// Result type for material operations.
 pub type Result<T> = std::result::Result<T, AwsmMaterialError>;
 
+/// Material-related errors.
 #[derive(Error, Debug)]
 pub enum AwsmMaterialError {
     #[error("[material] not found: {0:?}")]

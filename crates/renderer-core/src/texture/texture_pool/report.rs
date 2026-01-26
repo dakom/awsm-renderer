@@ -1,13 +1,17 @@
+//! Reporting types for texture pool usage.
+
 use serde::{Deserialize, Serialize};
 
 use crate::texture::mipmap::calculate_mipmap_levels;
 
+/// Summary report for a texture pool.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TexturePoolReport<ID> {
     pub arrays: Vec<TexturePoolArrayReport<ID>>,
     pub arrays_free: usize,
 }
 
+/// Report for a single texture array in the pool.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TexturePoolArrayReport<ID> {
     pub format: String,
@@ -21,6 +25,7 @@ pub struct TexturePoolArrayReport<ID> {
     pub entries: Vec<TexturePoolEntryReport<ID>>,
 }
 
+/// Report for a single texture entry in a pool array.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TexturePoolEntryReport<ID> {
     pub id: ID,
@@ -30,6 +35,7 @@ pub struct TexturePoolEntryReport<ID> {
 }
 
 impl<ID> super::TexturePool<ID> {
+    /// Generates a report using the provided GPU limits.
     pub fn generate_report(&self, limits: &web_sys::GpuSupportedLimits) -> TexturePoolReport<ID>
     where
         ID: Clone,

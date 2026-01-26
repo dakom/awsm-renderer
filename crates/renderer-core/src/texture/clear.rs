@@ -1,9 +1,12 @@
+//! Helpers for clearing textures via buffer copies.
+
 use crate::buffers::{BufferDescriptor, BufferUsage};
 use crate::command::copy_texture::{Origin3d, TexelCopyBufferInfo, TexelCopyTextureInfo};
 use crate::error::{AwsmCoreError, Result};
 use crate::texture::Extent3d;
 use crate::{renderer::AwsmRendererWebGpu, texture::TextureFormat};
 
+/// Utility for clearing textures in chunks with a staging buffer.
 pub struct TextureClearer {
     buffer: web_sys::GpuBuffer,
     width: u32,
@@ -14,6 +17,7 @@ pub struct TextureClearer {
 }
 
 impl TextureClearer {
+    /// Creates a texture clearer for a specific format and size.
     pub fn new(
         gpu: &AwsmRendererWebGpu,
         format: TextureFormat,
@@ -64,6 +68,7 @@ impl TextureClearer {
         })
     }
 
+    /// Clears the target texture to zero.
     pub fn clear(&self, gpu: &AwsmRendererWebGpu, texture: &web_sys::GpuTexture) -> Result<()> {
         let encoder = gpu.create_command_encoder(Some("Texture Clearer"));
 

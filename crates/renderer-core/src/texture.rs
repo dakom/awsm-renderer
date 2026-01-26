@@ -1,3 +1,5 @@
+//! Texture descriptors and helpers.
+
 #[cfg(feature = "texture-export")]
 pub mod exporter;
 // #[cfg(feature = "mega-texture")]
@@ -12,16 +14,23 @@ pub mod mipmap;
 
 use wasm_bindgen::convert::IntoWasmAbi;
 
+/// WebGPU texture format.
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuTextureFormat.html
+/// WebGPU texture format.
 pub type TextureFormat = web_sys::GpuTextureFormat;
+/// WebGPU texture aspect.
 pub type TextureAspect = web_sys::GpuTextureAspect;
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuTextureViewDimension.html
+/// WebGPU texture view dimension.
 pub type TextureViewDimension = web_sys::GpuTextureViewDimension;
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuTextureSampleType.html
+/// WebGPU texture sample type.
 pub type TextureSampleType = web_sys::GpuTextureSampleType;
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuTextureDimension.html
+/// WebGPU texture dimension.
 pub type TextureDimension = web_sys::GpuTextureDimension;
 
+/// Builder for a GPU texture descriptor.
 #[derive(Debug, Clone)]
 pub struct TextureDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createTexture#descriptor
@@ -37,6 +46,7 @@ pub struct TextureDescriptor<'a> {
 }
 
 impl<'a> TextureDescriptor<'a> {
+    /// Creates a texture descriptor with required fields.
     pub fn new(format: TextureFormat, size: Extent3d, usage: TextureUsage) -> Self {
         Self {
             dimension: None,
@@ -50,28 +60,34 @@ impl<'a> TextureDescriptor<'a> {
         }
     }
 
+    /// Sets the descriptor label.
     pub fn with_label(mut self, label: &'a str) -> Self {
         self.label = Some(label);
         self
     }
+    /// Sets the mip level count.
     pub fn with_mip_level_count(mut self, mip_level_count: u32) -> Self {
         self.mip_level_count = Some(mip_level_count);
         self
     }
+    /// Sets the sample count.
     pub fn with_sample_count(mut self, sample_count: u32) -> Self {
         self.sample_count = Some(sample_count);
         self
     }
+    /// Sets the texture dimension.
     pub fn with_dimension(mut self, dimension: TextureDimension) -> Self {
         self.dimension = Some(dimension);
         self
     }
+    /// Adds a view format.
     pub fn with_push_view_format(mut self, view_format: TextureFormat) -> Self {
         self.view_formats.push(view_format);
         self
     }
 }
 
+/// Texture usage flags.
 #[derive(Debug, Clone, Default)]
 pub struct TextureUsage {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUTexture/usage
@@ -84,10 +100,12 @@ pub struct TextureUsage {
 }
 
 impl TextureUsage {
+    /// Creates an empty usage set.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Returns the WebGPU usage bitfield.
     pub fn as_u32(&self) -> u32 {
         let mut usage = 0;
         if self.copy_dst {
@@ -109,28 +127,34 @@ impl TextureUsage {
         usage
     }
 
+    /// Enables COPY_DST usage.
     pub fn with_copy_dst(mut self) -> Self {
         self.copy_dst = true;
         self
     }
+    /// Enables COPY_SRC usage.
     pub fn with_copy_src(mut self) -> Self {
         self.copy_src = true;
         self
     }
+    /// Enables RENDER_ATTACHMENT usage.
     pub fn with_render_attachment(mut self) -> Self {
         self.render_attachment = true;
         self
     }
+    /// Enables STORAGE_BINDING usage.
     pub fn with_storage_binding(mut self) -> Self {
         self.storage_binding = true;
         self
     }
+    /// Enables TEXTURE_BINDING usage.
     pub fn with_texture_binding(mut self) -> Self {
         self.texture_binding = true;
         self
     }
 }
 
+/// Size for a 1D/2D/3D texture.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Extent3d {
     pub width: u32,
@@ -141,6 +165,7 @@ pub struct Extent3d {
 impl Extent3d {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createTexture#size
 
+    /// Creates a texture extent.
     pub fn new(width: u32, height: Option<u32>, depth_or_array_layers: Option<u32>) -> Self {
         Self {
             width,
@@ -149,17 +174,20 @@ impl Extent3d {
         }
     }
 
+    /// Sets the height.
     pub fn with_height(mut self, height: u32) -> Self {
         self.height = Some(height);
         self
     }
 
+    /// Sets depth or array layers.
     pub fn with_depth_or_array_layers(mut self, depth_or_array_layers: u32) -> Self {
         self.depth_or_array_layers = Some(depth_or_array_layers);
         self
     }
 }
 
+/// Builder for a texture view descriptor.
 #[derive(Debug, Clone, Default)]
 pub struct TextureViewDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUTexture/createView#descriptor
@@ -176,6 +204,7 @@ pub struct TextureViewDescriptor<'a> {
 }
 
 impl<'a> TextureViewDescriptor<'a> {
+    /// Creates a texture view descriptor with an optional label.
     pub fn new(label: Option<&'a str>) -> Self {
         Self {
             label,
@@ -183,57 +212,71 @@ impl<'a> TextureViewDescriptor<'a> {
         }
     }
 
+    /// Sets the array layer count.
     pub fn with_array_layer_count(mut self, array_layer_count: u32) -> Self {
         self.array_layer_count = Some(array_layer_count);
         self
     }
+    /// Sets the aspect.
     pub fn with_aspect(mut self, aspect: TextureAspect) -> Self {
         self.aspect = Some(aspect);
         self
     }
+    /// Sets the base array layer.
     pub fn with_base_array_layer(mut self, base_array_layer: u32) -> Self {
         self.base_array_layer = Some(base_array_layer);
         self
     }
+    /// Sets the base mip level.
     pub fn with_base_mip_level(mut self, base_mip_level: u32) -> Self {
         self.base_mip_level = Some(base_mip_level);
         self
     }
+    /// Sets the view dimension.
     pub fn with_dimension(mut self, dimension: TextureViewDimension) -> Self {
         self.dimension = Some(dimension);
         self
     }
+    /// Sets the view format.
     pub fn with_format(mut self, format: TextureFormat) -> Self {
         self.format = Some(format);
         self
     }
+    /// Sets the mip level count.
     pub fn with_mip_level_count(mut self, mip_level_count: u32) -> Self {
         self.mip_level_count = Some(mip_level_count);
         self
     }
+    /// Sets the usage flags.
     pub fn with_usage(mut self, usage: TextureUsage) -> Self {
         self.usage = Some(usage);
         self
     }
+    /// Sets the view label.
     pub fn with_label(mut self, label: &'a str) -> Self {
         self.label = Some(label);
         self
     }
 }
 
+/// Descriptor for importing an external texture.
 pub struct ExternalTextureDescriptor<'a> {
     pub source: ExternalTextureDescriptorSource,
     pub label: Option<&'a str>,
 }
 
 impl<'a> ExternalTextureDescriptor<'a> {
+    /// Creates an external texture descriptor.
     pub fn new(source: ExternalTextureDescriptorSource, label: Option<&'a str>) -> Self {
         Self { source, label }
     }
 }
 
+/// Source for an external texture.
 pub enum ExternalTextureDescriptorSource {
+    /// External texture from a video element.
     VideoElement(web_sys::HtmlVideoElement),
+    /// External texture from a video frame.
     VideoFrame(web_sys::VideoFrame),
 }
 
@@ -270,6 +313,7 @@ impl Ord for TextureFormatKey {
     }
 }
 
+/// Maps a texture format to a WGSL storage format string.
 pub fn texture_format_to_wgsl_storage(format: TextureFormat) -> crate::error::Result<&'static str> {
     match format {
         TextureFormat::Rgba8unorm => Ok("rgba8unorm"),

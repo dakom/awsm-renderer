@@ -1,3 +1,5 @@
+//! Shader templates for the opaque material pass.
+
 use askama::Template;
 
 use crate::{
@@ -7,12 +9,14 @@ use crate::{
     shaders::{AwsmShaderError, Result},
 };
 
+/// Opaque material shader template components.
 #[derive(Debug)]
 pub struct ShaderTemplateMaterialOpaque {
     pub bind_groups: ShaderTemplateMaterialOpaqueBindGroups,
     pub compute: ShaderTemplateMaterialOpaqueCompute,
 }
 
+/// Bind group template for the opaque material pass.
 #[derive(Template, Debug)]
 #[template(
     path = "material_opaque_wgsl/bind_groups.wgsl",
@@ -27,6 +31,7 @@ pub struct ShaderTemplateMaterialOpaqueBindGroups {
     pub msaa_sample_count: u32, // 0 if no MSAA
 }
 
+/// Compute shader template for the opaque material pass.
 #[derive(Template, Debug)]
 #[template(path = "material_opaque_wgsl/compute.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateMaterialOpaqueCompute {
@@ -39,6 +44,7 @@ pub struct ShaderTemplateMaterialOpaqueCompute {
 }
 
 impl ShaderTemplateMaterialOpaqueCompute {
+    /// Returns true if the shader includes IBL lighting.
     pub fn has_lighting_ibl(&self) -> bool {
         match self.debug.lighting {
             ShaderTemplateMaterialOpaqueDebugLighting::None => true,
@@ -47,6 +53,7 @@ impl ShaderTemplateMaterialOpaqueCompute {
         }
     }
 
+    /// Returns true if the shader includes punctual lighting.
     pub fn has_lighting_punctual(&self) -> bool {
         match self.debug.lighting {
             ShaderTemplateMaterialOpaqueDebugLighting::None => true,
@@ -94,6 +101,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaque> for ShaderTemplateMaterialOpaque {
     }
 }
 
+/// Mipmap sampling mode for the material opaque pass.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MipmapMode {
     None,
@@ -123,6 +131,7 @@ impl MipmapMode {
     }
 }
 
+/// Debug flags for the opaque material pass.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ShaderTemplateMaterialOpaqueDebug {
     mips: bool,
@@ -136,9 +145,11 @@ pub struct ShaderTemplateMaterialOpaqueDebug {
 }
 
 impl ShaderTemplateMaterialOpaqueDebug {
+    /// Creates a default debug configuration.
     pub fn new() -> Self {
         Self { ..Self::default() }
     }
+    /// Returns true if any debug mode is enabled.
     pub fn any(&self) -> bool {
         self.mips
             || self.n_dot_v
@@ -154,6 +165,7 @@ impl ShaderTemplateMaterialOpaqueDebug {
     }
 }
 
+/// Lighting debug override for opaque materials.
 #[derive(Clone, Copy, Debug, Default)]
 pub enum ShaderTemplateMaterialOpaqueDebugLighting {
     #[default]
@@ -163,6 +175,7 @@ pub enum ShaderTemplateMaterialOpaqueDebugLighting {
 }
 
 impl ShaderTemplateMaterialOpaque {
+    /// Renders the opaque material shader into WGSL.
     pub fn into_source(self) -> Result<String> {
         let bind_groups_source = self.bind_groups.render()?;
         let compute_source = self.compute.render()?;
@@ -176,6 +189,7 @@ impl ShaderTemplateMaterialOpaque {
     }
 
     #[cfg(debug_assertions)]
+    /// Returns an optional debug label for shader compilation.
     pub fn debug_label(&self) -> Option<&str> {
         Some("Material Opaque")
     }
@@ -194,6 +208,7 @@ impl TryFrom<&ShaderCacheKeyMaterialOpaqueEmpty> for ShaderTemplateMaterialOpaqu
     }
 }
 
+/// Empty shader template used when no opaque geometry is present.
 #[derive(Template, Debug)]
 #[template(path = "material_opaque_wgsl/empty.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateMaterialOpaqueEmpty {
@@ -204,6 +219,7 @@ pub struct ShaderTemplateMaterialOpaqueEmpty {
 }
 
 impl ShaderTemplateMaterialOpaqueEmpty {
+    /// Renders the empty opaque shader into WGSL.
     pub fn into_source(self) -> Result<String> {
         let source = self.render()?;
         // print_shader_source(&source, true);
@@ -214,14 +230,17 @@ impl ShaderTemplateMaterialOpaqueEmpty {
     }
 
     #[cfg(debug_assertions)]
+    /// Returns an optional debug label for shader compilation.
     pub fn debug_label(&self) -> Option<&str> {
         Some("Material Opaque Empty")
     }
 
+    /// Returns true if the shader includes IBL lighting.
     pub fn has_lighting_ibl(&self) -> bool {
         false
     }
 
+    /// Returns true if the shader includes punctual lighting.
     pub fn has_lighting_punctual(&self) -> bool {
         false
     }

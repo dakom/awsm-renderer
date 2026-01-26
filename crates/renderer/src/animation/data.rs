@@ -1,3 +1,5 @@
+//! Animation data types and interpolation helpers.
+
 use glam::{Quat, Vec3};
 
 use crate::transforms::Transform;
@@ -8,6 +10,7 @@ use super::interpolate::{
     interpolate_linear_quat, interpolate_linear_vec3,
 };
 
+/// Animation data variants supported by the player.
 #[derive(Debug, Clone)]
 pub enum AnimationData {
     Transform(TransformAnimation),
@@ -135,6 +138,7 @@ impl Animatable for AnimationData {
     }
 }
 
+/// Trait for types that support animation interpolation.
 pub trait Animatable: Clone {
     fn interpolate_linear(first: &Self, second: &Self, t: f64) -> Self;
     fn interpolate_cubic_spline(
@@ -147,6 +151,7 @@ pub trait Animatable: Clone {
     ) -> Self;
 }
 
+/// Translation/rotation/scale animation data.
 #[derive(Debug, Clone)]
 pub struct TransformAnimation {
     pub translation: Option<Vec3>,
@@ -155,6 +160,7 @@ pub struct TransformAnimation {
 }
 
 impl TransformAnimation {
+    /// Creates a translation-only animation.
     pub fn new_translation(translation: Vec3) -> Self {
         Self {
             translation: Some(translation),
@@ -162,6 +168,7 @@ impl TransformAnimation {
             scale: None,
         }
     }
+    /// Creates a rotation-only animation.
     pub fn new_rotation(rotation: Quat) -> Self {
         Self {
             translation: None,
@@ -169,6 +176,7 @@ impl TransformAnimation {
             scale: None,
         }
     }
+    /// Creates a scale-only animation.
     pub fn new_scale(scale: Vec3) -> Self {
         Self {
             translation: None,
@@ -176,6 +184,7 @@ impl TransformAnimation {
             scale: Some(scale),
         }
     }
+    /// Applies this animation onto a transform and returns the result.
     pub fn apply(&self, mut input: Transform) -> Transform {
         if let Some(translation) = &self.translation {
             input.translation = *translation;
@@ -189,6 +198,7 @@ impl TransformAnimation {
         input
     }
 
+    /// Applies this animation in place on a transform.
     pub fn apply_mut(&self, input: &mut Transform) {
         if let Some(translation) = &self.translation {
             input.translation = *translation;
@@ -301,16 +311,19 @@ impl Animatable for TransformAnimation {
     }
 }
 
+/// Per-vertex weight animation data.
 #[derive(Debug, Clone)]
 pub struct VertexAnimation {
     pub weights: Vec<f32>,
 }
 
 impl VertexAnimation {
+    /// Creates a vertex animation from morph weights.
     pub fn new(weights: Vec<f32>) -> Self {
         Self { weights }
     }
 
+    /// Applies weights to a copy of the provided data.
     pub fn apply(&self, input: Vec<f32>) -> Vec<f32> {
         let mut result = input;
         for (i, weight) in self.weights.iter().enumerate() {
@@ -321,6 +334,7 @@ impl VertexAnimation {
         result
     }
 
+    /// Applies weights in place on the provided data.
     pub fn apply_mut(&self, other: &mut [f32]) {
         for (i, weight) in self.weights.iter().enumerate() {
             if i < other.len() {

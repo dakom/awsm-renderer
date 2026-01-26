@@ -1,3 +1,5 @@
+//! Geometry pass pipeline setup.
+
 use std::sync::LazyLock;
 
 use awsm_renderer_core::compare::CompareFunction;
@@ -93,12 +95,14 @@ static VERTEX_BUFFER_LAYOUT_INSTANCING: LazyLock<VertexBufferLayout> = LazyLock:
     vertex_buffer_layout_instancing
 });
 
+/// Pipeline layout and render pipelines for the geometry pass.
 pub struct GeometryPipelines {
     pub pipeline_layout_key: PipelineLayoutKey,
     render_pipeline_keys: GeometryRenderPipelineKeys,
 }
 
 impl GeometryPipelines {
+    /// Creates geometry pipeline layouts and cached keys.
     pub async fn new(
         ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &GeometryBindGroups,
@@ -125,6 +129,7 @@ impl GeometryPipelines {
         })
     }
 
+    /// Returns the render pipeline key for the requested options.
     pub fn get_render_pipeline_key(
         &self,
         opts: GeometryRenderPipelineKeyOpts<'_>,
@@ -152,18 +157,21 @@ impl GeometryPipelines {
     }
 }
 
+/// Options for selecting a geometry render pipeline.
 pub struct GeometryRenderPipelineKeyOpts<'a> {
     pub anti_aliasing: &'a AntiAliasing,
     pub instancing: bool,
     pub cull_mode: CullMode,
 }
 
+/// Collection of geometry pipeline keys keyed by MSAA and instancing options.
 pub struct GeometryRenderPipelineKeys {
     pub no_anti_alias: GeometryRenderPipelineKeysLevel1,
     pub msaa_4_anti_alias: GeometryRenderPipelineKeysLevel1,
 }
 
 impl GeometryRenderPipelineKeys {
+    /// Creates geometry pipeline keys for all supported configurations.
     pub async fn new(
         ctx: &mut RenderPassInitContext<'_>,
         pipeline_layout_key: PipelineLayoutKey,
@@ -181,12 +189,14 @@ impl GeometryRenderPipelineKeys {
     }
 }
 
+/// Geometry pipeline keys keyed by instancing.
 pub struct GeometryRenderPipelineKeysLevel1 {
     pub no_instancing: GeometryRenderPipelineKeysLevel2,
     pub instancing: GeometryRenderPipelineKeysLevel2,
 }
 
 impl GeometryRenderPipelineKeysLevel1 {
+    /// Creates geometry pipeline keys for instancing and non-instancing.
     pub async fn new(
         ctx: &mut RenderPassInitContext<'_>,
         pipeline_layout_key: PipelineLayoutKey,
@@ -211,6 +221,7 @@ impl GeometryRenderPipelineKeysLevel1 {
     }
 }
 
+/// Geometry pipeline keys keyed by cull mode.
 pub struct GeometryRenderPipelineKeysLevel2 {
     pub no_cull: GeometryRenderPipelineKeysLevel3,
     pub back_cull: GeometryRenderPipelineKeysLevel3,
@@ -218,6 +229,7 @@ pub struct GeometryRenderPipelineKeysLevel2 {
 }
 
 impl GeometryRenderPipelineKeysLevel2 {
+    /// Creates geometry pipeline keys for all cull modes.
     pub async fn new(
         ctx: &mut RenderPassInitContext<'_>,
         pipeline_layout_key: PipelineLayoutKey,
@@ -253,11 +265,13 @@ impl GeometryRenderPipelineKeysLevel2 {
     }
 }
 
+/// Leaf geometry pipeline key holder.
 pub struct GeometryRenderPipelineKeysLevel3 {
     pub render_pipeline_key: RenderPipelineKey,
 }
 
 impl GeometryRenderPipelineKeysLevel3 {
+    /// Creates a geometry render pipeline key for a specific configuration.
     pub async fn new(
         ctx: &mut RenderPassInitContext<'_>,
         pipeline_layout_key: PipelineLayoutKey,

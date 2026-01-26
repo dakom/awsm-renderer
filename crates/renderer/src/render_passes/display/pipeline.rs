@@ -1,3 +1,5 @@
+//! Display pass pipeline setup.
+
 use awsm_renderer_core::{
     pipeline::{fragment::ColorTargetState, primitive::PrimitiveState},
     renderer::AwsmRendererWebGpu,
@@ -19,12 +21,14 @@ use crate::{
     shaders::Shaders,
 };
 
+/// Pipeline layout and render pipeline for the display pass.
 pub struct DisplayPipelines {
     pub pipeline_layout_key: PipelineLayoutKey,
     pub render_pipeline_key: Option<RenderPipelineKey>,
 }
 
 impl DisplayPipelines {
+    /// Creates pipeline layout state for the display pass.
     pub async fn new(
         ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &DisplayBindGroups,
@@ -44,6 +48,7 @@ impl DisplayPipelines {
         })
     }
 
+    /// Updates the render pipeline for the current post-processing settings.
     pub async fn set_render_pipeline_key(
         &mut self,
         post_processing: &PostProcessing,

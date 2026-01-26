@@ -1,3 +1,5 @@
+//! Dynamic uniform buffer utilities.
+
 use slotmap::{Key, SecondaryMap};
 
 /// Dynamic buffer for fixed-size allocations with efficient slot reuse.
@@ -57,6 +59,7 @@ pub struct DynamicUniformBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
 
 impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
     #[allow(clippy::too_many_arguments)]
+    /// Creates a new dynamic uniform buffer.
     pub fn new(
         initial_capacity: usize,
         byte_size: usize,
@@ -82,6 +85,7 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         }
     }
 
+    /// Returns the total byte size of the buffer.
     pub fn size(&self) -> usize {
         self.raw_data.len()
     }
@@ -160,18 +164,22 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         })
     }
 
+    /// Returns the full raw buffer slice.
     pub fn raw_slice(&self) -> &[u8] {
         &self.raw_data
     }
 
+    /// Takes and clears dirty ranges.
     pub fn take_dirty_ranges(&mut self) -> Vec<(usize, usize)> {
         std::mem::take(&mut self.dirty_ranges)
     }
 
+    /// Clears dirty ranges without returning them.
     pub fn clear_dirty_ranges(&mut self) {
         self.dirty_ranges.clear();
     }
 
+    /// Returns the new size if the GPU buffer needs resizing.
     pub fn take_gpu_needs_resize(&mut self) -> Option<usize> {
         let size = match self.gpu_buffer_needs_resize {
             true => Some(self.raw_data.len()),
@@ -201,16 +209,19 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         }
     }
 
+    /// Returns the byte offset for a key.
     pub fn offset(&self, key: K) -> Option<usize> {
         let slot = self.slot_indices.get(key)?;
 
         Some(slot * self.aligned_slice_size)
     }
 
+    /// Returns the slot index for a key.
     pub fn slot_index(&self, key: K) -> Option<usize> {
         self.slot_indices.get(key).copied()
     }
 
+    /// Returns an iterator over keys.
     pub fn keys<'a>(&'a self) -> slotmap::secondary::Keys<'a, K, usize> {
         self.slot_indices.keys()
     }

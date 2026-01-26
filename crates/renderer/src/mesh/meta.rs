@@ -1,3 +1,5 @@
+//! Mesh metadata buffers.
+
 pub mod geometry_meta;
 pub mod material_meta;
 
@@ -33,8 +35,10 @@ use crate::{
 // Reduced from 1024 to stay under 128MB default storage buffer limit.
 // Initial visibility buffer size = 512 * 3 * 1000 * 52 = ~76MB
 // This is conservative; buffer will grow dynamically as needed.
+/// Initial capacity for mesh meta buffers.
 pub const MESH_META_INITIAL_CAPACITY: usize = 512;
 
+/// Mesh metadata buffers for geometry and materials.
 pub struct MeshMeta {
     // meta data buffers
     geometry_buffers: DynamicUniformBuffer<MeshKey>,
@@ -47,6 +51,7 @@ pub struct MeshMeta {
 }
 
 impl MeshMeta {
+    /// Creates mesh meta buffers.
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Self {
             geometry_buffers: DynamicUniformBuffer::new(
@@ -79,6 +84,7 @@ impl MeshMeta {
             material_dirty: true,
         })
     }
+    /// Writes mesh metadata into GPU-bound buffers.
     pub fn insert(
         &mut self,
         mesh_key: MeshKey,
@@ -138,24 +144,29 @@ impl MeshMeta {
         Ok(())
     }
 
+    /// Returns the GPU buffer for geometry metadata.
     pub fn geometry_gpu_buffer(&self) -> &web_sys::GpuBuffer {
         &self.geometry_gpu_buffer
     }
+    /// Returns the geometry metadata buffer offset for a mesh.
     pub fn geometry_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         self.geometry_buffers
             .offset(key)
             .ok_or(AwsmMeshError::MetaNotFound(key))
     }
 
+    /// Returns the GPU buffer for material metadata.
     pub fn material_gpu_buffer(&self) -> &web_sys::GpuBuffer {
         &self.material_gpu_buffer
     }
+    /// Returns the material metadata buffer offset for a mesh.
     pub fn material_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         self.material_buffers
             .offset(key)
             .ok_or(AwsmMeshError::MetaNotFound(key))
     }
 
+    /// Removes mesh metadata entries.
     pub fn remove(&mut self, mesh_key: MeshKey) {
         if self.geometry_buffers.remove(mesh_key) {
             self.geometry_dirty = true;
@@ -166,6 +177,7 @@ impl MeshMeta {
         }
     }
 
+    /// Writes dirty metadata buffers to the GPU.
     pub fn write_gpu(
         &mut self,
         _logging: &AwsmRendererLogging,

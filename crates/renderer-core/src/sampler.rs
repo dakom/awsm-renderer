@@ -1,5 +1,8 @@
+//! Sampler descriptor helpers.
+
 use crate::compare::CompareFunction;
 
+/// Builder for a GPU sampler descriptor.
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct SamplerDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createSampler#descriptor
@@ -17,11 +20,17 @@ pub struct SamplerDescriptor<'a> {
     pub mipmap_filter: Option<MipmapFilterMode>,
 }
 
+/// WebGPU sampler address mode.
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuAddressMode.html
+/// WebGPU sampler address mode.
 pub type AddressMode = web_sys::GpuAddressMode;
+/// WebGPU sampler filter mode.
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuFilterMode.html
+/// WebGPU sampler filter mode.
 pub type FilterMode = web_sys::GpuFilterMode;
+/// WebGPU sampler mipmap filter mode.
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuMipmapFilterMode.html
+/// WebGPU sampler mipmap filter mode.
 pub type MipmapFilterMode = web_sys::GpuMipmapFilterMode;
 
 // js conversions

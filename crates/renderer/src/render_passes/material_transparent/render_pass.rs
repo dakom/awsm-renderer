@@ -1,3 +1,5 @@
+//! Transparent material render pass execution.
+
 use crate::{
     error::Result,
     render::RenderContext,
@@ -14,12 +16,14 @@ use awsm_renderer_core::command::{
     LoadOp, StoreOp,
 };
 
+/// Transparent material pass bind groups and pipelines.
 pub struct MaterialTransparentRenderPass {
     pub bind_groups: MaterialTransparentBindGroups,
     pub pipelines: MaterialTransparentPipelines,
 }
 
 impl MaterialTransparentRenderPass {
+    /// Creates the transparent material render pass resources.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_groups = MaterialTransparentBindGroups::new(ctx).await?;
         let pipelines = MaterialTransparentPipelines::new(ctx, &bind_groups).await?;
@@ -30,6 +34,7 @@ impl MaterialTransparentRenderPass {
         })
     }
 
+    /// Rebuilds bind groups and pipelines after texture pool changes.
     pub async fn texture_pool_changed(
         &mut self,
         ctx: &mut RenderPassInitContext<'_>,
@@ -40,6 +45,7 @@ impl MaterialTransparentRenderPass {
         Ok(())
     }
 
+    /// Executes the transparent material pass.
     pub fn render(
         &self,
         ctx: &RenderContext,

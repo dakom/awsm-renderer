@@ -1,3 +1,5 @@
+//! Unlit material parameters.
+
 use crate::{
     materials::{
         writer::{write, Value},
@@ -6,6 +8,7 @@ use crate::{
     textures::{SamplerKey, Textures},
 };
 
+/// Unlit material parameters.
 #[derive(Clone, Debug)]
 pub struct UnlitMaterial {
     pub base_color_tex: Option<MaterialTexture>,
@@ -18,6 +21,7 @@ pub struct UnlitMaterial {
 }
 
 impl UnlitMaterial {
+    /// Creates an unlit material.
     pub fn new(alpha_mode: MaterialAlphaMode, double_sided: bool) -> Self {
         Self {
             base_color_tex: None,
@@ -28,18 +32,22 @@ impl UnlitMaterial {
             double_sided,
         }
     }
+    /// Returns true if the material should render in the transparency pass.
     pub fn is_transparency_pass(&self) -> bool {
         self.has_alpha_blend() || self.alpha_cutoff().is_some()
     }
 
+    /// Returns the material alpha mode.
     pub fn alpha_mode(&self) -> &MaterialAlphaMode {
         &self.alpha_mode
     }
 
+    /// Returns whether the material is double sided.
     pub fn double_sided(&self) -> bool {
         self.double_sided
     }
 
+    /// Returns the alpha cutoff for masked materials.
     pub fn alpha_cutoff(&self) -> Option<f32> {
         match self.alpha_mode() {
             MaterialAlphaMode::Mask { cutoff } => Some(*cutoff),
@@ -47,10 +55,12 @@ impl UnlitMaterial {
         }
     }
 
+    /// Returns true if alpha blending is enabled.
     pub fn has_alpha_blend(&self) -> bool {
         matches!(self.alpha_mode(), MaterialAlphaMode::Blend)
     }
 
+    /// Returns the alpha mask cutoff, if any.
     pub fn alpha_mask(&self) -> Option<f32> {
         match self.alpha_mode() {
             MaterialAlphaMode::Mask { cutoff } => Some(*cutoff),
@@ -58,6 +68,7 @@ impl UnlitMaterial {
         }
     }
 
+    /// Builds the uniform buffer payload for this material.
     pub fn uniform_buffer_data(&self, textures: &Textures) -> Result<Vec<u8>> {
         let mut data = Vec::with_capacity(128);
 

@@ -1,3 +1,5 @@
+//! Lighting data and GPU uploads.
+
 pub mod ibl;
 
 use std::sync::LazyLock;
@@ -24,11 +26,13 @@ static INFO_BUFFER_USAGE: LazyLock<BufferUsage> =
     LazyLock::new(|| BufferUsage::new().with_uniform().with_copy_dst());
 
 impl AwsmRenderer {
+    /// Sets the BRDF LUT texture used for IBL.
     pub fn set_brdf_lut(&mut self, brdf_lut: BrdfLut) {
         self.lights.brdf_lut = brdf_lut;
         self.bind_groups
             .mark_create(BindGroupCreate::BrdfLutTextures);
     }
+    /// Sets image-based lighting textures.
     pub fn set_ibl(&mut self, ibl: Ibl) {
         self.lights.ibl = ibl;
         self.bind_groups.mark_create(BindGroupCreate::IblTextures);
@@ -36,6 +40,7 @@ impl AwsmRenderer {
     }
 }
 
+/// Light storage and GPU buffers.
 pub struct Lights {
     pub gpu_punctual_buffer: web_sys::GpuBuffer,
     pub gpu_info_buffer: web_sys::GpuBuffer,
@@ -52,9 +57,12 @@ pub struct Lights {
 }
 
 impl Lights {
+    /// Size in bytes for a single punctual light.
     pub const PUNCTUAL_LIGHT_SIZE: usize = 64;
+    /// Size in bytes for the lighting info block.
     pub const INFO_SIZE: usize = 16; // 2 * u32 for mipmap counts, 1 for number of lights, and 1 for padding
 
+    /// Creates light buffers and initializes IBL state.
     pub fn new(gpu: &AwsmRendererWebGpu, ibl: Ibl, brdf_lut: BrdfLut) -> Result<Self> {
         // GPU size should never be 0
         let punctual_gpu_size = Self::PUNCTUAL_LIGHT_SIZE;
@@ -84,12 +92,14 @@ impl Lights {
         })
     }
 
+    /// Removes all lights.
     pub fn clear(&mut self) {
         self.lights.clear();
         self.punctual_gpu_dirty = true;
         self.lighting_info_gpu_dirty = true;
     }
 
+    /// Inserts a light and returns its key.
     pub fn insert(&mut self, light: Light) -> Result<LightKey> {
         let key = self.lights.insert(light.clone());
 
@@ -98,12 +108,14 @@ impl Lights {
         Ok(key)
     }
 
+    /// Removes a light by key.
     pub fn remove(&mut self, key: LightKey) {
         self.lights.remove(key);
         self.punctual_gpu_dirty = true;
         self.lighting_info_gpu_dirty = true;
     }
 
+    /// Updates a light in place.
     pub fn update(&mut self, key: LightKey, f: impl FnOnce(&mut Light)) {
         if let Some(light) = self.lights.get_mut(key) {
             f(light);
@@ -111,6 +123,7 @@ impl Lights {
         }
     }
 
+    /// Writes lighting buffers to the GPU if dirty.
     pub fn write_gpu(
         &mut self,
         logging: &AwsmRendererLogging,
@@ -198,6 +211,7 @@ impl Lights {
     }
 }
 
+/// Punctual light definitions.
 #[derive(Debug, Clone)]
 pub enum Light {
     Directional {
@@ -223,8 +237,10 @@ pub enum Light {
 }
 
 impl Light {
+    /// Packed byte size for a light in the storage buffer.
     pub const BYTE_SIZE: usize = 64;
 
+    /// Returns a numeric tag for shader selection.
     pub fn enum_value(&self) -> f32 {
         // f32 since we aren't bitcasting, we're reading as item in packed vec4<f32>
         match self {
@@ -235,6 +251,7 @@ impl Light {
     }
 
     // matches LightPacked
+    /// Returns the packed storage buffer payload for this light.
     pub fn storage_buffer_data(&self) -> [u8; Self::BYTE_SIZE] {
         let mut data = [0u8; Self::BYTE_SIZE];
         let mut offset = 0;
@@ -358,11 +375,14 @@ impl Light {
 }
 
 new_key_type! {
+    /// Opaque key for lights.
     pub struct LightKey;
 }
 
+/// Result type for light operations.
 type Result<T> = std::result::Result<T, AwsmLightError>;
 
+/// Light-related errors.
 #[derive(Error, Debug)]
 pub enum AwsmLightError {
     #[error("[light] {0:?}")]

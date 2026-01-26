@@ -1,3 +1,5 @@
+//! Material mesh metadata packing.
+
 use std::sync::LazyLock;
 
 use awsm_renderer_core::buffers::BufferUsage;
@@ -11,9 +13,13 @@ use crate::{
     },
 };
 
+/// Bitmask for normal morphing.
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_NORMAL: u32 = 1;
+/// Bitmask for tangent morphing.
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_TANGENT: u32 = 1 << 1;
+/// Byte size for material mesh meta struct.
 pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 68;
+/// Byte alignment for material mesh meta entries.
 pub const MATERIAL_MESH_META_BYTE_ALIGNMENT: usize = 256;
 
 pub static MATERIAL_BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| {
@@ -23,7 +29,8 @@ pub static MATERIAL_BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| {
         .with_uniform()
 });
 
-// See meta.wgsl for the corresponding struct
+/// Material meta fields used by shaders.
+/// See `meta.wgsl` for the corresponding struct.
 pub struct MaterialMeshMeta<'a> {
     pub mesh_key: MeshKey,
     pub material_key: MaterialKey,
@@ -91,6 +98,7 @@ fn calculate_attribute_counts(buffer_info: &MeshBufferInfo) -> (u32, u32) {
 }
 
 impl<'a> MaterialMeshMeta<'a> {
+    /// Packs material meta into bytes.
     pub fn to_bytes(
         self,
     ) -> std::result::Result<[u8; MATERIAL_MESH_META_BYTE_SIZE], AwsmMeshError> {

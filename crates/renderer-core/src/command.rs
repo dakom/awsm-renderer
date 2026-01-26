@@ -1,3 +1,5 @@
+//! Command encoder wrappers and pass helpers.
+
 pub mod color;
 pub mod compute_pass;
 pub mod copy_texture;
@@ -9,6 +11,7 @@ use crate::error::{AwsmCoreError, Result};
 use compute_pass::ComputePassEncoder;
 use render_pass::RenderPassEncoder;
 
+/// Wrapper around a WebGPU command encoder.
 #[derive(Debug, Clone)]
 pub struct CommandEncoder {
     inner: web_sys::GpuCommandEncoder,
@@ -24,10 +27,12 @@ impl Deref for CommandEncoder {
 
 impl CommandEncoder {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder#instance_methods
+    /// Wraps a WebGPU command encoder.
     pub fn new(inner: web_sys::GpuCommandEncoder) -> Self {
         Self { inner }
     }
 
+    /// Begins a compute pass.
     pub fn begin_compute_pass(
         &self,
         descriptor: Option<&web_sys::GpuComputePassDescriptor>,
@@ -38,6 +43,7 @@ impl CommandEncoder {
         })
     }
 
+    /// Begins a render pass.
     pub fn begin_render_pass(
         &self,
         descriptor: &web_sys::GpuRenderPassDescriptor,
@@ -49,6 +55,7 @@ impl CommandEncoder {
         ))
     }
 
+    /// Clears a buffer range.
     pub fn clear_buffer(
         &self,
         buffer: &web_sys::GpuBuffer,
@@ -65,6 +72,7 @@ impl CommandEncoder {
         }
     }
 
+    /// Copies data from one buffer to another.
     pub fn copy_buffer_to_buffer(
         &self,
         source: &web_sys::GpuBuffer,
@@ -84,6 +92,7 @@ impl CommandEncoder {
             .map_err(AwsmCoreError::command_copy_buffer_to_buffer)
     }
 
+    /// Copies a buffer region into a texture.
     pub fn copy_buffer_to_texture(
         &self,
         source: &web_sys::GpuTexelCopyBufferInfo,
@@ -95,6 +104,7 @@ impl CommandEncoder {
             .map_err(AwsmCoreError::command_copy_buffer_to_texture)
     }
 
+    /// Copies a texture region into a buffer.
     pub fn copy_texture_to_buffer(
         &self,
         source: &web_sys::GpuTexelCopyTextureInfo,
@@ -106,6 +116,7 @@ impl CommandEncoder {
             .map_err(AwsmCoreError::command_copy_texture_to_buffer)
     }
 
+    /// Copies a texture region into another texture.
     pub fn copy_texture_to_texture(
         &self,
         source: &web_sys::GpuTexelCopyTextureInfo,
@@ -117,6 +128,7 @@ impl CommandEncoder {
             .map_err(AwsmCoreError::command_copy_texture_to_texture)
     }
 
+    /// Resolves a query set into a destination buffer.
     pub fn resolve_query_set(
         &self,
         query_set: &web_sys::GpuQuerySet,
@@ -134,24 +146,32 @@ impl CommandEncoder {
         );
     }
 
+    /// Inserts a debug marker into the command stream.
     pub fn insert_debug_marker(&self, label: &str) {
         self.inner.insert_debug_marker(label);
     }
 
+    /// Pushes a debug group onto the command stream.
     pub fn push_debug_group(&self, group_label: &str) {
         self.inner.push_debug_group(group_label);
     }
 
+    /// Pops the last debug group.
     pub fn pop_debug_group(&self) {
         self.inner.pop_debug_group();
     }
 
+    /// Finishes encoding and returns the command buffer.
     pub fn finish(&self) -> web_sys::GpuCommandBuffer {
         self.inner.finish()
     }
 }
 
+/// WebGPU load operation alias.
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuLoadOp.html
+/// WebGPU load operation.
 pub type LoadOp = web_sys::GpuLoadOp;
+/// WebGPU store operation alias.
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuStoreOp.html
+/// WebGPU store operation.
 pub type StoreOp = web_sys::GpuStoreOp;

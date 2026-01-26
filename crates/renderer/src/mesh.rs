@@ -1,3 +1,5 @@
+//! Mesh data and rendering helpers.
+
 mod buffer_info;
 mod error;
 mod meshes;
@@ -24,6 +26,7 @@ use super::error::Result;
 
 // this is most like a "primitive" in gltf, not the containing "mesh"
 // because for non-gltf naming, "mesh" makes more sense
+/// Mesh instance metadata and render flags.
 #[derive(Debug, Clone)]
 pub struct Mesh {
     pub world_aabb: Option<Aabb>, // this is the transformed AABB, used for frustum culling and depth sorting
@@ -36,6 +39,7 @@ pub struct Mesh {
 }
 
 impl Mesh {
+    /// Creates a mesh with the given properties.
     pub fn new(
         transform_key: TransformKey,
         material_key: MaterialKey,
@@ -55,6 +59,7 @@ impl Mesh {
         }
     }
 
+    /// Returns the geometry render pipeline key for this mesh.
     pub fn geometry_render_pipeline_key(&self, ctx: &RenderContext) -> Result<RenderPipelineKey> {
         ctx.render_passes
             .geometry
@@ -70,6 +75,7 @@ impl Mesh {
             })
     }
 
+    /// Pushes geometry pass draw commands for this mesh.
     pub fn push_geometry_pass_commands(
         &self,
         ctx: &RenderContext,
@@ -128,6 +134,7 @@ impl Mesh {
         Ok(())
     }
 
+    /// Pushes transparent material pass commands for this mesh.
     pub fn push_material_transparent_pass_commands(
         &self,
         ctx: &RenderContext,

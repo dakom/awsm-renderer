@@ -1,3 +1,5 @@
+//! Mesh-related errors.
+
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
@@ -9,9 +11,12 @@ use crate::{
 };
 
 use super::MeshKey;
+use crate::transforms::TransformKey;
 
+/// Result type for mesh operations.
 pub type Result<T> = std::result::Result<T, AwsmMeshError>;
 
+/// Mesh-related errors.
 #[derive(Error, Debug)]
 pub enum AwsmMeshError {
     #[error("[mesh] not found: {0:?}")]
@@ -28,6 +33,15 @@ pub enum AwsmMeshError {
 
     #[error("[mesh] instance transforms missing or empty: {0:?}")]
     InstancingMissingTransforms(MeshKey),
+
+    #[error("[mesh] instanced mesh unsupported for this operation: {0:?}")]
+    InstancedMeshUnsupported(MeshKey),
+
+    #[error("[mesh] transform has no meshes: {0:?}")]
+    TransformHasNoMeshes(TransformKey),
+
+    #[error("[mesh] mesh list is empty")]
+    MeshListEmpty,
 
     #[error("[mesh] visibility geometry buffer not found: {0:?}")]
     VisibilityGeometryBufferNotFound(MeshKey),

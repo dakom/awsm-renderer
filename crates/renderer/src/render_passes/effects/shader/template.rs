@@ -1,3 +1,5 @@
+//! Shader templates for the effects pass.
+
 use askama::Template;
 
 use crate::{
@@ -5,12 +7,14 @@ use crate::{
     shaders::{AwsmShaderError, Result},
 };
 
+/// Effects pass shader template components.
 #[derive(Debug)]
 pub struct ShaderTemplateEffects {
     pub bind_groups: ShaderTemplateEffectsBindGroups,
     pub compute: ShaderTemplateEffectsCompute,
 }
 
+/// Bind group template for the effects pass.
 #[derive(Template, Debug)]
 #[template(path = "effects_wgsl/bind_groups.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateEffectsBindGroups {
@@ -22,6 +26,7 @@ pub struct ShaderTemplateEffectsBindGroups {
 }
 
 impl ShaderTemplateEffectsBindGroups {
+    /// Creates a bind group template from the cache key.
     pub fn new(cache_key: &ShaderCacheKeyEffects) -> Self {
         Self {
             smaa_anti_alias: cache_key.smaa_anti_alias,
@@ -33,6 +38,7 @@ impl ShaderTemplateEffectsBindGroups {
     }
 }
 
+/// Compute shader template for the effects pass.
 #[derive(Template, Debug)]
 #[template(path = "effects_wgsl/compute.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateEffectsCompute {
@@ -50,6 +56,7 @@ pub struct ShaderTemplateEffectsCompute {
 }
 
 impl ShaderTemplateEffectsCompute {
+    /// Creates a compute shader template from the cache key.
     pub fn new(cache_key: &ShaderCacheKeyEffects) -> Self {
         let bloom = cache_key.bloom_phase != BloomPhase::None;
         let bloom_extract = cache_key.bloom_phase == BloomPhase::Extract;
@@ -80,6 +87,7 @@ impl TryFrom<&ShaderCacheKeyEffects> for ShaderTemplateEffects {
 }
 
 impl ShaderTemplateEffects {
+    /// Renders the effects shader template into WGSL.
     pub fn into_source(self) -> Result<String> {
         let bind_groups_source = self.bind_groups.render()?;
         let compute_source = self.compute.render()?;
@@ -87,17 +95,20 @@ impl ShaderTemplateEffects {
     }
 
     #[cfg(debug_assertions)]
+    /// Returns an optional debug label for shader compilation.
     pub fn debug_label(&self) -> Option<&str> {
         Some("Effects")
     }
 }
 
+/// Debug toggles for effects shaders.
 #[derive(Default, Debug, Clone)]
 pub struct ShaderTemplateEffectsDebug {
     pub smaa_edges: bool,
 }
 
 impl ShaderTemplateEffectsDebug {
+    /// Creates a default debug config.
     pub fn new() -> Self {
         Self { smaa_edges: false }
     }

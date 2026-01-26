@@ -1,8 +1,11 @@
+//! EXR image loading utilities.
+
 use std::{borrow::Cow, io::Cursor};
 
 use crate::error::{AwsmCoreError, Result};
 use exr::prelude::{ChannelDescription, ReadChannels, ReadLayers};
 
+/// Loaded EXR image data.
 #[derive(Clone, Debug)]
 pub struct ExrImage {
     pub data: Vec<f32>,
@@ -17,6 +20,7 @@ pub struct ExrImage {
 }
 
 impl ExrImage {
+    /// Loads an EXR image from a URL.
     pub async fn load_url(url: &str) -> anyhow::Result<Self> {
         let bytes = gloo_net::http::Request::get(url)
             .send()
@@ -63,6 +67,7 @@ impl ExrImage {
         Ok(result.layer_data.channel_data.pixels)
     }
 
+    /// Returns a JS object for external image copies if supported.
     pub fn js_obj(&self) -> Result<Cow<'_, js_sys::Object>> {
         Err(AwsmCoreError::ExrImageToJsValue(
             "EXR to js value not implemented yet".to_string(),

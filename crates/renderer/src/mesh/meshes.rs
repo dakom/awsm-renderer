@@ -1,3 +1,5 @@
+//! Mesh storage and GPU buffer management.
+
 use std::collections::HashMap;
 
 use awsm_renderer_core::buffers::{BufferDescriptor, BufferUsage};
@@ -14,13 +16,14 @@ use crate::materials::Materials;
 use crate::mesh::meta::{MeshMeta, MESH_META_INITIAL_CAPACITY};
 use crate::mesh::skins::{SkinKey, Skins};
 use crate::mesh::{MeshBufferInfoKey, MeshBufferInfos};
-use crate::transforms::{TransformKey, Transforms};
+use crate::transforms::{Transform, TransformKey, Transforms};
 use crate::AwsmRendererLogging;
 
 use super::error::{AwsmMeshError, Result};
 use super::morphs::{GeometryMorphKey, MaterialMorphKey, Morphs};
 use super::{Mesh, MeshBufferVertexInfo};
 
+/// Shared mesh resource data and buffer offsets.
 #[derive(Debug, Clone)]
 pub struct MeshResource {
     pub buffer_info_key: MeshBufferInfoKey,
@@ -35,6 +38,7 @@ pub struct MeshResource {
     pub refcount: usize,
 }
 
+/// Mesh list with shared resources and GPU buffers.
 pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
     resources: DenseSlotMap<MeshResourceKey, MeshResource>,
@@ -84,6 +88,7 @@ impl Meshes {
     // For textureless models this will be 0, but buffer will grow as needed.
     const ATTRIBUTE_DATA_INITIAL_SIZE: usize = Self::INDICES_INITIAL_SIZE * 16;
 
+    /// Creates mesh storage and GPU buffers.
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Self {
             list: DenseSlotMap::with_key(),
@@ -171,6 +176,7 @@ impl Meshes {
         })
     }
 
+    /// Inserts a mesh and its backing resource data, returning a mesh key.
     pub fn insert(
         &mut self,
         mesh: Mesh,
@@ -392,6 +398,7 @@ impl Meshes {
         Ok(mesh_key)
     }
 
+    /// Duplicates a mesh instance and assigns a new transform key.
     pub fn duplicate_with_transform(
         &mut self,
         mesh_key: MeshKey,
@@ -417,6 +424,155 @@ impl Meshes {
         self.insert_instance(new_mesh, resource_key, materials, transforms)
     }
 
+    /// Duplicates all meshes under a transform into a new transform key.
+    pub fn duplicate_by_transform_key(
+        &mut self,
+        transform_key: TransformKey,
+        materials: &Materials,
+        transforms: &mut Transforms,
+    ) -> Result<(TransformKey, Vec<MeshKey>)> {
+        let mesh_keys = self
+            .transform_to_meshes
+            .get(transform_key)
+            .cloned()
+            .ok_or(AwsmMeshError::TransformHasNoMeshes(transform_key))?;
+
+        if mesh_keys.is_empty() {
+            return Err(AwsmMeshError::TransformHasNoMeshes(transform_key));
+        }
+
+        for mesh_key in &mesh_keys {
+            if self.get(*mesh_key)?.instanced {
+                return Err(AwsmMeshError::InstancedMeshUnsupported(*mesh_key));
+            }
+        }
+
+        let new_transform_key = transforms.duplicate(transform_key)?;
+
+        let mut new_mesh_keys = Vec::with_capacity(mesh_keys.len());
+        for mesh_key in mesh_keys {
+            let new_mesh_key =
+                self.duplicate_with_transform(mesh_key, new_transform_key, materials, transforms)?;
+            new_mesh_keys.push(new_mesh_key);
+        }
+
+        Ok((new_transform_key, new_mesh_keys))
+    }
+
+    /// Splits a mesh into a new transform key so it can move independently.
+    pub fn split_mesh(
+        &mut self,
+        mesh_key: MeshKey,
+        transforms: &mut Transforms,
+        materials: &Materials,
+    ) -> Result<TransformKey> {
+        let old_transform_key = self.get(mesh_key)?.transform_key;
+        if self.get(mesh_key)?.instanced {
+            return Err(AwsmMeshError::InstancedMeshUnsupported(mesh_key));
+        }
+
+        let new_transform_key = transforms.duplicate(old_transform_key)?;
+
+        self.update_mesh_transform(mesh_key, old_transform_key, new_transform_key, materials, transforms)?;
+
+        Ok(new_transform_key)
+    }
+
+    /// Splits all meshes under a transform into independent transforms.
+    pub fn split_meshes_by_transform_key(
+        &mut self,
+        transform_key: TransformKey,
+        transforms: &mut Transforms,
+        materials: &Materials,
+    ) -> Result<Vec<(MeshKey, TransformKey)>> {
+        let mesh_keys = self
+            .transform_to_meshes
+            .get(transform_key)
+            .cloned()
+            .ok_or(AwsmMeshError::TransformHasNoMeshes(transform_key))?;
+
+        if mesh_keys.is_empty() {
+            return Err(AwsmMeshError::TransformHasNoMeshes(transform_key));
+        }
+
+        let mut out = Vec::with_capacity(mesh_keys.len());
+        for mesh_key in mesh_keys {
+            let new_transform_key = self.split_mesh(mesh_key, transforms, materials)?;
+            out.push((mesh_key, new_transform_key));
+        }
+
+        Ok(out)
+    }
+
+    /// Joins multiple meshes under a single transform key.
+    pub fn join_meshes(
+        &mut self,
+        mesh_keys: &[MeshKey],
+        transforms: &mut Transforms,
+        materials: &Materials,
+        transform_override: Option<Transform>,
+    ) -> Result<(TransformKey, Vec<MeshKey>)> {
+        if mesh_keys.is_empty() {
+            return Err(AwsmMeshError::MeshListEmpty);
+        }
+
+        for mesh_key in mesh_keys {
+            if self.get(*mesh_key)?.instanced {
+                return Err(AwsmMeshError::InstancedMeshUnsupported(*mesh_key));
+            }
+        }
+
+        let mut common_parent = None;
+        for (index, mesh_key) in mesh_keys.iter().enumerate() {
+            let mesh = self.get(*mesh_key)?;
+            let parent = transforms.get_parent(mesh.transform_key).ok();
+            if index == 0 {
+                common_parent = parent;
+            } else if common_parent != parent {
+                common_parent = None;
+                break;
+            }
+        }
+
+        let new_local = match transform_override {
+            Some(transform) => transform,
+            None => {
+                let mut center_sum = glam::Vec3::ZERO;
+                for mesh_key in mesh_keys {
+                    let mesh = self.get(*mesh_key)?;
+                    let center = mesh
+                        .world_aabb
+                        .as_ref()
+                        .map(|aabb| aabb.center())
+                        .or_else(|| transforms.get_world(mesh.transform_key).ok().map(|m| m.w_axis.truncate()))
+                        .unwrap_or(glam::Vec3::ZERO);
+                    center_sum += center;
+                }
+                let centroid_world = center_sum / mesh_keys.len() as f32;
+                let local_translation = match common_parent {
+                    Some(parent_key) => transforms
+                        .get_world(parent_key)
+                        .ok()
+                        .map(|m| m.inverse().transform_point3(centroid_world))
+                        .unwrap_or(centroid_world),
+                    None => centroid_world,
+                };
+                Transform::IDENTITY.with_translation(local_translation)
+            }
+        };
+
+        let new_transform_key = transforms.insert(new_local, common_parent);
+
+        let moved = mesh_keys.to_vec();
+        for mesh_key in &moved {
+            let old_transform_key = self.get(*mesh_key)?.transform_key;
+            self.update_mesh_transform(*mesh_key, old_transform_key, new_transform_key, materials, transforms)?;
+        }
+
+        Ok((new_transform_key, moved))
+    }
+
+    /// Updates world-space AABBs for meshes affected by dirty transforms or instances.
     pub fn update_world(
         &mut self,
         dirty_transforms: HashMap<TransformKey, Mat4>,
@@ -486,14 +642,106 @@ impl Meshes {
         self.skins.update_transforms(dirty_transforms);
     }
 
+    fn update_mesh_transform(
+        &mut self,
+        mesh_key: MeshKey,
+        old_transform_key: TransformKey,
+        new_transform_key: TransformKey,
+        materials: &Materials,
+        transforms: &Transforms,
+    ) -> Result<()> {
+        let resource_aabb = self.resource(mesh_key).ok().and_then(|r| r.aabb.clone());
+
+        if let Some(mesh) = self.list.get_mut(mesh_key) {
+            mesh.transform_key = new_transform_key;
+            mesh.world_aabb = resource_aabb;
+        }
+
+        if let Some(meshes) = self.transform_to_meshes.get_mut(old_transform_key) {
+            meshes.retain(|&key| key != mesh_key);
+        }
+        if let Some(meshes) = self.transform_to_meshes.get(old_transform_key) {
+            if meshes.is_empty() {
+                self.transform_to_meshes.remove(old_transform_key);
+            }
+        }
+
+        if let Some(meshes) = self.transform_to_meshes.get_mut(new_transform_key) {
+            meshes.push(mesh_key);
+        } else {
+            self.transform_to_meshes
+                .insert(new_transform_key, vec![mesh_key]);
+        }
+
+        self.refresh_meta_for_mesh(mesh_key, materials, transforms)?;
+
+        Ok(())
+    }
+
+    fn refresh_meta_for_mesh(
+        &mut self,
+        mesh_key: MeshKey,
+        materials: &Materials,
+        transforms: &Transforms,
+    ) -> Result<()> {
+        let mesh = self
+            .list
+            .get(mesh_key)
+            .ok_or(AwsmMeshError::MeshNotFound(mesh_key))?;
+
+        let (
+            buffer_info_key,
+            visibility_geometry_data_offset,
+            custom_attribute_index_offset,
+            custom_attribute_data_offset,
+            geometry_morph_key,
+            material_morph_key,
+            skin_key,
+        ) = {
+            let resource = self.resource(mesh_key)?;
+            (
+                resource.buffer_info_key,
+                resource.visibility_geometry_data_offset,
+                resource.custom_attribute_index_offset,
+                resource.custom_attribute_data_offset,
+                resource.geometry_morph_key,
+                resource.material_morph_key,
+                resource.skin_key,
+            )
+        };
+
+        let buffer_info = self.buffer_infos.get(buffer_info_key)?;
+
+        self.meta.insert(
+            mesh_key,
+            mesh,
+            buffer_info,
+            visibility_geometry_data_offset,
+            custom_attribute_index_offset,
+            custom_attribute_data_offset,
+            geometry_morph_key,
+            material_morph_key,
+            skin_key,
+            materials,
+            transforms,
+            &self.morphs,
+            &self.skins,
+        )?;
+
+        Ok(())
+    }
+
+    /// Returns mesh keys associated with a transform key.
     pub fn keys_by_transform_key(&self, transform_key: TransformKey) -> Option<&Vec<MeshKey>> {
         self.transform_to_meshes.get(transform_key)
     }
 
+    /// Iterates over all mesh keys.
     pub fn keys(&self) -> impl Iterator<Item = MeshKey> + '_ {
         self.list.keys()
     }
 
+    /// Returns the resource key for a mesh.
     pub fn resource_key(&self, mesh_key: MeshKey) -> Result<MeshResourceKey> {
         self.mesh_to_resource
             .get(mesh_key)
@@ -501,15 +749,18 @@ impl Meshes {
             .ok_or(AwsmMeshError::MeshNotFound(mesh_key))
     }
 
+    /// Returns the buffer info key for a mesh.
     pub fn buffer_info_key(&self, mesh_key: MeshKey) -> Result<MeshBufferInfoKey> {
         Ok(self.resource(mesh_key)?.buffer_info_key)
     }
 
+    /// Returns the buffer info for a mesh.
     pub fn buffer_info(&self, mesh_key: MeshKey) -> Result<&crate::mesh::MeshBufferInfo> {
         let buffer_info_key = self.buffer_info_key(mesh_key)?;
         self.buffer_infos.get(buffer_info_key)
     }
 
+    /// Returns the mesh resource referenced by a mesh key.
     pub fn resource(&self, mesh_key: MeshKey) -> Result<&MeshResource> {
         let resource_key = self.resource_key(mesh_key)?;
         self.resources
@@ -517,9 +768,11 @@ impl Meshes {
             .ok_or(AwsmMeshError::ResourceNotFound(resource_key))
     }
 
+    /// Returns the GPU buffer for visibility geometry vertex data.
     pub fn visibility_geometry_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
         &self.visibility_geometry_data_gpu_buffer
     }
+    /// Returns the offset into visibility geometry data for a mesh.
     pub fn visibility_geometry_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         let resource_key = self.resource_key(key)?;
         self.visibility_geometry_data_buffers
@@ -527,9 +780,11 @@ impl Meshes {
             .ok_or(AwsmMeshError::VisibilityGeometryBufferNotFound(key))
     }
 
+    /// Returns the GPU buffer for visibility geometry indices.
     pub fn visibility_geometry_index_gpu_buffer(&self) -> &web_sys::GpuBuffer {
         &self.visibility_geometry_index_gpu_buffer
     }
+    /// Returns the offset into visibility geometry indices for a mesh.
     pub fn visibility_geometry_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         let resource_key = self.resource_key(key)?;
         self.visibility_geometry_index_buffers
@@ -537,9 +792,11 @@ impl Meshes {
             .ok_or(AwsmMeshError::VisibilityGeometryBufferNotFound(key))
     }
 
+    /// Returns the GPU buffer for custom attribute vertex data.
     pub fn custom_attribute_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
         &self.custom_attribute_data_gpu_buffer
     }
+    /// Returns the offset into custom attribute vertex data for a mesh.
     pub fn custom_attribute_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         let resource_key = self.resource_key(key)?;
         self.custom_attribute_data_buffers
@@ -547,9 +804,11 @@ impl Meshes {
             .ok_or(AwsmMeshError::CustomAttributeBufferNotFound(key))
     }
 
+    /// Returns the GPU buffer for transparency geometry vertex data.
     pub fn transparency_geometry_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
         &self.transparency_geometry_data_gpu_buffer
     }
+    /// Returns the offset into transparency geometry data for a mesh.
     pub fn transparency_geometry_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         let resource_key = self.resource_key(key)?;
         self.transparency_geometry_data_buffers
@@ -557,9 +816,11 @@ impl Meshes {
             .ok_or(AwsmMeshError::TransparencyGeometryBufferNotFound(key))
     }
     // re-use the custom attribute index methods
+    /// Returns the GPU buffer for transparency geometry indices.
     pub fn transparency_geometry_index_gpu_buffer(&self) -> &web_sys::GpuBuffer {
         &self.custom_attribute_index_gpu_buffer
     }
+    /// Returns the offset into transparency geometry indices for a mesh.
     pub fn transparency_geometry_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         let resource_key = self.resource_key(key)?;
         self.custom_attribute_index_buffers
@@ -567,9 +828,11 @@ impl Meshes {
             .ok_or(AwsmMeshError::CustomAttributeBufferNotFound(key))
     }
 
+    /// Returns the GPU buffer for custom attribute indices.
     pub fn custom_attribute_index_gpu_buffer(&self) -> &web_sys::GpuBuffer {
         &self.custom_attribute_index_gpu_buffer
     }
+    /// Returns the offset into custom attribute indices for a mesh.
     pub fn custom_attribute_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         let resource_key = self.resource_key(key)?;
         self.custom_attribute_index_buffers
@@ -577,22 +840,26 @@ impl Meshes {
             .ok_or(AwsmMeshError::CustomAttributeBufferNotFound(key))
     }
 
+    /// Iterates over meshes and their keys.
     pub fn iter(&self) -> impl Iterator<Item = (MeshKey, &Mesh)> {
         self.list.iter()
     }
 
+    /// Returns a mesh by key.
     pub fn get(&self, mesh_key: MeshKey) -> Result<&Mesh> {
         self.list
             .get(mesh_key)
             .ok_or(AwsmMeshError::MeshNotFound(mesh_key))
     }
 
+    /// Returns a mutable mesh by key.
     pub fn get_mut(&mut self, mesh_key: MeshKey) -> Result<&mut Mesh> {
         self.list
             .get_mut(mesh_key)
             .ok_or(AwsmMeshError::MeshNotFound(mesh_key))
     }
 
+    /// Removes all meshes that share the given transform key.
     pub fn remove_by_transform_key(&mut self, transform_key: TransformKey) -> Option<Vec<Mesh>> {
         if let Some(mesh_keys) = self.transform_to_meshes.get(transform_key).cloned() {
             let mut removed_meshes = Vec::with_capacity(mesh_keys.capacity());
@@ -606,6 +873,7 @@ impl Meshes {
             None
         }
     }
+    /// Removes a mesh by key and returns it if found.
     pub fn remove(&mut self, mesh_key: MeshKey) -> Option<Mesh> {
         if let Some(mesh) = self.list.remove(mesh_key) {
             self.meta.remove(mesh_key);
@@ -670,6 +938,7 @@ impl Meshes {
         }
     }
 
+    /// Writes dirty mesh buffers to the GPU and updates bind groups.
     pub fn write_gpu(
         &mut self,
         logging: &AwsmRendererLogging,
@@ -784,6 +1053,8 @@ impl Drop for Meshes {
 }
 
 new_key_type! {
+    /// Opaque key for mesh instances.
     pub struct MeshKey;
+    /// Opaque key for shared mesh resources.
     pub struct MeshResourceKey;
 }

@@ -1,3 +1,5 @@
+//! Animation storage and per-frame updates.
+
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
 use crate::{
@@ -9,9 +11,11 @@ use crate::{
 use super::{data::AnimationData, error::Result, player::AnimationPlayer, AwsmAnimationError};
 
 new_key_type! {
+    /// SlotMap key for animation players.
     pub struct AnimationKey;
 }
 
+/// Morph targets that can be animated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AnimationMorphKey {
     Geometry(GeometryMorphKey),
@@ -30,6 +34,7 @@ impl From<MaterialMorphKey> for AnimationMorphKey {
     }
 }
 
+/// Container for animation players and their targets.
 #[derive(Debug, Clone, Default)]
 pub struct Animations {
     players: DenseSlotMap<AnimationKey, AnimationPlayer>,
@@ -39,16 +44,19 @@ pub struct Animations {
 }
 
 impl Animations {
+    /// Creates an empty animation container.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Removes an animation player and its associations.
     pub fn remove(&mut self, key: AnimationKey) {
         self.players.remove(key);
         self.transforms.remove(key);
         self.morphs.remove(key);
     }
 
+    /// Inserts a transform animation player.
     pub fn insert_transform(
         &mut self,
         player: AnimationPlayer,
@@ -59,6 +67,7 @@ impl Animations {
         key
     }
 
+    /// Inserts a morph animation player.
     pub fn insert_morph(
         &mut self,
         player: AnimationPlayer,
@@ -71,6 +80,7 @@ impl Animations {
 }
 
 impl AwsmRenderer {
+    /// Advances animation players and applies their results.
     pub fn update_animations(&mut self, global_time_delta: f64) -> Result<()> {
         for player in self.animations.players.values_mut() {
             player.update(global_time_delta)

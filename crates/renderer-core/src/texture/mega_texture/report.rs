@@ -1,7 +1,10 @@
+//! Reporting types for mega texture usage.
+
 use serde::{Deserialize, Serialize};
 
 use crate::texture::mega_texture::MegaTextureInfo;
 
+/// Summary report for a mega texture.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MegaTextureReport<ID> {
     pub entries: Vec<Vec<Vec<MegaTextureReportEntry<ID>>>>,
@@ -10,6 +13,7 @@ pub struct MegaTextureReport<ID> {
     pub mip_levels: Option<u32>,
 }
 
+/// Count statistics for a mega texture report.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MegaTextureReportCount {
     pub entries: u32,
@@ -20,6 +24,7 @@ pub struct MegaTextureReportCount {
     pub max_layers_total: u32,
 }
 
+/// Size statistics for a mega texture report.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MegaTextureReportSizes {
     pub total: MegaTextureReportArea,
@@ -28,6 +33,7 @@ pub struct MegaTextureReportSizes {
     pub texture_size: MegaTextureReportSize,
 }
 
+/// Single entry record in a mega texture report.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MegaTextureReportEntry<ID> {
     pub pixel_offset: MegaTextureReportCoords,
@@ -38,6 +44,7 @@ pub struct MegaTextureReportEntry<ID> {
     pub grad_scale: MegaTextureReportCoordsF32,
 }
 
+/// Integer coordinate pair for report output.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct MegaTextureReportCoords {
     pub x: u32,
@@ -50,6 +57,7 @@ impl From<(u32, u32)> for MegaTextureReportCoords {
     }
 }
 
+/// Float coordinate pair for report output.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct MegaTextureReportCoordsF32 {
     pub x: f32,
@@ -61,6 +69,7 @@ impl From<(f32, f32)> for MegaTextureReportCoordsF32 {
         Self { x, y }
     }
 }
+/// Size and area record used in reports.
 #[derive(Clone, Debug, Copy, Serialize, Deserialize)]
 pub struct MegaTextureReportSize {
     pub width: u32,
@@ -69,12 +78,14 @@ pub struct MegaTextureReportSize {
 }
 
 impl MegaTextureReportSize {
+    /// Empty size with zero area.
     pub const ZERO: Self = Self {
         width: 0,
         height: 0,
         area: 0.0,
     };
 
+    /// Adds dimensions and updates area.
     pub fn add(&mut self, width: u32, height: u32) {
         self.width += width;
         self.height += height;
@@ -93,6 +104,7 @@ impl From<(u32, u32)> for MegaTextureReportSize {
     }
 }
 
+/// Area usage statistics for reports.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MegaTextureReportArea {
     pub perc_free: f64,
@@ -102,6 +114,7 @@ pub struct MegaTextureReportArea {
 }
 
 impl MegaTextureReportArea {
+    /// Creates a report area from max and used sizes.
     pub fn new(max_size: MegaTextureReportSize, used_size: MegaTextureReportSize) -> Self {
         let perc_used = (used_size.area / max_size.area) * 100.0;
         let perc_free = (1.0 - perc_used / 100.0) * 100.0;
@@ -119,6 +132,7 @@ impl<ID> MegaTextureInfo<ID>
 where
     ID: Clone,
 {
+    /// Converts info into a report structure.
     pub fn into_report(self) -> MegaTextureReport<ID> {
         let Self {
             entries,
@@ -237,6 +251,7 @@ impl<ID> MegaTextureReport<ID>
 where
     ID: Serialize,
 {
+    /// Logs the report to the browser console.
     pub fn console_log(&self) {
         let js_value = serde_wasm_bindgen::to_value(self).unwrap();
         web_sys::console::log_1(&js_value);

@@ -1,5 +1,8 @@
+//! Shader cache keys for the opaque material pass.
+
 use crate::{render_passes::shader_cache_key::ShaderCacheKeyRenderPass, shaders::ShaderCacheKey};
 
+/// Cache key for opaque material shaders.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyMaterialOpaque {
     pub texture_pool_arrays_len: u32,
@@ -14,6 +17,7 @@ impl From<ShaderCacheKeyMaterialOpaque> for ShaderCacheKey {
     }
 }
 
+/// Cache key for the opaque pass when no geometry is rendered.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyMaterialOpaqueEmpty {
     pub texture_pool_arrays_len: u32,

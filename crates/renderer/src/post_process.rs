@@ -1,5 +1,8 @@
+//! Post-processing configuration and updates.
+
 use crate::{error::Result, AwsmRenderer};
 
+/// Post-processing settings for the renderer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PostProcessing {
     pub tonemapping: ToneMapping,
@@ -7,6 +10,7 @@ pub struct PostProcessing {
     pub dof: bool,
 }
 
+/// Tonemapping operator selection.
 #[derive(Clone, Debug, PartialEq, Eq, Copy, Hash)]
 pub enum ToneMapping {
     None,
@@ -25,6 +29,7 @@ impl Default for PostProcessing {
 }
 
 impl AwsmRenderer {
+    /// Applies post-processing configuration and rebuilds pipelines as needed.
     pub async fn set_post_processing(&mut self, pp: PostProcessing) -> Result<()> {
         self.post_processing = pp;
 

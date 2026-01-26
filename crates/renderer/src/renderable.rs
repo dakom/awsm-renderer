@@ -1,3 +1,5 @@
+//! Renderable collection and draw helpers.
+
 use awsm_renderer_core::command::render_pass::RenderPassEncoder;
 use glam::Mat4;
 
@@ -12,6 +14,7 @@ use crate::{
     AwsmRenderer,
 };
 
+/// Renderable lists grouped by pass type.
 pub struct Renderables<'a> {
     pub opaque: Vec<Renderable<'a>>,
     pub transparent: Vec<Renderable<'a>>,
@@ -19,16 +22,19 @@ pub struct Renderables<'a> {
 }
 
 impl Renderables<'_> {
+    /// Returns true if there are no renderables.
     pub fn is_empty(&self) -> bool {
         self.opaque.is_empty() && self.transparent.is_empty() && self.hud.is_empty()
     }
 
+    /// Returns the total number of renderables.
     pub fn len(&self) -> usize {
         self.opaque.len() + self.transparent.len() + self.hud.len()
     }
 }
 
 impl AwsmRenderer {
+    /// Collects renderables for the current frame.
     pub fn collect_renderables<'a>(&'a self, ctx: &RenderContext) -> Result<Renderables<'a>> {
         let _maybe_span_guard = if self.logging.render_timings {
             Some(tracing::span!(tracing::Level::INFO, "Collect renderables").entered())
@@ -143,6 +149,7 @@ fn geometry_sort_renderable(
     }
 }
 
+/// Single renderable entity.
 #[derive(Debug, Clone)]
 pub enum Renderable<'a> {
     Mesh {
@@ -154,12 +161,14 @@ pub enum Renderable<'a> {
 }
 
 impl Renderable<'_> {
+    /// Returns the geometry render pipeline key.
     pub fn geometry_render_pipeline_key(&self, ctx: &RenderContext) -> Result<RenderPipelineKey> {
         match self {
             Self::Mesh { mesh, .. } => mesh.geometry_render_pipeline_key(ctx),
         }
     }
 
+    /// Returns the opaque compute pipeline key, if any.
     pub fn material_opaque_compute_pipeline_key(&self) -> Option<ComputePipelineKey> {
         match self {
             Self::Mesh {
@@ -169,6 +178,7 @@ impl Renderable<'_> {
         }
     }
 
+    /// Returns the transparent render pipeline key, if any.
     pub fn material_transparent_render_pipeline_key(
         &self,
         _ctx: &RenderContext,
@@ -181,18 +191,21 @@ impl Renderable<'_> {
         }
     }
 
+    /// Returns the material key for this renderable.
     pub fn material_key(&self) -> crate::materials::MaterialKey {
         match self {
             Self::Mesh { mesh, .. } => mesh.material_key,
         }
     }
 
+    /// Returns the world-space AABB, if present.
     pub fn world_aabb(&self) -> Option<&'_ Aabb> {
         match self {
             Self::Mesh { mesh, .. } => mesh.world_aabb.as_ref(),
         }
     }
 
+    /// Pushes geometry pass commands for this renderable.
     pub fn push_geometry_pass_commands(
         &self,
         ctx: &RenderContext,
@@ -206,6 +219,7 @@ impl Renderable<'_> {
         }
     }
 
+    /// Pushes transparent material pass commands for this renderable.
     pub fn push_material_transparent_pass_commands(
         &self,
         ctx: &RenderContext,

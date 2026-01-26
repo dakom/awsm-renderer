@@ -1,3 +1,5 @@
+//! Helpers for generating cubemap images.
+
 use crate::command::color::Color;
 use crate::cubemap::CubemapImage;
 use crate::image::bitmap::{create_color, create_vertical_gradient};
@@ -10,6 +12,7 @@ use crate::{
     texture::{Extent3d, TextureDescriptor, TextureDimension, TextureUsage},
 };
 
+/// Solid colors for each cubemap face.
 #[derive(Clone, Debug)]
 pub struct CubemapBitmapColors {
     pub z_positive: Color,
@@ -21,6 +24,7 @@ pub struct CubemapBitmapColors {
 }
 
 impl CubemapBitmapColors {
+    /// Uses the same color for all faces.
     pub fn all(color: Color) -> Self {
         Self {
             z_positive: color.clone(),
@@ -33,6 +37,7 @@ impl CubemapBitmapColors {
     }
 }
 
+/// Gradient colors for a sky-like cubemap.
 #[derive(Clone, Debug)]
 pub struct CubemapSkyGradient {
     pub zenith: Color,
@@ -40,6 +45,7 @@ pub struct CubemapSkyGradient {
 }
 
 impl CubemapSkyGradient {
+    /// Creates a sky gradient from zenith and nadir colors.
     pub fn new(zenith: Color, nadir: Color) -> Self {
         Self { zenith, nadir }
     }
@@ -54,6 +60,7 @@ impl Default for CubemapSkyGradient {
     }
 }
 
+/// Creates a cubemap with solid color faces.
 pub async fn new_colors(
     colors: CubemapBitmapColors,
     width: u32,
@@ -101,6 +108,7 @@ pub async fn new_colors(
     })
 }
 
+/// Creates a cubemap with a vertical sky gradient on side faces.
 pub async fn new_sky_gradient(
     colors: CubemapSkyGradient,
     width: u32,
@@ -181,6 +189,7 @@ pub async fn new_sky_gradient(
 }
 
 #[allow(clippy::too_many_arguments)]
+/// Creates a cubemap texture from six images.
 pub async fn create_texture(
     gpu: &AwsmRendererWebGpu,
     z_positive: &ImageData,

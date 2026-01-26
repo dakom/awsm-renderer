@@ -1,3 +1,5 @@
+//! Shader templates for the geometry pass.
+
 use askama::Template;
 
 use crate::{
@@ -5,6 +7,7 @@ use crate::{
     shaders::{AwsmShaderError, Result},
 };
 
+/// Geometry pass shader template components.
 #[derive(Debug)]
 pub struct ShaderTemplateGeometry {
     pub bind_groups: ShaderTemplateGeometryBindGroups,
@@ -12,16 +15,19 @@ pub struct ShaderTemplateGeometry {
     pub fragment: ShaderTemplateGeometryFragment,
 }
 
+/// Bind group template for the geometry pass.
 #[derive(Template, Debug)]
 #[template(path = "geometry_wgsl/bind_groups.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateGeometryBindGroups {}
 
 impl ShaderTemplateGeometryBindGroups {
+    /// Creates a bind group template from the cache key.
     pub fn new(_cache_key: &ShaderCacheKeyGeometry) -> Self {
         Self {}
     }
 }
 
+/// Vertex shader template for the geometry pass.
 #[derive(Template, Debug)]
 #[template(path = "geometry_wgsl/vertex.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateGeometryVertex {
@@ -31,6 +37,7 @@ pub struct ShaderTemplateGeometryVertex {
 }
 
 impl ShaderTemplateGeometryVertex {
+    /// Creates a vertex shader template from the cache key.
     pub fn new(cache_key: &ShaderCacheKeyGeometry) -> Self {
         Self {
             max_morph_unroll: 2,
@@ -40,11 +47,13 @@ impl ShaderTemplateGeometryVertex {
     }
 }
 
+/// Fragment shader template for the geometry pass.
 #[derive(Template, Debug)]
 #[template(path = "geometry_wgsl/fragment.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateGeometryFragment {}
 
 impl ShaderTemplateGeometryFragment {
+    /// Creates a fragment shader template from the cache key.
     pub fn new(_cache_key: &ShaderCacheKeyGeometry) -> Self {
         Self {}
     }
@@ -63,6 +72,7 @@ impl TryFrom<&ShaderCacheKeyGeometry> for ShaderTemplateGeometry {
 }
 
 impl ShaderTemplateGeometry {
+    /// Renders the geometry shader template into WGSL.
     pub fn into_source(self) -> Result<String> {
         let bind_groups_source = self.bind_groups.render()?;
         let vertex_source = self.vertex.render()?;
@@ -79,6 +89,7 @@ impl ShaderTemplateGeometry {
     }
 
     #[cfg(debug_assertions)]
+    /// Returns an optional debug label for shader compilation.
     pub fn debug_label(&self) -> Option<&str> {
         Some("Geometry")
     }

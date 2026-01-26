@@ -1,9 +1,10 @@
 use crate::{camera::CameraMatrices, AwsmRenderer};
 
 impl AwsmRenderer {
-    // just a convenience function to update non-GPU properties
-    // pair this with .render() once a frame and everything should run smoothly
-    // but real-world you may want to update transforms more often for physics, for example
+    /// Convenience helper to update non-GPU properties once per frame.
+    ///
+    /// Pair this with `render()` for a simple frame loop; for physics-heavy scenes,
+    /// you may want to update transforms more frequently.
     pub fn update_all(
         &mut self,
         global_time_delta: f64,

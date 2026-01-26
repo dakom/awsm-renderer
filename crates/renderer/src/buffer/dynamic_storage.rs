@@ -1,3 +1,5 @@
+//! Dynamic storage buffer utilities.
+
 use slotmap::{Key, SecondaryMap};
 
 /// Dynamic buffer for variable-size allocations using buddy memory allocation.
@@ -49,6 +51,7 @@ pub struct DynamicStorageBuffer<K: Key, const ZERO: u8 = 0> {
 }
 
 impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
+    /// Creates a new dynamic storage buffer.
     pub fn new(mut initial_bytes: usize, label: Option<String>) -> Self {
         let initial_bytes_orig = initial_bytes;
         // round up to next power‑of‑two multiple of MIN_BLOCK
@@ -131,6 +134,7 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
         off
     }
 
+    /// Removes a key and frees its allocation.
     pub fn remove(&mut self, key: K) {
         if let Some((off, size)) = self.slot_indices.remove(key) {
             self.raw_data[off..off + size].fill(ZERO);
@@ -162,18 +166,22 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
     /*                GPU write                                           */
     /* ------------------------------------------------------------------ */
 
+    /// Returns the full raw buffer slice.
     pub fn raw_slice(&self) -> &[u8] {
         &self.raw_data
     }
 
+    /// Takes and clears dirty ranges.
     pub fn take_dirty_ranges(&mut self) -> Vec<(usize, usize)> {
         std::mem::take(&mut self.dirty_ranges)
     }
 
+    /// Clears dirty ranges without returning them.
     pub fn clear_dirty_ranges(&mut self) {
         self.dirty_ranges.clear();
     }
 
+    /// Returns the new size if the GPU buffer needs resizing.
     pub fn take_gpu_needs_resize(&mut self) -> Option<usize> {
         let size = match self.gpu_buffer_needs_resize {
             true => Some(self.raw_data.len()),
@@ -304,9 +312,11 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
 
     /* ---------- tiny query helpers (unchanged APIs) -------------------- */
 
+    /// Returns the byte offset for a key.
     pub fn offset(&self, key: K) -> Option<usize> {
         self.slot_indices.get(key).map(|&(off, _)| off)
     }
+    /// Returns the allocated size for a key.
     pub fn size(&self, key: K) -> Option<usize> {
         self.slot_indices.get(key).map(|&(_, sz)| sz)
     }

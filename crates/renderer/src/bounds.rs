@@ -1,6 +1,8 @@
+//! Axis-aligned bounding boxes.
+
 use glam::{Mat4, Vec3};
 
-// Axis-Aligned Bounding Box (AABB) structure
+/// Axis-aligned bounding box (AABB).
 #[derive(Debug, Clone)]
 pub struct Aabb {
     pub min: Vec3,
@@ -8,10 +10,12 @@ pub struct Aabb {
 }
 
 impl Aabb {
+    /// Creates an AABB from min and max points.
     pub fn new(min: Vec3, max: Vec3) -> Self {
         Self { min, max }
     }
 
+    /// Creates a cube AABB centered at the origin.
     pub const fn new_cube(width: f32, height: f32) -> Self {
         Self {
             min: Vec3::new(-width / 2.0, -height / 2.0, -width / 2.0),
@@ -19,15 +23,18 @@ impl Aabb {
         }
     }
 
+    /// Creates a 2x2x2 cube AABB centered at the origin.
     pub const fn new_unit_cube() -> Self {
         Self::new_cube(2.0, 2.0)
     }
 
+    /// Expands this AABB to include another.
     pub fn extend(&mut self, other: &Self) {
         self.min = self.min.min(other.min);
         self.max = self.max.max(other.max);
     }
 
+    /// Transforms this AABB in place by a matrix.
     pub fn transform(&mut self, mat: &Mat4) {
         // Transform all 8 corners of the AABB and recompute bounds
         // This is necessary because rotation can change which corners are min/max
@@ -53,16 +60,19 @@ impl Aabb {
         }
     }
 
+    /// Returns a transformed copy of this AABB.
     pub fn transformed(&self, mat: &Mat4) -> Self {
         let mut out = self.clone();
         out.transform(mat);
         out
     }
 
+    /// Returns the center point of the AABB.
     pub fn center(&self) -> Vec3 {
         (self.min + self.max) * 0.5
     }
 
+    /// Returns the size of the AABB along each axis.
     pub fn size(&self) -> Vec3 {
         self.max - self.min
     }
@@ -70,6 +80,7 @@ impl Aabb {
 
 #[cfg(feature = "gltf")]
 impl Aabb {
+    /// Computes an AABB for a glTF document.
     pub fn from_gltf_doc(doc: &gltf::Document) -> Self {
         let mut aabb: Option<Aabb> = None;
 
@@ -101,6 +112,7 @@ impl Aabb {
         aabb.unwrap_or_else(Aabb::new_unit_cube)
     }
 
+    /// Computes an AABB for a glTF node.
     pub fn from_gltf_node(node: &gltf::Node, parent_transform: Option<Mat4>) -> Option<Self> {
         let node_transform = match parent_transform {
             Some(transform) => transform * Mat4::from_cols_array_2d(&node.transform().matrix()),
@@ -126,6 +138,7 @@ impl Aabb {
         aabb
     }
 
+    /// Computes an AABB for a glTF primitive.
     pub fn from_gltf_primitive(
         primitive: &gltf::Primitive,
         transform: Option<Mat4>,

@@ -1,8 +1,12 @@
+//! Buffer helper utilities.
+
+/// Returns a static zero slice of the requested size (up to 32 bytes).
 pub fn slice_zeroes(size: usize) -> &'static [u8] {
     const ZEROES: [u8; 32] = [0; 32];
     &ZEROES[..size]
 }
 
+/// Splits a byte slice into f32 chunks for debugging.
 #[allow(dead_code)]
 pub fn debug_chunks_to_f32(slice: &[u8], chunk_size: usize) -> Vec<Vec<f32>> {
     u8_to_f32_vec(slice)
@@ -11,6 +15,7 @@ pub fn debug_chunks_to_f32(slice: &[u8], chunk_size: usize) -> Vec<Vec<f32>> {
         .collect()
 }
 
+/// Splits a byte slice into u32 chunks for debugging.
 #[allow(dead_code)]
 pub fn debug_chunks_to_u32(slice: &[u8], chunk_size: usize) -> Vec<Vec<u32>> {
     u8_to_u32_vec(slice)
@@ -23,6 +28,7 @@ pub fn debug_chunks_to_u32(slice: &[u8], chunk_size: usize) -> Vec<Vec<u32>> {
 // "All buffer data defined in this specification (i.e., geometry attributes, geometry indices, sparse accessor data, animation inputs and outputs, inverse bind matrices)
 // MUST use little endian byte order."
 
+/// Expands packed u16 bytes into u32 bytes (little endian).
 pub fn u16_to_u32_vec(v: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(v.len() * 2);
     for chunk in v.chunks_exact(2) {
@@ -34,6 +40,7 @@ pub fn u16_to_u32_vec(v: &[u8]) -> Vec<u8> {
     output
 }
 
+/// Expands packed i16 bytes into i32 bytes (little endian).
 pub fn i16_to_i32_vec(v: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(v.len() * 2);
     for chunk in v.chunks_exact(2) {
@@ -44,6 +51,7 @@ pub fn i16_to_i32_vec(v: &[u8]) -> Vec<u8> {
     output
 }
 
+/// Converts raw bytes into f32 values (little endian).
 pub fn u8_to_f32_vec(v: &[u8]) -> Vec<f32> {
     v.chunks_exact(4)
         .map(TryInto::try_into)
@@ -52,6 +60,7 @@ pub fn u8_to_f32_vec(v: &[u8]) -> Vec<f32> {
         .collect()
 }
 
+/// Iterates f32 values from raw bytes (little endian).
 pub fn u8_to_f32_iter(v: &[u8]) -> impl Iterator<Item = f32> + '_ {
     v.chunks_exact(4)
         .map(TryInto::try_into)
@@ -59,6 +68,7 @@ pub fn u8_to_f32_iter(v: &[u8]) -> impl Iterator<Item = f32> + '_ {
         .map(f32::from_le_bytes)
 }
 
+/// Converts raw bytes into i8 values.
 pub fn u8_to_i8_vec(v: &[u8]) -> Vec<i8> {
     v.chunks_exact(1)
         .map(TryInto::try_into)
@@ -67,6 +77,7 @@ pub fn u8_to_i8_vec(v: &[u8]) -> Vec<i8> {
         .collect()
 }
 
+/// Converts raw bytes into u16 values (little endian).
 pub fn u8_to_u16_vec(v: &[u8]) -> Vec<u16> {
     v.chunks_exact(2)
         .map(TryInto::try_into)
@@ -75,6 +86,7 @@ pub fn u8_to_u16_vec(v: &[u8]) -> Vec<u16> {
         .collect()
 }
 
+/// Iterates u16 values from raw bytes (little endian).
 pub fn u8_to_u16_iter(v: &[u8]) -> impl Iterator<Item = u16> + '_ {
     v.chunks_exact(2)
         .map(TryInto::try_into)
@@ -82,6 +94,7 @@ pub fn u8_to_u16_iter(v: &[u8]) -> impl Iterator<Item = u16> + '_ {
         .map(u16::from_le_bytes)
 }
 
+/// Converts raw bytes into i16 values (little endian).
 pub fn u8_to_i16_vec(v: &[u8]) -> Vec<i16> {
     v.chunks_exact(2)
         .map(TryInto::try_into)
@@ -90,6 +103,7 @@ pub fn u8_to_i16_vec(v: &[u8]) -> Vec<i16> {
         .collect()
 }
 
+/// Converts raw bytes into u32 values (little endian).
 pub fn u8_to_u32_vec(v: &[u8]) -> Vec<u32> {
     v.chunks_exact(4)
         .map(TryInto::try_into)
@@ -98,6 +112,7 @@ pub fn u8_to_u32_vec(v: &[u8]) -> Vec<u32> {
         .collect()
 }
 
+/// Iterates u32 values from raw bytes (little endian).
 pub fn u8_to_u32_iter(v: &[u8]) -> impl Iterator<Item = u32> + '_ {
     v.chunks_exact(4)
         .map(TryInto::try_into)
@@ -109,6 +124,7 @@ use awsm_renderer_core::{error::AwsmCoreError, renderer::AwsmRendererWebGpu};
 const DIRTY_RANGE_FULL_WRITE_THRESHOLD_PERCENT: u64 = 60;
 const DIRTY_RANGE_MAX_RANGES: usize = 32;
 
+/// Writes only dirty ranges to a GPU buffer, with a full-write fallback.
 pub fn write_buffer_with_dirty_ranges(
     gpu: &AwsmRendererWebGpu,
     gpu_buffer: &web_sys::GpuBuffer,

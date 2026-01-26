@@ -1,3 +1,5 @@
+//! Frustum extraction and culling helpers.
+
 use glam::{Mat4, Vec3, Vec4};
 
 use crate::bounds::Aabb;
@@ -28,6 +30,7 @@ impl Plane {
     }
 }
 
+/// View frustum planes extracted from a view-projection matrix.
 #[derive(Debug, Clone, Copy)]
 pub struct Frustum {
     planes: [Plane; 6],
@@ -35,6 +38,7 @@ pub struct Frustum {
 
 impl Frustum {
     // Assumes a right-handed view-projection with WebGPU depth range [0, 1].
+    /// Builds a frustum from a view-projection matrix.
     pub fn from_view_projection(view_projection: Mat4) -> Self {
         let x = view_projection.x_axis;
         let y = view_projection.y_axis;
@@ -58,6 +62,7 @@ impl Frustum {
         }
     }
 
+    /// Returns true if the AABB intersects the frustum.
     pub fn intersects_aabb(&self, aabb: &Aabb) -> bool {
         for plane in &self.planes {
             let px = if plane.normal.x >= 0.0 {

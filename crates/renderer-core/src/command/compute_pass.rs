@@ -1,16 +1,21 @@
+//! Compute pass helpers.
+
 use crate::error::{AwsmCoreError, Result};
 use std::ops::Deref;
 
+/// Wrapper for a WebGPU compute pass encoder.
 #[derive(Debug, Clone)]
 pub struct ComputePassEncoder {
     inner: web_sys::GpuComputePassEncoder,
 }
 
 impl ComputePassEncoder {
+    /// Wraps a compute pass encoder.
     pub fn new(inner: web_sys::GpuComputePassEncoder) -> Self {
         Self { inner }
     }
 
+    /// Dispatches compute workgroups.
     pub fn dispatch_workgroups(
         &self,
         workgroup_count_x: u32,
@@ -44,6 +49,7 @@ impl ComputePassEncoder {
         }
     }
 
+    /// Sets a bind group for the pass.
     pub fn set_bind_group(
         &self,
         index: u32,
@@ -76,6 +82,7 @@ impl Deref for ComputePassEncoder {
     }
 }
 
+/// Descriptor for starting a compute pass.
 #[derive(Debug, Clone, Default)]
 pub struct ComputePassDescriptor<'a> {
     pub label: Option<&'a str>,
@@ -83,6 +90,7 @@ pub struct ComputePassDescriptor<'a> {
 }
 
 impl<'a> ComputePassDescriptor<'a> {
+    /// Creates a compute pass descriptor.
     pub fn new(label: Option<&'a str>) -> Self {
         Self {
             label,
@@ -90,12 +98,14 @@ impl<'a> ComputePassDescriptor<'a> {
         }
     }
 
+    /// Sets timestamp writes for the pass.
     pub fn with_timestamp_writes(mut self, timestamp_writes: ComputeTimestampWrites<'a>) -> Self {
         self.timestamp_writes = Some(timestamp_writes);
         self
     }
 }
 
+/// Timestamp write configuration for a compute pass.
 #[derive(Debug, Clone)]
 pub struct ComputeTimestampWrites<'a> {
     pub query_set: &'a web_sys::GpuQuerySet,

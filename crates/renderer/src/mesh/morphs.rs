@@ -1,3 +1,5 @@
+//! Morph target storage and GPU updates.
+
 use std::sync::LazyLock;
 
 use awsm_renderer_core::buffers::{BufferDescriptor, BufferUsage};
@@ -15,12 +17,14 @@ use crate::AwsmRendererLogging;
 // The weights are dynamic and updated on a per-mesh basis as frequently as needed
 // The values are essentially static, but may be sourced from different (large) buffers
 // e.g. they are loaded up front per-gltf file
+/// Geometry and material morph target storage.
 pub struct Morphs {
     pub geometry: MorphData<GeometryMorphKey, MeshBufferGeometryMorphInfo>,
     pub material: MorphData<MaterialMorphKey, MeshBufferMaterialMorphInfo>,
 }
 
 impl Morphs {
+    /// Creates morph target buffers.
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Self {
             geometry: MorphData::new(gpu)?,
@@ -28,6 +32,7 @@ impl Morphs {
         })
     }
 
+    /// Writes morph target data to the GPU.
     pub fn write_gpu(
         &mut self,
         logging: &AwsmRendererLogging,
@@ -52,6 +57,7 @@ impl Morphs {
     }
 }
 
+/// Trait for morph info metadata.
 pub trait MorphInfo: Clone {
     fn targets_len(&self) -> usize;
 }
@@ -74,9 +80,12 @@ static BUFFER_USAGE_VALUES: LazyLock<BufferUsage> =
     LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
 
 impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
+    /// Initial size for morph weights buffer.
     pub const WEIGHTS_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
+    /// Initial size for morph values buffer.
     pub const VALUES_INITIAL_SIZE: usize = 4096; // 4kB is a good starting point
 
+    /// Creates morph data buffers.
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let gpu_buffer_weights = gpu.create_buffer(
             &BufferDescriptor::new(
@@ -113,12 +122,14 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
         })
     }
 
+    /// Returns morph info by key.
     pub fn get_info(&self, key: Key) -> Result<&Info> {
         self.infos
             .get(key)
             .ok_or_else(|| AwsmMeshError::MorphNotFound(format!("{:?}", key)))
     }
 
+    /// Inserts morph data from f32 weights and values.
     pub fn insert(
         &mut self,
         morph_buffer_info: Info,
@@ -133,6 +144,7 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
         self.insert_raw(morph_buffer_info, weights_u8, values_u8)
     }
 
+    /// Inserts morph data from raw bytes.
     pub fn insert_raw(
         &mut self,
         morph_buffer_info: Info,
@@ -157,6 +169,7 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
         Ok(key)
     }
 
+    /// Removes morph data by key.
     pub fn remove(&mut self, key: Key) {
         self.weights.remove(key);
         self.values.remove(key);
@@ -166,19 +179,21 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
         self.values_dirty = true;
     }
 
+    /// Returns the weights buffer offset for a morph key.
     pub fn weights_buffer_offset(&self, key: Key) -> Result<usize> {
         self.weights
             .offset(key)
             .ok_or_else(|| AwsmMeshError::MorphNotFound(format!("{:?}", key)))
     }
 
+    /// Returns the values buffer offset for a morph key.
     pub fn values_buffer_offset(&self, key: Key) -> Result<usize> {
         self.values
             .offset(key)
             .ok_or_else(|| AwsmMeshError::MorphNotFound(format!("{:?}", key)))
     }
 
-    // this does *not* write to the GPU, so it can be called relatively frequently for physics etc.
+    /// Updates morph weights without writing to the GPU.
     pub fn update_morph_weights_with(
         &mut self,
         key: Key,
@@ -292,6 +307,7 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
     }
 }
 
+/// Morph target data and GPU buffers.
 pub struct MorphData<Key: slotmap::Key, Info> {
     weights: DynamicStorageBuffer<Key>,
     values: DynamicStorageBuffer<Key>,
@@ -303,9 +319,11 @@ pub struct MorphData<Key: slotmap::Key, Info> {
 }
 
 new_key_type! {
+    /// Opaque key for geometry morph targets.
     pub struct GeometryMorphKey;
 }
 
 new_key_type! {
+    /// Opaque key for material morph targets.
     pub struct MaterialMorphKey;
 }

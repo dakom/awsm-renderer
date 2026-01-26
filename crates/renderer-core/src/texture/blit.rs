@@ -1,3 +1,5 @@
+//! Simple blit pipeline for texture copies.
+
 use std::{borrow::Cow, cell::RefCell, collections::HashMap};
 
 use web_sys::GpuTextureView;
@@ -26,6 +28,7 @@ use crate::{
     texture::{TextureFormat, TextureFormatKey, TextureSampleType, TextureViewDimension},
 };
 
+/// Cached pipeline and layout for blit operations.
 #[derive(Debug, Clone)]
 pub struct BlitPipeline {
     pub render_pipeline: web_sys::GpuRenderPipeline,
@@ -80,6 +83,7 @@ static SHADER_SOURCE: &str = r#"
     }
 "#;
 
+/// Blits a texture view into another view using a cached pipeline.
 pub async fn blit_tex_simple(
     gpu: &AwsmRendererWebGpu,
     src_view: &web_sys::GpuTextureView,
@@ -95,6 +99,7 @@ pub async fn blit_tex_simple(
     Ok(())
 }
 
+/// Records a blit render pass into the command encoder.
 pub fn blit_tex(
     pipeline: &BlitPipeline,
     bind_group: &web_sys::GpuBindGroup,
@@ -124,6 +129,7 @@ pub fn blit_tex(
     Ok(())
 }
 
+/// Creates a bind group for a blit pipeline and source view.
 pub fn blit_get_bind_group(
     gpu: &AwsmRendererWebGpu,
     pipeline: &BlitPipeline,
@@ -142,6 +148,7 @@ pub fn blit_get_bind_group(
     )
 }
 
+/// Returns a cached blit pipeline for the given format and sample count.
 pub async fn blit_get_pipeline(
     gpu: &AwsmRendererWebGpu,
     dst_format: TextureFormat,

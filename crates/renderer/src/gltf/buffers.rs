@@ -1,3 +1,5 @@
+//! glTF buffer extraction and layout helpers.
+
 // pub mod vertex;
 //pub mod morph;
 pub mod accessor;
@@ -32,6 +34,7 @@ use crate::{
 
 use super::error::{AwsmGltfError, Result};
 
+/// Packed buffers extracted from a glTF asset.
 #[derive(Debug)]
 pub struct GltfBuffers {
     pub raw: Vec<Vec<u8>>,
@@ -67,6 +70,7 @@ pub struct GltfBuffers {
 }
 
 impl GltfBuffers {
+    /// Clones all buffer data for independent use.
     pub fn heavy_clone(&self) -> Self {
         Self {
             raw: self.raw.clone(),
@@ -153,6 +157,7 @@ fn determine_front_face(
     front_face.unwrap_or(FrontFace::Ccw)
 }
 
+/// Mesh buffer info paired with byte offsets into the packed buffers.
 #[derive(Clone, Debug)]
 pub struct MeshBufferInfoWithOffset {
     pub visibility_geometry_vertex: Option<MeshBufferVertexInfoWithOffset>,
@@ -176,6 +181,7 @@ impl From<MeshBufferInfoWithOffset> for MeshBufferInfo {
     }
 }
 
+/// Vertex buffer info paired with byte offsets into the packed buffers.
 #[derive(Clone, Debug)]
 pub struct MeshBufferVertexInfoWithOffset {
     pub count: usize,
@@ -188,6 +194,7 @@ impl From<MeshBufferVertexInfoWithOffset> for MeshBufferVertexInfo {
     }
 }
 
+/// Triangle buffer info paired with byte offsets into the packed buffers.
 #[derive(Clone, Debug)]
 pub struct MeshBufferTriangleInfoWithOffset {
     pub count: usize,
@@ -211,6 +218,7 @@ impl From<MeshBufferTriangleInfoWithOffset> for MeshBufferTriangleInfo {
     }
 }
 
+/// Index buffer info paired with byte offsets into the packed buffers.
 #[derive(Debug, Clone)]
 pub struct MeshBufferAttributeIndexInfoWithOffset {
     pub offset: usize,
@@ -218,6 +226,7 @@ pub struct MeshBufferAttributeIndexInfoWithOffset {
 }
 
 impl MeshBufferAttributeIndexInfoWithOffset {
+    /// Returns the total size in bytes for the index data.
     pub fn total_size(&self) -> usize {
         self.count * 4 // guaranteed u32
     }
@@ -229,7 +238,7 @@ impl From<MeshBufferAttributeIndexInfoWithOffset> for MeshBufferAttributeIndexIn
     }
 }
 
-/// Information about geometry morphs (positions, normals, tangents - indexed per vertex)
+/// Geometry morph info paired with byte offsets into the packed buffers.
 #[derive(Debug, Clone)]
 pub struct MeshBufferGeometryMorphInfoWithOffset {
     pub targets_len: usize,
@@ -248,7 +257,7 @@ impl From<MeshBufferGeometryMorphInfoWithOffset> for MeshBufferGeometryMorphInfo
     }
 }
 
-/// Information about material morphs (normals + tangents, non-exploded per-vertex)
+/// Material morph info paired with byte offsets into the packed buffers.
 #[derive(Debug, Clone)]
 pub struct MeshBufferMaterialMorphInfoWithOffset {
     pub attributes: MeshBufferMaterialMorphAttributes, // Which attributes are present
@@ -269,6 +278,7 @@ impl From<MeshBufferMaterialMorphInfoWithOffset> for MeshBufferMaterialMorphInfo
     }
 }
 
+/// Skin buffer info paired with byte offsets into the packed buffers.
 #[derive(Debug, Clone)]
 pub struct MeshBufferSkinInfoWithOffset {
     pub set_count: usize,
@@ -286,6 +296,7 @@ impl From<MeshBufferSkinInfoWithOffset> for MeshBufferSkinInfo {
     }
 }
 
+/// Triangle data info paired with byte offsets into the packed buffers.
 #[derive(Debug, Clone)]
 pub struct MeshBufferTriangleDataInfoWithOffset {
     pub size_per_triangle: usize,
@@ -303,6 +314,7 @@ impl From<MeshBufferTriangleDataInfoWithOffset> for MeshBufferTriangleDataInfo {
 }
 
 impl GltfBuffers {
+    /// Builds packed buffers from a glTF document and raw buffer data.
     pub fn new(doc: &gltf::Document, buffers: Vec<Vec<u8>>, hints: GltfDataHints) -> Result<Self> {
         let world_matrices = compute_world_matrices(doc);
 

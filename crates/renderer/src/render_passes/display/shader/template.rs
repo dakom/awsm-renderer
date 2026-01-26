@@ -1,3 +1,5 @@
+//! Shader templates for the display pass.
+
 use askama::Template;
 
 use crate::{
@@ -6,6 +8,7 @@ use crate::{
     shaders::{AwsmShaderError, Result},
 };
 
+/// Display pass shader template components.
 #[derive(Debug)]
 pub struct ShaderTemplateDisplay {
     pub bind_groups: ShaderTemplateDisplayBindGroups,
@@ -13,26 +16,31 @@ pub struct ShaderTemplateDisplay {
     pub fragment: ShaderTemplateDisplayFragment,
 }
 
+/// Bind group template for the display pass.
 #[derive(Template, Debug)]
 #[template(path = "display_wgsl/bind_groups.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateDisplayBindGroups {}
 
 impl ShaderTemplateDisplayBindGroups {
+    /// Creates a bind group template from the cache key.
     pub fn new(_cache_key: &ShaderCacheKeyDisplay) -> Self {
         Self {}
     }
 }
 
+/// Vertex shader template for the display pass.
 #[derive(Template, Debug)]
 #[template(path = "display_wgsl/vertex.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateDisplayVertex {}
 
 impl ShaderTemplateDisplayVertex {
+    /// Creates a vertex shader template from the cache key.
     pub fn new(_cache_key: &ShaderCacheKeyDisplay) -> Self {
         Self {}
     }
 }
 
+/// Fragment shader template for the display pass.
 #[derive(Template, Debug)]
 #[template(path = "display_wgsl/fragment.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplateDisplayFragment {
@@ -40,6 +48,7 @@ pub struct ShaderTemplateDisplayFragment {
 }
 
 impl ShaderTemplateDisplayFragment {
+    /// Creates a fragment shader template from the cache key.
     pub fn new(cache_key: &ShaderCacheKeyDisplay) -> Self {
         Self {
             tonemapping: cache_key.tonemapping,
@@ -60,6 +69,7 @@ impl TryFrom<&ShaderCacheKeyDisplay> for ShaderTemplateDisplay {
 }
 
 impl ShaderTemplateDisplay {
+    /// Renders the display shader template into WGSL.
     pub fn into_source(self) -> Result<String> {
         let bind_groups_source = self.bind_groups.render()?;
         let vertex_source = self.vertex.render()?;
@@ -71,6 +81,7 @@ impl ShaderTemplateDisplay {
     }
 
     #[cfg(debug_assertions)]
+    /// Returns an optional debug label for shader compilation.
     pub fn debug_label(&self) -> Option<&str> {
         Some("Display")
     }

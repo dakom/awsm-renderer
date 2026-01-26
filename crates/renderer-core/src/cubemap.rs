@@ -1,3 +1,5 @@
+//! Cubemap image loading and texture creation helpers.
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "ktx")] {
         pub mod ktx;
@@ -15,11 +17,14 @@ use crate::{
     texture::{TextureViewDescriptor, TextureViewDimension},
 };
 
+/// Source cubemap data backed by KTX or six images.
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum CubemapImage {
     #[cfg(feature = "ktx")]
+    /// KTX2 cubemap source.
     Ktx(Arc<ktx2::Reader<Vec<u8>>>),
+    /// Individual images for each cubemap face.
     Images {
         z_positive: ImageData,
         z_negative: ImageData,
@@ -34,6 +39,7 @@ pub enum CubemapImage {
 impl CubemapImage {
     cfg_if::cfg_if! {
         if #[cfg(feature = "ktx")] {
+            /// Loads a KTX2 cubemap from a URL.
             pub async fn load_url_ktx(url:&str) -> anyhow::Result<Self> {
                 let reader = ktx::load_url(url).await?;
 
@@ -41,6 +47,7 @@ impl CubemapImage {
             }
 
             // returns mip count as well
+            /// Creates a GPU cubemap texture and view.
             pub async fn create_texture_and_view(
                 &self,
                 gpu: &AwsmRendererWebGpu,
@@ -62,14 +69,17 @@ impl CubemapImage {
 
             }
 
+            /// Creates a cubemap from solid colors for each face.
             pub async fn new_colors(colors: CubemapBitmapColors, width: u32, height: u32) -> Result<Self> {
                 images::new_colors(colors, width, height).await
             }
 
+            /// Creates a cubemap from a simple sky gradient.
             pub async fn new_sky_gradient(colors: CubemapSkyGradient, width: u32, height: u32) -> Result<Self> {
                 images::new_sky_gradient(colors, width, height).await
             }
         } else {
+            /// Creates a GPU cubemap texture and view.
             pub async fn create_texture_and_view(
                 &self,
                 gpu: &AwsmRendererWebGpu,
@@ -86,10 +96,12 @@ impl CubemapImage {
 
             }
 
+            /// Creates a cubemap from solid colors for each face.
             pub async fn new_colors(colors: CubemapBitmapColors, width: u32, height: u32) -> Result<Self> {
                 images::new_colors(colors, width, height).await
             }
 
+            /// Creates a cubemap from a simple sky gradient.
             pub async fn new_sky_gradient(colors: CubemapSkyGradient, width: u32, height: u32) -> Result<Self> {
                 images::new_sky_gradient(colors, width, height).await
             }

@@ -1,3 +1,5 @@
+//! Shader cache and template helpers.
+
 use std::collections::HashMap;
 
 use awsm_renderer_core::{
@@ -15,11 +17,13 @@ use crate::{
     },
 };
 
+/// Cached GPU shader modules keyed by template parameters.
 pub struct Shaders {
     lookup: SlotMap<ShaderKey, web_sys::GpuShaderModule>,
     cache: HashMap<ShaderCacheKey, ShaderKey>,
 }
 impl Shaders {
+    /// Creates an empty shader cache.
     pub fn new() -> Self {
         Self {
             lookup: SlotMap::with_key(),
@@ -29,10 +33,12 @@ impl Shaders {
 
     // usually used with hooks, i.e. third-party shaders that are completely outside
     // of the normal renderer system
+    /// Inserts a shader module without caching it by template key.
     pub fn insert_uncached(&mut self, shader_module: web_sys::GpuShaderModule) -> ShaderKey {
         self.lookup.insert(shader_module)
     }
 
+    /// Returns a cached shader key, compiling and caching on demand.
     pub async fn get_key(
         &mut self,
         gpu: &AwsmRendererWebGpu,
@@ -62,6 +68,7 @@ impl Shaders {
         Ok(shader_key)
     }
 
+    /// Returns a shader module by key.
     pub fn get(&self, shader_key: ShaderKey) -> Option<&web_sys::GpuShaderModule> {
         self.lookup.get(shader_key)
     }
@@ -73,12 +80,14 @@ impl Default for Shaders {
     }
 }
 
+/// Shader cache keys for renderer-managed shader templates.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum ShaderCacheKey {
     RenderPass(ShaderCacheKeyRenderPass),
     Picker(ShaderCacheKeyPicker),
 }
 
+/// Shader template variants for renderer-managed shaders.
 pub enum ShaderTemplate {
     RenderPass(ShaderTemplateRenderPass),
     Picker(ShaderTemplatePicker),
@@ -99,17 +108,20 @@ impl TryFrom<&ShaderCacheKey> for ShaderTemplate {
 
 impl ShaderTemplate {
     #[cfg(debug_assertions)]
+    /// Builds a GPU shader module descriptor with a debug label.
     pub fn into_descriptor(self) -> Result<web_sys::GpuShaderModuleDescriptor> {
         let label = self.debug_label().map(|l| l.to_string());
         Ok(ShaderModuleDescriptor::new(&self.into_source()?, label.as_deref()).into())
     }
 
     #[cfg(not(debug_assertions))]
+    /// Builds a GPU shader module descriptor without debug metadata.
     pub fn into_descriptor(self) -> Result<web_sys::GpuShaderModuleDescriptor> {
         Ok(ShaderModuleDescriptor::new(&self.into_source()?, None).into())
     }
 
     #[cfg(debug_assertions)]
+    /// Returns an optional debug label for this shader template.
     pub fn debug_label(&self) -> Option<&str> {
         match self {
             ShaderTemplate::RenderPass(tmpl) => tmpl.debug_label(),
@@ -117,6 +129,7 @@ impl ShaderTemplate {
         }
     }
 
+    /// Renders the template into WGSL source.
     pub fn into_source(self) -> Result<String> {
         let source = match self {
             ShaderTemplate::RenderPass(tmpl) => tmpl.into_source()?,
@@ -130,6 +143,7 @@ impl ShaderTemplate {
 }
 
 #[allow(dead_code)]
+/// Logs shader source to the console for debugging.
 pub fn print_shader_source(source: &str, with_line_numbers: bool) {
     let mut output = "\n".to_string();
     let lines = source.lines();
@@ -147,10 +161,13 @@ pub fn print_shader_source(source: &str, with_line_numbers: bool) {
 }
 
 new_key_type! {
+    /// SlotMap key for cached shader modules.
     pub struct ShaderKey;
 }
 
+/// Shader result type.
 pub type Result<T> = std::result::Result<T, AwsmShaderError>;
+/// Shader template and compilation errors.
 #[derive(Error, Debug)]
 pub enum AwsmShaderError {
     #[error("[shader] source error: {0}")]

@@ -1,3 +1,5 @@
+//! Pipeline layout caching.
+
 use std::collections::HashMap;
 
 use awsm_renderer_core::{
@@ -8,12 +10,14 @@ use thiserror::Error;
 
 use crate::bind_group_layout::{AwsmBindGroupLayoutError, BindGroupLayoutKey, BindGroupLayouts};
 
+/// Cache for GPU pipeline layouts.
 pub struct PipelineLayouts {
     lookup: SlotMap<PipelineLayoutKey, web_sys::GpuPipelineLayout>,
     cache: HashMap<PipelineLayoutCacheKey, PipelineLayoutKey>,
 }
 
 impl PipelineLayouts {
+    /// Creates an empty pipeline layout cache.
     pub fn new() -> Self {
         Self {
             lookup: SlotMap::with_key(),
@@ -21,6 +25,7 @@ impl PipelineLayouts {
         }
     }
 
+    /// Returns a layout key for the cache key, creating it if needed.
     pub fn get_key(
         &mut self,
         gpu: &AwsmRendererWebGpu,
@@ -51,6 +56,7 @@ impl PipelineLayouts {
         Ok(key)
     }
 
+    /// Returns the layout for a given key.
     pub fn get(&self, key: PipelineLayoutKey) -> Result<&web_sys::GpuPipelineLayout> {
         self.lookup
             .get(key)
@@ -64,23 +70,28 @@ impl Default for PipelineLayouts {
     }
 }
 
+/// Cache key for pipeline layouts.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PipelineLayoutCacheKey {
     pub bind_group_layouts: Vec<BindGroupLayoutKey>,
 }
 
 impl PipelineLayoutCacheKey {
+    /// Creates a cache key from bind group layout keys.
     pub fn new(bind_group_layouts: Vec<BindGroupLayoutKey>) -> Self {
         Self { bind_group_layouts }
     }
 }
 
 new_key_type! {
+    /// Opaque key for pipeline layouts.
     pub struct PipelineLayoutKey;
 }
 
+/// Result type for pipeline layout operations.
 type Result<T> = std::result::Result<T, AwsmPipelineLayoutError>;
 
+/// Pipeline layout errors.
 #[derive(Error, Debug)]
 pub enum AwsmPipelineLayoutError {
     #[error("[pipeline layout] Unable to create: {0:?}")]

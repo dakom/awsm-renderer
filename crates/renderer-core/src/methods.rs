@@ -1,3 +1,5 @@
+//! Convenience methods for WebGPU operations.
+
 use crate::{
     buffers::{extract_buffer_vec, BufferDescriptor, BufferUsage},
     configuration::CanvasConfiguration,
@@ -14,6 +16,7 @@ use crate::{
 };
 
 impl AwsmRendererWebGpu {
+    /// Returns the underlying canvas element.
     pub fn canvas(&self) -> web_sys::HtmlCanvasElement {
         self.context.canvas().unchecked_into()
     }
@@ -81,6 +84,7 @@ impl AwsmRendererWebGpu {
         }
     }
 
+    /// Returns the currently configured canvas format.
     pub fn current_context_format(&self) -> TextureFormat {
         self.context
             .get_configuration()
@@ -89,6 +93,7 @@ impl AwsmRendererWebGpu {
             .get_format()
     }
 
+    /// Returns the current swap chain texture.
     pub fn current_context_texture(&self) -> Result<web_sys::GpuTexture> {
         // fine to call this often, from spec https://gpuweb.github.io/gpuweb/#dom-gpucanvascontext-getcurrenttexture
         // "Note: The same GPUTexture object will be returned by every call to getCurrentTexture()
@@ -98,11 +103,13 @@ impl AwsmRendererWebGpu {
             .map_err(AwsmCoreError::current_context_texture)
     }
 
+    /// Returns the current swap chain texture size.
     pub fn current_context_texture_size(&self) -> Result<(u32, u32)> {
         let texture = self.current_context_texture()?;
         Ok((texture.width(), texture.height()))
     }
 
+    /// Returns a view for the current swap chain texture.
     pub fn current_context_texture_view(&self) -> Result<web_sys::GpuTextureView> {
         let texture = self.current_context_texture()?;
 
@@ -201,6 +208,7 @@ impl AwsmRendererWebGpu {
     /// Example usage:
     /// let descriptor:TextureDescriptor = ...;
     /// renderer.create_texture(&descriptor.into());
+    /// Creates a GPU texture from a descriptor.
     pub fn create_texture(
         &self,
         descriptor: &web_sys::GpuTextureDescriptor,
@@ -210,7 +218,8 @@ impl AwsmRendererWebGpu {
             .map_err(AwsmCoreError::texture_creation)
     }
 
-    // Typically this is called via ImageData.to_texture(&gpu)
+    /// Copies an external image into a texture.
+    /// Typically this is called via `ImageData::to_texture(&gpu)`.
     pub fn copy_external_image_to_texture(
         &self,
         source: &web_sys::GpuCopyExternalImageSourceInfo,
@@ -226,6 +235,7 @@ impl AwsmRendererWebGpu {
     /// Example usage:
     /// let descriptor:BufferDescriptor = ...;
     /// renderer.create_buffer(&descriptor.into());
+    /// Creates a GPU buffer from a descriptor.
     pub fn create_buffer(
         &self,
         descriptor: &web_sys::GpuBufferDescriptor,
@@ -253,6 +263,7 @@ impl AwsmRendererWebGpu {
     /// render_pass.draw(3);
     /// render_pass.end();
     /// self.gpu.submit_commands(&command_encoder.finish());
+    /// Creates a command encoder with an optional label.
     pub fn create_command_encoder(&self, label: Option<&str>) -> CommandEncoder {
         let encoder = match label {
             None => self.device.create_command_encoder(),
@@ -268,6 +279,7 @@ impl AwsmRendererWebGpu {
     }
 
     /// See [create_command_encoder](create_command_encoder) for usage.
+    /// Submits a single command buffer.
     pub fn submit_commands(&self, command_buffer: &web_sys::GpuCommandBuffer) {
         self.device
             .queue()
@@ -275,6 +287,7 @@ impl AwsmRendererWebGpu {
     }
 
     /// See [create_command_encoder](create_command_encoder) for usage.
+    /// Submits a batch of command buffers.
     pub fn submit_commands_batch<'a>(
         &self,
         command_buffers: impl IntoIterator<Item = &'a web_sys::GpuCommandBuffer>,
@@ -287,6 +300,7 @@ impl AwsmRendererWebGpu {
     }
 
     // pretty much a direct pass-through, just a bit nicer
+    /// Creates a query set.
     pub fn create_query_set(
         &self,
         query_type: web_sys::GpuQueryType,
@@ -307,6 +321,7 @@ impl AwsmRendererWebGpu {
     /// Example usage:
     /// let descriptor:ExternalTextureDescriptor = ...;
     /// renderer.import_external_texture(&descriptor.into());
+    /// Imports an external texture.
     pub fn import_external_texture(
         &self,
         descriptor: &web_sys::GpuExternalTextureDescriptor,
@@ -319,6 +334,7 @@ impl AwsmRendererWebGpu {
     /// Example usage:
     /// let data: &[u8] = ...;
     /// renderer.write_buffer(buffer, None, data, None, None);
+    /// Writes data into a GPU buffer.
     #[allow(private_bounds)]
     pub fn write_buffer<'a>(
         &self,
@@ -417,6 +433,7 @@ impl AwsmRendererWebGpu {
     /// let size: Extent3d = ...;
     /// let data: &[u8] = ...;
     /// renderer.write_texture(&destination.into(), data, &layout.into(), &size.into());
+    /// Writes data into a GPU texture.
     #[allow(private_bounds)]
     pub fn write_texture<'a>(
         &self,
@@ -451,6 +468,7 @@ impl AwsmRendererWebGpu {
         .map_err(AwsmCoreError::texture_write)
     }
 
+    /// Configures the canvas with an optional configuration override.
     pub fn configure(&mut self, configuration: Option<CanvasConfiguration>) -> Result<()> {
         self.context
             .configure(

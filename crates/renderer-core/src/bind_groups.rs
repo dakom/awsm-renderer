@@ -1,3 +1,5 @@
+//! Bind group layout and bind group descriptors for WebGPU.
+
 use std::{borrow::Cow, hash::Hash};
 
 use crate::{
@@ -5,6 +7,7 @@ use crate::{
     texture::{TextureFormat, TextureSampleType, TextureViewDimension},
 };
 
+/// Builder for a bind group layout descriptor.
 #[derive(Debug, Clone, Default)]
 pub struct BindGroupLayoutDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#descriptor
@@ -13,23 +16,27 @@ pub struct BindGroupLayoutDescriptor<'a> {
 }
 
 impl<'a> BindGroupLayoutDescriptor<'a> {
+    /// Creates a bind group layout descriptor.
     pub fn new(label: Option<&'a str>) -> Self {
         Self {
             label,
             entries: Vec::new(),
         }
     }
+    /// Appends an entry to the layout.
     pub fn with_push_entry(mut self, entry: BindGroupLayoutEntry) -> Self {
         self.entries.push(entry);
         self
     }
 
+    /// Replaces all entries in the layout.
     pub fn with_entries(mut self, entries: Vec<BindGroupLayoutEntry>) -> Self {
         self.entries = entries;
         self
     }
 }
 
+/// Single entry in a bind group layout descriptor.
 #[derive(Debug, Clone)]
 pub struct BindGroupLayoutEntry {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#entry_objects
@@ -43,6 +50,7 @@ pub struct BindGroupLayoutEntry {
 }
 
 impl BindGroupLayoutEntry {
+    /// Creates a bind group layout entry for a binding and resource.
     pub fn new(binding: u32, resource: BindGroupLayoutResource) -> Self {
         Self {
             binding,
@@ -53,21 +61,25 @@ impl BindGroupLayoutEntry {
         }
     }
 
+    /// Enables compute stage visibility.
     pub fn with_visibility_compute(mut self) -> Self {
         self.visibility_compute = true;
         self
     }
 
+    /// Enables vertex stage visibility.
     pub fn with_visibility_vertex(mut self) -> Self {
         self.visibility_vertex = true;
         self
     }
 
+    /// Enables fragment stage visibility.
     pub fn with_visibility_fragment(mut self) -> Self {
         self.visibility_fragment = true;
         self
     }
 
+    /// Enables visibility for all stages.
     pub fn with_visibility_all(mut self) -> Self {
         self.visibility_compute = true;
         self.visibility_vertex = true;
@@ -76,6 +88,7 @@ impl BindGroupLayoutEntry {
     }
 }
 
+/// Resource type used in a bind group layout entry.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum BindGroupLayoutResource {
     Buffer(BufferBindingLayout),
@@ -85,6 +98,7 @@ pub enum BindGroupLayoutResource {
     Texture(TextureBindingLayout),
 }
 
+/// Buffer binding layout parameters.
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct BufferBindingLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#hasdynamicoffset
@@ -103,28 +117,35 @@ impl Hash for BufferBindingLayout {
 }
 
 impl BufferBindingLayout {
+    /// Creates a default buffer binding layout.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets whether the binding uses dynamic offsets.
     pub fn with_dynamic_offset(mut self, has_dynamic_offset: bool) -> Self {
         self.has_dynamic_offset = Some(has_dynamic_offset);
         self
     }
 
+    /// Sets the minimum binding size.
     pub fn with_min_binding_size(mut self, min_binding_size: usize) -> Self {
         self.min_binding_size = Some(min_binding_size);
         self
     }
+    /// Sets the buffer binding type.
     pub fn with_binding_type(mut self, binding_type: BufferBindingType) -> Self {
         self.binding_type = Some(binding_type);
         self
     }
 }
 
+/// WebGPU buffer binding type alias.
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuBufferBindingType.html
+/// WebGPU buffer binding type.
 pub type BufferBindingType = web_sys::GpuBufferBindingType;
 
+/// Sampler binding layout parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SamplerBindingLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#type_2
@@ -139,19 +160,24 @@ impl Hash for SamplerBindingLayout {
 }
 
 impl SamplerBindingLayout {
+    /// Creates a default sampler binding layout.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the sampler binding type.
     pub fn with_binding_type(mut self, binding_type: SamplerBindingType) -> Self {
         self.binding_type = Some(binding_type);
         self
     }
 }
 
+/// WebGPU sampler binding type alias.
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuSamplerBindingType.html
+/// WebGPU sampler binding type.
 pub type SamplerBindingType = web_sys::GpuSamplerBindingType;
 
+/// Storage texture binding layout parameters.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StorageTextureBindingLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#access
@@ -170,6 +196,7 @@ impl Hash for StorageTextureBindingLayout {
 }
 
 impl StorageTextureBindingLayout {
+    /// Creates a storage texture binding layout for a format.
     pub fn new(format: TextureFormat) -> Self {
         Self {
             format,
@@ -178,19 +205,24 @@ impl StorageTextureBindingLayout {
         }
     }
 
+    /// Sets the storage access mode.
     pub fn with_access(mut self, access: StorageTextureAccess) -> Self {
         self.access = Some(access);
         self
     }
+    /// Sets the view dimension.
     pub fn with_view_dimension(mut self, view_dimension: TextureViewDimension) -> Self {
         self.view_dimension = Some(view_dimension);
         self
     }
 }
 
+/// WebGPU storage texture access alias.
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuStorageTextureAccess.html
+/// WebGPU storage texture access mode.
 pub type StorageTextureAccess = web_sys::GpuStorageTextureAccess;
 
+/// Sampled texture binding layout parameters.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextureBindingLayout {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroupLayout#multisampled
@@ -215,6 +247,7 @@ impl Default for TextureBindingLayout {
 }
 
 impl TextureBindingLayout {
+    /// Creates a default sampled texture binding layout.
     pub fn new() -> Self {
         Self {
             multisampled: None,
@@ -223,22 +256,26 @@ impl TextureBindingLayout {
         }
     }
 
+    /// Sets the multisampled flag.
     pub fn with_multisampled(mut self, multisampled: bool) -> Self {
         self.multisampled = Some(multisampled);
         self
     }
 
+    /// Sets the view dimension.
     pub fn with_view_dimension(mut self, view_dimension: TextureViewDimension) -> Self {
         self.view_dimension = Some(view_dimension);
         self
     }
 
+    /// Sets the sample type.
     pub fn with_sample_type(mut self, sample_type: TextureSampleType) -> Self {
         self.sample_type = Some(sample_type);
         self
     }
 }
 
+/// Builder for a bind group descriptor.
 #[derive(Debug, Clone)]
 pub struct BindGroupDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroup#descriptor
@@ -247,6 +284,7 @@ pub struct BindGroupDescriptor<'a> {
     pub entries: Vec<BindGroupEntry<'a>>,
 }
 
+/// Single entry in a bind group descriptor.
 #[derive(Debug, Clone)]
 pub struct BindGroupEntry<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroup#entries
@@ -255,11 +293,13 @@ pub struct BindGroupEntry<'a> {
 }
 
 impl<'a> BindGroupEntry<'a> {
+    /// Creates a bind group entry for a binding and resource.
     pub fn new(binding: u32, resource: BindGroupResource<'a>) -> Self {
         Self { binding, resource }
     }
 }
 
+/// Resource value for a bind group entry.
 #[derive(Debug, Clone)]
 pub enum BindGroupResource<'a> {
     Buffer(BufferBinding<'a>),
@@ -269,6 +309,7 @@ pub enum BindGroupResource<'a> {
 }
 
 impl<'a> BindGroupDescriptor<'a> {
+    /// Creates a bind group descriptor.
     pub fn new(
         layout: &'a web_sys::GpuBindGroupLayout,
         label: Option<&'a str>,

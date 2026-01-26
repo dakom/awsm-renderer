@@ -1,3 +1,5 @@
+//! Helpers for packing material data into GPU buffers.
+
 use awsm_renderer_core::{
     sampler::AddressMode,
     texture::texture_pool::{TexturePoolArray, TexturePoolEntryInfo},
@@ -8,6 +10,7 @@ use crate::{
     textures::{SamplerKey, TextureKey, Textures},
 };
 
+/// Packed value used by material writers.
 pub enum Value<'a> {
     F32(f32),
     U32(u32),
@@ -44,8 +47,9 @@ impl From<&u32> for Value<'_> {
     }
 }
 
-// Encode the WebGPU address mode for mipmap selection.
-// The shader uses this to compute correct UV derivatives when textures wrap/repeat.
+/// Encodes a WebGPU address mode for mipmap selection.
+///
+/// The shader uses this to compute UV derivatives when textures wrap or repeat.
 pub fn encode_address_mode(mode: Option<AddressMode>) -> u32 {
     match mode.unwrap_or(AddressMode::Repeat) {
         AddressMode::ClampToEdge => 0,
@@ -57,6 +61,7 @@ pub fn encode_address_mode(mode: Option<AddressMode>) -> u32 {
     }
 }
 
+/// Writes a packed value into a byte buffer.
 pub fn write(data: &mut Vec<u8>, value: Value) {
     match value {
         Value::F32(value) => {
@@ -94,6 +99,7 @@ pub fn write(data: &mut Vec<u8>, value: Value) {
     }
 }
 
+/// Maps a material texture to a packed value for shader use.
 pub fn map_texture<'a>(
     tex: &MaterialTexture,
     textures: &'a Textures,

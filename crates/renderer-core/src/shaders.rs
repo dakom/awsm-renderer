@@ -1,13 +1,17 @@
+//! Shader module helpers and compilation info.
+
 use crate::error::{AwsmCoreError, Result};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
+/// Builder for a shader module descriptor.
 pub struct ShaderModuleDescriptor<'a> {
     pub code: &'a str,
     pub label: Option<&'a str>,
 }
 
 impl<'a> ShaderModuleDescriptor<'a> {
+    /// Creates a shader module descriptor.
     pub fn new(code: &'a str, label: Option<&'a str>) -> Self {
         Self { code, label }
     }
@@ -25,6 +29,7 @@ impl From<ShaderModuleDescriptor<'_>> for web_sys::GpuShaderModuleDescriptor {
     }
 }
 
+/// Extension trait for shader compilation info.
 pub trait ShaderModuleExt {
     fn get_compilation_info_ext(
         &self,
@@ -54,6 +59,7 @@ impl ShaderModuleExt for web_sys::GpuShaderModule {
     }
 }
 
+/// Compilation info for a shader module.
 #[derive(Clone, Debug)]
 pub struct ShaderCompilationInfo {
     pub errors: Vec<ShaderCompilationMessage>,
@@ -61,6 +67,7 @@ pub struct ShaderCompilationInfo {
     pub infos: Vec<ShaderCompilationMessage>,
 }
 
+/// Single shader compilation message.
 #[derive(Clone, Debug)]
 pub struct ShaderCompilationMessage {
     pub length: u64,
@@ -71,6 +78,7 @@ pub struct ShaderCompilationMessage {
 }
 
 impl ShaderCompilationInfo {
+    /// Parses compilation info into categorized messages.
     pub fn new(info: web_sys::GpuCompilationInfo) -> Self {
         let mut errors = Vec::new();
         let mut warnings = Vec::new();

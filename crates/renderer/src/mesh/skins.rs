@@ -1,3 +1,5 @@
+//! Skinning data and GPU updates.
+
 use std::{collections::HashMap, sync::LazyLock};
 
 use awsm_renderer_core::{
@@ -17,6 +19,7 @@ use crate::{
     AwsmRendererLogging,
 };
 
+/// Skinning data and GPU buffers.
 pub struct Skins {
     skeleton_transforms: DenseSlotMap<SkinKey, Vec<TransformKey>>,
     // may be None, in which case its virtually an identity matrix
@@ -33,9 +36,12 @@ pub struct Skins {
 static BUFFER_USAGE: LazyLock<BufferUsage> =
     LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
 impl Skins {
+    /// Initial size for skin matrix storage.
     pub const SKIN_MATRICES_INITIAL_SIZE: usize = 16 * 4 * 32; // 32 elements is a good starting point
+    /// Initial size for joint index/weight storage.
     pub const JOINT_INDEX_WEIGHTS_INITIAL_SIZE: usize = 4096 * 2; // 4kB (per pair) is a good starting point
 
+    /// Creates skin buffers.
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let matrices_gpu_buffer = gpu.create_buffer(
             &BufferDescriptor::new(
@@ -74,6 +80,7 @@ impl Skins {
         })
     }
 
+    /// Inserts a skin and returns its key.
     pub fn insert(
         &mut self,
         skeleton_joint_transforms: Vec<TransformKey>,
@@ -129,6 +136,7 @@ impl Skins {
         Ok(skin_key)
     }
 
+    /// Returns the number of joints in a skin.
     pub fn sets_len(&self, skin_key: SkinKey) -> Result<usize> {
         self.sets_len
             .get(skin_key)
@@ -136,18 +144,21 @@ impl Skins {
             .ok_or(AwsmSkinError::SkinNotFound(skin_key))
     }
 
+    /// Returns the GPU buffer offset for joint matrices.
     pub fn joint_matrices_offset(&self, skin_key: SkinKey) -> Result<usize> {
         self.skin_matrices
             .offset(skin_key)
             .ok_or(AwsmSkinError::SkinNotFound(skin_key))
     }
 
+    /// Returns the GPU buffer offset for joint index/weight data.
     pub fn joint_index_weights_offset(&self, skin_key: SkinKey) -> Result<usize> {
         self.joint_index_weights
             .offset(skin_key)
             .ok_or(AwsmSkinError::SkinNotFound(skin_key))
     }
 
+    /// Updates skin matrices from dirty joint transforms.
     pub fn update_transforms(&mut self, dirty_skin_joints: HashMap<TransformKey, Mat4>) {
         // different skins can theoretically share the same joint, so, iterate over them all
         for (skin_key, transform_keys) in self.skeleton_transforms.iter() {
@@ -182,6 +193,7 @@ impl Skins {
         }
     }
 
+    /// Writes skin buffers to the GPU.
     pub fn write_gpu(
         &mut self,
         logging: &AwsmRendererLogging,
@@ -277,6 +289,7 @@ impl Skins {
         Ok(())
     }
 
+    /// Removes a skin and associated data.
     pub fn remove(&mut self, key: SkinKey, transform: Option<TransformKey>) {
         self.skeleton_transforms.remove(key);
         self.skin_matrices.remove(key);
@@ -290,11 +303,14 @@ impl Skins {
 }
 
 new_key_type! {
+    /// Opaque key for skins.
     pub struct SkinKey;
 }
 
+/// Result type for skin operations.
 pub type Result<T> = std::result::Result<T, AwsmSkinError>;
 
+/// Skin-related errors.
 #[derive(Error, Debug)]
 pub enum AwsmSkinError {
     #[error("[skin] {0:?}")]
