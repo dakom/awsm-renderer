@@ -4,7 +4,7 @@ use thiserror::Error;
 use crate::{
     bind_groups::AwsmBindGroupError,
     materials::AwsmMaterialError,
-    mesh::{skins::AwsmSkinError, MeshBufferInfoKey},
+    mesh::{skins::AwsmSkinError, MeshBufferInfoKey, MeshResourceKey},
     transforms::AwsmTransformError,
 };
 
@@ -16,6 +16,18 @@ pub type Result<T> = std::result::Result<T, AwsmMeshError>;
 pub enum AwsmMeshError {
     #[error("[mesh] not found: {0:?}")]
     MeshNotFound(MeshKey),
+
+    #[error("[mesh] resource not found: {0:?}")]
+    ResourceNotFound(MeshResourceKey),
+
+    #[error("[mesh] instancing not enabled: {0:?}")]
+    InstancingNotEnabled(MeshKey),
+
+    #[error("[mesh] instancing already enabled: {0:?}")]
+    InstancingAlreadyEnabled(MeshKey),
+
+    #[error("[mesh] instance transforms missing or empty: {0:?}")]
+    InstancingMissingTransforms(MeshKey),
 
     #[error("[mesh] visibility geometry buffer not found: {0:?}")]
     VisibilityGeometryBufferNotFound(MeshKey),

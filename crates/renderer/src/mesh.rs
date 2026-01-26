@@ -10,17 +10,15 @@ use awsm_renderer_core::{
 };
 
 use crate::materials::MaterialKey;
-use crate::mesh::morphs::{GeometryMorphKey, MaterialMorphKey};
 use crate::render::RenderContext;
 use crate::render_passes::geometry::bind_group::GeometryBindGroups;
 use crate::render_passes::geometry::pipeline::GeometryRenderPipelineKeyOpts;
 use crate::transforms::TransformKey;
 use crate::{bounds::Aabb, pipelines::render_pipeline::RenderPipelineKey};
-use skins::SkinKey;
 
 pub use buffer_info::*;
 pub use error::AwsmMeshError;
-pub use meshes::{MeshKey, Meshes};
+pub use meshes::{MeshKey, MeshResourceKey, Meshes};
 
 use super::error::Result;
 
@@ -28,14 +26,9 @@ use super::error::Result;
 // because for non-gltf naming, "mesh" makes more sense
 #[derive(Debug, Clone)]
 pub struct Mesh {
-    pub buffer_info_key: MeshBufferInfoKey,
-    pub aabb: Option<Aabb>,
     pub world_aabb: Option<Aabb>, // this is the transformed AABB, used for frustum culling and depth sorting
     pub transform_key: TransformKey,
     pub material_key: MaterialKey,
-    pub geometry_morph_key: Option<GeometryMorphKey>,
-    pub material_morph_key: Option<MaterialMorphKey>,
-    pub skin_key: Option<SkinKey>,
     pub double_sided: bool,
     pub instanced: bool,
     pub hud: bool,
@@ -44,7 +37,6 @@ pub struct Mesh {
 
 impl Mesh {
     pub fn new(
-        buffer_info_key: MeshBufferInfoKey,
         transform_key: TransformKey,
         material_key: MaterialKey,
         double_sided: bool,
@@ -53,40 +45,14 @@ impl Mesh {
         hidden: bool,
     ) -> Self {
         Self {
-            buffer_info_key,
             transform_key,
             material_key,
             double_sided,
             instanced,
             hud,
-            aabb: None,
             world_aabb: None,
-            geometry_morph_key: None,
-            material_morph_key: None,
-            skin_key: None,
             hidden,
         }
-    }
-
-    pub fn with_aabb(mut self, aabb: Aabb) -> Self {
-        self.aabb = Some(aabb.clone());
-        self.world_aabb = Some(aabb); // initially, world_aabb is the same as aabb
-        self
-    }
-
-    pub fn with_geometry_morph_key(mut self, morph_key: GeometryMorphKey) -> Self {
-        self.geometry_morph_key = Some(morph_key);
-        self
-    }
-
-    pub fn with_material_morph_key(mut self, morph_key: MaterialMorphKey) -> Self {
-        self.material_morph_key = Some(morph_key);
-        self
-    }
-
-    pub fn with_skin_key(mut self, skin_key: SkinKey) -> Self {
-        self.skin_key = Some(skin_key);
-        self
     }
 
     pub fn geometry_render_pipeline_key(&self, ctx: &RenderContext) -> Result<RenderPipelineKey> {
@@ -125,7 +91,8 @@ impl Mesh {
             None,
         );
 
-        if let Ok(offset) = ctx.instances.transform_buffer_offset(self.transform_key) {
+        if self.instanced {
+            let offset = ctx.instances.transform_buffer_offset(self.transform_key)?;
             render_pass.set_vertex_buffer(
                 1,
                 ctx.instances.gpu_transform_buffer(),
@@ -134,7 +101,7 @@ impl Mesh {
             );
         }
 
-        let buffer_info = ctx.meshes.buffer_infos.get(self.buffer_info_key)?;
+        let buffer_info = ctx.meshes.buffer_info(mesh_key)?;
 
         render_pass.set_index_buffer(
             ctx.meshes.visibility_geometry_index_gpu_buffer(),
@@ -148,13 +115,14 @@ impl Mesh {
 
         let index_count = buffer_info.triangles.vertex_attribute_indices.count as u32;
 
-        match ctx.instances.transform_instance_count(self.transform_key) {
-            Some(instance_count) => {
-                render_pass.draw_indexed_with_instance_count(index_count, instance_count as u32);
-            }
-            _ => {
-                render_pass.draw_indexed(index_count);
-            }
+        if self.instanced {
+            let instance_count = ctx
+                .instances
+                .transform_instance_count(self.transform_key)
+                .ok_or(AwsmMeshError::InstancingMissingTransforms(mesh_key))?;
+            render_pass.draw_indexed_with_instance_count(index_count, instance_count as u32);
+        } else {
+            render_pass.draw_indexed(index_count);
         }
 
         Ok(())
@@ -169,7 +137,7 @@ impl Mesh {
     ) -> Result<()> {
         let geometry_meta_offset = ctx.meshes.meta.geometry_buffer_offset(mesh_key)? as u32;
         let material_meta_offset = ctx.meshes.meta.material_buffer_offset(mesh_key)? as u32;
-        let buffer_info = ctx.meshes.buffer_infos.get(self.buffer_info_key)?;
+        let buffer_info = ctx.meshes.buffer_info(mesh_key)?;
 
         render_pass.set_bind_group(
             3,
@@ -189,19 +157,19 @@ impl Mesh {
         );
 
         // Instancing Slot 1 (locations 5-8)
-        let attribute_slot =
-            if let Ok(offset) = ctx.instances.transform_buffer_offset(self.transform_key) {
-                render_pass.set_vertex_buffer(
-                    1,
-                    ctx.instances.gpu_transform_buffer(),
-                    Some(offset as u64),
-                    None,
-                );
+        let attribute_slot = if self.instanced {
+            let offset = ctx.instances.transform_buffer_offset(self.transform_key)?;
+            render_pass.set_vertex_buffer(
+                1,
+                ctx.instances.gpu_transform_buffer(),
+                Some(offset as u64),
+                None,
+            );
 
-                2
-            } else {
-                1
-            };
+            2
+        } else {
+            1
+        };
 
         // Attributes
         // If instanced: slot 2 (locations 9+)
@@ -225,13 +193,14 @@ impl Mesh {
 
         let index_count = buffer_info.triangles.vertex_attribute_indices.count as u32;
 
-        match ctx.instances.transform_instance_count(self.transform_key) {
-            Some(instance_count) => {
-                render_pass.draw_indexed_with_instance_count(index_count, instance_count as u32);
-            }
-            _ => {
-                render_pass.draw_indexed(index_count);
-            }
+        if self.instanced {
+            let instance_count = ctx
+                .instances
+                .transform_instance_count(self.transform_key)
+                .ok_or(AwsmMeshError::InstancingMissingTransforms(mesh_key))?;
+            render_pass.draw_indexed_with_instance_count(index_count, instance_count as u32);
+        } else {
+            render_pass.draw_indexed(index_count);
         }
 
         Ok(())

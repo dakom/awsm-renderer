@@ -204,7 +204,7 @@ impl GeometryRenderPipelineKeysLevel1 {
                 ctx,
                 pipeline_layout_key,
                 msaa_samples,
-                false,
+                true,
             )
             .await?,
         })

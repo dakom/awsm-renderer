@@ -12,6 +12,7 @@ use thiserror::Error;
 use crate::{
     bind_groups::{AwsmBindGroupError, BindGroupCreate, BindGroups},
     buffer::dynamic_storage::DynamicStorageBuffer,
+    buffer::helpers::write_buffer_with_dirty_ranges,
     transforms::TransformKey,
     AwsmRendererLogging,
 };
@@ -194,21 +195,34 @@ impl Skins {
                 None
             };
 
+            let mut resized = false;
             if let Some(new_size) = self.skin_matrices.take_gpu_needs_resize() {
                 self.matrices_gpu_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(Some("Skins"), new_size, *BUFFER_USAGE).into(),
                 )?;
 
                 bind_groups.mark_create(BindGroupCreate::SkinJointMatricesResize);
+                resized = true;
             }
 
-            gpu.write_buffer(
-                &self.matrices_gpu_buffer,
-                None,
-                self.skin_matrices.raw_slice(),
-                None,
-                None,
-            )?;
+            if resized {
+                self.skin_matrices.clear_dirty_ranges();
+                gpu.write_buffer(
+                    &self.matrices_gpu_buffer,
+                    None,
+                    self.skin_matrices.raw_slice(),
+                    None,
+                    None,
+                )?;
+            } else {
+                let ranges = self.skin_matrices.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.matrices_gpu_buffer,
+                    self.skin_matrices.raw_slice(),
+                    ranges,
+                )?;
+            }
 
             self.matrices_gpu_dirty = false;
         }
@@ -223,6 +237,7 @@ impl Skins {
                 None
             };
 
+            let mut resized = false;
             if let Some(new_size) = self.joint_index_weights.take_gpu_needs_resize() {
                 self.joint_index_weights_gpu_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(
@@ -234,15 +249,27 @@ impl Skins {
                 )?;
 
                 bind_groups.mark_create(BindGroupCreate::SkinJointIndexAndWeightsResize);
+                resized = true;
             }
 
-            gpu.write_buffer(
-                &self.joint_index_weights_gpu_buffer,
-                None,
-                self.joint_index_weights.raw_slice(),
-                None,
-                None,
-            )?;
+            if resized {
+                self.joint_index_weights.clear_dirty_ranges();
+                gpu.write_buffer(
+                    &self.joint_index_weights_gpu_buffer,
+                    None,
+                    self.joint_index_weights.raw_slice(),
+                    None,
+                    None,
+                )?;
+            } else {
+                let ranges = self.joint_index_weights.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.joint_index_weights_gpu_buffer,
+                    self.joint_index_weights.raw_slice(),
+                    ranges,
+                )?;
+            }
 
             self.joint_index_weights_gpu_dirty = false;
         }

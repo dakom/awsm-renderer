@@ -8,6 +8,7 @@ use super::error::{AwsmMeshError, Result};
 use crate::bind_groups::BindGroupCreate;
 use crate::bind_groups::BindGroups;
 use crate::buffer::dynamic_storage::DynamicStorageBuffer;
+use crate::buffer::helpers::write_buffer_with_dirty_ranges;
 use crate::mesh::{MeshBufferGeometryMorphInfo, MeshBufferMaterialMorphInfo};
 use crate::AwsmRendererLogging;
 
@@ -217,6 +218,7 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
                 None
             };
 
+            let mut resized = false;
             if let Some(new_size) = self.weights.take_gpu_needs_resize() {
                 self.gpu_buffer_weights = gpu.create_buffer(
                     &BufferDescriptor::new(Some("Morph Weights"), new_size, *BUFFER_USAGE_WEIGHTS)
@@ -224,14 +226,26 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
                 )?;
 
                 bind_groups.mark_create(bind_group_create_weight_kind);
+                resized = true;
             }
-            gpu.write_buffer(
-                &self.gpu_buffer_weights,
-                None,
-                self.weights.raw_slice(),
-                None,
-                None,
-            )?;
+            if resized {
+                self.weights.clear_dirty_ranges();
+                gpu.write_buffer(
+                    &self.gpu_buffer_weights,
+                    None,
+                    self.weights.raw_slice(),
+                    None,
+                    None,
+                )?;
+            } else {
+                let ranges = self.weights.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.gpu_buffer_weights,
+                    self.weights.raw_slice(),
+                    ranges,
+                )?;
+            }
 
             self.weights_dirty = false;
         }
@@ -242,6 +256,7 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
                 None
             };
 
+            let mut resized = false;
             if let Some(new_size) = self.values.take_gpu_needs_resize() {
                 self.gpu_buffer_values = gpu.create_buffer(
                     &BufferDescriptor::new(Some("Morph Values"), new_size, *BUFFER_USAGE_VALUES)
@@ -249,14 +264,26 @@ impl<Key: slotmap::Key, Info: MorphInfo> MorphData<Key, Info> {
                 )?;
 
                 bind_groups.mark_create(bind_group_create_value_kind);
+                resized = true;
             }
-            gpu.write_buffer(
-                &self.gpu_buffer_values,
-                None,
-                self.values.raw_slice(),
-                None,
-                None,
-            )?;
+            if resized {
+                self.values.clear_dirty_ranges();
+                gpu.write_buffer(
+                    &self.gpu_buffer_values,
+                    None,
+                    self.values.raw_slice(),
+                    None,
+                    None,
+                )?;
+            } else {
+                let ranges = self.values.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.gpu_buffer_values,
+                    self.values.raw_slice(),
+                    ranges,
+                )?;
+            }
 
             self.values_dirty = false;
         }

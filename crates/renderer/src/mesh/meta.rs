@@ -6,6 +6,7 @@ use awsm_renderer_core::{buffers::BufferDescriptor, renderer::AwsmRendererWebGpu
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
     buffer::dynamic_uniform::DynamicUniformBuffer,
+    buffer::helpers::write_buffer_with_dirty_ranges,
     debug::AwsmRendererLogging,
     materials::Materials,
     mesh::{
@@ -22,6 +23,8 @@ use crate::{
         },
         morphs::Morphs,
         skins::Skins,
+        morphs::{GeometryMorphKey, MaterialMorphKey},
+        skins::SkinKey,
         Mesh, MeshBufferInfo, MeshKey,
     },
     transforms::Transforms,
@@ -82,18 +85,17 @@ impl MeshMeta {
         mesh: &Mesh,
         buffer_info: &MeshBufferInfo,
         visibility_geometry_data_offset: Option<usize>,
-        _transparency_geometry_data_offset: Option<usize>,
         custom_attribute_indices_offset: usize,
         custom_attribute_data_offset: usize,
+        geometry_morph_key: Option<GeometryMorphKey>,
+        material_morph_key: Option<MaterialMorphKey>,
+        skin_key: Option<SkinKey>,
         materials: &Materials,
         transforms: &Transforms,
         morphs: &Morphs,
         skins: &Skins,
     ) -> Result<()> {
         let transform_key = mesh.transform_key;
-        let geometry_morph_key = mesh.geometry_morph_key;
-        let material_morph_key = mesh.material_morph_key;
-        let skin_key = mesh.skin_key;
         let material_key = mesh.material_key;
         let transform_offset = transforms.buffer_offset(transform_key)?;
         let normal_matrix_offset = transforms.normals_buffer_offset(transform_key)?;
@@ -171,6 +173,7 @@ impl MeshMeta {
         bind_groups: &mut BindGroups,
     ) -> Result<()> {
         if self.geometry_dirty {
+            let mut resized = false;
             if let Some(new_size) = self.geometry_buffers.take_gpu_needs_resize() {
                 self.geometry_gpu_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(
@@ -181,19 +184,33 @@ impl MeshMeta {
                     .into(),
                 )?;
                 bind_groups.mark_create(BindGroupCreate::GeometryMeshMetaResize);
+                resized = true;
             }
-            gpu.write_buffer(
-                &self.geometry_gpu_buffer,
-                None,
-                self.geometry_buffers.raw_slice(),
-                None,
-                None,
-            )?;
+
+            if resized {
+                self.geometry_buffers.clear_dirty_ranges();
+                gpu.write_buffer(
+                    &self.geometry_gpu_buffer,
+                    None,
+                    self.geometry_buffers.raw_slice(),
+                    None,
+                    None,
+                )?;
+            } else {
+                let ranges = self.geometry_buffers.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.geometry_gpu_buffer,
+                    self.geometry_buffers.raw_slice(),
+                    ranges,
+                )?;
+            }
 
             self.geometry_dirty = false;
         }
 
         if self.material_dirty {
+            let mut resized = false;
             if let Some(new_size) = self.material_buffers.take_gpu_needs_resize() {
                 self.material_gpu_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(
@@ -204,14 +221,27 @@ impl MeshMeta {
                     .into(),
                 )?;
                 bind_groups.mark_create(BindGroupCreate::MaterialMeshMetaResize);
+                resized = true;
             }
-            gpu.write_buffer(
-                &self.material_gpu_buffer,
-                None,
-                self.material_buffers.raw_slice(),
-                None,
-                None,
-            )?;
+
+            if resized {
+                self.material_buffers.clear_dirty_ranges();
+                gpu.write_buffer(
+                    &self.material_gpu_buffer,
+                    None,
+                    self.material_buffers.raw_slice(),
+                    None,
+                    None,
+                )?;
+            } else {
+                let ranges = self.material_buffers.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.material_gpu_buffer,
+                    self.material_buffers.raw_slice(),
+                    ranges,
+                )?;
+            }
 
             self.material_dirty = false;
         }

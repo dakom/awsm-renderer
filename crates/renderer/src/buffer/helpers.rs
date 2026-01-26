@@ -104,3 +104,101 @@ pub fn u8_to_u32_iter(v: &[u8]) -> impl Iterator<Item = u32> + '_ {
         .map(Result::unwrap)
         .map(u32::from_le_bytes)
 }
+use awsm_renderer_core::{error::AwsmCoreError, renderer::AwsmRendererWebGpu};
+
+const DIRTY_RANGE_FULL_WRITE_THRESHOLD_PERCENT: u64 = 60;
+const DIRTY_RANGE_MAX_RANGES: usize = 32;
+
+pub fn write_buffer_with_dirty_ranges(
+    gpu: &AwsmRendererWebGpu,
+    gpu_buffer: &web_sys::GpuBuffer,
+    raw_data: &[u8],
+    ranges: Vec<(usize, usize)>,
+) -> Result<(), AwsmCoreError> {
+    write_buffer_with_dirty_ranges_config(
+        gpu,
+        gpu_buffer,
+        raw_data,
+        ranges,
+        DIRTY_RANGE_FULL_WRITE_THRESHOLD_PERCENT,
+        DIRTY_RANGE_MAX_RANGES,
+    )
+}
+
+fn write_buffer_with_dirty_ranges_config(
+    gpu: &AwsmRendererWebGpu,
+    gpu_buffer: &web_sys::GpuBuffer,
+    raw_data: &[u8],
+    mut ranges: Vec<(usize, usize)>,
+    full_write_threshold_percent: u64,
+    max_ranges: usize,
+) -> Result<(), AwsmCoreError> {
+    if raw_data.is_empty() || ranges.is_empty() {
+        return Ok(());
+    }
+
+    if ranges.len() > max_ranges {
+        gpu.write_buffer(gpu_buffer, None, raw_data, None, None)?;
+        return Ok(());
+    }
+
+    let total_bytes = raw_data.len() as u64;
+    let dirty_bytes = if ranges.len() == 1 {
+        ranges[0].1 as u64
+    } else {
+        ranges.iter().map(|(_, size)| *size as u64).sum()
+    };
+    let use_full_write = dirty_bytes.saturating_mul(100)
+        >= total_bytes.saturating_mul(full_write_threshold_percent);
+
+    if use_full_write {
+        gpu.write_buffer(gpu_buffer, None, raw_data, None, None)?;
+        return Ok(());
+    }
+
+    if ranges.len() > 1 {
+        ranges.sort_unstable_by_key(|(start, _)| *start);
+        ranges = coalesce_ranges(ranges);
+    }
+
+    for (offset, size) in ranges {
+        if size == 0 {
+            continue;
+        }
+
+        let end = offset.saturating_add(size);
+        debug_assert!(end <= raw_data.len());
+
+        if let Some(slice) = raw_data.get(offset..end) {
+            if !slice.is_empty() {
+                gpu.write_buffer(gpu_buffer, Some(offset), slice, None, None)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn coalesce_ranges(ranges: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
+    if ranges.is_empty() {
+        return ranges;
+    }
+
+    let mut merged = Vec::with_capacity(ranges.len());
+    let mut current_start = ranges[0].0;
+    let mut current_end = current_start.saturating_add(ranges[0].1);
+
+    for (start, size) in ranges.into_iter().skip(1) {
+        let end = start.saturating_add(size);
+        if start <= current_end {
+            current_end = current_end.max(end);
+        } else {
+            merged.push((current_start, current_end - current_start));
+            current_start = start;
+            current_end = end;
+        }
+    }
+
+    merged.push((current_start, current_end - current_start));
+    merged
+}

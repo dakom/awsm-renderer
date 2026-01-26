@@ -161,8 +161,7 @@ impl AwsmRenderer {
             .buffer_infos
             .insert(native_primitive_buffer_info);
 
-        let mut mesh = Mesh::new(
-            buffer_info_key,
+        let mesh = Mesh::new(
             transform_key,
             material_key,
             double_sided,
@@ -174,21 +173,7 @@ impl AwsmRenderer {
             ctx.data.hints.hidden,
         );
 
-        if let Some(aabb) = try_position_aabb(&gltf_primitive) {
-            mesh = mesh.with_aabb(aabb);
-        }
-
-        if let Some(morph_key) = geometry_morph_key {
-            mesh = mesh.with_geometry_morph_key(morph_key);
-        }
-
-        if let Some(morph_key) = material_morph_key {
-            mesh = mesh.with_material_morph_key(morph_key);
-        }
-
-        if let Some(skin_key) = skin_key {
-            mesh = mesh.with_skin_key(skin_key);
-        }
+        let aabb = try_position_aabb(&gltf_primitive);
 
         let mesh_key = {
             let visibility_geometry_data =
@@ -242,10 +227,15 @@ impl AwsmRenderer {
                 mesh,
                 &self.materials,
                 &self.transforms,
+                buffer_info_key,
                 visibility_geometry_data,
                 transparency_geometry_data,
                 custom_attribute_data,
                 attribute_index,
+                aabb,
+                geometry_morph_key,
+                material_morph_key,
+                skin_key,
             )?
         };
 

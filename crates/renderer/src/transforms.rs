@@ -16,6 +16,7 @@ use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
+    buffer::helpers::write_buffer_with_dirty_ranges,
     buffer::dynamic_uniform::DynamicUniformBuffer,
     mesh::skins::AwsmSkinError,
     AwsmRenderer, AwsmRendererLogging,
@@ -235,14 +236,17 @@ impl Transforms {
                 None
             };
 
+            let mut transform_resized = false;
             if let Some(new_size) = self.buffer.take_gpu_needs_resize() {
                 self.gpu_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(Some("Transforms"), new_size, *BUFFER_USAGE).into(),
                 )?;
 
                 bind_groups.mark_create(BindGroupCreate::TransformsResize);
+                transform_resized = true;
             }
 
+            let mut normals_resized = false;
             if let Some(new_size) = self.normals_buffer.take_gpu_needs_resize() {
                 self.normals_gpu_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(
@@ -254,17 +258,40 @@ impl Transforms {
                 )?;
 
                 bind_groups.mark_create(BindGroupCreate::TransformNormalsResize);
+                normals_resized = true;
             }
 
-            gpu.write_buffer(&self.gpu_buffer, None, self.buffer.raw_slice(), None, None)?;
+            if transform_resized {
+                self.buffer.clear_dirty_ranges();
+                gpu.write_buffer(&self.gpu_buffer, None, self.buffer.raw_slice(), None, None)?;
+            } else {
+                let transform_ranges = self.buffer.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.gpu_buffer,
+                    self.buffer.raw_slice(),
+                    transform_ranges,
+                )?;
+            }
 
-            gpu.write_buffer(
-                &self.normals_gpu_buffer,
-                None,
-                self.normals_buffer.raw_slice(),
-                None,
-                None,
-            )?;
+            if normals_resized {
+                self.normals_buffer.clear_dirty_ranges();
+                gpu.write_buffer(
+                    &self.normals_gpu_buffer,
+                    None,
+                    self.normals_buffer.raw_slice(),
+                    None,
+                    None,
+                )?;
+            } else {
+                let normal_ranges = self.normals_buffer.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.normals_gpu_buffer,
+                    self.normals_buffer.raw_slice(),
+                    normal_ranges,
+                )?;
+            }
 
             self.gpu_dirty = false;
         }

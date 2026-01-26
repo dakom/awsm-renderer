@@ -808,10 +808,7 @@ impl AppScene {
             {
                 continue;
             }
-            if let Some(mut mesh_aabb) = mesh.aabb.clone() {
-                if let Ok(world_transform) = renderer.transforms.get_world(mesh.transform_key) {
-                    mesh_aabb.transform(world_transform);
-                }
+            if let Some(mesh_aabb) = mesh.world_aabb.clone() {
                 if let Some(current_scene_aabb) = &mut scene_aabb {
                     current_scene_aabb.extend(&mesh_aabb);
                 } else {

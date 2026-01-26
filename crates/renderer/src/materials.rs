@@ -11,6 +11,7 @@ use thiserror::Error;
 use crate::{
     bind_groups::{AwsmBindGroupError, BindGroupCreate, BindGroups},
     buffer::dynamic_storage::DynamicStorageBuffer,
+    buffer::helpers::write_buffer_with_dirty_ranges,
     materials::{pbr::PbrMaterial, unlit::UnlitMaterial},
     textures::{AwsmTextureError, SamplerKey, TextureKey, TextureTransformKey, Textures},
     AwsmRenderer, AwsmRendererLogging,
@@ -193,15 +194,28 @@ impl Materials {
                 None
             };
 
+            let mut resized = false;
             if let Some(new_size) = self.buffer.take_gpu_needs_resize() {
                 self.gpu_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(Some("Material"), new_size, *BUFFER_USAGE).into(),
                 )?;
 
                 bind_groups.mark_create(BindGroupCreate::MaterialResize);
+                resized = true;
             }
 
-            gpu.write_buffer(&self.gpu_buffer, None, self.buffer.raw_slice(), None, None)?;
+            if resized {
+                self.buffer.clear_dirty_ranges();
+                gpu.write_buffer(&self.gpu_buffer, None, self.buffer.raw_slice(), None, None)?;
+            } else {
+                let ranges = self.buffer.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.gpu_buffer,
+                    self.buffer.raw_slice(),
+                    ranges,
+                )?;
+            }
 
             self.gpu_dirty = false;
         }

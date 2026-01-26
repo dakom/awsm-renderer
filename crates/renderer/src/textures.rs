@@ -20,6 +20,7 @@ use thiserror::Error;
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
     buffer::dynamic_uniform::DynamicUniformBuffer,
+    buffer::helpers::write_buffer_with_dirty_ranges,
     error::AwsmError,
     render_passes::RenderPassInitContext,
     AwsmRenderer, AwsmRendererLogging,
@@ -81,8 +82,9 @@ impl AwsmRenderer {
         let mut has_seen_buffer_info = SecondaryMap::new();
         let mut has_seen_material = SecondaryMap::new();
         for (key, mesh) in self.meshes.iter() {
+            let buffer_info_key = self.meshes.buffer_info_key(key)?;
             if has_seen_buffer_info
-                .insert(mesh.buffer_info_key, ())
+                .insert(buffer_info_key, ())
                 .is_none()
                 || has_seen_material.insert(mesh.material_key, ()).is_none()
             {
@@ -93,6 +95,7 @@ impl AwsmRenderer {
                         &self.gpu,
                         mesh,
                         key,
+                        buffer_info_key,
                         &mut self.shaders,
                         &mut self.pipelines,
                         &self.render_passes.material_transparent.bind_groups,
@@ -360,6 +363,7 @@ impl Textures {
                 None
             };
 
+            let mut resized = false;
             if let Some(new_size) = self.texture_transforms_buffer.take_gpu_needs_resize() {
                 self.texture_transforms_gpu_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(
@@ -371,15 +375,27 @@ impl Textures {
                 )?;
 
                 bind_groups.mark_create(BindGroupCreate::TextureTransformsResize);
+                resized = true;
             }
 
-            gpu.write_buffer(
-                &self.texture_transforms_gpu_buffer,
-                None,
-                self.texture_transforms_buffer.raw_slice(),
-                None,
-                None,
-            )?;
+            if resized {
+                self.texture_transforms_buffer.clear_dirty_ranges();
+                gpu.write_buffer(
+                    &self.texture_transforms_gpu_buffer,
+                    None,
+                    self.texture_transforms_buffer.raw_slice(),
+                    None,
+                    None,
+                )?;
+            } else {
+                let ranges = self.texture_transforms_buffer.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.texture_transforms_gpu_buffer,
+                    self.texture_transforms_buffer.raw_slice(),
+                    ranges,
+                )?;
+            }
 
             self.texture_transforms_gpu_dirty = false;
         }

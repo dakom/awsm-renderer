@@ -769,7 +769,7 @@ fn get_local_transform(renderer: &AwsmRenderer, object: TransformObject) -> Opti
 
 fn get_world_matrix(renderer: &AwsmRenderer, object: TransformObject) -> Option<Mat4> {
     let world = match renderer.transforms.get_world(object.key) {
-        Ok(world) => world.clone(),
+        Ok(world) => *world,
         Err(_) => {
             return None;
         }

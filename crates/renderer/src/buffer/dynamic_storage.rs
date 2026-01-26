@@ -8,7 +8,7 @@ use slotmap::{Key, SecondaryMap};
 ///-------------------------------- PERFORMANCE SUMMARY ------------------------//
 ///
 /// • insert/update/remove:   O(log N) (amortized, ignoring rare growth)
-/// • GPU write (per frame):  uploads entire buffer each time
+/// • GPU write (per frame):  uploads dirty ranges (full upload when dense)
 /// • Resize strategy:        doubles capacity when needed; rebuilds tree
 ///                           (infrequent pauses)
 /// • External fragmentation: none (buddy blocks always coalesce)
@@ -36,6 +36,7 @@ const MIN_BLOCK: usize = 256;
 #[derive(Debug)]
 pub struct DynamicStorageBuffer<K: Key, const ZERO: u8 = 0> {
     raw_data: Vec<u8>,
+    dirty_ranges: Vec<(usize, usize)>,
     /// Complete binary tree stored as an array where each node
     /// is the size of the *largest* free block in that subtree.
     buddy_tree: Vec<usize>,
@@ -64,6 +65,7 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
 
         Self {
             raw_data,
+            dirty_ranges: Vec::new(),
             buddy_tree,
             slot_indices: SecondaryMap::new(),
             gpu_buffer_needs_resize: initial_bytes != initial_bytes_orig,
@@ -90,6 +92,7 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
                 if bytes.len() < old_size {
                     self.raw_data[off + bytes.len()..off + old_size].fill(ZERO);
                 }
+                self.mark_dirty_range(off, old_size);
                 return off;
             }
             self.remove(key);
@@ -105,6 +108,7 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
         match self.slot_indices.get(key) {
             Some((off, size)) => {
                 f(*off, &mut self.raw_data[*off..*off + *size]);
+                self.mark_dirty_range(*off, *size);
             }
             None => {
                 panic!("Key {key:?} not found in DynamicBuddyBuffer");
@@ -122,6 +126,7 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
         });
         self.raw_data[off..off + bytes.len()].copy_from_slice(bytes);
         self.slot_indices.insert(key, (off, req));
+        self.mark_dirty_range(off, req);
 
         off
     }
@@ -129,6 +134,7 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
     pub fn remove(&mut self, key: K) {
         if let Some((off, size)) = self.slot_indices.remove(key) {
             self.raw_data[off..off + size].fill(ZERO);
+            self.mark_dirty_range(off, size);
             self.free(off, size);
         }
     }
@@ -147,12 +153,25 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
         Some(&self.raw_data[*off..*off + *size])
     }
 
+    /// Returns the allocated block size (in bytes) for the given key.
+    pub fn allocated_size(&self, key: K) -> Option<usize> {
+        self.slot_indices.get(key).map(|(_, size)| *size)
+    }
+
     /* ------------------------------------------------------------------ */
     /*                GPU write                                           */
     /* ------------------------------------------------------------------ */
 
     pub fn raw_slice(&self) -> &[u8] {
         &self.raw_data
+    }
+
+    pub fn take_dirty_ranges(&mut self) -> Vec<(usize, usize)> {
+        std::mem::take(&mut self.dirty_ranges)
+    }
+
+    pub fn clear_dirty_ranges(&mut self) {
+        self.dirty_ranges.clear();
     }
 
     pub fn take_gpu_needs_resize(&mut self) -> Option<usize> {
@@ -164,6 +183,23 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
         self.gpu_buffer_needs_resize = false;
 
         size
+    }
+
+    fn mark_dirty_range(&mut self, offset: usize, size: usize) {
+        if size == 0 || self.raw_data.is_empty() || offset >= self.raw_data.len() {
+            return;
+        }
+
+        let mut start = offset;
+        let mut end = offset.saturating_add(size).min(self.raw_data.len());
+
+        // WebGPU writeBuffer offsets/sizes must be 4-byte aligned.
+        start &= !3;
+        end = ((end + 3) & !3).min(self.raw_data.len());
+
+        if start < end {
+            self.dirty_ranges.push((start, end - start));
+        }
     }
 
     /* ------------------------------------------------------------------ */

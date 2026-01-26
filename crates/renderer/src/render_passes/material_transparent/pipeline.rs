@@ -17,8 +17,8 @@ use slotmap::SecondaryMap;
 use crate::anti_alias::AntiAliasing;
 use crate::error::Result;
 use crate::mesh::{
-    Mesh, MeshBufferInfo, MeshBufferInfos, MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
-    MeshKey,
+    Mesh, MeshBufferInfo, MeshBufferInfoKey, MeshBufferInfos, MeshBufferVertexAttributeInfo,
+    MeshBufferVertexInfo, MeshKey,
 };
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
@@ -68,6 +68,7 @@ impl MaterialTransparentPipelines {
         gpu: &AwsmRendererWebGpu,
         mesh: &Mesh,
         mesh_key: MeshKey,
+        buffer_info_key: MeshBufferInfoKey,
         shaders: &mut Shaders,
         pipelines: &mut Pipelines,
         material_bind_groups: &MaterialTransparentBindGroups,
@@ -77,7 +78,7 @@ impl MaterialTransparentPipelines {
         _textures: &Textures,
         render_texture_formats: &RenderTextureFormats,
     ) -> Result<RenderPipelineKey> {
-        let mesh_buffer_info = mesh_buffer_infos.get(mesh.buffer_info_key)?;
+        let mesh_buffer_info = mesh_buffer_infos.get(buffer_info_key)?;
 
         let shader_cache_key = ShaderCacheKeyMaterialTransparent {
             attributes: mesh_buffer_info.into(),
@@ -131,6 +132,12 @@ impl MaterialTransparentPipelines {
 
     pub fn get_render_pipeline_key(&self, mesh_key: MeshKey) -> Option<RenderPipelineKey> {
         self.render_pipeline_keys.get(mesh_key).cloned()
+    }
+
+    pub fn clone_render_pipeline_key(&mut self, from: MeshKey, to: MeshKey) {
+        if let Some(key) = self.render_pipeline_keys.get(from).cloned() {
+            self.render_pipeline_keys.insert(to, key);
+        }
     }
 }
 

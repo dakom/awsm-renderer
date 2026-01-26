@@ -5,40 +5,58 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::Mat4;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
+use crate::bounds::Aabb;
 use crate::bind_groups::{BindGroupCreate, BindGroups};
 use crate::buffer::dynamic_storage::DynamicStorageBuffer;
+use crate::buffer::helpers::write_buffer_with_dirty_ranges;
 use crate::materials::Materials;
 use crate::mesh::meta::{MeshMeta, MESH_META_INITIAL_CAPACITY};
-use crate::mesh::skins::Skins;
-use crate::mesh::MeshBufferInfos;
+use crate::mesh::skins::{SkinKey, Skins};
+use crate::mesh::{MeshBufferInfoKey, MeshBufferInfos};
 use crate::transforms::{TransformKey, Transforms};
 use crate::AwsmRendererLogging;
 
 use super::error::{AwsmMeshError, Result};
-use super::morphs::Morphs;
+use super::morphs::{GeometryMorphKey, MaterialMorphKey, Morphs};
 use super::{Mesh, MeshBufferVertexInfo};
+
+#[derive(Debug, Clone)]
+pub struct MeshResource {
+    pub buffer_info_key: MeshBufferInfoKey,
+    pub visibility_geometry_data_offset: Option<usize>,
+    pub transparency_geometry_data_offset: Option<usize>,
+    pub custom_attribute_data_offset: usize,
+    pub custom_attribute_index_offset: usize,
+    pub aabb: Option<Aabb>,
+    pub geometry_morph_key: Option<GeometryMorphKey>,
+    pub material_morph_key: Option<MaterialMorphKey>,
+    pub skin_key: Option<SkinKey>,
+    pub refcount: usize,
+}
 
 pub struct Meshes {
     list: DenseSlotMap<MeshKey, Mesh>,
+    resources: DenseSlotMap<MeshResourceKey, MeshResource>,
+    mesh_to_resource: SecondaryMap<MeshKey, MeshResourceKey>,
     transform_to_meshes: SecondaryMap<TransformKey, Vec<MeshKey>>,
     // visibility geometry data buffers (position, triangle-id, barycentric)
-    visibility_geometry_data_buffers: DynamicStorageBuffer<MeshKey>,
+    visibility_geometry_data_buffers: DynamicStorageBuffer<MeshResourceKey>,
     visibility_geometry_data_gpu_buffer: web_sys::GpuBuffer,
     visibility_geometry_data_dirty: bool,
     // visibility geometry index buffers (position, triangle-id, barycentric, etc.)
-    visibility_geometry_index_buffers: DynamicStorageBuffer<MeshKey>,
+    visibility_geometry_index_buffers: DynamicStorageBuffer<MeshResourceKey>,
     visibility_geometry_index_gpu_buffer: web_sys::GpuBuffer,
     visibility_geometry_index_dirty: bool,
     // transparency geometry data buffers (position, etc.)
-    transparency_geometry_data_buffers: DynamicStorageBuffer<MeshKey>,
+    transparency_geometry_data_buffers: DynamicStorageBuffer<MeshResourceKey>,
     transparency_geometry_data_gpu_buffer: web_sys::GpuBuffer,
     transparency_geometry_data_dirty: bool,
     // attribute data buffers
-    custom_attribute_data_buffers: DynamicStorageBuffer<MeshKey>,
+    custom_attribute_data_buffers: DynamicStorageBuffer<MeshResourceKey>,
     custom_attribute_data_gpu_buffer: web_sys::GpuBuffer,
     custom_attribute_data_dirty: bool,
     // attribute index buffers (normals, uvs, colors, etc.)
-    custom_attribute_index_buffers: DynamicStorageBuffer<MeshKey>,
+    custom_attribute_index_buffers: DynamicStorageBuffer<MeshResourceKey>,
     custom_attribute_index_gpu_buffer: web_sys::GpuBuffer,
     custom_attribute_index_dirty: bool,
     // buffer infos
@@ -68,6 +86,8 @@ impl Meshes {
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Self {
             list: DenseSlotMap::with_key(),
+            resources: DenseSlotMap::with_key(),
+            mesh_to_resource: SecondaryMap::new(),
             transform_to_meshes: SecondaryMap::new(),
             buffer_infos: MeshBufferInfos::new(),
             // visibility data
@@ -155,35 +175,67 @@ impl Meshes {
         mesh: Mesh,
         materials: &Materials,
         transforms: &Transforms,
+        buffer_info_key: MeshBufferInfoKey,
         visibility_geometry_data: Option<&[u8]>,
         transparency_geometry_data: Option<&[u8]>,
         attribute_data: &[u8],
         attribute_index: &[u8],
+        aabb: Option<Aabb>,
+        geometry_morph_key: Option<GeometryMorphKey>,
+        material_morph_key: Option<MaterialMorphKey>,
+        skin_key: Option<SkinKey>,
     ) -> Result<MeshKey> {
-        let transform_key = mesh.transform_key;
-        let buffer_info_key = mesh.buffer_info_key;
-        let mesh_key = self.list.insert(mesh.clone());
+        let resource_key = self.insert_resource(
+            buffer_info_key,
+            visibility_geometry_data,
+            transparency_geometry_data,
+            attribute_data,
+            attribute_index,
+            aabb,
+            geometry_morph_key,
+            material_morph_key,
+            skin_key,
+        )?;
 
+        self.insert_instance(mesh, resource_key, materials, transforms)
+    }
+
+    fn insert_resource(
+        &mut self,
+        buffer_info_key: MeshBufferInfoKey,
+        visibility_geometry_data: Option<&[u8]>,
+        transparency_geometry_data: Option<&[u8]>,
+        attribute_data: &[u8],
+        attribute_index: &[u8],
+        aabb: Option<Aabb>,
+        geometry_morph_key: Option<GeometryMorphKey>,
+        material_morph_key: Option<MaterialMorphKey>,
+        skin_key: Option<SkinKey>,
+    ) -> Result<MeshResourceKey> {
         let buffer_info = self.buffer_infos.get(buffer_info_key)?;
 
-        self.transform_to_meshes
-            .entry(transform_key)
-            .unwrap()
-            .or_default()
-            .push(mesh_key);
-
-        // geometry
+        let resource_key = self.resources.insert(MeshResource {
+            buffer_info_key,
+            visibility_geometry_data_offset: None,
+            transparency_geometry_data_offset: None,
+            custom_attribute_data_offset: 0,
+            custom_attribute_index_offset: 0,
+            aabb,
+            geometry_morph_key,
+            material_morph_key,
+            skin_key,
+            refcount: 1,
+        });
 
         let visibility_geometry_data_offset = match visibility_geometry_data {
             Some(geometry_data) => {
-                // visibility geometry - index (auto-generated sequential for drawing)
                 if let Some(vertex_info) = &buffer_info.visibility_geometry_vertex {
                     let mut geometry_index = Vec::new();
                     for i in 0..vertex_info.count {
                         geometry_index.extend_from_slice(&(i as u32).to_le_bytes());
                     }
                     self.visibility_geometry_index_buffers
-                        .update(mesh_key, &geometry_index);
+                        .update(resource_key, &geometry_index);
                 } else {
                     return Err(AwsmMeshError::VisibilityGeometryBufferInfoNotFound(
                         buffer_info_key,
@@ -193,7 +245,7 @@ impl Meshes {
                 self.visibility_geometry_index_dirty = true;
                 let offset = self
                     .visibility_geometry_data_buffers
-                    .update(mesh_key, geometry_data);
+                    .update(resource_key, geometry_data);
                 self.visibility_geometry_data_dirty = true;
 
                 Some(offset)
@@ -205,7 +257,7 @@ impl Meshes {
             Some(geometry_data) => {
                 let offset = self
                     .transparency_geometry_data_buffers
-                    .update(mesh_key, geometry_data);
+                    .update(resource_key, geometry_data);
                 self.transparency_geometry_data_dirty = true;
 
                 Some(offset)
@@ -213,16 +265,14 @@ impl Meshes {
             None => None,
         };
 
-        // attributes - index
         let custom_attribute_indices_offset = self
             .custom_attribute_index_buffers
-            .update(mesh_key, attribute_index);
+            .update(resource_key, attribute_index);
         self.custom_attribute_index_dirty = true;
 
-        // attributes - data
         let custom_attribute_data_offset = self
             .custom_attribute_data_buffers
-            .update(mesh_key, attribute_data);
+            .update(resource_key, attribute_data);
         self.custom_attribute_data_dirty = true;
 
         // KEEP THIS AROUND FOR DEBUGGING
@@ -260,14 +310,78 @@ impl Meshes {
         //         _ => {}
         //     }
         // }
+
+        if let Some(resource) = self.resources.get_mut(resource_key) {
+            resource.visibility_geometry_data_offset = visibility_geometry_data_offset;
+            resource.transparency_geometry_data_offset = transparency_geometry_data_offset;
+            resource.custom_attribute_data_offset = custom_attribute_data_offset;
+            resource.custom_attribute_index_offset = custom_attribute_indices_offset;
+        }
+
+        Ok(resource_key)
+    }
+
+    fn insert_instance(
+        &mut self,
+        mut mesh: Mesh,
+        resource_key: MeshResourceKey,
+        materials: &Materials,
+        transforms: &Transforms,
+    ) -> Result<MeshKey> {
+        let transform_key = mesh.transform_key;
+
+        let (
+            resource_aabb,
+            buffer_info_key,
+            visibility_geometry_data_offset,
+            custom_attribute_index_offset,
+            custom_attribute_data_offset,
+            geometry_morph_key,
+            material_morph_key,
+            skin_key,
+        ) = {
+            let resource = self
+                .resources
+                .get(resource_key)
+                .ok_or(AwsmMeshError::ResourceNotFound(resource_key))?;
+
+            (
+                resource.aabb.clone(),
+                resource.buffer_info_key,
+                resource.visibility_geometry_data_offset,
+                resource.custom_attribute_index_offset,
+                resource.custom_attribute_data_offset,
+                resource.geometry_morph_key,
+                resource.material_morph_key,
+                resource.skin_key,
+            )
+        };
+
+        if mesh.world_aabb.is_none() {
+            mesh.world_aabb = resource_aabb;
+        }
+
+        let mesh_key = self.list.insert(mesh.clone());
+        self.mesh_to_resource.insert(mesh_key, resource_key);
+
+        self.transform_to_meshes
+            .entry(transform_key)
+            .unwrap()
+            .or_default()
+            .push(mesh_key);
+
+        let buffer_info = self.buffer_infos.get(buffer_info_key)?;
+
         self.meta.insert(
             mesh_key,
             &mesh,
             buffer_info,
             visibility_geometry_data_offset,
-            transparency_geometry_data_offset,
-            custom_attribute_indices_offset,
+            custom_attribute_index_offset,
             custom_attribute_data_offset,
+            geometry_morph_key,
+            material_morph_key,
+            skin_key,
             materials,
             transforms,
             &self.morphs,
@@ -275,6 +389,31 @@ impl Meshes {
         )?;
 
         Ok(mesh_key)
+    }
+
+    pub fn duplicate_with_transform(
+        &mut self,
+        mesh_key: MeshKey,
+        new_transform_key: TransformKey,
+        materials: &Materials,
+        transforms: &Transforms,
+    ) -> Result<MeshKey> {
+        let mesh = self.get(mesh_key)?.clone();
+        let resource_key = self.resource_key(mesh_key)?;
+        let resource_aabb = {
+            let resource = self
+                .resources
+                .get_mut(resource_key)
+                .ok_or(AwsmMeshError::ResourceNotFound(resource_key))?;
+            resource.refcount += 1;
+            resource.aabb.clone()
+        };
+
+        let mut new_mesh = mesh.clone();
+        new_mesh.transform_key = new_transform_key;
+        new_mesh.world_aabb = resource_aabb;
+
+        self.insert_instance(new_mesh, resource_key, materials, transforms)
     }
 
     pub fn update_world(&mut self, dirty_transforms: HashMap<TransformKey, &Mat4>) {
@@ -305,12 +444,36 @@ impl Meshes {
         self.list.keys()
     }
 
+    pub fn resource_key(&self, mesh_key: MeshKey) -> Result<MeshResourceKey> {
+        self.mesh_to_resource
+            .get(mesh_key)
+            .copied()
+            .ok_or(AwsmMeshError::MeshNotFound(mesh_key))
+    }
+
+    pub fn buffer_info_key(&self, mesh_key: MeshKey) -> Result<MeshBufferInfoKey> {
+        Ok(self.resource(mesh_key)?.buffer_info_key)
+    }
+
+    pub fn buffer_info(&self, mesh_key: MeshKey) -> Result<&crate::mesh::MeshBufferInfo> {
+        let buffer_info_key = self.buffer_info_key(mesh_key)?;
+        self.buffer_infos.get(buffer_info_key)
+    }
+
+    pub fn resource(&self, mesh_key: MeshKey) -> Result<&MeshResource> {
+        let resource_key = self.resource_key(mesh_key)?;
+        self.resources
+            .get(resource_key)
+            .ok_or(AwsmMeshError::ResourceNotFound(resource_key))
+    }
+
     pub fn visibility_geometry_data_gpu_buffer(&self) -> &web_sys::GpuBuffer {
         &self.visibility_geometry_data_gpu_buffer
     }
     pub fn visibility_geometry_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        let resource_key = self.resource_key(key)?;
         self.visibility_geometry_data_buffers
-            .offset(key)
+            .offset(resource_key)
             .ok_or(AwsmMeshError::VisibilityGeometryBufferNotFound(key))
     }
 
@@ -318,8 +481,9 @@ impl Meshes {
         &self.visibility_geometry_index_gpu_buffer
     }
     pub fn visibility_geometry_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        let resource_key = self.resource_key(key)?;
         self.visibility_geometry_index_buffers
-            .offset(key)
+            .offset(resource_key)
             .ok_or(AwsmMeshError::VisibilityGeometryBufferNotFound(key))
     }
 
@@ -327,8 +491,9 @@ impl Meshes {
         &self.custom_attribute_data_gpu_buffer
     }
     pub fn custom_attribute_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        let resource_key = self.resource_key(key)?;
         self.custom_attribute_data_buffers
-            .offset(key)
+            .offset(resource_key)
             .ok_or(AwsmMeshError::CustomAttributeBufferNotFound(key))
     }
 
@@ -336,8 +501,9 @@ impl Meshes {
         &self.transparency_geometry_data_gpu_buffer
     }
     pub fn transparency_geometry_data_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        let resource_key = self.resource_key(key)?;
         self.transparency_geometry_data_buffers
-            .offset(key)
+            .offset(resource_key)
             .ok_or(AwsmMeshError::TransparencyGeometryBufferNotFound(key))
     }
     // re-use the custom attribute index methods
@@ -345,8 +511,9 @@ impl Meshes {
         &self.custom_attribute_index_gpu_buffer
     }
     pub fn transparency_geometry_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        let resource_key = self.resource_key(key)?;
         self.custom_attribute_index_buffers
-            .offset(key)
+            .offset(resource_key)
             .ok_or(AwsmMeshError::CustomAttributeBufferNotFound(key))
     }
 
@@ -354,8 +521,9 @@ impl Meshes {
         &self.custom_attribute_index_gpu_buffer
     }
     pub fn custom_attribute_index_buffer_offset(&self, key: MeshKey) -> Result<usize> {
+        let resource_key = self.resource_key(key)?;
         self.custom_attribute_index_buffers
-            .offset(key)
+            .offset(resource_key)
             .ok_or(AwsmMeshError::CustomAttributeBufferNotFound(key))
     }
 
@@ -390,41 +558,60 @@ impl Meshes {
     }
     pub fn remove(&mut self, mesh_key: MeshKey) -> Option<Mesh> {
         if let Some(mesh) = self.list.remove(mesh_key) {
-            self.visibility_geometry_data_buffers.remove(mesh_key);
-            self.visibility_geometry_index_buffers.remove(mesh_key);
-            self.transparency_geometry_data_buffers.remove(mesh_key);
-            self.custom_attribute_data_buffers.remove(mesh_key);
-            self.custom_attribute_index_buffers.remove(mesh_key);
             self.meta.remove(mesh_key);
-
-            if self.buffer_infos.remove(mesh.buffer_info_key).is_some() {
-                self.visibility_geometry_data_dirty = true;
-                self.visibility_geometry_index_dirty = true;
-                self.transparency_geometry_data_dirty = true;
-                self.custom_attribute_data_dirty = true;
-                self.custom_attribute_index_dirty = true;
-            }
 
             if let Some(meshes) = self.transform_to_meshes.get_mut(mesh.transform_key) {
                 meshes.retain(|&key| key != mesh_key)
             }
 
-            let last_transform = if self.transform_to_meshes.contains_key(mesh.transform_key) {
-                None
-            } else {
-                Some(mesh.transform_key)
-            };
+            if let Some(resource_key) = self.mesh_to_resource.remove(mesh_key) {
+                let should_remove_resource = match self.resources.get_mut(resource_key) {
+                    Some(resource) => {
+                        if resource.refcount > 1 {
+                            resource.refcount -= 1;
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                    None => false,
+                };
 
-            if let Some(morph_key) = mesh.geometry_morph_key {
-                self.morphs.geometry.remove(morph_key);
-            }
+                if should_remove_resource {
+                    if let Some(resource) = self.resources.remove(resource_key) {
+                        self.visibility_geometry_data_buffers.remove(resource_key);
+                        self.visibility_geometry_index_buffers.remove(resource_key);
+                        self.transparency_geometry_data_buffers.remove(resource_key);
+                        self.custom_attribute_data_buffers.remove(resource_key);
+                        self.custom_attribute_index_buffers.remove(resource_key);
 
-            if let Some(morph_key) = mesh.material_morph_key {
-                self.morphs.material.remove(morph_key);
-            }
+                        self.visibility_geometry_data_dirty = true;
+                        self.visibility_geometry_index_dirty = true;
+                        self.transparency_geometry_data_dirty = true;
+                        self.custom_attribute_data_dirty = true;
+                        self.custom_attribute_index_dirty = true;
 
-            if let Some(skin_key) = mesh.skin_key {
-                self.skins.remove(skin_key, last_transform);
+                        if self.buffer_infos.remove(resource.buffer_info_key).is_some() {
+                            self.visibility_geometry_data_dirty = true;
+                            self.visibility_geometry_index_dirty = true;
+                            self.transparency_geometry_data_dirty = true;
+                            self.custom_attribute_data_dirty = true;
+                            self.custom_attribute_index_dirty = true;
+                        }
+
+                        if let Some(morph_key) = resource.geometry_morph_key {
+                            self.morphs.geometry.remove(morph_key);
+                        }
+
+                        if let Some(morph_key) = resource.material_morph_key {
+                            self.morphs.material.remove(morph_key);
+                        }
+
+                        if let Some(skin_key) = resource.skin_key {
+                            self.skins.remove(skin_key, None);
+                        }
+                    }
+                }
             }
 
             Some(mesh)
@@ -504,6 +691,7 @@ impl Meshes {
             };
             for (dirty, buffer, gpu_buffer, usage, label, bind_group_create) in to_check_dynamic {
                 if dirty {
+                    let mut resized = false;
                     if let Some(new_size) = buffer.take_gpu_needs_resize() {
                         *gpu_buffer = gpu.create_buffer(
                             &BufferDescriptor::new(Some(label), new_size, usage).into(),
@@ -512,8 +700,15 @@ impl Meshes {
                         if let Some(create) = bind_group_create {
                             bind_groups.mark_create(create);
                         }
+                        resized = true;
                     }
-                    gpu.write_buffer(gpu_buffer, None, buffer.raw_slice(), None, None)?;
+                    if resized {
+                        buffer.clear_dirty_ranges();
+                        gpu.write_buffer(gpu_buffer, None, buffer.raw_slice(), None, None)?;
+                    } else {
+                        let ranges = buffer.take_dirty_ranges();
+                        write_buffer_with_dirty_ranges(gpu, gpu_buffer, buffer.raw_slice(), ranges)?;
+                    }
                 }
             }
 
@@ -540,4 +735,5 @@ impl Drop for Meshes {
 
 new_key_type! {
     pub struct MeshKey;
+    pub struct MeshResourceKey;
 }
