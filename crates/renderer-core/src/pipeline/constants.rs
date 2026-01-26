@@ -1,10 +1,15 @@
+//! Shader constant override keys and values.
+
 use ordered_float::OrderedFloat;
 use wasm_bindgen::prelude::*;
 
 // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#vertex_object_structure
+/// Key used to identify a shader constant override.
 #[derive(Debug, Clone, PartialEq, Hash, Eq, Ord, PartialOrd)]
 pub enum ConstantOverrideKey {
+    /// Numeric identifier.
     Id(u16),
+    /// Named constant.
     Name(String),
 }
 
@@ -30,11 +35,16 @@ impl From<String> for ConstantOverrideKey {
 }
 
 // https://gpuweb.github.io/gpuweb/#abstract-opdef-to-wgsl-type
+/// Value used for a shader constant override.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd)]
 pub enum ConstantOverrideValue {
+    /// Boolean constant.
     Bool(bool),
+    /// Signed 32-bit integer constant.
     I32(i32),
+    /// Unsigned 32-bit integer constant.
     U32(u32),
+    /// 32-bit float constant.
     F32(OrderedFloat<f32>),
     //F16(f16),
 }

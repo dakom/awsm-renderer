@@ -1,3 +1,5 @@
+//! glTF loader error types and results.
+
 use awsm_renderer_core::{error::AwsmCoreError, pipeline::primitive::IndexFormat};
 use gltf::Semantic;
 use thiserror::Error;
@@ -8,7 +10,7 @@ use crate::{
     bind_groups::AwsmBindGroupError,
     error::AwsmError,
     materials::AwsmMaterialError,
-    mesh::{skins::AwsmSkinError, AwsmMeshError, MeshBufferInfoKey},
+    meshes::{buffer_info::MeshBufferInfoKey, error::AwsmMeshError, skins::AwsmSkinError},
     pipeline_layouts::AwsmPipelineLayoutError,
     pipelines::render_pipeline::AwsmRenderPipelineError,
     shaders::AwsmShaderError,
@@ -16,6 +18,7 @@ use crate::{
     transforms::AwsmTransformError,
 };
 
+/// Errors returned while loading or populating glTF assets.
 #[derive(Error, Debug)]
 pub enum AwsmGltfError {
     #[error("[gltf] TODO: {0}")]
@@ -200,4 +203,5 @@ pub enum AwsmGltfError {
     TransparencyGeometryNotSupplied(MeshBufferInfoKey),
 }
 
+/// glTF loader result type.
 pub type Result<T> = std::result::Result<T, AwsmGltfError>;

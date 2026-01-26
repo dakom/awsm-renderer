@@ -1,3 +1,5 @@
+//! Shader template variants for render passes.
+
 use crate::{
     render_passes::{
         display::shader::template::ShaderTemplateDisplay,
@@ -13,6 +15,7 @@ use crate::{
     shaders::AwsmShaderError,
 };
 
+/// Render-pass shader template variants.
 pub enum ShaderTemplateRenderPass {
     Geometry(ShaderTemplateGeometry),
     LightCulling(ShaderTemplateLightCulling),
@@ -54,6 +57,7 @@ impl TryFrom<&ShaderCacheKeyRenderPass> for ShaderTemplateRenderPass {
 }
 
 impl ShaderTemplateRenderPass {
+    /// Renders the template into WGSL source.
     pub fn into_source(self) -> std::result::Result<String, AwsmShaderError> {
         match self {
             ShaderTemplateRenderPass::Geometry(tmpl) => tmpl.into_source(),
@@ -67,6 +71,7 @@ impl ShaderTemplateRenderPass {
     }
 
     #[cfg(debug_assertions)]
+    /// Returns an optional debug label for shader compilation.
     pub fn debug_label(&self) -> Option<&str> {
         match self {
             ShaderTemplateRenderPass::Geometry(tmpl) => tmpl.debug_label(),

@@ -1,3 +1,5 @@
+//! Transparent material bind group setup.
+
 use std::borrow::Cow;
 
 use awsm_renderer_core::bind_groups::{
@@ -12,12 +14,13 @@ use indexmap::IndexSet;
 use crate::bind_group_layout::{BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry};
 use crate::bind_groups::{AwsmBindGroupError, BindGroupRecreateContext};
 use crate::error::Result;
-use crate::mesh::meta::geometry_meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT;
-use crate::mesh::meta::material_meta::MATERIAL_MESH_META_BYTE_ALIGNMENT;
+use crate::meshes::meta::geometry_meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT;
+use crate::meshes::meta::material_meta::MATERIAL_MESH_META_BYTE_ALIGNMENT;
 use crate::render_passes::shared::material::bind_group::{TexturePoolDeps, TexturePoolVisibility};
 use crate::textures::SamplerKey;
 use crate::{bind_group_layout::BindGroupLayoutKey, render_passes::RenderPassInitContext};
 
+/// Bind group layout keys and cached bind groups for transparent materials.
 pub struct MaterialTransparentBindGroups {
     pub main_bind_group_layout_key: BindGroupLayoutKey,
     pub mesh_material_bind_group_layout_key: BindGroupLayoutKey,
@@ -33,6 +36,7 @@ pub struct MaterialTransparentBindGroups {
 }
 
 impl MaterialTransparentBindGroups {
+    /// Creates bind group layouts for transparent materials.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let TexturePoolDeps {
             bind_group_layout_key: texture_pool_textures_bind_group_layout_key,
@@ -274,6 +278,7 @@ impl MaterialTransparentBindGroups {
         })
     }
 
+    /// Rebuilds texture-pool-related layouts while preserving other state.
     pub fn clone_because_texture_pool_changed(
         &self,
         ctx: &mut RenderPassInitContext<'_>,
@@ -300,6 +305,7 @@ impl MaterialTransparentBindGroups {
         Ok(_self)
     }
 
+    /// Returns the live bind groups used for rendering.
     pub fn get_bind_groups(
         &self,
     ) -> std::result::Result<
@@ -343,6 +349,7 @@ impl MaterialTransparentBindGroups {
         }
     }
 
+    /// Recreates the main bind group for transparent materials.
     pub fn recreate_main(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let mut entries = Vec::new();
 
@@ -415,6 +422,7 @@ impl MaterialTransparentBindGroups {
         Ok(())
     }
 
+    /// Recreates the mesh/material bind group for transparent materials.
     pub fn recreate_mesh_material(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let mut entries = Vec::new();
 
@@ -448,6 +456,7 @@ impl MaterialTransparentBindGroups {
         Ok(())
     }
 
+    /// Recreates the light bind group for transparent materials.
     pub fn recreate_lights(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let mut entries = Vec::new();
 
@@ -506,6 +515,7 @@ impl MaterialTransparentBindGroups {
         Ok(())
     }
 
+    /// Recreates the texture pool bind group for transparent materials.
     pub fn recreate_texture_pool(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let mut entries = Vec::new();
 

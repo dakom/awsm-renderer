@@ -1,3 +1,5 @@
+//! Bind group recreation coordination.
+
 use std::collections::HashSet;
 
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
@@ -6,7 +8,7 @@ use thiserror::Error;
 
 use crate::{
     anti_alias::AntiAliasing, bind_group_layout::BindGroupLayouts, camera::CameraBuffer,
-    environment::Environment, lights::Lights, materials::Materials, mesh::Meshes, picker::Picker,
+    environment::Environment, lights::Lights, materials::Materials, meshes::Meshes, picker::Picker,
     render_passes::RenderPasses, render_textures::RenderTextureViews, textures::Textures,
     transforms::Transforms,
 };
@@ -21,6 +23,7 @@ use crate::{
 //
 // That conscpicuously does not include changes to material textures
 // since those are looked up via the material key and do not require a bind group recreation
+/// Inputs required to rebuild bind groups.
 pub struct BindGroupRecreateContext<'a> {
     pub gpu: &'a AwsmRendererWebGpu,
     pub render_texture_views: &'a RenderTextureViews,
@@ -35,6 +38,7 @@ pub struct BindGroupRecreateContext<'a> {
     pub anti_aliasing: &'a AntiAliasing,
 }
 
+/// Reasons to recreate bind groups.
 #[derive(Hash, Debug, Clone, PartialEq, Eq, EnumIter)]
 pub enum BindGroupCreate {
     CameraInitOnly,
@@ -62,6 +66,7 @@ pub enum BindGroupCreate {
     AntiAliasingChange,
 }
 
+/// Tracks pending bind group recreations.
 pub struct BindGroups {
     create_list: HashSet<BindGroupCreate>,
 }
@@ -73,6 +78,7 @@ impl Default for BindGroups {
 }
 
 impl BindGroups {
+    /// Creates a bind group tracker with all groups marked dirty.
     pub fn new() -> Self {
         Self {
             // startup means all bind groups are "re"created
@@ -80,10 +86,12 @@ impl BindGroups {
         }
     }
 
+    /// Marks a bind group recreation reason.
     pub fn mark_create(&mut self, create: BindGroupCreate) {
         self.create_list.insert(create);
     }
 
+    /// Recreates bind groups affected by pending changes.
     pub fn recreate(
         &mut self,
         ctx: BindGroupRecreateContext<'_>,
@@ -293,6 +301,7 @@ impl BindGroups {
     }
 }
 
+/// Bind group errors.
 #[derive(Error, Debug)]
 pub enum AwsmBindGroupError {
     #[error("[bind group] bind group not found for {0}")]

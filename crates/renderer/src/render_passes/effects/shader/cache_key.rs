@@ -1,3 +1,5 @@
+//! Shader cache key definitions for the effects pass.
+
 use crate::{render_passes::shader_cache_key::ShaderCacheKeyRenderPass, shaders::ShaderCacheKey};
 
 /// Phase of multi-pass bloom processing
@@ -13,6 +15,7 @@ pub enum BloomPhase {
     Blend,
 }
 
+/// Cache key for effects pass shaders.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyEffects {
     pub smaa_anti_alias: bool,

@@ -1,3 +1,5 @@
+//! Effects pass bind group setup.
+
 use std::borrow::Cow;
 
 use crate::{
@@ -19,6 +21,7 @@ use awsm_renderer_core::{
     texture::{TextureSampleType, TextureViewDimension},
 };
 
+/// Bind group layouts and cached bind groups for the effects pass.
 #[derive(Default)]
 pub struct EffectsBindGroups {
     pub multisampled_bind_group_layout_key: BindGroupLayoutKey,
@@ -29,6 +32,7 @@ pub struct EffectsBindGroups {
 }
 
 impl EffectsBindGroups {
+    /// Creates bind group layouts for the effects pass.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let singlesampled_bind_group_layout_cache_key =
             bind_group_layout_cache_key(ctx.render_texture_formats, false);
@@ -52,6 +56,7 @@ impl EffectsBindGroups {
         })
     }
 
+    /// Returns the active effects bind group for the ping-pong target.
     pub fn get_bind_group(
         &self,
         ping_pong: bool,
@@ -67,6 +72,7 @@ impl EffectsBindGroups {
         }
     }
 
+    /// Recreates bind groups for the current render textures.
     pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let mut entries = Vec::new();
 

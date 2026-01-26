@@ -1,3 +1,6 @@
+//! Render entry points and render context.
+
+use awsm_renderer_core::command::color::Color;
 use awsm_renderer_core::command::CommandEncoder;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use awsm_renderer_core::texture::blit::blit_tex;
@@ -7,7 +10,7 @@ use crate::bind_groups::{BindGroupCreate, BindGroupRecreateContext, BindGroups};
 use crate::error::{AwsmError, Result};
 use crate::instances::Instances;
 use crate::materials::Materials;
-use crate::mesh::Meshes;
+use crate::meshes::Meshes;
 use crate::pipelines::Pipelines;
 use crate::post_process::PostProcessing;
 use crate::render_passes::RenderPasses;
@@ -15,6 +18,7 @@ use crate::render_textures::{RenderTextureViews, RenderTextures};
 use crate::transforms::Transforms;
 use crate::{AwsmRenderer, AwsmRendererLogging};
 
+/// Optional callbacks around render passes.
 #[derive(Default)]
 pub struct RenderHooks {
     pub pre_render: Option<Box<dyn Fn(&mut AwsmRenderer) -> Result<()>>>,
@@ -28,6 +32,7 @@ impl AwsmRenderer {
     // this should only be called once per frame
     // the various underlying raw data can be updated on their own cadence
     // or just call .update_all() right before .render() for convenience
+    /// Executes a full render with optional hooks.
     pub fn render(&mut self, hooks: Option<&RenderHooks>) -> Result<()> {
         if let Some(hook) = hooks.and_then(|h| h.pre_render.as_ref()) {
             {
@@ -116,6 +121,7 @@ impl AwsmRenderer {
             render_passes: &self.render_passes,
             anti_aliasing: &self.anti_aliasing,
             post_processing: &self.post_processing,
+            clear_color: &self._clear_color,
         };
 
         let renderables = self.collect_renderables(&ctx)?;
@@ -336,6 +342,7 @@ impl AwsmRenderer {
     }
 }
 
+/// Context passed to render passes during a frame.
 pub struct RenderContext<'a> {
     pub gpu: &'a AwsmRendererWebGpu,
     pub command_encoder: CommandEncoder,
@@ -351,4 +358,5 @@ pub struct RenderContext<'a> {
     pub render_passes: &'a RenderPasses,
     pub anti_aliasing: &'a AntiAliasing,
     pub post_processing: &'a PostProcessing,
+    pub clear_color: &'a Color,
 }

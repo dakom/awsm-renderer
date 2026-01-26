@@ -20,6 +20,7 @@ pub(crate) enum JsData<'a> {
 }
 
 impl<'a> JsData<'a> {
+    /// Returns the underlying data as a `JsValue` reference when supported.
     pub fn as_js_value_ref(&'a self) -> &'a JsValue {
         match self {
             JsData::SliceU8(_) => {

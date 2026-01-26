@@ -1,3 +1,5 @@
+//! Compute pipeline cache.
+
 use std::collections::{BTreeMap, HashMap};
 
 use awsm_renderer_core::{
@@ -18,12 +20,14 @@ use crate::{
     shaders::{ShaderKey, Shaders},
 };
 
+/// Cache of compute pipelines by key.
 pub struct ComputePipelines {
     lookup: SlotMap<ComputePipelineKey, web_sys::GpuComputePipeline>,
     cache: HashMap<ComputePipelineCacheKey, ComputePipelineKey>,
 }
 
 impl ComputePipelines {
+    /// Creates an empty compute pipeline cache.
     pub fn new() -> Self {
         Self {
             lookup: SlotMap::with_key(),
@@ -31,6 +35,7 @@ impl ComputePipelines {
         }
     }
 
+    /// Returns a pipeline key, creating the pipeline if needed.
     pub async fn get_key(
         &mut self,
         gpu: &AwsmRendererWebGpu,
@@ -69,6 +74,7 @@ impl ComputePipelines {
         Ok(key)
     }
 
+    /// Returns a compute pipeline for a key.
     pub fn get(&self, key: ComputePipelineKey) -> Result<&web_sys::GpuComputePipeline> {
         self.lookup
             .get(key)
@@ -82,7 +88,7 @@ impl Default for ComputePipelines {
     }
 }
 
-// merely a key to hash ad-hoc pipeline generation
+/// Cache key for compute pipeline creation.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ComputePipelineCacheKey {
     pub shader_key: ShaderKey,
@@ -91,6 +97,7 @@ pub struct ComputePipelineCacheKey {
 }
 
 impl ComputePipelineCacheKey {
+    /// Creates a cache key with shader and layout keys.
     pub fn new(shader_key: ShaderKey, layout_key: PipelineLayoutKey) -> Self {
         Self {
             shader_key,
@@ -99,6 +106,7 @@ impl ComputePipelineCacheKey {
         }
     }
 
+    /// Adds a constant override to the cache key.
     pub fn with_push_constant_override(
         mut self,
         key: ConstantOverrideKey,
@@ -110,11 +118,14 @@ impl ComputePipelineCacheKey {
 }
 
 new_key_type! {
+    /// Opaque key for compute pipelines.
     pub struct ComputePipelineKey;
 }
 
+/// Result type for compute pipeline operations.
 type Result<T> = std::result::Result<T, AwsmComputePipelineError>;
 
+/// Compute pipeline errors.
 #[derive(Error, Debug)]
 pub enum AwsmComputePipelineError {
     #[error("[compute pipeline] missing pipeline: {0:?}")]

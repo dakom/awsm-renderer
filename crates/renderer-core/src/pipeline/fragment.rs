@@ -1,3 +1,5 @@
+//! Fragment state descriptors and blending helpers.
+
 use std::collections::BTreeMap;
 
 use crate::texture::TextureFormat;
@@ -5,6 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use super::constants::{ConstantOverrideKey, ConstantOverrideValue};
 
+/// Fragment stage descriptor.
 #[derive(Debug, Clone)]
 pub struct FragmentState<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#fragment_object_structure
@@ -15,6 +18,7 @@ pub struct FragmentState<'a> {
     pub targets: Vec<ColorTargetState>,
 }
 
+/// Color target state for a render pipeline.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColorTargetState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#targets
@@ -29,6 +33,7 @@ pub struct ColorTargetState {
 }
 
 impl ColorTargetState {
+    /// Creates a color target state for a given format.
     pub fn new(format: TextureFormat) -> Self {
         Self {
             blend: None,
@@ -41,36 +46,43 @@ impl ColorTargetState {
         }
     }
 
+    /// Sets blending for the target.
     pub fn with_blend(mut self, blend: BlendState) -> Self {
         self.blend = Some(blend);
         self
     }
 
+    /// Enables all color write mask bits.
     pub fn with_write_mask_all(mut self) -> Self {
         self.write_mask_all = true;
         self
     }
 
+    /// Enables alpha channel writes.
     pub fn with_write_mask_alpha(mut self) -> Self {
         self.write_mask_alpha = true;
         self
     }
 
+    /// Enables red channel writes.
     pub fn with_write_mask_red(mut self) -> Self {
         self.write_mask_red = true;
         self
     }
 
+    /// Enables green channel writes.
     pub fn with_write_mask_green(mut self) -> Self {
         self.write_mask_green = true;
         self
     }
 
+    /// Enables blue channel writes.
     pub fn with_write_mask_blue(mut self) -> Self {
         self.write_mask_blue = true;
         self
     }
 
+    /// Returns the WebGPU write mask bitfield.
     pub fn write_mask_u32(&self) -> u32 {
         let mut mask = 0;
         if self.write_mask_all {
@@ -104,6 +116,7 @@ impl std::hash::Hash for ColorTargetState {
     }
 }
 
+/// Blend state for a color target.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct BlendState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#blend
@@ -113,11 +126,13 @@ pub struct BlendState {
 }
 
 impl BlendState {
+    /// Creates a blend state with color and alpha components.
     pub fn new(alpha: BlendComponent, color: BlendComponent) -> Self {
         Self { alpha, color }
     }
 }
 
+/// Blend component configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct BlendComponent {
     // https://docs.rs/web-sys/latest/web_sys/struct.GpuBlendComponent.html
@@ -127,18 +142,22 @@ pub struct BlendComponent {
 }
 
 impl BlendComponent {
+    /// Creates a default blend component.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the blend operation.
     pub fn with_operation(mut self, operation: BlendOperation) -> Self {
         self.operation = Some(operation);
         self
     }
+    /// Sets the source blend factor.
     pub fn with_src_factor(mut self, src_factor: BlendFactor) -> Self {
         self.src_factor = Some(src_factor);
         self
     }
+    /// Sets the destination blend factor.
     pub fn with_dst_factor(mut self, dst_factor: BlendFactor) -> Self {
         self.dst_factor = Some(dst_factor);
         self
@@ -154,13 +173,16 @@ impl std::hash::Hash for BlendComponent {
 }
 
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuBlendFactor.html
+/// WebGPU blend factor.
 pub type BlendFactor = web_sys::GpuBlendFactor;
 // https://docs.rs/web-sys/latest/web_sys/enum.GpuBlendOperation.html
+/// WebGPU blend operation.
 pub type BlendOperation = web_sys::GpuBlendOperation;
 
 // js conversions
 
 impl<'a> FragmentState<'a> {
+    /// Creates a fragment state for a module and entry point.
     pub fn new(
         module: &'a web_sys::GpuShaderModule,
         entry_point: Option<&'a str>,
@@ -174,6 +196,7 @@ impl<'a> FragmentState<'a> {
         }
     }
 
+    /// Adds a constant override.
     pub fn with_constant(
         mut self,
         binding: ConstantOverrideKey,
@@ -182,6 +205,7 @@ impl<'a> FragmentState<'a> {
         self.constants.insert(binding, constant);
         self
     }
+    /// Adds a color target.
     pub fn with_target(mut self, target: ColorTargetState) -> Self {
         self.targets.push(target);
         self

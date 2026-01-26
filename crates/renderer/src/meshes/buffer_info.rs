@@ -1,7 +1,10 @@
+//! Mesh buffer metadata and attribute layouts.
+
 use super::error::{AwsmMeshError, Result};
 use awsm_renderer_core::pipeline::vertex::VertexFormat;
 use slotmap::new_key_type;
 
+/// Storage for mesh buffer info records.
 pub struct MeshBufferInfos {
     infos: slotmap::SlotMap<MeshBufferInfoKey, MeshBufferInfo>,
 }
@@ -13,27 +16,32 @@ impl Default for MeshBufferInfos {
 }
 
 impl MeshBufferInfos {
+    /// Creates an empty buffer info store.
     pub fn new() -> Self {
         Self {
             infos: slotmap::SlotMap::with_key(),
         }
     }
 
+    /// Inserts buffer info and returns its key.
     pub fn insert(&mut self, info: MeshBufferInfo) -> MeshBufferInfoKey {
         self.infos.insert(info)
     }
 
+    /// Returns buffer info by key.
     pub fn get(&self, key: MeshBufferInfoKey) -> Result<&MeshBufferInfo> {
         self.infos
             .get(key)
             .ok_or(AwsmMeshError::BufferInfoNotFound(key))
     }
 
+    /// Removes buffer info by key.
     pub fn remove(&mut self, key: MeshBufferInfoKey) -> Option<MeshBufferInfo> {
         self.infos.remove(key)
     }
 }
 
+/// Aggregate buffer info for a mesh.
 #[derive(Debug, Clone)]
 pub struct MeshBufferInfo {
     pub visibility_geometry_vertex: Option<MeshBufferVertexInfo>,
@@ -44,6 +52,7 @@ pub struct MeshBufferInfo {
     pub skin: Option<MeshBufferSkinInfo>,
 }
 
+/// Vertex buffer info for a mesh.
 #[derive(Debug, Clone)]
 pub struct MeshBufferVertexInfo {
     // Number of vertices (triangle_count * 3)
@@ -59,25 +68,31 @@ impl MeshBufferVertexInfo {
     // - tangents (vec4<f32>), 16 bytes per vertex (w = handedness)
     // - original_vertex_index (u32), 4 bytes per vertex (for indexed skin/morph access)
     // Total size per vertex = 12 + 4 + 8 + 12 + 16 + 4 = 56 bytes
+    /// Byte size for visibility geometry vertices.
     pub const VISIBILITY_GEOMETRY_BYTE_SIZE: usize = 56;
 
     // positions (vec3<f32>), 12 bytes per vertex
     // normals (vec3<f32>), 12 bytes per vertex
     // tangents (vec4<f32>), 16 bytes per vertex (w = handedness)
     // Total size per vertex = 12 + 12 + 16 = 40 bytes
+    /// Byte size for transparency geometry vertices.
     pub const TRANSPARENCY_GEOMETRY_BYTE_SIZE: usize = 40;
     // 16 * 4floats for transform
+    /// Byte size for instance transform data.
     pub const INSTANCING_BYTE_SIZE: usize = 64;
 
+    /// Returns the visibility geometry buffer size in bytes.
     pub fn visibility_geometry_size(&self) -> usize {
         self.count * Self::VISIBILITY_GEOMETRY_BYTE_SIZE
     }
 
+    /// Returns the transparency geometry buffer size in bytes.
     pub fn transparency_geometry_size(&self) -> usize {
         self.count * Self::TRANSPARENCY_GEOMETRY_BYTE_SIZE
     }
 }
 
+/// Triangle metadata for a mesh.
 #[derive(Debug, Clone)]
 pub struct MeshBufferTriangleInfo {
     // Number of triangles in this primitive
@@ -103,6 +118,7 @@ impl MeshBufferTriangleInfo {
             .sum()
     }
 
+    /// Debug helper that returns attribute values as f32 arrays for each vertex.
     pub fn debug_get_attribute_vec_f32(
         &self,
         info: &MeshBufferVertexAttributeInfo,
@@ -140,6 +156,7 @@ impl MeshBufferTriangleInfo {
     }
 }
 
+/// Index buffer info for vertex attributes.
 #[derive(Debug, Clone)]
 pub struct MeshBufferAttributeIndexInfo {
     // Number of index elements for this primitive (triangle_count * 3)
@@ -147,6 +164,7 @@ pub struct MeshBufferAttributeIndexInfo {
 }
 
 impl MeshBufferAttributeIndexInfo {
+    /// Debug helper that expands index buffer bytes into per-triangle index lists.
     pub fn debug_to_vec(&self, data: &[u8]) -> Vec<Vec<usize>> {
         data.chunks(12)
             .map(|chunk| {
@@ -161,11 +179,13 @@ impl MeshBufferAttributeIndexInfo {
 
 impl MeshBufferAttributeIndexInfo {
     // The size in bytes of the index buffer for this primitive
+    /// Returns the total byte size for the index buffer.
     pub fn total_size(&self) -> usize {
         self.count * 4 // always u32
     }
 }
 
+/// Triangle data buffer info.
 #[derive(Debug, Clone)]
 pub struct MeshBufferTriangleDataInfo {
     // Size per triangle (vertex indices, typically 12 bytes (3 u32 indices))
@@ -174,7 +194,7 @@ pub struct MeshBufferTriangleDataInfo {
     pub total_size: usize,
 }
 
-/// Information about geometry morphs (positions, normals, tangents - indexed per vertex)
+/// Information about geometry morphs (positions, normals, tangents).
 #[derive(Debug, Clone)]
 pub struct MeshBufferGeometryMorphInfo {
     pub targets_len: usize,
@@ -182,7 +202,7 @@ pub struct MeshBufferGeometryMorphInfo {
     pub values_size: usize,
 }
 
-/// Information about material morphs (normals + tangents, non-exploded per-vertex)
+/// Information about material morphs (normals and tangents).
 #[derive(Debug, Clone)]
 pub struct MeshBufferMaterialMorphInfo {
     pub attributes: MeshBufferMaterialMorphAttributes, // Which attributes are present
@@ -191,13 +211,14 @@ pub struct MeshBufferMaterialMorphInfo {
     pub values_size: usize,
 }
 
+/// Attribute flags for material morphs.
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct MeshBufferMaterialMorphAttributes {
     pub normal: bool,
     pub tangent: bool,
 }
 
-/// Information about skin (indices and weights, indexed per original vertex)
+/// Information about skin (indices and weights).
 #[derive(Debug, Clone)]
 pub struct MeshBufferSkinInfo {
     // 4 joint influences per set
@@ -209,11 +230,13 @@ pub struct MeshBufferSkinInfo {
 
 impl MeshBufferInfo {
     // Helper to get triangle count
+    /// Returns the number of triangles in this mesh.
     pub fn triangle_count(&self) -> usize {
         self.triangles.count
     }
 
     // Helper to check if we have a specific vertex attribute
+    /// Returns true if the mesh includes the given vertex attribute.
     pub fn has_vertex_attribute(&self, attr: &MeshBufferVertexAttributeInfo) -> bool {
         self.triangles
             .vertex_attributes
@@ -247,6 +270,7 @@ pub enum MeshBufferVisibilityVertexAttributeInfo {
 }
 
 impl MeshBufferVisibilityVertexAttributeInfo {
+    /// Returns the vertex size in bytes for this visibility attribute.
     pub fn vertex_size(&self) -> usize {
         match self {
             MeshBufferVisibilityVertexAttributeInfo::Positions {
@@ -288,6 +312,7 @@ pub enum MeshBufferCustomVertexAttributeInfo {
 }
 
 impl MeshBufferCustomVertexAttributeInfo {
+    /// Returns the packed vertex format for this attribute.
     pub fn vertex_format(&self) -> VertexFormat {
         match self {
             MeshBufferCustomVertexAttributeInfo::Colors { component_len, .. } => {
@@ -310,6 +335,7 @@ impl MeshBufferCustomVertexAttributeInfo {
         }
     }
 
+    /// Returns the vertex size in bytes for this custom attribute.
     pub fn vertex_size(&self) -> usize {
         match self {
             MeshBufferCustomVertexAttributeInfo::Colors {
@@ -334,6 +360,7 @@ pub enum MeshBufferVertexAttributeInfo {
 }
 
 impl MeshBufferVertexAttributeInfo {
+    /// Returns true if the two attributes are the same kind, ignoring indices.
     pub fn variant_equals(&self, other: &Self) -> bool {
         match self {
             MeshBufferVertexAttributeInfo::Visibility(vis_self) => match other {
@@ -386,6 +413,7 @@ impl MeshBufferVertexAttributeInfo {
         }
     }
 
+    /// Forces the stored data size for this attribute.
     pub fn force_data_size(&mut self, new_size: usize) {
         match self {
             MeshBufferVertexAttributeInfo::Visibility(vis) => match vis {
@@ -410,6 +438,7 @@ impl MeshBufferVertexAttributeInfo {
         }
     }
 
+    /// Returns the size in bytes per component for this attribute.
     pub fn data_size(&self) -> usize {
         match self {
             MeshBufferVertexAttributeInfo::Visibility(vis) => match vis {
@@ -424,6 +453,7 @@ impl MeshBufferVertexAttributeInfo {
         }
     }
 
+    /// Returns the number of components for this attribute.
     pub fn component_len(&self) -> usize {
         match self {
             MeshBufferVertexAttributeInfo::Visibility(vis) => match vis {
@@ -446,6 +476,7 @@ impl MeshBufferVertexAttributeInfo {
         }
     }
 
+    /// Returns the total vertex size in bytes for this attribute.
     pub fn vertex_size(&self) -> usize {
         match self {
             MeshBufferVertexAttributeInfo::Visibility(vis) => vis.vertex_size(),
@@ -469,5 +500,6 @@ impl Ord for MeshBufferVertexAttributeInfo {
 }
 
 new_key_type! {
+    /// SlotMap key for mesh buffer info records.
     pub struct MeshBufferInfoKey;
 }

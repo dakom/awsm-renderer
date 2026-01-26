@@ -1,3 +1,5 @@
+//! Pipeline cache keys and descriptor builders.
+
 use std::collections::BTreeMap;
 
 use awsm_renderer_core::pipeline::{
@@ -17,7 +19,7 @@ use crate::{
 
 use super::{pipelines::PipelineLayoutKey, AwsmPipelineError};
 
-// merely a key to hash ad-hoc pipeline generation
+/// Cache key for render pipeline creation.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct RenderPipelineCacheKey {
     pub shader_key: ShaderKey,
@@ -29,7 +31,7 @@ pub struct RenderPipelineCacheKey {
     pub vertex_constants: BTreeMap<ConstantOverrideKey, ConstantOverrideValue>,
 }
 
-// merely a key to hash ad-hoc pipeline generation
+/// Cache key for pipeline layouts.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum PipelineLayoutCacheKey {
     Mesh {
@@ -40,6 +42,7 @@ pub enum PipelineLayoutCacheKey {
 }
 
 impl PipelineLayoutCacheKey {
+    /// Creates a mesh pipeline layout cache key.
     pub fn new_mesh(
         material_layout_key: MaterialBindGroupLayoutKey,
         has_morph_key: bool,
@@ -54,6 +57,7 @@ impl PipelineLayoutCacheKey {
 }
 
 impl RenderPipelineCacheKey {
+    /// Creates a cache key with shader and layout keys.
     pub fn new(shader_key: ShaderKey, layout_key: PipelineLayoutKey) -> Self {
         Self {
             shader_key,
@@ -66,6 +70,7 @@ impl RenderPipelineCacheKey {
         }
     }
 
+    /// Adds a vertex buffer layout to the key.
     pub fn with_push_vertex_buffer_layout(
         mut self,
         vertex_buffer_layout: VertexBufferLayout,
@@ -74,22 +79,26 @@ impl RenderPipelineCacheKey {
         self
     }
 
+    /// Adds a fragment target to the key.
     pub fn with_push_fragment_target(mut self, target: ColorTargetState) -> Self {
         self.fragment_targets.push(target);
         self
     }
 
+    /// Sets the primitive state.
     pub fn with_primitive(mut self, primitive: PrimitiveState) -> Self {
         self.primitive = primitive;
         self
     }
 
+    /// Sets the depth/stencil state.
     pub fn with_depth_stencil(mut self, depth_stencil: DepthStencilState) -> Self {
         self.depth_stencil = Some(depth_stencil);
         self
     }
 
     #[allow(dead_code)]
+    /// Adds a vertex constant override.
     pub fn with_vertex_constant(
         mut self,
         key: ConstantOverrideKey,
@@ -101,6 +110,7 @@ impl RenderPipelineCacheKey {
 }
 
 impl RenderPipelineCacheKey {
+    /// Builds a WebGPU render pipeline descriptor.
     pub fn into_descriptor(
         self,
         shader_module: &web_sys::GpuShaderModule,
@@ -127,6 +137,7 @@ impl RenderPipelineCacheKey {
 }
 
 impl PipelineLayoutCacheKey {
+    /// Builds a pipeline layout descriptor from the cache key.
     pub fn into_descriptor<'a>(
         self,
         bind_groups: &BindGroups,

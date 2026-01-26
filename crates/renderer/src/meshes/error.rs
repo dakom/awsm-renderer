@@ -1,21 +1,45 @@
+//! Mesh-related errors.
+
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
+use super::{skins::AwsmSkinError, MeshBufferInfoKey, MeshResourceKey};
 use crate::{
-    bind_groups::AwsmBindGroupError,
-    materials::AwsmMaterialError,
-    mesh::{skins::AwsmSkinError, MeshBufferInfoKey},
-    transforms::AwsmTransformError,
+    bind_groups::AwsmBindGroupError, materials::AwsmMaterialError, transforms::AwsmTransformError,
 };
 
 use super::MeshKey;
+use crate::transforms::TransformKey;
 
+/// Result type for mesh operations.
 pub type Result<T> = std::result::Result<T, AwsmMeshError>;
 
+/// Mesh-related errors.
 #[derive(Error, Debug)]
 pub enum AwsmMeshError {
     #[error("[mesh] not found: {0:?}")]
     MeshNotFound(MeshKey),
+
+    #[error("[mesh] resource not found: {0:?}")]
+    ResourceNotFound(MeshResourceKey),
+
+    #[error("[mesh] instancing not enabled: {0:?}")]
+    InstancingNotEnabled(MeshKey),
+
+    #[error("[mesh] instancing already enabled: {0:?}")]
+    InstancingAlreadyEnabled(MeshKey),
+
+    #[error("[mesh] instance transforms missing or empty: {0:?}")]
+    InstancingMissingTransforms(MeshKey),
+
+    #[error("[mesh] instanced mesh unsupported for this operation: {0:?}")]
+    InstancedMeshUnsupported(MeshKey),
+
+    #[error("[mesh] transform has no meshes: {0:?}")]
+    TransformHasNoMeshes(TransformKey),
+
+    #[error("[mesh] mesh list is empty")]
+    MeshListEmpty,
 
     #[error("[mesh] visibility geometry buffer not found: {0:?}")]
     VisibilityGeometryBufferNotFound(MeshKey),

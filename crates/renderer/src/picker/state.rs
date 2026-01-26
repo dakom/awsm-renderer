@@ -17,6 +17,7 @@ pub(super) struct PickerState {
 }
 
 impl PickerState {
+    /// Creates GPU buffers used for picking.
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let gpu_input_buffer = gpu.create_buffer(
             &BufferDescriptor::new(
@@ -53,6 +54,7 @@ impl PickerState {
         })
     }
 
+    /// Begins a GPU pick pass for the given pixel coordinates.
     pub fn begin_pick(
         &mut self,
         gpu: &AwsmRendererWebGpu,

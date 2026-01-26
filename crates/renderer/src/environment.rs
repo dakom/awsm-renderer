@@ -1,3 +1,5 @@
+//! Environment and skybox helpers.
+
 use std::sync::LazyLock;
 
 use awsm_renderer_core::cubemap::images::CubemapBitmapColors;
@@ -11,6 +13,7 @@ use crate::textures::{CubemapTextureKey, SamplerCacheKey, Textures};
 use crate::AwsmRenderer;
 
 impl AwsmRenderer {
+    /// Sets the active skybox.
     pub fn set_skybox(&mut self, skybox: Skybox) {
         self.environment.skybox = skybox;
         self.bind_groups
@@ -18,11 +21,13 @@ impl AwsmRenderer {
     }
 }
 
+/// Global environment state.
 #[derive(Clone)]
 pub struct Environment {
     pub skybox: Skybox,
 }
 
+/// Skybox texture and sampler data.
 #[derive(Clone)]
 pub struct Skybox {
     pub texture_key: CubemapTextureKey,
@@ -43,10 +48,12 @@ static SAMPLER_CACHE_KEY: LazyLock<SamplerCacheKey> = LazyLock::new(|| SamplerCa
 });
 
 impl Skybox {
+    /// Returns the sampler cache key used for skyboxes.
     pub fn sampler_cache_key() -> SamplerCacheKey {
         SAMPLER_CACHE_KEY.clone()
     }
 
+    /// Creates a skybox from an existing cubemap texture.
     pub fn new(
         texture_key: CubemapTextureKey,
         texture_view: web_sys::GpuTextureView,
@@ -61,6 +68,7 @@ impl Skybox {
         }
     }
 
+    /// Creates a skybox from solid colors.
     pub async fn new_colors(
         gpu: &AwsmRendererWebGpu,
         textures: &mut Textures,
@@ -82,6 +90,7 @@ impl Skybox {
 }
 
 impl Environment {
+    /// Creates an environment with a skybox.
     pub fn new(skybox: Skybox) -> Self {
         Self { skybox }
     }

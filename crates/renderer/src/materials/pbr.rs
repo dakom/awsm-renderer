@@ -1,3 +1,5 @@
+//! PBR material parameters and packing.
+
 use crate::{
     materials::{
         writer::{write, Value},
@@ -6,6 +8,7 @@ use crate::{
     textures::{SamplerKey, Textures},
 };
 
+/// Physically based rendering (PBR) material parameters.
 #[derive(Clone, Debug)]
 pub struct PbrMaterial {
     pub base_color_tex: Option<MaterialTexture>,
@@ -46,6 +49,7 @@ pub struct PbrMaterial {
     double_sided: bool,
 }
 
+/// Debug visualization modes for PBR materials.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 pub enum PbrMaterialDebug {
     None,
@@ -58,6 +62,7 @@ pub enum PbrMaterialDebug {
 }
 
 impl PbrMaterialDebug {
+    /// Returns the debug bitmask value.
     pub fn bitmask(&self) -> u32 {
         match self {
             PbrMaterialDebug::None => 0,
@@ -71,21 +76,25 @@ impl PbrMaterialDebug {
     }
 }
 
+/// Vertex color metadata for PBR materials.
 #[derive(Clone, Debug)]
 pub struct PbrMaterialVertexColorInfo {
     pub set_index: u32,
 }
 
+/// Emissive strength extension data.
 #[derive(Clone, Debug)]
 pub struct PbrMaterialEmissiveStrength {
     pub strength: f32,
 }
 
+/// Index of refraction extension data.
 #[derive(Clone, Debug)]
 pub struct PbrMaterialIor {
     pub ior: f32,
 }
 
+/// Specular extension data.
 #[derive(Clone, Debug)]
 pub struct PbrMaterialSpecular {
     pub tex: Option<MaterialTexture>,
@@ -94,12 +103,14 @@ pub struct PbrMaterialSpecular {
     pub color_factor: [f32; 3],
 }
 
+/// Transmission extension data.
 #[derive(Clone, Debug)]
 pub struct PbrMaterialTransmission {
     pub tex: Option<MaterialTexture>,
     pub factor: f32,
 }
 
+/// Diffuse transmission extension data.
 #[derive(Clone, Debug)]
 pub struct PbrMaterialDiffuseTransmission {
     pub tex: Option<MaterialTexture>,
@@ -108,6 +119,7 @@ pub struct PbrMaterialDiffuseTransmission {
     pub color_factor: [f32; 3],
 }
 
+/// Volume extension data.
 #[derive(Clone, Debug)]
 pub struct PbrMaterialVolume {
     // volume extension
@@ -117,6 +129,7 @@ pub struct PbrMaterialVolume {
     pub attenuation_color: [f32; 3],
 }
 
+/// Clear coat extension data.
 #[derive(Clone, Debug)]
 pub struct PbrMaterialClearCoat {
     // clearcoat extension
@@ -128,6 +141,7 @@ pub struct PbrMaterialClearCoat {
     pub normal_scale: f32,
 }
 
+/// Sheen extension data.
 #[derive(Clone, Debug)]
 pub struct PbrMaterialSheen {
     pub roughness_tex: Option<MaterialTexture>,
@@ -136,11 +150,13 @@ pub struct PbrMaterialSheen {
     pub color_factor: [f32; 3],
 }
 
+/// Dispersion extension data.
 #[derive(Clone, Debug)]
 pub struct PbrMaterialDispersion {
     pub dispersion: f32,
 }
 
+/// Anisotropy extension data.
 #[derive(Clone, Debug)]
 pub struct PbrMaterialAnisotropy {
     pub tex: Option<MaterialTexture>,
@@ -148,6 +164,7 @@ pub struct PbrMaterialAnisotropy {
     pub rotation: f32,
 }
 
+/// Iridescence extension data.
 #[derive(Clone, Debug)]
 pub struct PbrMaterialIridescence {
     pub tex: Option<MaterialTexture>,
@@ -159,6 +176,7 @@ pub struct PbrMaterialIridescence {
 }
 
 impl PbrMaterial {
+    /// Creates a PBR material with default parameters.
     pub fn new(alpha_mode: MaterialAlphaMode, double_sided: bool) -> Self {
         Self {
             base_color_tex: None,
@@ -191,6 +209,7 @@ impl PbrMaterial {
     }
 
     // this should match `mesh_buffer_geometry_kind()`
+    /// Returns true if the material should render in the transparency pass.
     pub fn is_transparency_pass(&self) -> bool {
         self.has_alpha_blend() || self.alpha_cutoff().is_some() || self.has_transmission()
     }
@@ -204,14 +223,17 @@ impl PbrMaterial {
         }
     }
 
+    /// Returns the material alpha mode.
     pub fn alpha_mode(&self) -> &MaterialAlphaMode {
         &self.alpha_mode
     }
 
+    /// Returns whether the material is double sided.
     pub fn double_sided(&self) -> bool {
         self.double_sided
     }
 
+    /// Returns the alpha cutoff for masked materials.
     pub fn alpha_cutoff(&self) -> Option<f32> {
         match self.alpha_mode() {
             MaterialAlphaMode::Mask { cutoff } => Some(*cutoff),
@@ -219,10 +241,12 @@ impl PbrMaterial {
         }
     }
 
+    /// Returns true if alpha blending is enabled.
     pub fn has_alpha_blend(&self) -> bool {
         matches!(self.alpha_mode(), MaterialAlphaMode::Blend)
     }
 
+    /// Returns the alpha mask cutoff, if any.
     pub fn alpha_mask(&self) -> Option<f32> {
         match self.alpha_mode() {
             MaterialAlphaMode::Mask { cutoff } => Some(*cutoff),
@@ -230,6 +254,7 @@ impl PbrMaterial {
         }
     }
 
+    /// Builds the uniform buffer payload for this material.
     pub fn uniform_buffer_data(&self, textures: &Textures) -> Result<Vec<u8>> {
         let mut data: Vec<u8> = Vec::with_capacity(256);
 
@@ -304,6 +329,7 @@ impl PbrMaterial {
         }
 
         impl FeatureIndices {
+            /// Returns the feature indices as a fixed u32 array.
             pub fn to_u32_array(&self) -> [u32; 12] {
                 [
                     self.vertex_color_info,

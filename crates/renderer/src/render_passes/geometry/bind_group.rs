@@ -1,3 +1,5 @@
+//! Geometry pass bind group setup.
+
 use awsm_renderer_core::{
     bind_groups::{
         BindGroupDescriptor, BindGroupEntry, BindGroupLayoutResource, BindGroupResource,
@@ -12,10 +14,11 @@ use crate::{
         BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey,
     },
     bind_groups::{AwsmBindGroupError, BindGroupRecreateContext},
-    mesh::meta::geometry_meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT,
+    meshes::meta::geometry_meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT,
     render_passes::RenderPassInitContext,
 };
 
+/// Bind groups used by the geometry pass.
 pub struct GeometryBindGroups {
     pub camera: GeometryBindGroupCamera,
     // these could be be used for multiple meshes
@@ -26,6 +29,7 @@ pub struct GeometryBindGroups {
 }
 
 impl GeometryBindGroups {
+    /// Creates all geometry bind group layouts.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let camera = GeometryBindGroupCamera::new(ctx).await?;
         let transforms = GeometryBindGroupTransforms::new(ctx).await?;
@@ -41,6 +45,7 @@ impl GeometryBindGroups {
     }
 }
 
+/// Bind group for camera data in the geometry pass.
 pub struct GeometryBindGroupCamera {
     pub bind_group_layout_key: BindGroupLayoutKey,
     // this is set via `recreate` mechanism
@@ -48,6 +53,7 @@ pub struct GeometryBindGroupCamera {
 }
 
 impl GeometryBindGroupCamera {
+    /// Creates the camera bind group layout.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
             entries: vec![BindGroupLayoutCacheKeyEntry {
@@ -70,6 +76,7 @@ impl GeometryBindGroupCamera {
         })
     }
 
+    /// Recreates the camera bind group.
     pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts.get(self.bind_group_layout_key)?,
@@ -86,6 +93,7 @@ impl GeometryBindGroupCamera {
         Ok(())
     }
 
+    /// Returns the active camera bind group.
     pub fn get_bind_group(
         &self,
     ) -> std::result::Result<&web_sys::GpuBindGroup, AwsmBindGroupError> {
@@ -95,6 +103,7 @@ impl GeometryBindGroupCamera {
     }
 }
 
+/// Bind group for transform buffers in the geometry pass.
 #[derive(Default)]
 pub struct GeometryBindGroupTransforms {
     pub bind_group_layout_key: BindGroupLayoutKey,
@@ -103,6 +112,7 @@ pub struct GeometryBindGroupTransforms {
 }
 
 impl GeometryBindGroupTransforms {
+    /// Creates the transforms bind group layout.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
             entries: vec![
@@ -129,6 +139,7 @@ impl GeometryBindGroupTransforms {
         })
     }
 
+    /// Recreates the transforms bind group.
     pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts.get(self.bind_group_layout_key)?,
@@ -145,6 +156,7 @@ impl GeometryBindGroupTransforms {
         Ok(())
     }
 
+    /// Returns the active transforms bind group.
     pub fn get_bind_group(
         &self,
     ) -> std::result::Result<&web_sys::GpuBindGroup, AwsmBindGroupError> {
@@ -154,6 +166,7 @@ impl GeometryBindGroupTransforms {
     }
 }
 
+/// Bind group for mesh metadata in the geometry pass.
 #[derive(Default)]
 pub struct GeometryBindGroupMeta {
     pub bind_group_layout_key: BindGroupLayoutKey,
@@ -162,6 +175,7 @@ pub struct GeometryBindGroupMeta {
 }
 
 impl GeometryBindGroupMeta {
+    /// Creates the metadata bind group layout.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
             entries: vec![BindGroupLayoutCacheKeyEntry {
@@ -186,6 +200,7 @@ impl GeometryBindGroupMeta {
         })
     }
 
+    /// Recreates the metadata bind group.
     pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts.get(self.bind_group_layout_key)?,
@@ -205,6 +220,7 @@ impl GeometryBindGroupMeta {
         Ok(())
     }
 
+    /// Returns the active metadata bind group.
     pub fn get_bind_group(
         &self,
     ) -> std::result::Result<&web_sys::GpuBindGroup, AwsmBindGroupError> {
@@ -214,6 +230,7 @@ impl GeometryBindGroupMeta {
     }
 }
 
+/// Bind group for morph and skin buffers in the geometry pass.
 #[derive(Default)]
 pub struct GeometryBindGroupAnimation {
     pub bind_group_layout_key: BindGroupLayoutKey,
@@ -222,6 +239,7 @@ pub struct GeometryBindGroupAnimation {
 }
 
 impl GeometryBindGroupAnimation {
+    /// Creates the animation bind group layout.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
             entries: vec![
@@ -274,6 +292,7 @@ impl GeometryBindGroupAnimation {
         })
     }
 
+    /// Recreates the animation bind group.
     pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts.get(self.bind_group_layout_key)?,
@@ -312,6 +331,7 @@ impl GeometryBindGroupAnimation {
         Ok(())
     }
 
+    /// Returns the active animation bind group.
     pub fn get_bind_group(
         &self,
     ) -> std::result::Result<&web_sys::GpuBindGroup, AwsmBindGroupError> {

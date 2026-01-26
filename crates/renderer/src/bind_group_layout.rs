@@ -1,3 +1,5 @@
+//! Bind group layout caching.
+
 use std::collections::HashMap;
 
 use awsm_renderer_core::{
@@ -8,6 +10,7 @@ use awsm_renderer_core::{
 use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
+/// Cache for GPU bind group layouts.
 pub struct BindGroupLayouts {
     lookup: SlotMap<BindGroupLayoutKey, web_sys::GpuBindGroupLayout>,
     cache: HashMap<BindGroupLayoutCacheKey, BindGroupLayoutKey>,
@@ -16,6 +19,7 @@ pub struct BindGroupLayouts {
 }
 
 impl BindGroupLayouts {
+    /// Creates an empty bind group layout cache.
     pub fn new() -> Self {
         Self {
             lookup: SlotMap::with_key(),
@@ -25,6 +29,7 @@ impl BindGroupLayouts {
         }
     }
 
+    /// Returns a layout key for the cache key, creating it if needed.
     pub fn get_key(
         &mut self,
         gpu: &AwsmRendererWebGpu,
@@ -64,6 +69,7 @@ impl BindGroupLayouts {
         Ok(key)
     }
 
+    /// Returns the layout for a given key.
     pub fn get(&self, key: BindGroupLayoutKey) -> Result<&web_sys::GpuBindGroupLayout> {
         self.lookup
             .get(key)
@@ -122,6 +128,7 @@ impl BindGroupLayouts {
 
 #[cfg(debug_assertions)]
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
+/// Debug counter for bind group layout limits.
 pub struct BindGroupLayoutCounter {
     pub buffers: u32,
     pub samplers: u32,
@@ -138,16 +145,19 @@ impl Default for BindGroupLayouts {
 }
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
+/// Cache key for bind group layouts.
 pub struct BindGroupLayoutCacheKey {
     pub entries: Vec<BindGroupLayoutCacheKeyEntry>,
 }
 impl BindGroupLayoutCacheKey {
+    /// Creates a cache key from entries.
     pub fn new(entries: Vec<BindGroupLayoutCacheKeyEntry>) -> Self {
         Self { entries }
     }
 }
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
+/// Single entry in a bind group layout cache key.
 pub struct BindGroupLayoutCacheKeyEntry {
     pub resource: BindGroupLayoutResource,
     pub visibility_compute: bool,
@@ -156,10 +166,13 @@ pub struct BindGroupLayoutCacheKeyEntry {
 }
 
 new_key_type! {
+    /// Opaque key for cached bind group layouts.
     pub struct BindGroupLayoutKey;
 }
 
+/// Result type for bind group layout operations.
 type Result<T> = std::result::Result<T, AwsmBindGroupLayoutError>;
+/// Bind group layout errors.
 #[derive(Error, Debug)]
 pub enum AwsmBindGroupLayoutError {
     #[error("[bind group layout] Unable to create: {0:?}")]

@@ -1,3 +1,5 @@
+//! Material opaque pass pipeline setup.
+
 use crate::anti_alias::AntiAliasing;
 use crate::error::Result;
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey};
@@ -10,6 +12,7 @@ use crate::render_passes::{
     RenderPassInitContext,
 };
 
+/// Compute pipelines for the opaque material pass.
 pub struct MaterialOpaquePipelines {
     // Pipeline variants based on MSAA and mipmap settings
     msaa_4_mipmaps_compute_pipeline_key: ComputePipelineKey,
@@ -22,6 +25,7 @@ pub struct MaterialOpaquePipelines {
 }
 
 impl MaterialOpaquePipelines {
+    /// Creates pipelines for the opaque material pass.
     pub async fn new(
         ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &MaterialOpaqueBindGroups,
@@ -183,6 +187,7 @@ impl MaterialOpaquePipelines {
             .await?)
     }
 
+    /// Returns the empty pipeline key for the current MSAA state.
     pub fn get_empty_compute_pipeline_key(
         &self,
         anti_aliasing: &AntiAliasing,
@@ -194,6 +199,7 @@ impl MaterialOpaquePipelines {
         }
     }
 
+    /// Returns the opaque material pipeline key for the current options.
     pub fn get_compute_pipeline_key(
         &self,
         anti_aliasing: &AntiAliasing,

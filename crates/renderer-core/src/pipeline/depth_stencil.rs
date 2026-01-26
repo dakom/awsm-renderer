@@ -1,9 +1,12 @@
+//! Depth/stencil state descriptors.
+
 use ordered_float::OrderedFloat;
 
 use crate::texture::TextureFormat;
 
 use crate::compare::CompareFunction;
 
+/// Depth and stencil state for a render pipeline.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DepthStencilState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#depthstencil_object_structure
@@ -21,6 +24,7 @@ pub struct DepthStencilState {
 }
 
 impl DepthStencilState {
+    /// Creates a depth/stencil state for the given format.
     pub fn new(format: TextureFormat) -> Self {
         Self {
             format,
@@ -36,14 +40,17 @@ impl DepthStencilState {
         }
     }
 
+    /// Sets depth bias.
     pub fn with_depth_bias(mut self, depth_bias: i32) -> Self {
         self.depth_bias = Some(depth_bias);
         self
     }
+    /// Sets depth bias clamp.
     pub fn with_depth_bias_clamp(mut self, depth_bias_clamp: impl Into<OrderedFloat<f32>>) -> Self {
         self.depth_bias_clamp = Some(depth_bias_clamp.into());
         self
     }
+    /// Sets depth bias slope scale.
     pub fn with_depth_bias_slope_scale(
         mut self,
         depth_bias_slope_scale: impl Into<OrderedFloat<f32>>,
@@ -51,26 +58,32 @@ impl DepthStencilState {
         self.depth_bias_slope_scale = Some(depth_bias_slope_scale.into());
         self
     }
+    /// Sets the depth compare function.
     pub fn with_depth_compare(mut self, depth_compare: CompareFunction) -> Self {
         self.depth_compare = Some(depth_compare);
         self
     }
+    /// Enables or disables depth writes.
     pub fn with_depth_write_enabled(mut self, depth_write_enabled: bool) -> Self {
         self.depth_write_enabled = Some(depth_write_enabled);
         self
     }
+    /// Sets the stencil back face state.
     pub fn with_stencil_back(mut self, stencil_back: StencilFaceState) -> Self {
         self.stencil_back = Some(stencil_back);
         self
     }
+    /// Sets the stencil front face state.
     pub fn with_stencil_front(mut self, stencil_front: StencilFaceState) -> Self {
         self.stencil_front = Some(stencil_front);
         self
     }
+    /// Sets the stencil read mask.
     pub fn with_stencil_read_mask(mut self, stencil_read_mask: u32) -> Self {
         self.stencil_read_mask = Some(stencil_read_mask);
         self
     }
+    /// Sets the stencil write mask.
     pub fn with_stencil_write_mask(mut self, stencil_write_mask: u32) -> Self {
         self.stencil_write_mask = Some(stencil_write_mask);
         self
@@ -92,6 +105,7 @@ impl std::hash::Hash for DepthStencilState {
     }
 }
 
+/// Stencil face state for front or back faces.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StencilFaceState {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline#stencilback
@@ -111,6 +125,7 @@ impl std::hash::Hash for StencilFaceState {
     }
 }
 
+/// WebGPU stencil operation.
 pub type StencilOperation = web_sys::GpuStencilOperation;
 
 impl From<DepthStencilState> for web_sys::GpuDepthStencilState {

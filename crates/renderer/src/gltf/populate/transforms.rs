@@ -1,3 +1,5 @@
+//! glTF transform conversion helpers.
+
 use glam::{Mat4, Quat, Vec3};
 
 use crate::{
@@ -37,6 +39,7 @@ impl AwsmRenderer {
     }
 }
 
+/// Converts a glTF node transform into a renderer `Transform`.
 pub fn transform_gltf_node(node: &gltf::Node) -> Transform {
     // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-node
     match node.transform() {

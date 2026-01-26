@@ -12,7 +12,7 @@ use crate::{
         },
         error::AwsmGltfError,
     },
-    mesh::MeshBufferVertexAttributeInfo,
+    meshes::buffer_info::{MeshBufferVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo},
 };
 
 /// Creates EXPLODED visibility vertices for deferred/visibility buffer rendering.
@@ -49,7 +49,6 @@ pub(super) fn create_visibility_vertices(
         [0.0, 1.0], // Second vertex: (0, 1, 0) - z = 1-0-1 = 0
         [0.0, 0.0], // Third vertex: (0, 0, 1) - z = 1-0-0 = 1
     ];
-    use crate::mesh::MeshBufferVisibilityVertexAttributeInfo;
 
     // Get positions data
     let positions = attribute_data

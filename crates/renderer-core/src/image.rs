@@ -1,3 +1,5 @@
+//! Image loading and texture upload helpers.
+
 use crate::command::copy_texture::Origin3d;
 use crate::error::Result;
 use crate::renderer::AwsmRendererWebGpu;
@@ -14,6 +16,7 @@ pub mod bitmap;
 #[cfg(feature = "exr")]
 pub mod exr;
 
+/// Image source data for textures.
 #[derive(Clone)]
 pub enum ImageData {
     #[cfg(feature = "exr")]
@@ -42,6 +45,7 @@ pub enum ImageData {
 impl ImageData {
     cfg_if::cfg_if! {
         if #[cfg(feature = "exr")] {
+            /// Loads an image or EXR from a URL.
             pub async fn load_url(url:&str, options: Option<ImageBitmapOptions>) -> anyhow::Result<Self> {
                 if url.contains(".exr") {
                     let exr_image = exr::ExrImage::load_url(url).await?;
@@ -52,6 +56,7 @@ impl ImageData {
                 }
             }
         } else if #[cfg(feature = "image")] {
+            /// Loads an image from a URL.
             pub async fn load_url(url:&str, options: Option<ImageBitmapOptions>) -> Result<Self> {
                 let image = bitmap::load(url.to_string(), options.clone()).await?;
                 Ok(Self::Bitmap{image, options})
@@ -59,6 +64,7 @@ impl ImageData {
         }
     }
 
+    /// Returns the GPU texture format for this image.
     pub fn format(&self) -> TextureFormat {
         match self {
             #[cfg(feature = "exr")]
@@ -74,6 +80,7 @@ impl ImageData {
         }
     }
 
+    /// Returns whether the image is premultiplied.
     pub fn premultiplied_alpha(&self) -> bool {
         match self {
             // TODO - is this right?
@@ -87,6 +94,7 @@ impl ImageData {
         }
     }
 
+    /// Returns the image size in pixels.
     pub fn size(&self) -> (u32, u32) {
         match self {
             #[cfg(feature = "exr")]
@@ -95,6 +103,7 @@ impl ImageData {
         }
     }
 
+    /// Returns the image size as a texture extent.
     pub fn extent_3d(&self) -> Extent3d {
         match self {
             #[cfg(feature = "exr")]
@@ -112,6 +121,7 @@ impl ImageData {
         }
     }
 
+    /// Returns the JS object used for external image copies.
     pub fn js_obj(&self) -> Result<Cow<'_, js_sys::Object>> {
         match self {
             #[cfg(feature = "exr")]
@@ -124,6 +134,7 @@ impl ImageData {
         }
     }
 
+    /// Builds a copy source info for `copy_external_image_to_texture`.
     pub fn source_info(
         &self,
         origin: Option<[f32; 2]>,
@@ -136,6 +147,7 @@ impl ImageData {
         })
     }
 
+    /// Creates a GPU texture and optionally generates mipmaps.
     pub async fn create_texture(
         &self,
         gpu: &AwsmRendererWebGpu,
@@ -194,6 +206,7 @@ impl ImageData {
     }
 }
 
+/// Options for creating an image bitmap.
 #[derive(Clone, Debug, Default)]
 pub struct ImageBitmapOptions {
     // https://docs.rs/web-sys/latest/web_sys/struct.ImageBitmapOptions.html
@@ -206,10 +219,12 @@ pub struct ImageBitmapOptions {
 }
 
 impl ImageBitmapOptions {
+    /// Creates default image bitmap options.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets color space conversion behavior.
     pub fn with_color_space_conversion(
         mut self,
         color_space_conversion: ColorSpaceConversion,
@@ -218,42 +233,56 @@ impl ImageBitmapOptions {
         self
     }
 
+    /// Sets the image orientation.
     pub fn with_image_orientation(mut self, image_orientation: ImageOrientation) -> Self {
         self.image_orientation = Some(image_orientation);
         self
     }
 
+    /// Sets premultiply alpha behavior.
     pub fn with_premultiply_alpha(mut self, premultiply_alpha: PremultiplyAlpha) -> Self {
         self.premultiply_alpha = Some(premultiply_alpha);
         self
     }
 
+    /// Sets resize height.
     pub fn with_resize_height(mut self, resize_height: u32) -> Self {
         self.resize_height = Some(resize_height);
         self
     }
 
+    /// Sets resize width.
     pub fn with_resize_width(mut self, resize_width: u32) -> Self {
         self.resize_width = Some(resize_width);
         self
     }
 
+    /// Sets resize quality.
     pub fn with_resize_quality(mut self, resize_quality: ResizeQuality) -> Self {
         self.resize_quality = Some(resize_quality);
         self
     }
 }
 
+/// Web image color space conversion mode.
 // https://docs.rs/web-sys/latest/web_sys/enum.ColorSpaceConversion.html
+/// Image color space conversion setting.
 pub type ColorSpaceConversion = web_sys::ColorSpaceConversion;
+/// Web image orientation mode.
 // https://docs.rs/web-sys/latest/web_sys/enum.ImageOrientation.html
+/// Image orientation metadata handling.
 pub type ImageOrientation = web_sys::ImageOrientation;
+/// Web image premultiply alpha mode.
 // https://docs.rs/web-sys/latest/web_sys/enum.PremultiplyAlpha.html
+/// Premultiply alpha option for image decoding.
 pub type PremultiplyAlpha = web_sys::PremultiplyAlpha;
+/// Web image resize quality.
 // https://docs.rs/web-sys/latest/web_sys/enum.ResizeQuality.html
+/// Image resize quality hint.
 pub type ResizeQuality = web_sys::ResizeQuality;
 
 // Can create this from ImageData.source_info()
+/// Source info for `copy_external_image_to_texture`.
 pub struct CopyExternalImageSourceInfo<'a> {
     pub flip_y: Option<bool>,
     pub origin: Option<[f32; 2]>,
@@ -261,6 +290,7 @@ pub struct CopyExternalImageSourceInfo<'a> {
 }
 
 impl<'a> CopyExternalImageSourceInfo<'a> {
+    /// Creates a source info wrapper.
     pub fn new(source: Cow<'a, js_sys::Object>) -> Self {
         Self {
             flip_y: None,
@@ -270,6 +300,7 @@ impl<'a> CopyExternalImageSourceInfo<'a> {
     }
 }
 
+/// Destination info for `copy_external_image_to_texture`.
 pub struct CopyExternalImageDestInfo<'a> {
     pub texture: &'a web_sys::GpuTexture,
     pub aspect: Option<TextureAspect>,
@@ -279,6 +310,7 @@ pub struct CopyExternalImageDestInfo<'a> {
 }
 
 impl<'a> CopyExternalImageDestInfo<'a> {
+    /// Creates a destination info wrapper.
     pub fn new(texture: &'a web_sys::GpuTexture) -> Self {
         Self {
             aspect: None,
@@ -289,18 +321,22 @@ impl<'a> CopyExternalImageDestInfo<'a> {
         }
     }
 
+    /// Sets the texture aspect.
     pub fn with_aspect(mut self, aspect: TextureAspect) -> Self {
         self.aspect = Some(aspect);
         self
     }
+    /// Sets the mip level.
     pub fn with_mip_level(mut self, mip_level: u32) -> Self {
         self.mip_level = Some(mip_level);
         self
     }
+    /// Sets the copy origin.
     pub fn with_origin(mut self, origin: Origin3d) -> Self {
         self.origin = Some(origin);
         self
     }
+    /// Sets premultiplied alpha behavior.
     pub fn with_premultiplied_alpha(mut self, premultiplied_alpha: bool) -> Self {
         self.premultiplied_alpha = Some(premultiplied_alpha);
         self

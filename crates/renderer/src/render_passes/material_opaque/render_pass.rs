@@ -1,3 +1,5 @@
+//! Opaque material render pass execution.
+
 use crate::{
     error::Result,
     render::RenderContext,
@@ -12,12 +14,14 @@ use crate::{
 use awsm_renderer_core::command::compute_pass::ComputePassDescriptor;
 use slotmap::SecondaryMap;
 
+/// Opaque material pass bind groups and pipelines.
 pub struct MaterialOpaqueRenderPass {
     pub bind_groups: MaterialOpaqueBindGroups,
     pub pipelines: MaterialOpaquePipelines,
 }
 
 impl MaterialOpaqueRenderPass {
+    /// Creates the opaque material render pass resources.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_groups = MaterialOpaqueBindGroups::new(ctx).await?;
         let pipelines = MaterialOpaquePipelines::new(ctx, &bind_groups).await?;
@@ -28,6 +32,7 @@ impl MaterialOpaqueRenderPass {
         })
     }
 
+    /// Rebuilds bind groups and pipelines after texture pool changes.
     pub async fn texture_pool_changed(
         &mut self,
         ctx: &mut RenderPassInitContext<'_>,
@@ -38,6 +43,7 @@ impl MaterialOpaqueRenderPass {
         Ok(())
     }
 
+    /// Executes the opaque material pass.
     pub fn render(&self, ctx: &RenderContext, renderables: Vec<Renderable>) -> Result<()> {
         let compute_pass = ctx.command_encoder.begin_compute_pass(Some(
             &ComputePassDescriptor::new(Some("Material Opaque Pass")).into(),

@@ -1,3 +1,5 @@
+//! Texture export helpers.
+
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
 use wasm_bindgen_futures::JsFuture;

@@ -1,3 +1,5 @@
+//! Mesh metadata buffers.
+
 pub mod geometry_meta;
 pub mod material_meta;
 
@@ -6,9 +8,11 @@ use awsm_renderer_core::{buffers::BufferDescriptor, renderer::AwsmRendererWebGpu
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
     buffer::dynamic_uniform::DynamicUniformBuffer,
+    buffer::helpers::write_buffer_with_dirty_ranges,
     debug::AwsmRendererLogging,
     materials::Materials,
-    mesh::{
+    meshes::{
+        buffer_info::MeshBufferInfo,
         error::{AwsmMeshError, Result},
         meta::{
             geometry_meta::{
@@ -21,8 +25,10 @@ use crate::{
             },
         },
         morphs::Morphs,
+        morphs::{GeometryMorphKey, MaterialMorphKey},
+        skins::SkinKey,
         skins::Skins,
-        Mesh, MeshBufferInfo, MeshKey,
+        Mesh, MeshKey,
     },
     transforms::Transforms,
 };
@@ -30,8 +36,10 @@ use crate::{
 // Reduced from 1024 to stay under 128MB default storage buffer limit.
 // Initial visibility buffer size = 512 * 3 * 1000 * 52 = ~76MB
 // This is conservative; buffer will grow dynamically as needed.
+/// Initial capacity for mesh meta buffers.
 pub const MESH_META_INITIAL_CAPACITY: usize = 512;
 
+/// Mesh metadata buffers for geometry and materials.
 pub struct MeshMeta {
     // meta data buffers
     geometry_buffers: DynamicUniformBuffer<MeshKey>,
@@ -44,6 +52,7 @@ pub struct MeshMeta {
 }
 
 impl MeshMeta {
+    /// Creates mesh meta buffers.
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         Ok(Self {
             geometry_buffers: DynamicUniformBuffer::new(
@@ -76,30 +85,30 @@ impl MeshMeta {
             material_dirty: true,
         })
     }
+    /// Writes mesh metadata into GPU-bound buffers.
     pub fn insert(
         &mut self,
-        key: MeshKey,
+        mesh_key: MeshKey,
         mesh: &Mesh,
         buffer_info: &MeshBufferInfo,
         visibility_geometry_data_offset: Option<usize>,
-        _transparency_geometry_data_offset: Option<usize>,
         custom_attribute_indices_offset: usize,
         custom_attribute_data_offset: usize,
+        geometry_morph_key: Option<GeometryMorphKey>,
+        material_morph_key: Option<MaterialMorphKey>,
+        skin_key: Option<SkinKey>,
         materials: &Materials,
         transforms: &Transforms,
         morphs: &Morphs,
         skins: &Skins,
     ) -> Result<()> {
         let transform_key = mesh.transform_key;
-        let geometry_morph_key = mesh.geometry_morph_key;
-        let material_morph_key = mesh.material_morph_key;
-        let skin_key = mesh.skin_key;
         let material_key = mesh.material_key;
         let transform_offset = transforms.buffer_offset(transform_key)?;
         let normal_matrix_offset = transforms.normals_buffer_offset(transform_key)?;
 
         let meta_data = MaterialMeshMeta {
-            mesh_key: key,
+            mesh_key,
             material_morph_key,
             material_key,
             buffer_info,
@@ -113,11 +122,11 @@ impl MeshMeta {
             mesh,
         }
         .to_bytes()?;
-        self.material_buffers.update(key, &meta_data);
+        self.material_buffers.update(mesh_key, &meta_data);
         self.material_dirty = true;
 
         let meta_data = GeometryMeshMeta {
-            mesh_key: key,
+            mesh_key,
             material_key,
             transform_key,
             geometry_morph_key,
@@ -130,30 +139,35 @@ impl MeshMeta {
         }
         .to_bytes()?;
 
-        self.geometry_buffers.update(key, &meta_data);
+        self.geometry_buffers.update(mesh_key, &meta_data);
         self.geometry_dirty = true;
 
         Ok(())
     }
 
+    /// Returns the GPU buffer for geometry metadata.
     pub fn geometry_gpu_buffer(&self) -> &web_sys::GpuBuffer {
         &self.geometry_gpu_buffer
     }
+    /// Returns the geometry metadata buffer offset for a mesh.
     pub fn geometry_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         self.geometry_buffers
             .offset(key)
             .ok_or(AwsmMeshError::MetaNotFound(key))
     }
 
+    /// Returns the GPU buffer for material metadata.
     pub fn material_gpu_buffer(&self) -> &web_sys::GpuBuffer {
         &self.material_gpu_buffer
     }
+    /// Returns the material metadata buffer offset for a mesh.
     pub fn material_buffer_offset(&self, key: MeshKey) -> Result<usize> {
         self.material_buffers
             .offset(key)
             .ok_or(AwsmMeshError::MetaNotFound(key))
     }
 
+    /// Removes mesh metadata entries.
     pub fn remove(&mut self, mesh_key: MeshKey) {
         if self.geometry_buffers.remove(mesh_key) {
             self.geometry_dirty = true;
@@ -164,6 +178,7 @@ impl MeshMeta {
         }
     }
 
+    /// Writes dirty metadata buffers to the GPU.
     pub fn write_gpu(
         &mut self,
         _logging: &AwsmRendererLogging,
@@ -171,6 +186,7 @@ impl MeshMeta {
         bind_groups: &mut BindGroups,
     ) -> Result<()> {
         if self.geometry_dirty {
+            let mut resized = false;
             if let Some(new_size) = self.geometry_buffers.take_gpu_needs_resize() {
                 self.geometry_gpu_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(
@@ -181,19 +197,33 @@ impl MeshMeta {
                     .into(),
                 )?;
                 bind_groups.mark_create(BindGroupCreate::GeometryMeshMetaResize);
+                resized = true;
             }
-            gpu.write_buffer(
-                &self.geometry_gpu_buffer,
-                None,
-                self.geometry_buffers.raw_slice(),
-                None,
-                None,
-            )?;
+
+            if resized {
+                self.geometry_buffers.clear_dirty_ranges();
+                gpu.write_buffer(
+                    &self.geometry_gpu_buffer,
+                    None,
+                    self.geometry_buffers.raw_slice(),
+                    None,
+                    None,
+                )?;
+            } else {
+                let ranges = self.geometry_buffers.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.geometry_gpu_buffer,
+                    self.geometry_buffers.raw_slice(),
+                    ranges,
+                )?;
+            }
 
             self.geometry_dirty = false;
         }
 
         if self.material_dirty {
+            let mut resized = false;
             if let Some(new_size) = self.material_buffers.take_gpu_needs_resize() {
                 self.material_gpu_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(
@@ -204,14 +234,27 @@ impl MeshMeta {
                     .into(),
                 )?;
                 bind_groups.mark_create(BindGroupCreate::MaterialMeshMetaResize);
+                resized = true;
             }
-            gpu.write_buffer(
-                &self.material_gpu_buffer,
-                None,
-                self.material_buffers.raw_slice(),
-                None,
-                None,
-            )?;
+
+            if resized {
+                self.material_buffers.clear_dirty_ranges();
+                gpu.write_buffer(
+                    &self.material_gpu_buffer,
+                    None,
+                    self.material_buffers.raw_slice(),
+                    None,
+                    None,
+                )?;
+            } else {
+                let ranges = self.material_buffers.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.material_gpu_buffer,
+                    self.material_buffers.raw_slice(),
+                    ranges,
+                )?;
+            }
 
             self.material_dirty = false;
         }

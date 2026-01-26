@@ -18,7 +18,7 @@ use crate::gltf::buffers::{
 };
 use crate::gltf::data::GltfDataHints;
 use crate::gltf::error::AwsmGltfError;
-use crate::mesh::MeshBufferVertexAttributeInfo;
+use crate::meshes::buffer_info::MeshBufferVertexAttributeInfo;
 
 use super::Result;
 

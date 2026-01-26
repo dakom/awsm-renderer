@@ -1,3 +1,5 @@
+//! Dynamic uniform buffer utilities.
+
 use slotmap::{Key, SecondaryMap};
 
 /// Dynamic buffer for fixed-size allocations with efficient slot reuse.
@@ -9,7 +11,7 @@ use slotmap::{Key, SecondaryMap};
 ///-------------------------------- PERFORMANCE SUMMARY ------------------------//
 ///
 /// • insert/update/remove:   O(1)  (amortized, ignoring rare growth)
-/// • GPU write (per frame):  uploads entire buffer each time
+/// • GPU write (per frame):  uploads dirty ranges (full upload when dense)
 /// • Resize strategy:        doubles capacity when needed (infrequent pauses)
 /// • External fragmentation: none (fixed-size slots)
 /// • Internal fragmentation: none
@@ -38,6 +40,7 @@ use slotmap::{Key, SecondaryMap};
 pub struct DynamicUniformBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
     /// Raw CPU‑side data for all items, organized in BYTE_SIZE slots.
     raw_data: Vec<u8>,
+    dirty_ranges: Vec<(usize, usize)>,
     /// The GPU buffer storing the raw data.
     gpu_buffer_needs_resize: bool,
     /// Mapping from a Key to a slot index within the buffer.
@@ -56,6 +59,7 @@ pub struct DynamicUniformBuffer<K: Key, const ZERO_VALUE: u8 = 0> {
 
 impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
     #[allow(clippy::too_many_arguments)]
+    /// Creates a new dynamic uniform buffer.
     pub fn new(
         initial_capacity: usize,
         byte_size: usize,
@@ -69,6 +73,7 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
 
         Self {
             raw_data,
+            dirty_ranges: Vec::new(),
             gpu_buffer_needs_resize: false,
             slot_indices: SecondaryMap::new(),
             free_slots: (0..initial_capacity).rev().collect(), // Reverse so slot 0 is used first
@@ -80,6 +85,7 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         }
     }
 
+    /// Returns the total byte size of the buffer.
     pub fn size(&self) -> usize {
         self.raw_data.len()
     }
@@ -128,6 +134,7 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
             offset_bytes,
             &mut self.raw_data[offset_bytes..offset_bytes + self.byte_size],
         );
+        self.mark_dirty_range(offset_bytes, self.byte_size);
     }
 
     /// Updates an item in the buffer with raw bytes.
@@ -140,6 +147,13 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         })
     }
 
+    /// Gets an immutable view into the slice
+    pub fn get(&self, key: K) -> Option<&[u8]> {
+        let slot = self.slot_indices.get(key)?;
+        let offset_bytes = slot * self.aligned_slice_size;
+        Some(&self.raw_data[offset_bytes..offset_bytes + self.byte_size])
+    }
+
     /// Updates a portion of an existing slot starting at the given offset.
     ///
     /// # Panics
@@ -150,10 +164,22 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
         })
     }
 
+    /// Returns the full raw buffer slice.
     pub fn raw_slice(&self) -> &[u8] {
         &self.raw_data
     }
 
+    /// Takes and clears dirty ranges.
+    pub fn take_dirty_ranges(&mut self) -> Vec<(usize, usize)> {
+        std::mem::take(&mut self.dirty_ranges)
+    }
+
+    /// Clears dirty ranges without returning them.
+    pub fn clear_dirty_ranges(&mut self) {
+        self.dirty_ranges.clear();
+    }
+
+    /// Returns the new size if the GPU buffer needs resizing.
     pub fn take_gpu_needs_resize(&mut self) -> Option<usize> {
         let size = match self.gpu_buffer_needs_resize {
             true => Some(self.raw_data.len()),
@@ -176,22 +202,26 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
             // Zero out the data in the slot.
             let offset_bytes = slot * self.aligned_slice_size;
             self.raw_data[offset_bytes..offset_bytes + self.aligned_slice_size].fill(ZERO_VALUE);
+            self.mark_dirty_range(offset_bytes, self.aligned_slice_size);
             true
         } else {
             false
         }
     }
 
+    /// Returns the byte offset for a key.
     pub fn offset(&self, key: K) -> Option<usize> {
         let slot = self.slot_indices.get(key)?;
 
         Some(slot * self.aligned_slice_size)
     }
 
+    /// Returns the slot index for a key.
     pub fn slot_index(&self, key: K) -> Option<usize> {
         self.slot_indices.get(key).copied()
     }
 
+    /// Returns an iterator over keys.
     pub fn keys<'a>(&'a self) -> slotmap::secondary::Keys<'a, K, usize> {
         self.slot_indices.keys()
     }
@@ -238,6 +268,23 @@ impl<K: Key, const ZERO_VALUE: u8> DynamicUniformBuffer<K, ZERO_VALUE> {
 
         self.capacity_slots = new_cap;
         self.gpu_buffer_needs_resize = true;
+    }
+
+    fn mark_dirty_range(&mut self, offset: usize, size: usize) {
+        if size == 0 || self.raw_data.is_empty() || offset >= self.raw_data.len() {
+            return;
+        }
+
+        let mut start = offset;
+        let mut end = offset.saturating_add(size).min(self.raw_data.len());
+
+        // WebGPU writeBuffer offsets/sizes must be 4-byte aligned.
+        start &= !3;
+        end = ((end + 3) & !3).min(self.raw_data.len());
+
+        if start < end {
+            self.dirty_ranges.push((start, end - start));
+        }
     }
 }
 

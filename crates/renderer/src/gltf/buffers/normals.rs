@@ -7,7 +7,7 @@ use crate::{
         buffers::{index::extract_triangle_indices, MeshBufferAttributeIndexInfoWithOffset},
         error::{AwsmGltfError, Result},
     },
-    mesh::{MeshBufferVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo},
+    meshes::buffer_info::{MeshBufferVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo},
 };
 
 pub(super) fn ensure_normals<'a>(

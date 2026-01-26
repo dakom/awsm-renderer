@@ -1,7 +1,10 @@
+//! Animation sampling and interpolation.
+
 use std::cmp::Ordering;
 
 use super::{data::AnimationData, Animatable};
 
+/// Keyframe sampler for animation data.
 #[derive(Debug, Clone)]
 pub enum AnimationSampler<T = AnimationData> {
     Linear {
@@ -21,14 +24,17 @@ pub enum AnimationSampler<T = AnimationData> {
 }
 
 impl<T: Animatable> AnimationSampler<T> {
+    /// Creates a linear interpolation sampler.
     pub fn new_linear(times: Vec<f64>, values: Vec<T>) -> Self {
         Self::Linear { times, values }
     }
 
+    /// Creates a step interpolation sampler.
     pub fn new_step(times: Vec<f64>, values: Vec<T>) -> Self {
         Self::Step { times, values }
     }
 
+    /// Creates a cubic spline interpolation sampler.
     pub fn new_cubic_spline(
         times: Vec<f64>,
         values: Vec<T>,
@@ -43,6 +49,7 @@ impl<T: Animatable> AnimationSampler<T> {
         }
     }
 
+    /// Returns the keyframe times for this sampler.
     pub fn times(&self) -> &[f64] {
         match self {
             Self::Linear { times, .. } => times,
@@ -51,6 +58,7 @@ impl<T: Animatable> AnimationSampler<T> {
         }
     }
 
+    /// Samples the animation at the given time.
     pub fn sample(&self, time: f64) -> T {
         let bounds = self.binary_search_bounds(time);
 

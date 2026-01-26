@@ -1,3 +1,5 @@
+//! Effects render pass execution.
+
 use awsm_renderer_core::command::compute_pass::ComputePassDescriptor;
 
 use crate::{
@@ -13,12 +15,14 @@ use crate::{
     },
 };
 
+/// Effects pass bind groups and pipelines.
 pub struct EffectsRenderPass {
     pub bind_groups: EffectsBindGroups,
     pub pipelines: EffectsPipelines,
 }
 
 impl EffectsRenderPass {
+    /// Creates the effects render pass resources.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_groups = EffectsBindGroups::new(ctx).await?;
         let pipelines = EffectsPipelines::new(ctx, &bind_groups).await?;
@@ -29,6 +33,7 @@ impl EffectsRenderPass {
         })
     }
 
+    /// Executes the effects pass.
     pub fn render(&self, ctx: &RenderContext) -> Result<()> {
         let workgroup_size = (
             ctx.render_texture_views.width.div_ceil(8),

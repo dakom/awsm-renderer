@@ -16,9 +16,12 @@ use crate::render_passes::shared::material::bind_group::{TexturePoolDeps, Textur
 use crate::textures::SamplerKey;
 use crate::{bind_group_layout::BindGroupLayoutKey, render_passes::RenderPassInitContext};
 
+/// Bind group index for material-opaque core textures.
 pub const MATERIAL_OPAQUE_CORE_TEXTURES_START_GROUP: u32 = 1;
+/// Binding index for material-opaque core textures.
 pub const MATERIAL_OPAQUE_CORE_TEXTURES_START_BINDING: u32 = 0;
 
+/// Bind group layout keys and cached bind groups for opaque materials.
 pub struct MaterialOpaqueBindGroups {
     pub multisampled_main_bind_group_layout_key: BindGroupLayoutKey,
     pub singlesampled_main_bind_group_layout_key: BindGroupLayoutKey,
@@ -33,6 +36,7 @@ pub struct MaterialOpaqueBindGroups {
 }
 
 impl MaterialOpaqueBindGroups {
+    /// Creates bind group layouts for the opaque material pass.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let multisampled_main_bind_group_layout_key =
             create_main_bind_group_layout_key(ctx, true).await?;
@@ -89,6 +93,7 @@ impl MaterialOpaqueBindGroups {
         })
     }
 
+    /// Rebuilds texture-pool-related layouts while preserving other state.
     pub fn clone_because_texture_pool_changed(
         &self,
         ctx: &mut RenderPassInitContext<'_>,
@@ -114,6 +119,7 @@ impl MaterialOpaqueBindGroups {
         Ok(_self)
     }
 
+    /// Returns the live bind groups used for rendering.
     pub fn get_bind_groups(
         &self,
     ) -> std::result::Result<
@@ -144,6 +150,7 @@ impl MaterialOpaqueBindGroups {
         }
     }
 
+    /// Recreates the main bind group for the opaque material pass.
     pub fn recreate_main(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let mut entries = Vec::new();
 
@@ -293,6 +300,7 @@ impl MaterialOpaqueBindGroups {
         Ok(())
     }
 
+    /// Recreates the light bind group for the opaque material pass.
     pub fn recreate_lights(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let mut entries = Vec::new();
 
@@ -319,6 +327,7 @@ impl MaterialOpaqueBindGroups {
         Ok(())
     }
 
+    /// Recreates the texture pool bind group for the opaque material pass.
     pub fn recreate_texture_pool(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let mut entries = Vec::new();
 

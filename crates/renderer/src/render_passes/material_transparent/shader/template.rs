@@ -1,3 +1,5 @@
+//! Shader templates for the transparent material pass.
+
 use askama::Template;
 
 use crate::{
@@ -5,6 +7,7 @@ use crate::{
     shaders::{AwsmShaderError, Result},
 };
 
+/// Transparent material shader template components.
 #[derive(Debug)]
 pub struct ShaderTemplateMaterialTransparent {
     pub includes: ShaderTemplateTransparentMaterialIncludes,
@@ -13,6 +16,7 @@ pub struct ShaderTemplateMaterialTransparent {
     pub fragment: ShaderTemplateTransparentMaterialFragment,
 }
 
+/// Shared include template for transparent materials.
 #[derive(Template, Debug)]
 #[template(
     path = "material_transparent_wgsl/includes.wgsl",
@@ -29,6 +33,7 @@ pub struct ShaderTemplateTransparentMaterialIncludes {
     pub debug: ShaderTemplateMaterialTransparentDebug,
 }
 impl ShaderTemplateTransparentMaterialIncludes {
+    /// Creates include template data from the cache key.
     pub fn new(cache_key: &ShaderCacheKeyMaterialTransparent) -> Self {
         Self {
             max_morph_unroll: 2,
@@ -42,6 +47,7 @@ impl ShaderTemplateTransparentMaterialIncludes {
         }
     }
 
+    /// Returns true if the shader includes IBL lighting.
     pub fn has_lighting_ibl(&self) -> bool {
         match self.debug.lighting {
             ShaderTemplateMaterialTransparentDebugLighting::None => true,
@@ -50,6 +56,7 @@ impl ShaderTemplateTransparentMaterialIncludes {
         }
     }
 
+    /// Returns true if the shader includes punctual lighting.
     pub fn has_lighting_punctual(&self) -> bool {
         match self.debug.lighting {
             ShaderTemplateMaterialTransparentDebugLighting::None => true,
@@ -59,6 +66,7 @@ impl ShaderTemplateTransparentMaterialIncludes {
     }
 }
 
+/// Bind group template for transparent materials.
 #[derive(Template, Debug)]
 #[template(
     path = "material_transparent_wgsl/bind_groups.wgsl",
@@ -71,6 +79,7 @@ pub struct ShaderTemplateTransparentMaterialBindGroups {
 }
 
 impl ShaderTemplateTransparentMaterialBindGroups {
+    /// Creates a bind group template from the cache key.
     pub fn new(cache_key: &ShaderCacheKeyMaterialTransparent) -> Self {
         Self {
             texture_pool_arrays_len: cache_key.texture_pool_arrays_len,
@@ -80,6 +89,7 @@ impl ShaderTemplateTransparentMaterialBindGroups {
     }
 }
 
+/// Vertex shader template for transparent materials.
 #[derive(Template, Debug)]
 #[template(
     path = "material_transparent_wgsl/vertex.wgsl",
@@ -96,6 +106,7 @@ pub struct ShaderTemplateTransparentMaterialVertex {
 }
 
 impl ShaderTemplateTransparentMaterialVertex {
+    /// Creates a vertex shader template from the cache key.
     pub fn new(cache_key: &ShaderCacheKeyMaterialTransparent) -> Self {
         let uv_sets = cache_key.attributes.uv_sets.unwrap_or_default();
         let color_sets = cache_key.attributes.color_sets.unwrap_or_default();
@@ -124,6 +135,7 @@ impl ShaderTemplateTransparentMaterialVertex {
     }
 }
 
+/// Fragment shader template for transparent materials.
 #[derive(Template, Debug)]
 #[template(
     path = "material_transparent_wgsl/fragment.wgsl",
@@ -141,6 +153,7 @@ pub struct ShaderTemplateTransparentMaterialFragment {
 }
 
 impl ShaderTemplateTransparentMaterialFragment {
+    /// Creates a fragment shader template from the cache key.
     pub fn new(cache_key: &ShaderCacheKeyMaterialTransparent) -> Self {
         let uv_sets = cache_key.attributes.uv_sets.unwrap_or_default();
         let color_sets = cache_key.attributes.color_sets.unwrap_or_default();
@@ -159,6 +172,7 @@ impl ShaderTemplateTransparentMaterialFragment {
         }
     }
 
+    /// Returns true if the shader includes IBL lighting.
     pub fn has_lighting_ibl(&self) -> bool {
         match self.debug.lighting {
             ShaderTemplateMaterialTransparentDebugLighting::None => true,
@@ -167,6 +181,7 @@ impl ShaderTemplateTransparentMaterialFragment {
         }
     }
 
+    /// Returns true if the shader includes punctual lighting.
     pub fn has_lighting_punctual(&self) -> bool {
         match self.debug.lighting {
             ShaderTemplateMaterialTransparentDebugLighting::None => true,
@@ -189,17 +204,20 @@ impl TryFrom<&ShaderCacheKeyMaterialTransparent> for ShaderTemplateMaterialTrans
     }
 }
 
+/// Debug flags for transparent materials.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ShaderTemplateMaterialTransparentDebug {
     lighting: ShaderTemplateMaterialTransparentDebugLighting,
 }
 
 impl ShaderTemplateMaterialTransparentDebug {
+    /// Creates a default debug configuration.
     pub fn new() -> Self {
         Self {
             ..Default::default()
         }
     }
+    /// Returns true if any debug mode is enabled.
     pub fn any(&self) -> bool {
         !matches!(
             self.lighting,
@@ -208,6 +226,7 @@ impl ShaderTemplateMaterialTransparentDebug {
     }
 }
 
+/// Lighting debug override for transparent materials.
 #[derive(Clone, Copy, Debug, Default)]
 pub enum ShaderTemplateMaterialTransparentDebugLighting {
     #[default]
@@ -217,6 +236,7 @@ pub enum ShaderTemplateMaterialTransparentDebugLighting {
 }
 
 impl ShaderTemplateMaterialTransparent {
+    /// Renders the transparent material shader into WGSL.
     pub fn into_source(self) -> Result<String> {
         let includes_source = self.includes.render()?;
         let bind_groups_source = self.bind_groups.render()?;
@@ -236,6 +256,7 @@ impl ShaderTemplateMaterialTransparent {
     }
 
     #[cfg(debug_assertions)]
+    /// Returns an optional debug label for shader compilation.
     pub fn debug_label(&self) -> Option<&str> {
         Some("Material Transparent")
     }

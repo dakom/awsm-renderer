@@ -1,3 +1,5 @@
+//! glTF scene population into renderer resources.
+
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
@@ -6,7 +8,7 @@ use std::{
 use awsm_renderer_core::texture::texture_pool::TextureColorInfo;
 use glam::Mat4;
 
-use crate::{mesh::MeshKey, textures::TextureKey, transforms::TransformKey, AwsmRenderer};
+use crate::{meshes::MeshKey, textures::TextureKey, transforms::TransformKey, AwsmRenderer};
 
 use super::{data::GltfData, error::AwsmGltfError};
 
@@ -17,6 +19,7 @@ mod mesh;
 mod skin;
 pub(super) mod transforms;
 
+/// Context and shared state used while populating glTF data.
 pub struct GltfPopulateContext {
     pub data: Arc<GltfData>,
     pub textures: Mutex<HashMap<GltfTextureKey, TextureKey>>,
@@ -27,6 +30,7 @@ pub struct GltfPopulateContext {
     pub key_lookups: Arc<Mutex<GltfKeyLookups>>,
 }
 
+/// Lookup tables for glTF node, mesh, and primitive keys.
 #[derive(Debug, Clone, Default)]
 pub struct GltfKeyLookups {
     pub node_transforms: HashMap<String, TransformKey>,
@@ -39,6 +43,7 @@ pub struct GltfKeyLookups {
 }
 
 impl GltfKeyLookups {
+    /// Records a transform key for a glTF node.
     pub fn insert_transform(&mut self, node: &gltf::Node, key: TransformKey) {
         if let Some(name) = node.name() {
             self.node_transforms.insert(name.to_string(), key);
@@ -47,6 +52,7 @@ impl GltfKeyLookups {
         self.node_index_to_transform.insert(node.index(), key);
     }
 
+    /// Records a mesh key for a glTF node and mesh.
     pub fn insert_mesh(&mut self, node: &gltf::Node, mesh: &gltf::Mesh, mesh_key: MeshKey) {
         self.all_mesh_keys
             .entry(mesh.index())
@@ -88,6 +94,7 @@ impl GltfKeyLookups {
         }
     }
 
+    /// Returns an iterator over meshes for a node name.
     pub fn meshes_for_node_iter(&self, node_name: &str) -> impl Iterator<Item = &MeshKey> {
         self.node_meshes
             .get(node_name)
@@ -97,6 +104,7 @@ impl GltfKeyLookups {
     }
 }
 
+/// Key that identifies a glTF texture plus color info.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct GltfTextureKey {
     pub index: GltfIndex,
@@ -108,6 +116,7 @@ type SkinInverseBindMatrix = Mat4;
 type GltfIndex = usize;
 
 impl AwsmRenderer {
+    /// Populates renderer resources from a glTF asset.
     pub async fn populate_gltf(
         &mut self,
         gltf_data: impl Into<Arc<GltfData>>,

@@ -1,3 +1,5 @@
+//! Geometry mesh metadata packing.
+
 use std::sync::LazyLock;
 
 use awsm_renderer_core::buffers::BufferUsage;
@@ -6,7 +8,7 @@ use slotmap::Key;
 use crate::{
     buffer::dynamic_uniform::DynamicUniformBuffer,
     materials::{MaterialKey, Materials},
-    mesh::{
+    meshes::{
         morphs::{GeometryMorphKey, Morphs},
         skins::{SkinKey, Skins},
         AwsmMeshError, MeshKey,
@@ -14,13 +16,16 @@ use crate::{
     transforms::{TransformKey, Transforms},
 };
 
+/// Byte size for geometry mesh meta struct.
 pub const GEOMETRY_MESH_META_BYTE_SIZE: usize = 40;
+/// Byte alignment for geometry mesh meta buffer entries.
 pub const GEOMETRY_MESH_META_BYTE_ALIGNMENT: usize = 256;
 
 pub static GEOMETRY_BUFFER_USAGE: LazyLock<BufferUsage> =
     LazyLock::new(|| BufferUsage::new().with_copy_dst().with_uniform());
 
-// See meta.wgsl for the corresponding struct
+/// Geometry meta fields used by shaders.
+/// See `meta.wgsl` for the corresponding struct.
 pub struct GeometryMeshMeta<'a> {
     pub mesh_key: MeshKey,
     pub transform_key: TransformKey,
@@ -35,6 +40,7 @@ pub struct GeometryMeshMeta<'a> {
 }
 
 impl<'a> GeometryMeshMeta<'a> {
+    /// Packs geometry meta into bytes.
     pub fn to_bytes(
         self,
     ) -> std::result::Result<[u8; GEOMETRY_MESH_META_BYTE_SIZE], AwsmMeshError> {

@@ -1,3 +1,5 @@
+//! Camera buffers and matrices.
+
 use awsm_renderer_core::buffers::{BufferDescriptor, BufferUsage};
 use awsm_renderer_core::error::AwsmCoreError;
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
@@ -11,6 +13,7 @@ use crate::{AwsmRenderer, AwsmRendererLogging};
 const APPLY_JITTER: bool = false;
 
 impl AwsmRenderer {
+    /// Updates the camera buffer with new matrices.
     pub fn update_camera(&mut self, camera_matrices: CameraMatrices) -> Result<()> {
         let (current_width, current_height) = self.gpu.current_context_texture_size()?;
 
@@ -25,6 +28,7 @@ impl AwsmRenderer {
     }
 }
 
+/// GPU camera buffer and cached state.
 pub struct CameraBuffer {
     pub(crate) raw_data: [u8; Self::BYTE_SIZE],
     pub gpu_buffer: web_sys::GpuBuffer,
@@ -33,6 +37,7 @@ pub struct CameraBuffer {
     gpu_dirty: bool,
 }
 
+/// Camera matrices and parameters.
 #[derive(Clone, Debug)]
 pub struct CameraMatrices {
     pub view: Mat4,
@@ -45,14 +50,17 @@ pub struct CameraMatrices {
 }
 
 impl CameraMatrices {
+    /// Returns the combined view-projection matrix.
     pub fn view_projection(&self) -> Mat4 {
         self.projection * self.view
     }
 
+    /// Returns the inverse view-projection matrix.
     pub fn inv_view_projection(&self) -> Mat4 {
         self.view_projection().inverse()
     }
 
+    /// Returns true if the projection is orthographic.
     pub fn is_orthographic(&self) -> bool {
         // Orthographic projections have m[3][3] = 1.0 (no perspective divide)
         // Perspective projections have m[3][3] = 0.0 (w' = -z for perspective divide)
@@ -75,8 +83,10 @@ impl CameraBuffer {
     //  viewport (vec4) 16 bytes
     //  dof_params (vec4: focus_distance, aperture, unused, unused) 16 bytes
     // Total = 512 bytes (all members 16-byte aligned, no implicit gaps)
+    /// Byte size of the camera uniform buffer.
     pub const BYTE_SIZE: usize = 512;
 
+    /// Creates a camera buffer on the GPU.
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let gpu_buffer = gpu.create_buffer(
             &BufferDescriptor::new(
@@ -216,11 +226,13 @@ impl CameraBuffer {
         Ok(())
     }
 
+    /// Returns true if the camera was moved since the last update.
     pub fn moved(&self) -> bool {
         self.camera_moved
     }
 
     // writes to the GPU
+    /// Writes the camera buffer to the GPU when dirty.
     pub fn write_gpu(
         &mut self,
         logging: &AwsmRendererLogging,
@@ -314,8 +326,10 @@ fn write_u32(buffer: &mut [u8], offset: &mut usize, value: u32) {
     *offset += 4;
 }
 
+/// Result type for camera operations.
 type Result<T> = std::result::Result<T, AwsmCameraError>;
 
+/// Camera-related errors.
 #[derive(Error, Debug)]
 pub enum AwsmCameraError {
     #[error("[camera] {0:?}")]

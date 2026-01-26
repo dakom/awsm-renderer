@@ -1,5 +1,8 @@
+//! Color helpers for command descriptors.
+
 use wasm_bindgen::prelude::*;
 
+/// RGBA color in linear space.
 #[derive(Clone, Debug)]
 pub struct Color {
     pub r: f64,
@@ -9,12 +12,14 @@ pub struct Color {
 }
 
 impl Color {
+    /// Fully transparent black.
     pub const ZERO: Self = Self {
         r: 0.0,
         g: 0.0,
         b: 0.0,
         a: 0.0,
     };
+    /// Opaque black.
     pub const BLACK: Self = Self {
         r: 0.0,
         g: 0.0,
@@ -22,6 +27,7 @@ impl Color {
         a: 1.0,
     };
 
+    /// Opaque white.
     pub const WHITE: Self = Self {
         r: 1.0,
         g: 1.0,
@@ -29,6 +35,7 @@ impl Color {
         a: 1.0,
     };
 
+    /// Opaque mid-grey.
     pub const MID_GREY: Self = Self {
         r: 0.5,
         g: 0.5,
@@ -36,6 +43,7 @@ impl Color {
         a: 1.0,
     };
 
+    /// Opaque red.
     pub const RED: Self = Self {
         r: 1.0,
         g: 0.0,
@@ -43,6 +51,7 @@ impl Color {
         a: 1.0,
     };
 
+    /// Opaque red with a u32::MAX red channel.
     pub const RED_U32: Self = Self {
         r: u32::MAX as f64,
         g: 0.0,
@@ -50,10 +59,12 @@ impl Color {
         a: 1.0,
     };
 
+    /// Creates a color from RGBA components.
     pub fn new_values(r: f64, g: f64, b: f64, a: f64) -> Self {
         Self { r, g, b, a }
     }
 
+    /// Creates a color from a 4-element slice.
     pub fn new_slice(arr: &[f64]) -> Self {
         if arr.len() != 4 {
             panic!("Array length must be 4");
@@ -66,6 +77,7 @@ impl Color {
         }
     }
 
+    /// Creates a color from a 24-bit RGB hex value.
     pub fn from_hex_rgb(hex: u32) -> Self {
         let r = ((hex >> 16) & 0xFF) as f64 / 255.0;
         let g = ((hex >> 8) & 0xFF) as f64 / 255.0;
@@ -74,6 +86,7 @@ impl Color {
         Self { r, g, b, a: 1.0 }
     }
 
+    /// Creates a color from a 32-bit RGBA hex value.
     pub fn from_hex_rgba(hex: u32) -> Self {
         let r = ((hex >> 24) & 0xFF) as f64 / 255.0;
         let g = ((hex >> 16) & 0xFF) as f64 / 255.0;
@@ -83,6 +96,7 @@ impl Color {
         Self { r, g, b, a }
     }
 
+    /// Converts from perceptual (sRGB-like) to linear space.
     pub fn perceptual_to_linear(self) -> Self {
         Self {
             r: perceptual_to_linear(self.r),
@@ -92,6 +106,7 @@ impl Color {
         }
     }
 
+    /// Converts to a JS array `[r, g, b, a]`.
     pub fn as_js_value(&self) -> JsValue {
         let arr = js_sys::Array::new();
         arr.push(&JsValue::from_f64(self.r));

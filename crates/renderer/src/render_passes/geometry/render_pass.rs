@@ -1,3 +1,5 @@
+//! Geometry render pass execution.
+
 use std::sync::LazyLock;
 
 use awsm_renderer_core::command::{
@@ -27,12 +29,14 @@ static VISIBILITY_CLEAR_COLOR: LazyLock<Color> = LazyLock::new(|| {
     }
 });
 
+/// Geometry pass bind groups and pipelines.
 pub struct GeometryRenderPass {
     pub bind_groups: GeometryBindGroups,
     pub pipelines: GeometryPipelines,
 }
 
 impl GeometryRenderPass {
+    /// Creates the geometry render pass resources.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_groups = GeometryBindGroups::new(ctx).await?;
         let pipelines = GeometryPipelines::new(ctx, &bind_groups).await?;
@@ -43,6 +47,7 @@ impl GeometryRenderPass {
         })
     }
 
+    /// Executes the geometry render pass.
     pub fn render(
         &self,
         ctx: &RenderContext,
@@ -56,7 +61,7 @@ impl GeometryRenderPass {
                     LoadOp::Load,
                     StoreOp::Store,
                 )
-                .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
+                .with_clear_color(&VISIBILITY_CLEAR_COLOR),
                 ColorAttachment::new(
                     &ctx.render_texture_views.barycentric,
                     LoadOp::Load,
@@ -80,7 +85,7 @@ impl GeometryRenderPass {
                     LoadOp::Clear,
                     StoreOp::Store,
                 )
-                .with_clear_color(VISIBILITY_CLEAR_COLOR.clone()),
+                .with_clear_color(&VISIBILITY_CLEAR_COLOR),
                 ColorAttachment::new(
                     &ctx.render_texture_views.barycentric,
                     LoadOp::Clear,

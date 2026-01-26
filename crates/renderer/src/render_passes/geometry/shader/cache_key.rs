@@ -1,5 +1,8 @@
+//! Shader cache key for the geometry pass.
+
 use crate::{render_passes::shader_cache_key::ShaderCacheKeyRenderPass, shaders::ShaderCacheKey};
 
+/// Cache key for geometry pass shaders.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyGeometry {
     pub instancing_transforms: bool,

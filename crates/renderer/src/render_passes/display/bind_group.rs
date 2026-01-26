@@ -1,3 +1,5 @@
+//! Display pass bind group setup.
+
 use std::borrow::Cow;
 
 use crate::{
@@ -16,6 +18,7 @@ use awsm_renderer_core::{
     texture::{TextureSampleType, TextureViewDimension},
 };
 
+/// Bind group layout and cached bind group for the display pass.
 #[derive(Default)]
 pub struct DisplayBindGroups {
     pub bind_group_layout_key: BindGroupLayoutKey,
@@ -24,6 +27,7 @@ pub struct DisplayBindGroups {
 }
 
 impl DisplayBindGroups {
+    /// Creates the display bind group layout.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_group_layout_cache_key = BindGroupLayoutCacheKey {
             entries: vec![BindGroupLayoutCacheKeyEntry {
@@ -48,6 +52,7 @@ impl DisplayBindGroups {
         })
     }
 
+    /// Returns the active display bind group.
     pub fn get_bind_group(
         &self,
     ) -> std::result::Result<&web_sys::GpuBindGroup, AwsmBindGroupError> {
@@ -56,6 +61,7 @@ impl DisplayBindGroups {
             .ok_or_else(|| AwsmBindGroupError::NotFound("Display".to_string()))
     }
 
+    /// Recreates the bind group for the current render textures.
     pub fn recreate(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let descriptor = BindGroupDescriptor::new(
             ctx.bind_group_layouts.get(self.bind_group_layout_key)?,

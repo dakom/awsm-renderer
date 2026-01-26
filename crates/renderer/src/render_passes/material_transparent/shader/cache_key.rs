@@ -1,3 +1,5 @@
+//! Shader cache key for the transparent material pass.
+
 use crate::{
     render_passes::{
         shader_cache_key::ShaderCacheKeyRenderPass,
@@ -6,6 +8,7 @@ use crate::{
     shaders::ShaderCacheKey,
 };
 
+/// Cache key for transparent material shaders.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyMaterialTransparent {
     pub instancing_transforms: bool,

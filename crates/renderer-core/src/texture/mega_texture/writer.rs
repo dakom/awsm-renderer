@@ -1,3 +1,5 @@
+//! Mega texture GPU upload helpers.
+
 #[cfg(feature = "texture-export")]
 use std::sync::LazyLock;
 use std::{borrow::Cow, cell::RefCell};
@@ -26,6 +28,7 @@ thread_local! {
 }
 
 impl<ID> MegaTexture<ID> {
+    /// Uploads all atlas layers and returns GPU textures.
     pub async fn write_texture_arrays(
         &mut self,
         gpu: &AwsmRendererWebGpu,
@@ -63,6 +66,7 @@ static TEXTURE_USAGE_NO_MIPMAP: LazyLock<TextureUsage> =
 
 impl<ID> MegaTextureAtlas<ID> {
     // Will only create a texture array up to the _actual_ depth of the atlas, not maximum potential depth
+    /// Uploads this atlas to a GPU texture array.
     pub async fn write_texture_array(
         &self,
         gpu: &AwsmRendererWebGpu,
@@ -159,6 +163,7 @@ impl<ID> MegaTextureAtlas<ID> {
 const UNIFORM_BUFFER_SIZE: usize = 24; // 5 * 4 bytes (u32) + 4 bytes padding
 
 impl<ID> MegaTextureLayer<ID> {
+    /// Writes this layer into the destination texture array.
     pub async fn write_texture_to_array(
         &self,
         gpu: &AwsmRendererWebGpu,

@@ -5,7 +5,7 @@ use crate::{
         buffers::{index::extract_triangle_indices, MeshBufferAttributeIndexInfoWithOffset},
         error::{AwsmGltfError, Result},
     },
-    mesh::{
+    meshes::buffer_info::{
         MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo,
         MeshBufferVisibilityVertexAttributeInfo,
     },
@@ -164,7 +164,7 @@ impl<'a> MikkTSpaceGeometry<'a> {
     }
 }
 
-impl mikktspace::Geometry for MikkTSpaceGeometry<'_> {
+impl bevy_mikktspace::Geometry for MikkTSpaceGeometry<'_> {
     fn num_faces(&self) -> usize {
         self.triangles.len()
     }
@@ -234,7 +234,7 @@ fn compute_tangents(
     let mut geometry =
         MikkTSpaceGeometry::new(positions, normals, texcoords, triangles, vertex_count);
 
-    if !mikktspace::generate_tangents(&mut geometry) {
+    if !bevy_mikktspace::generate_tangents(&mut geometry) {
         return Err(AwsmGltfError::GenerateTangents(
             "MikkTSpace tangent generation failed".to_string(),
         ));

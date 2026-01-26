@@ -1,3 +1,5 @@
+//! Transparent material pass pipeline setup.
+
 use awsm_renderer_core::compare::CompareFunction;
 use awsm_renderer_core::pipeline::depth_stencil::DepthStencilState;
 use awsm_renderer_core::pipeline::fragment::{
@@ -16,10 +18,12 @@ use slotmap::SecondaryMap;
 
 use crate::anti_alias::AntiAliasing;
 use crate::error::Result;
-use crate::mesh::{
-    Mesh, MeshBufferInfo, MeshBufferInfos, MeshBufferVertexAttributeInfo, MeshBufferVertexInfo,
-    MeshKey,
+use crate::meshes::buffer_info::{
+    MeshBufferInfo, MeshBufferInfoKey, MeshBufferInfos, MeshBufferVertexAttributeInfo,
+    MeshBufferVertexInfo,
 };
+use crate::meshes::mesh::Mesh;
+use crate::meshes::MeshKey;
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
 use crate::pipelines::Pipelines;
@@ -34,12 +38,14 @@ use crate::render_textures::RenderTextureFormats;
 use crate::shaders::{ShaderKey, Shaders};
 use crate::textures::Textures;
 
+/// Render pipeline cache for transparent materials.
 pub struct MaterialTransparentPipelines {
     pipeline_layout_key: PipelineLayoutKey,
     render_pipeline_keys: SecondaryMap<MeshKey, RenderPipelineKey>,
 }
 
 impl MaterialTransparentPipelines {
+    /// Creates pipeline layout state for transparent materials.
     pub async fn new(
         ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &MaterialTransparentBindGroups,
@@ -63,11 +69,13 @@ impl MaterialTransparentPipelines {
         })
     }
 
+    /// Creates and caches a render pipeline for a mesh.
     pub async fn set_render_pipeline_key(
         &mut self,
         gpu: &AwsmRendererWebGpu,
         mesh: &Mesh,
         mesh_key: MeshKey,
+        buffer_info_key: MeshBufferInfoKey,
         shaders: &mut Shaders,
         pipelines: &mut Pipelines,
         material_bind_groups: &MaterialTransparentBindGroups,
@@ -77,7 +85,7 @@ impl MaterialTransparentPipelines {
         _textures: &Textures,
         render_texture_formats: &RenderTextureFormats,
     ) -> Result<RenderPipelineKey> {
-        let mesh_buffer_info = mesh_buffer_infos.get(mesh.buffer_info_key)?;
+        let mesh_buffer_info = mesh_buffer_infos.get(buffer_info_key)?;
 
         let shader_cache_key = ShaderCacheKeyMaterialTransparent {
             attributes: mesh_buffer_info.into(),
@@ -129,8 +137,16 @@ impl MaterialTransparentPipelines {
         Ok(render_pipeline_key)
     }
 
+    /// Returns the cached render pipeline key for a mesh, if present.
     pub fn get_render_pipeline_key(&self, mesh_key: MeshKey) -> Option<RenderPipelineKey> {
         self.render_pipeline_keys.get(mesh_key).cloned()
+    }
+
+    /// Copies a cached pipeline key from one mesh to another.
+    pub fn clone_render_pipeline_key(&mut self, from: MeshKey, to: MeshKey) {
+        if let Some(key) = self.render_pipeline_keys.get(from).cloned() {
+            self.render_pipeline_keys.insert(to, key);
+        }
     }
 }
 

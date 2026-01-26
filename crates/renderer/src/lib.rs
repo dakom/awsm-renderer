@@ -1,3 +1,5 @@
+//! High-level renderer API and shared modules.
+
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::match_like_matches_macro)]
@@ -11,10 +13,11 @@ pub mod camera;
 pub mod debug;
 pub mod environment;
 pub mod error;
+pub mod frustum;
 pub mod instances;
 pub mod lights;
 pub mod materials;
-pub mod mesh;
+pub mod meshes;
 pub mod picker;
 pub mod pipeline_layouts;
 pub mod pipelines;
@@ -51,7 +54,7 @@ use camera::CameraBuffer;
 use instances::Instances;
 use lights::Lights;
 use materials::Materials;
-use mesh::Meshes;
+use meshes::Meshes;
 use pipelines::Pipelines;
 use shaders::Shaders;
 use textures::Textures;
@@ -70,6 +73,7 @@ use crate::{
     render_textures::{RenderTextureFormats, RenderTextures},
 };
 
+/// Main renderer state and GPU resources.
 pub struct AwsmRenderer {
     pub gpu: core::renderer::AwsmRendererWebGpu,
     pub bind_group_layouts: BindGroupLayouts,
@@ -102,12 +106,14 @@ pub struct AwsmRenderer {
     pub animations: animation::Animations,
 }
 
+/// Compatibility requirements for this renderer.
 pub static COMPATIBITLIY_REQUIREMENTS: LazyLock<CompatibilityRequirements> =
     LazyLock::new(|| CompatibilityRequirements {
         storage_buffers: Some(9),
     });
 
 impl AwsmRenderer {
+    /// Removes all scene data by rebuilding the renderer state.
     pub async fn remove_all(&mut self) -> crate::error::Result<()> {
         // meh, just recreate the renderer, it's fine
         let renderer = AwsmRendererBuilder::new(self.gpu.clone())
@@ -122,6 +128,7 @@ impl AwsmRenderer {
     }
 }
 
+/// Builder for `AwsmRenderer`.
 pub struct AwsmRendererBuilder {
     gpu: AwsmRendererGpuBuilderKind,
     logging: AwsmRendererLogging,
@@ -137,8 +144,11 @@ pub struct AwsmRendererBuilder {
     post_processing: PostProcessing,
 }
 
+/// WebGPU builder input for `AwsmRendererBuilder`.
 pub enum AwsmRendererGpuBuilderKind {
+    /// Build from a WebGPU builder.
     WebGpuBuilder(AwsmRendererWebGpuBuilder),
+    /// Use an already-built WebGPU context.
     WebGpuBuilt(AwsmRendererWebGpu),
 }
 
@@ -155,6 +165,7 @@ impl From<AwsmRendererWebGpu> for AwsmRendererGpuBuilderKind {
 }
 
 impl AwsmRendererBuilder {
+    /// Creates a new renderer builder from a WebGPU builder or context.
     pub fn new(gpu: impl Into<AwsmRendererGpuBuilderKind>) -> Self {
         Self {
             gpu: gpu.into(),
@@ -199,46 +210,55 @@ impl AwsmRendererBuilder {
         }
     }
 
+    /// Sets BRDF LUT generation options.
     pub fn with_brdf_lut_options(mut self, options: BrdfLutOptions) -> Self {
         self.brdf_lut_options = options;
         self
     }
 
+    /// Sets the filtered environment colors for IBL.
     pub fn with_ibl_filtered_env_colors(mut self, colors: CubemapBitmapColors) -> Self {
         self.ibl_filtered_env_colors = colors;
         self
     }
 
+    /// Sets the anti-aliasing configuration.
     pub fn with_anti_aliasing(mut self, anti_aliasing: AntiAliasing) -> Self {
         self.anti_aliasing = anti_aliasing;
         self
     }
 
+    /// Sets the irradiance colors for IBL.
     pub fn with_ibl_irradiance_colors(mut self, colors: CubemapBitmapColors) -> Self {
         self.ibl_irradiance_colors = colors;
         self
     }
 
+    /// Sets the skybox colors.
     pub fn with_skybox_colors(mut self, colors: CubemapBitmapColors) -> Self {
         self.skybox_colors = colors;
         self
     }
 
+    /// Sets logging options for the renderer.
     pub fn with_logging(mut self, logging: AwsmRendererLogging) -> Self {
         self.logging = logging;
         self
     }
 
+    /// Sets render texture formats.
     pub fn with_render_texture_formats(mut self, formats: RenderTextureFormats) -> Self {
         self.render_texture_formats = Some(formats);
         self
     }
 
+    /// Sets the clear color used for the main render pass.
     pub fn with_clear_color(mut self, color: Color) -> Self {
         self.clear_color = color;
         self
     }
 
+    /// Builds the renderer and initializes GPU resources.
     pub async fn build(self) -> std::result::Result<AwsmRenderer, crate::error::AwsmError> {
         let Self {
             gpu,
@@ -349,6 +369,12 @@ impl AwsmRendererBuilder {
             #[cfg(feature = "animation")]
             animations,
         };
+
+        // need to call these to create pipelines
+        _self.set_anti_aliasing(_self.anti_aliasing.clone()).await?;
+        _self
+            .set_post_processing(_self.post_processing.clone())
+            .await?;
 
         Ok(_self)
     }

@@ -1,3 +1,5 @@
+//! KTX2 cubemap loading helpers.
+
 use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -10,6 +12,7 @@ use crate::{
     texture::{Extent3d, TextureDescriptor, TextureDimension, TextureUsage},
 };
 
+/// Loads a KTX2 file from a URL.
 pub async fn load_url(url: &str) -> anyhow::Result<ktx2::Reader<Vec<u8>>> {
     let resp: web_sys::Response = gloo_net::http::Request::get(url)
         .send()
@@ -27,6 +30,8 @@ pub async fn load_url(url: &str) -> anyhow::Result<ktx2::Reader<Vec<u8>>> {
 
     Ok(ktx2::Reader::new(bytes).map_err(|e| AwsmCoreError::Ktx(e.to_string()))?)
 }
+
+/// Creates a cubemap texture from a KTX2 reader.
 pub async fn create_texture(
     reader: &ktx2::Reader<Vec<u8>>,
     gpu: &AwsmRendererWebGpu,

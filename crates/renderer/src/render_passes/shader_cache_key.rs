@@ -1,3 +1,5 @@
+//! Render-pass shader cache keys.
+
 use crate::render_passes::{
     display::shader::cache_key::ShaderCacheKeyDisplay,
     effects::shader::cache_key::ShaderCacheKeyEffects,
@@ -9,6 +11,7 @@ use crate::render_passes::{
     material_transparent::shader::cache_key::ShaderCacheKeyMaterialTransparent,
 };
 
+/// Cache key variants for render-pass shader templates.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum ShaderCacheKeyRenderPass {
     Geometry(ShaderCacheKeyGeometry),

@@ -1,3 +1,5 @@
+//! Material mesh metadata packing.
+
 use std::sync::LazyLock;
 
 use awsm_renderer_core::buffers::BufferUsage;
@@ -5,15 +7,21 @@ use slotmap::Key;
 
 use crate::{
     materials::{MaterialKey, Materials},
-    mesh::{
+    meshes::{
+        buffer_info::MeshBufferInfo,
+        buffer_info::{MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo},
         morphs::{MaterialMorphKey, Morphs},
-        AwsmMeshError, Mesh, MeshBufferInfo, MeshKey,
+        AwsmMeshError, Mesh, MeshKey,
     },
 };
 
+/// Bitmask for normal morphing.
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_NORMAL: u32 = 1;
+/// Bitmask for tangent morphing.
 pub const MATERIAL_MESH_META_MORPH_MATERIAL_BITMASK_TANGENT: u32 = 1 << 1;
+/// Byte size for material mesh meta struct.
 pub const MATERIAL_MESH_META_BYTE_SIZE: usize = 68;
+/// Byte alignment for material mesh meta entries.
 pub const MATERIAL_MESH_META_BYTE_ALIGNMENT: usize = 256;
 
 pub static MATERIAL_BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| {
@@ -23,7 +31,8 @@ pub static MATERIAL_BUFFER_USAGE: LazyLock<BufferUsage> = LazyLock::new(|| {
         .with_uniform()
 });
 
-// See meta.wgsl for the corresponding struct
+/// Material meta fields used by shaders.
+/// See `meta.wgsl` for the corresponding struct.
 pub struct MaterialMeshMeta<'a> {
     pub mesh_key: MeshKey,
     pub material_key: MaterialKey,
@@ -42,10 +51,6 @@ pub struct MaterialMeshMeta<'a> {
 /// Calculate the offset (in floats) to TEXCOORD_0 within the vertex attribute data.
 /// This accounts for any COLOR_n attributes that come before texture coordinates.
 fn calculate_uv_sets_index(buffer_info: &MeshBufferInfo) -> u32 {
-    use crate::mesh::buffer_info::{
-        MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo,
-    };
-
     let mut offset_floats = 0;
     for attr in &buffer_info.triangles.vertex_attributes {
         if let MeshBufferVertexAttributeInfo::Custom(custom) = attr {
@@ -67,10 +72,6 @@ fn calculate_uv_sets_index(buffer_info: &MeshBufferInfo) -> u32 {
 /// Calculate how many UV sets and color sets this mesh has.
 /// Returns (uv_set_count, color_set_count).
 fn calculate_attribute_counts(buffer_info: &MeshBufferInfo) -> (u32, u32) {
-    use crate::mesh::buffer_info::{
-        MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo,
-    };
-
     let mut uv_set_count = 0u32;
     let mut color_set_count = 0u32;
 
@@ -91,6 +92,7 @@ fn calculate_attribute_counts(buffer_info: &MeshBufferInfo) -> (u32, u32) {
 }
 
 impl<'a> MaterialMeshMeta<'a> {
+    /// Packs material meta into bytes.
     pub fn to_bytes(
         self,
     ) -> std::result::Result<[u8; MATERIAL_MESH_META_BYTE_SIZE], AwsmMeshError> {

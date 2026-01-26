@@ -1,3 +1,5 @@
+//! BRDF LUT generation utilities.
+
 use std::cell::RefCell;
 
 use crate::bind_groups::BindGroupLayoutDescriptor;
@@ -18,12 +20,14 @@ thread_local! {
     static BRDF_SAMPLER: RefCell<Option<web_sys::GpuSampler>> = const { RefCell::new(None) };
 }
 
+/// Generated BRDF lookup texture and sampler.
 pub struct BrdfLut {
     pub texture: web_sys::GpuTexture,
     pub view: web_sys::GpuTextureView,
     pub sampler: web_sys::GpuSampler,
 }
 
+/// Options for BRDF LUT generation.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct BrdfLutOptions {
     pub width: u32,
@@ -31,6 +35,7 @@ pub struct BrdfLutOptions {
 }
 
 impl BrdfLutOptions {
+    /// Creates options with explicit dimensions.
     pub fn new(width: u32, height: u32) -> Self {
         Self { width, height }
     }
@@ -46,6 +51,7 @@ impl Default for BrdfLutOptions {
 }
 
 impl BrdfLut {
+    /// Generates a BRDF LUT texture.
     pub async fn new(gpu: &AwsmRendererWebGpu, options: BrdfLutOptions) -> Result<Self> {
         let render_pipeline = get_pipeline(gpu).await?;
 

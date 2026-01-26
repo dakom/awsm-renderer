@@ -1,3 +1,5 @@
+//! sRGB to linear texture conversion helpers.
+
 use std::{borrow::Cow, cell::RefCell, collections::HashMap};
 
 use crate::{

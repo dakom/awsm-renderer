@@ -1,3 +1,5 @@
+//! Effects pass pipeline setup.
+
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 
 use crate::{
@@ -20,10 +22,11 @@ use crate::{
     shaders::Shaders,
 };
 
-/// Number of bloom blur passes (more = smoother but slower)
-/// Total passes = 1 extract + BLOOM_BLUR_PASSES + 1 blend
+/// Number of bloom blur passes (more = smoother but slower).
+/// Total passes = 1 extract + BLOOM_BLUR_PASSES + 1 blend.
 pub const BLOOM_BLUR_PASSES: u32 = 3;
 
+/// Compute pipelines for post-processing effects.
 pub struct EffectsPipelines {
     multisampled_pipeline_layout_key: PipelineLayoutKey,
     singlesampled_pipeline_layout_key: PipelineLayoutKey,
@@ -39,6 +42,7 @@ pub struct EffectsPipelines {
 }
 
 impl EffectsPipelines {
+    /// Creates pipeline layout state for the effects pass.
     pub async fn new(
         ctx: &mut RenderPassInitContext<'_>,
         bind_groups: &EffectsBindGroups,
@@ -91,6 +95,7 @@ impl EffectsPipelines {
         }
     }
 
+    /// Updates pipelines for the current anti-aliasing and post-processing settings.
     pub async fn set_render_pipeline_keys(
         &mut self,
         anti_aliasing: &AntiAliasing,

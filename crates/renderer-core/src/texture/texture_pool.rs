@@ -1,3 +1,5 @@
+//! Texture pooling and upload helpers.
+
 #[cfg(feature = "serde")]
 pub mod report;
 
@@ -20,11 +22,13 @@ use crate::{
     },
 };
 
+/// Pool of texture arrays grouped by size and format.
 pub struct TexturePool<ID> {
     arrays: IndexMap<TexturePoolArrayKey, TexturePoolArray<ID>>,
     id_to_array_key: HashMap<ID, TexturePoolArrayKey>,
 }
 
+/// Single texture array in the pool.
 pub struct TexturePoolArray<ID> {
     pub format: TextureFormat,
     pub width: u32,
@@ -36,6 +40,7 @@ pub struct TexturePoolArray<ID> {
     pub gpu_texture_view: Option<web_sys::GpuTextureView>,
 }
 
+/// Lookup information for a texture entry in the pool.
 pub struct TexturePoolEntryInfo<ID> {
     pub id: ID,
     pub array_index: usize,
@@ -43,6 +48,7 @@ pub struct TexturePoolEntryInfo<ID> {
     pub color: TextureColorInfo,
 }
 
+/// Color and mipmap settings for pooled textures.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Ord, PartialOrd)]
 pub struct TextureColorInfo {
     pub mipmap_kind: MipmapTextureKind,
@@ -66,6 +72,7 @@ impl<ID: Eq + Hash + Clone> Default for TexturePool<ID> {
 }
 
 impl<ID: Eq + Hash + Clone> TexturePool<ID> {
+    /// Creates an empty texture pool.
     pub fn new() -> Self {
         Self {
             arrays: IndexMap::new(),
@@ -73,6 +80,7 @@ impl<ID: Eq + Hash + Clone> TexturePool<ID> {
         }
     }
 
+    /// Adds an image to the pool.
     pub fn add_image(
         &mut self,
         id: ID,
@@ -96,14 +104,17 @@ impl<ID: Eq + Hash + Clone> TexturePool<ID> {
         self.id_to_array_key.insert(id, array_key);
     }
 
+    /// Returns a texture array by index.
     pub fn array_by_index(&self, index: usize) -> Option<&TexturePoolArray<ID>> {
         self.arrays.values().nth(index)
     }
 
+    /// Returns the number of texture arrays in the pool.
     pub fn arrays_len(&self) -> usize {
         self.arrays.len()
     }
 
+    /// Looks up an entry by its ID.
     pub fn entry(&self, id: ID) -> Option<TexturePoolEntryInfo<ID>> {
         let id_array_key = self.id_to_array_key.get(&id)?;
 
@@ -125,6 +136,7 @@ impl<ID: Eq + Hash + Clone> TexturePool<ID> {
         None
     }
 
+    /// Uploads dirty arrays to the GPU. Returns true if any array was dirty.
     pub async fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<bool> {
         let mut any_dirty = false;
         for array in self.arrays.values_mut() {
@@ -135,12 +147,14 @@ impl<ID: Eq + Hash + Clone> TexturePool<ID> {
         Ok(any_dirty)
     }
 
+    /// Iterates over GPU textures for uploaded arrays.
     pub fn textures(&self) -> impl Iterator<Item = &web_sys::GpuTexture> {
         self.arrays
             .values()
             .filter_map(|array| array.gpu_texture.as_ref())
     }
 
+    /// Iterates over GPU texture views for uploaded arrays.
     pub fn texture_views(&self) -> impl Iterator<Item = &web_sys::GpuTextureView> {
         self.arrays
             .values()
@@ -149,6 +163,7 @@ impl<ID: Eq + Hash + Clone> TexturePool<ID> {
 }
 
 impl<ID> TexturePoolArray<ID> {
+    /// Creates a new texture array for a format and size.
     pub fn new(format: TextureFormat, width: u32, height: u32) -> Self {
         Self {
             format,
@@ -163,11 +178,13 @@ impl<ID> TexturePoolArray<ID> {
     }
 
     // returns the index of the inserted image
+    /// Inserts an image into the array.
     pub fn insert(&mut self, id: ID, image: ImageData, color: TextureColorInfo) {
         self.images.push((id, image, color));
         self.gpu_dirty = true;
     }
 
+    /// Returns the mip level count for this array.
     pub fn mipmap_levels(&self) -> u32 {
         if self.mipmap {
             calculate_mipmap_levels(self.width, self.height)
@@ -176,6 +193,7 @@ impl<ID> TexturePoolArray<ID> {
         }
     }
 
+    /// Uploads this array to the GPU if dirty.
     pub async fn write_gpu(&mut self, gpu: &AwsmRendererWebGpu) -> Result<()> {
         if !self.gpu_dirty {
             return Ok(());

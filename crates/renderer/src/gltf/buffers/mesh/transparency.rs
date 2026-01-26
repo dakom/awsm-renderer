@@ -8,7 +8,7 @@ use crate::{
         buffers::{mesh::get_vec3_from_buffer, MeshBufferAttributeIndexInfoWithOffset},
         error::AwsmGltfError,
     },
-    mesh::MeshBufferVertexAttributeInfo,
+    meshes::buffer_info::{MeshBufferVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo},
 };
 
 /// Creates NON-EXPLODED transparency vertices for traditional forward rendering.
@@ -36,8 +36,6 @@ pub(super) fn create_transparency_vertices(
     _front_face: FrontFace,
     transparency_vertex_bytes: &mut Vec<u8>,
 ) -> Result<()> {
-    use crate::mesh::MeshBufferVisibilityVertexAttributeInfo;
-
     // Get positions data
     let positions = attribute_data
         .iter()

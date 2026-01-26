@@ -1,3 +1,5 @@
+//! Mipmap generation utilities.
+
 use std::{borrow::Cow, cell::RefCell, collections::HashMap};
 
 use crate::{
@@ -20,17 +22,27 @@ use crate::{
     },
 };
 
+/// Semantic texture type for mipmap filtering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
 #[repr(u32)]
 pub enum MipmapTextureKind {
+    /// Base color texture.
     Albedo = 0,
+    /// Normal map.
     Normal = 1,
+    /// Metallic-roughness texture.
     MetallicRoughness = 2,
+    /// Occlusion texture.
     Occlusion = 3,
+    /// Emissive texture.
     Emissive = 4,
+    /// Specular texture.
     Specular = 5,
+    /// Specular color texture.
     SpecularColor = 6,
+    /// Transmission texture.
     Transmission = 7,
+    /// Volume thickness texture.
     VolumeThickness = 8,
 }
 /// Calculate the number of mip levels needed for a texture of the given dimensions.

@@ -1,3 +1,5 @@
+//! Shared material bind group helpers.
+
 use awsm_renderer_core::bind_groups::{
     BindGroupLayoutResource, SamplerBindingLayout, SamplerBindingType, TextureBindingLayout,
 };
@@ -12,32 +14,38 @@ use crate::{
     textures::SamplerKey,
 };
 
+/// Bind group layout data for the texture pool.
 pub struct TexturePoolDeps {
     pub bind_group_layout_key: BindGroupLayoutKey,
     pub arrays_len: u32,
     pub sampler_keys: IndexSet<SamplerKey>,
 }
 
+/// Shader stage visibility for texture pool bindings.
 pub enum TexturePoolVisibility {
     Render,
     Compute,
 }
 
 impl TexturePoolVisibility {
+    /// Returns true if the binding is visible to the vertex stage.
     pub fn vertex(&self) -> bool {
         matches!(self, TexturePoolVisibility::Render)
     }
 
+    /// Returns true if the binding is visible to the fragment stage.
     pub fn fragment(&self) -> bool {
         matches!(self, TexturePoolVisibility::Render)
     }
 
+    /// Returns true if the binding is visible to the compute stage.
     pub fn compute(&self) -> bool {
         matches!(self, TexturePoolVisibility::Compute)
     }
 }
 
 impl TexturePoolDeps {
+    /// Builds texture pool bind group layout metadata from the render context.
     pub fn new(
         ctx: &mut RenderPassInitContext<'_>,
         visibility: TexturePoolVisibility,

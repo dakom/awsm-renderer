@@ -1,3 +1,5 @@
+//! Display render pass execution.
+
 use std::vec;
 
 use awsm_renderer_core::command::{
@@ -14,12 +16,14 @@ use crate::{
     },
 };
 
+/// Display pass bind groups and pipelines.
 pub struct DisplayRenderPass {
     pub bind_groups: DisplayBindGroups,
     pub pipelines: DisplayPipelines,
 }
 
 impl DisplayRenderPass {
+    /// Creates the display render pass resources.
     pub async fn new(ctx: &mut RenderPassInitContext<'_>) -> Result<Self> {
         let bind_groups = DisplayBindGroups::new(ctx).await?;
         let pipelines = DisplayPipelines::new(ctx, &bind_groups).await?;
@@ -30,6 +34,7 @@ impl DisplayRenderPass {
         })
     }
 
+    /// Executes the display render pass.
     pub fn render(&self, ctx: &RenderContext) -> Result<()> {
         let render_pass = ctx.command_encoder.begin_render_pass(
             &RenderPassDescriptor {
@@ -38,7 +43,8 @@ impl DisplayRenderPass {
                     &ctx.gpu.current_context_texture_view()?,
                     LoadOp::Clear,
                     StoreOp::Store,
-                )],
+                )
+                .with_clear_color(ctx.clear_color)],
                 ..Default::default()
             }
             .into(),

@@ -1,8 +1,11 @@
-use crate::mesh::{
+//! Shared material shader cache key helpers.
+
+use crate::meshes::buffer_info::{
     MeshBufferCustomVertexAttributeInfo, MeshBufferInfo, MeshBufferVertexAttributeInfo,
     MeshBufferVisibilityVertexAttributeInfo,
 };
 
+/// Vertex attribute flags used for material shader specialization.
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ShaderMaterialVertexAttributes {
     pub normals: bool,

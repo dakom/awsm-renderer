@@ -1,3 +1,5 @@
+//! Image-based lighting (IBL) helpers.
+
 use std::sync::LazyLock;
 
 use awsm_renderer_core::cubemap::CubemapImage;
@@ -7,6 +9,7 @@ use awsm_renderer_core::{cubemap::images::CubemapBitmapColors, renderer::AwsmRen
 use crate::error::Result;
 use crate::textures::{CubemapTextureKey, SamplerCacheKey, Textures};
 
+/// Image-based lighting textures.
 #[derive(Clone)]
 pub struct Ibl {
     pub prefiltered_env: IblTexture,
@@ -14,6 +17,7 @@ pub struct Ibl {
 }
 
 impl Ibl {
+    /// Creates IBL data from prefiltered and irradiance textures.
     pub fn new(prefiltered_env: IblTexture, irradiance: IblTexture) -> Self {
         Self {
             prefiltered_env,
@@ -22,6 +26,7 @@ impl Ibl {
     }
 }
 
+/// Single IBL cubemap texture and sampler.
 #[derive(Clone)]
 pub struct IblTexture {
     pub texture_key: CubemapTextureKey,
@@ -42,10 +47,12 @@ static SAMPLER_CACHE_KEY: LazyLock<SamplerCacheKey> = LazyLock::new(|| SamplerCa
 });
 
 impl IblTexture {
+    /// Returns the sampler cache key used for IBL textures.
     pub fn sampler_cache_key() -> SamplerCacheKey {
         SAMPLER_CACHE_KEY.clone()
     }
 
+    /// Creates an IBL texture wrapper.
     pub fn new(
         texture_key: CubemapTextureKey,
         texture_view: web_sys::GpuTextureView,
@@ -60,6 +67,7 @@ impl IblTexture {
         }
     }
 
+    /// Creates an IBL texture from solid colors.
     pub async fn new_colors(
         gpu: &AwsmRendererWebGpu,
         textures: &mut Textures,

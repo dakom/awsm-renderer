@@ -1,3 +1,5 @@
+//! Texture management and GPU uploads.
+
 use std::{collections::HashMap, sync::LazyLock};
 
 use awsm_renderer_core::{
@@ -20,6 +22,7 @@ use thiserror::Error;
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
     buffer::dynamic_uniform::DynamicUniformBuffer,
+    buffer::helpers::write_buffer_with_dirty_ranges,
     error::AwsmError,
     render_passes::RenderPassInitContext,
     AwsmRenderer, AwsmRendererLogging,
@@ -28,11 +31,14 @@ use crate::{
 static TEXTURE_TRANSFORM_BUFFER_USAGE: LazyLock<BufferUsage> =
     LazyLock::new(|| BufferUsage::new().with_storage().with_copy_dst());
 
+/// Initial capacity for texture transform storage.
 pub const TEXTURE_TRANSFORMS_INITIAL_CAPACITY: usize = 32; // 32 elements is a good starting point
+/// Byte size for a single texture transform.
 pub const TEXTURE_TRANSFORMS_BYTE_SIZE: usize = 32; // 32 bytes per texture transform (must match shader struct size)
 
 impl AwsmRenderer {
     // this should ideally only be called after all the textures have been loaded
+    /// Uploads texture pool data and refreshes dependent pipelines.
     pub async fn finalize_gpu_textures(&mut self) -> std::result::Result<(), AwsmError> {
         let was_dirty = self
             .textures
@@ -81,9 +87,8 @@ impl AwsmRenderer {
         let mut has_seen_buffer_info = SecondaryMap::new();
         let mut has_seen_material = SecondaryMap::new();
         for (key, mesh) in self.meshes.iter() {
-            if has_seen_buffer_info
-                .insert(mesh.buffer_info_key, ())
-                .is_none()
+            let buffer_info_key = self.meshes.buffer_info_key(key)?;
+            if has_seen_buffer_info.insert(buffer_info_key, ()).is_none()
                 || has_seen_material.insert(mesh.material_key, ()).is_none()
             {
                 self.render_passes
@@ -93,6 +98,7 @@ impl AwsmRenderer {
                         &self.gpu,
                         mesh,
                         key,
+                        buffer_info_key,
                         &mut self.shaders,
                         &mut self.pipelines,
                         &self.render_passes.material_transparent.bind_groups,
@@ -109,6 +115,7 @@ impl AwsmRenderer {
     }
 }
 
+/// Texture pool, samplers, and texture transforms.
 pub struct Textures {
     pub pool: TexturePool<TextureKey>,
     pub pool_sampler_set: IndexSet<SamplerKey>,
@@ -125,6 +132,7 @@ pub struct Textures {
     pub(crate) texture_transforms_gpu_buffer: web_sys::GpuBuffer,
 }
 
+/// Cache key for samplers.
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct SamplerCacheKey {
     pub address_mode_u: Option<AddressMode>,
@@ -140,6 +148,7 @@ pub struct SamplerCacheKey {
 }
 
 impl SamplerCacheKey {
+    /// Returns true if anisotropy is allowed with the current filters.
     pub fn allowed_ansiotropy(&self) -> bool {
         match (self.min_filter, self.mag_filter, self.mipmap_filter) {
             (Some(FilterMode::Nearest), _, _)
@@ -165,6 +174,7 @@ impl std::hash::Hash for SamplerCacheKey {
     }
 }
 
+/// Texture transform parameters.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextureTransform {
     pub offset: [f32; 2],
@@ -174,6 +184,7 @@ pub struct TextureTransform {
 }
 
 impl TextureTransform {
+    /// Returns an identity transform.
     pub fn identity() -> Self {
         Self {
             offset: [0.0, 0.0],
@@ -183,6 +194,7 @@ impl TextureTransform {
         }
     }
 
+    /// Packs the transform into GPU bytes.
     pub fn as_gpu_bytes(&self) -> [u8; TEXTURE_TRANSFORMS_BYTE_SIZE] {
         let mut bytes = [0u8; TEXTURE_TRANSFORMS_BYTE_SIZE];
 
@@ -224,6 +236,7 @@ impl TextureTransform {
 }
 
 impl Textures {
+    /// Creates texture storage and GPU buffers.
     pub fn new(gpu: &AwsmRendererWebGpu) -> Result<Self> {
         let samplers = SlotMap::with_key();
         let sampler_cache = HashMap::new();
@@ -273,6 +286,7 @@ impl Textures {
         })
     }
 
+    /// Adds an image to the texture pool and returns its key.
     pub fn add_image(
         &mut self,
         image_data: ImageData,
@@ -292,6 +306,7 @@ impl Textures {
         Ok(key)
     }
 
+    /// Inserts a texture transform and returns its key.
     pub fn insert_texture_transform(
         &mut self,
         transform: &TextureTransform,
@@ -300,6 +315,7 @@ impl Textures {
         self.update_texture_transform(key, transform);
         key
     }
+    /// Updates an existing texture transform.
     pub fn update_texture_transform(
         &mut self,
         key: TextureTransformKey,
@@ -310,23 +326,28 @@ impl Textures {
         self.texture_transforms_gpu_dirty = true;
     }
 
+    /// Removes a texture transform.
     pub fn remove_texture_transform(&mut self, key: TextureTransformKey) {
         self.texture_transforms_buffer.remove(key);
         self.texture_transforms_gpu_dirty = true;
     }
 
+    /// Returns the byte offset for a texture transform.
     pub fn get_texture_transform_offset(&self, key: TextureTransformKey) -> Option<usize> {
         self.texture_transforms_buffer.offset(key)
     }
 
+    /// Returns the slot index for a texture transform.
     pub fn get_texture_transform_slot_index(&self, key: TextureTransformKey) -> Option<usize> {
         self.texture_transforms_buffer.slot_index(key)
     }
 
+    /// Inserts a cubemap texture and returns its key.
     pub fn insert_cubemap(&mut self, texture: web_sys::GpuTexture) -> CubemapTextureKey {
         self.cubemaps.insert(texture)
     }
 
+    /// Returns a cubemap texture by key.
     pub fn get_cubemap(&self, key: CubemapTextureKey) -> Result<&web_sys::GpuTexture> {
         self.cubemaps
             .get(key)
@@ -347,6 +368,7 @@ impl Textures {
         self.pool.write_gpu(gpu).await.map_err(|e| e.into())
     }
 
+    /// Writes texture transform data to the GPU if dirty.
     pub fn write_texture_transforms_gpu(
         &mut self,
         logging: &AwsmRendererLogging,
@@ -360,6 +382,7 @@ impl Textures {
                 None
             };
 
+            let mut resized = false;
             if let Some(new_size) = self.texture_transforms_buffer.take_gpu_needs_resize() {
                 self.texture_transforms_gpu_buffer = gpu.create_buffer(
                     &BufferDescriptor::new(
@@ -371,27 +394,41 @@ impl Textures {
                 )?;
 
                 bind_groups.mark_create(BindGroupCreate::TextureTransformsResize);
+                resized = true;
             }
 
-            gpu.write_buffer(
-                &self.texture_transforms_gpu_buffer,
-                None,
-                self.texture_transforms_buffer.raw_slice(),
-                None,
-                None,
-            )?;
+            if resized {
+                self.texture_transforms_buffer.clear_dirty_ranges();
+                gpu.write_buffer(
+                    &self.texture_transforms_gpu_buffer,
+                    None,
+                    self.texture_transforms_buffer.raw_slice(),
+                    None,
+                    None,
+                )?;
+            } else {
+                let ranges = self.texture_transforms_buffer.take_dirty_ranges();
+                write_buffer_with_dirty_ranges(
+                    gpu,
+                    &self.texture_transforms_gpu_buffer,
+                    self.texture_transforms_buffer.raw_slice(),
+                    ranges,
+                )?;
+            }
 
             self.texture_transforms_gpu_dirty = false;
         }
         Ok(())
     }
 
+    /// Returns pool entry info for a texture key.
     pub fn get_entry(&self, key: TextureKey) -> Result<&TexturePoolEntryInfo<TextureKey>> {
         self.pool_textures
             .get(key)
             .ok_or(AwsmTextureError::TextureNotFound(key))
     }
 
+    /// Returns a sampler key, inserting if missing.
     pub fn get_sampler_key(
         &mut self,
         gpu: &AwsmRendererWebGpu,
@@ -410,12 +447,14 @@ impl Textures {
         )
     }
 
+    /// Returns a sampler by key.
     pub fn get_sampler(&self, key: SamplerKey) -> Result<&web_sys::GpuSampler> {
         self.samplers
             .get(key)
             .ok_or(AwsmTextureError::SamplerNotFound(key))
     }
 
+    /// Returns cached sampler address modes.
     pub fn sampler_address_modes(
         &self,
         key: SamplerKey,
@@ -477,23 +516,29 @@ fn create_sampler_key(
 }
 
 new_key_type! {
+    /// Opaque key for pooled textures.
     pub struct TextureKey;
 }
 
 new_key_type! {
+    /// Opaque key for texture transforms.
     pub struct TextureTransformKey;
 }
 
 new_key_type! {
+    /// Opaque key for samplers.
     pub struct SamplerKey;
 }
 
 new_key_type! {
+    /// Opaque key for cubemap textures.
     pub struct CubemapTextureKey;
 }
 
+/// Result type for texture operations.
 pub type Result<T> = std::result::Result<T, AwsmTextureError>;
 
+/// Texture-related errors.
 #[derive(Error, Debug)]
 pub enum AwsmTextureError {
     #[error("[texture] {0:?}")]

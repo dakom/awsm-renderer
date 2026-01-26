@@ -1,3 +1,5 @@
+//! Core WebGPU wrappers, descriptors, and helpers for awsm-renderer.
+
 pub mod alignment;
 pub mod bind_groups;
 pub mod brdf_lut;

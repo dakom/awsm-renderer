@@ -1,3 +1,5 @@
+//! WebGPU context and builder.
+
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
@@ -8,7 +10,8 @@ use crate::{
     error::{AwsmCoreError, Result},
 };
 
-// relatively cheap to clone
+/// WebGPU device and canvas context wrapper.
+/// Relatively cheap to clone.
 #[derive(Clone)]
 pub struct AwsmRendererWebGpu {
     pub gpu: web_sys::Gpu,
@@ -17,6 +20,7 @@ pub struct AwsmRendererWebGpu {
     pub context: web_sys::GpuCanvasContext,
 }
 
+/// Builder for creating an `AwsmRendererWebGpu`.
 pub struct AwsmRendererWebGpuBuilder {
     pub gpu: web_sys::Gpu,
     pub canvas: web_sys::HtmlCanvasElement,
@@ -28,6 +32,7 @@ pub struct AwsmRendererWebGpuBuilder {
 }
 
 impl AwsmRendererWebGpuBuilder {
+    /// Creates a builder for a given GPU and canvas.
     pub fn new(gpu: web_sys::Gpu, canvas: web_sys::HtmlCanvasElement) -> Self {
         Self {
             gpu,
@@ -40,26 +45,31 @@ impl AwsmRendererWebGpuBuilder {
         }
     }
 
+    /// Sets the canvas configuration.
     pub fn with_configuration(mut self, configuration: CanvasConfiguration) -> Self {
         self.configuration = Some(configuration);
         self
     }
 
+    /// Sets a pre-selected adapter.
     pub fn with_adapter(mut self, adapter: web_sys::GpuAdapter) -> Self {
         self.adapter = Some(adapter);
         self
     }
 
+    /// Sets a pre-created device.
     pub fn with_device(mut self, device: web_sys::GpuDevice) -> Self {
         self.device = Some(device);
         self
     }
 
+    /// Sets requested device limits.
     pub fn with_device_request_limits(mut self, device_req_limits: DeviceRequestLimits) -> Self {
         self.device_req_limits = Some(device_req_limits);
         self
     }
 
+    /// Builds the WebGPU context and device.
     pub async fn build(self) -> Result<AwsmRendererWebGpu> {
         tracing::info!("Building WebGPU Context");
 
@@ -139,6 +149,7 @@ impl AwsmRendererWebGpuBuilder {
     }
 }
 
+/// Requested device limits to increase WebGPU caps.
 #[derive(Debug, Clone, Default)]
 pub struct DeviceRequestLimits {
     pub max_texture_dimension_2d: bool,
@@ -152,6 +163,7 @@ pub struct DeviceRequestLimits {
 }
 
 impl DeviceRequestLimits {
+    /// Requests maximum supported limits for all tracked fields.
     pub fn max_all() -> Self {
         Self {
             max_texture_dimension_2d: true,
@@ -165,22 +177,26 @@ impl DeviceRequestLimits {
         }
     }
 
+    /// Requests a typical set of limits for awsm-renderer.
     pub fn typical() -> Self {
         Self::default()
             .with_max_storage_buffer_binding_size()
             .with_max_storage_buffers_per_shader_stage()
     }
 
+    /// Enables requesting max storage buffer binding size.
     pub fn with_max_storage_buffer_binding_size(mut self) -> Self {
         self.max_storage_buffer_binding_size = true;
         self
     }
 
+    /// Enables requesting max storage buffers per shader stage.
     pub fn with_max_storage_buffers_per_shader_stage(mut self) -> Self {
         self.max_storage_buffers_per_shader_stage = true;
         self
     }
 
+    /// Converts requested limits into a WebGPU limits object.
     pub fn into_js(self, limits: &GpuSupportedLimits) -> js_sys::Object {
         let obj = js_sys::Object::new();
 

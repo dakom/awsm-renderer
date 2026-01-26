@@ -1,3 +1,5 @@
+//! glTF accessor decoding helpers.
+
 use std::borrow::Cow;
 
 use awsm_renderer_core::pipeline::vertex::VertexFormat;
@@ -8,6 +10,7 @@ use crate::buffer::helpers::{
     u8_to_f32_vec, u8_to_i16_vec, u8_to_i8_vec, u8_to_u16_vec, u8_to_u32_vec,
 };
 
+/// Extracts accessor data into a byte slice, handling sparse accessors.
 pub fn accessor_to_bytes<'a>(
     accessor: &gltf::Accessor<'_>,
     buffers: &'a [Vec<u8>],
@@ -104,6 +107,7 @@ fn sparse_to_indices(
     indices
 }
 
+/// Decodes accessor data into a typed vector representation.
 pub fn accessor_to_vec(accessor: &gltf::Accessor<'_>, buffers: &[Vec<u8>]) -> Result<AccessorVec> {
     let bytes = accessor_to_bytes(accessor, buffers)?;
 
@@ -369,6 +373,7 @@ pub fn accessor_to_vec(accessor: &gltf::Accessor<'_>, buffers: &[Vec<u8>]) -> Re
     })
 }
 
+/// Typed accessor data decoded from glTF buffers.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AccessorVec {
     ScalarU8(Vec<u8>),

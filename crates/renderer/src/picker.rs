@@ -1,3 +1,5 @@
+//! GPU picking support for mesh selection.
+
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 use crate::{
@@ -6,7 +8,7 @@ use crate::{
     },
     bind_groups::BindGroupRecreateContext,
     error::Result,
-    mesh::MeshKey,
+    meshes::MeshKey,
     picker::state::{PickerState, OUTPUT_BYTE_SIZE},
     pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts},
     pipelines::{
@@ -30,6 +32,7 @@ use slotmap::KeyData;
 
 mod state;
 
+/// Result of a GPU pick request.
 #[derive(Debug, Clone)]
 pub enum PickResult {
     Initializing,
@@ -39,6 +42,7 @@ pub enum PickResult {
 }
 
 impl PickResult {
+    /// Returns the hit mesh key if this is a hit result.
     pub fn mesh_key(&self) -> Option<MeshKey> {
         match self {
             PickResult::Hit(mesh_key) => Some(*mesh_key),
@@ -48,6 +52,7 @@ impl PickResult {
 }
 
 impl AwsmRenderer {
+    /// Performs a GPU pick at the given pixel coordinates.
     pub async fn pick(&self, x: i32, y: i32) -> Result<PickResult> {
         let pipeline_key = if self.anti_aliasing.msaa_sample_count.is_some() {
             self.picker.multisampled_compute_pipeline_key
@@ -110,6 +115,7 @@ impl AwsmRenderer {
     }
 }
 
+/// Picker state and GPU resources.
 pub struct Picker {
     singlesampled_compute_pipeline_key: ComputePipelineKey,
     multisampled_compute_pipeline_key: ComputePipelineKey,
@@ -121,6 +127,7 @@ pub struct Picker {
 }
 
 impl Picker {
+    /// Creates a picker with the required bind groups and pipelines.
     pub async fn new(
         gpu: &AwsmRendererWebGpu,
         bind_group_layouts: &mut BindGroupLayouts,
@@ -175,6 +182,7 @@ impl Picker {
         })
     }
 
+    /// Rebuilds the bind group for the current render textures.
     pub fn recreate_bind_group(&mut self, ctx: &BindGroupRecreateContext<'_>) -> Result<()> {
         let state = self.state.borrow();
 
@@ -303,6 +311,7 @@ async fn create_pipeline(
         .await?)
 }
 
+/// Shader cache key for the picker compute shader.
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct ShaderCacheKeyPicker {
     pub multisampled_geometry: bool,
@@ -314,6 +323,7 @@ impl From<ShaderCacheKeyPicker> for ShaderCacheKey {
     }
 }
 
+/// Shader template for the picker compute shader.
 #[derive(Template, Debug)]
 #[template(path = "picker_wgsl/compute.wgsl", whitespace = "minimize")]
 pub struct ShaderTemplatePicker {
@@ -322,10 +332,12 @@ pub struct ShaderTemplatePicker {
 
 impl ShaderTemplatePicker {
     #[cfg(debug_assertions)]
+    /// Returns an optional debug label for shader compilation.
     pub fn debug_label(&self) -> Option<&str> {
         Some("Picker")
     }
 
+    /// Renders the template into WGSL source.
     pub fn into_source(self) -> crate::shaders::Result<String> {
         Ok(self.render()?)
     }

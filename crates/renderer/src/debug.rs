@@ -1,13 +1,17 @@
+//! Debug helpers and logging flags.
+
 use std::{
     collections::HashMap,
     sync::{LazyLock, Mutex},
 };
 
+/// Renderer logging flags.
 #[derive(Clone, Debug, Default)]
 pub struct AwsmRendererLogging {
     pub render_timings: bool,
 }
 
+/// Debug ID reserved for renderable tracking.
 pub const DEBUG_ID_RENDERABLE: u32 = u32::MAX - 1;
 
 static DEBUG_TRANSACTION_ID: LazyLock<Mutex<HashMap<u32, u64>>> =
@@ -25,6 +29,7 @@ fn bump_transaction_count(id: u32) -> u64 {
     curr
 }
 
+/// Runs a closure only once per debug ID.
 pub fn debug_once(id: u32, f: impl FnOnce()) {
     let transaction_count = bump_transaction_count(id);
 
@@ -33,6 +38,7 @@ pub fn debug_once(id: u32, f: impl FnOnce()) {
     }
 }
 
+/// Runs a closure up to `n` times per debug ID.
 pub fn debug_n(id: u32, n: u64, f: impl FnOnce()) {
     let transaction_count = bump_transaction_count(id);
 
@@ -41,6 +47,7 @@ pub fn debug_n(id: u32, n: u64, f: impl FnOnce()) {
     }
 }
 
+/// Runs a closure if the input string changes for the debug ID.
 pub fn debug_unique_string(id: u32, input: &str, f: impl FnOnce()) {
     bump_transaction_count(id);
 

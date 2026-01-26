@@ -1,3 +1,5 @@
+//! Mega texture atlas packing and metadata.
+
 pub mod mipmap;
 /// A "MegaTexture" can be used to store a large number of images
 /// in a way that ultimately maps to a collection of large GPU texture arrays.
@@ -42,7 +44,7 @@ use binpack2d::{
 
 use crate::image::ImageData;
 
-/// Texture type for mipmap generation filtering
+/// Texture type for mipmap generation filtering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TextureType {
     /// Standard color/albedo textures (sRGB or linear)
@@ -63,6 +65,7 @@ impl Default for TextureType {
     }
 }
 
+/// Atlas-backed mega texture with dynamic growth.
 pub struct MegaTexture<ID> {
     // width and height of each layer in each atlas
     pub texture_size: u32,
@@ -78,6 +81,7 @@ pub struct MegaTexture<ID> {
     lookup: HashMap<ID, MegaTextureIndex>,
 }
 
+/// Index into the mega texture atlas, layer, and entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MegaTextureIndex {
     pub atlas: u16,
@@ -86,6 +90,7 @@ pub struct MegaTextureIndex {
 }
 
 impl MegaTextureIndex {
+    /// Creates an index from atlas, layer, and entry indices.
     pub fn new(atlas: usize, layer: usize, entry: usize) -> Self {
         Self {
             atlas: atlas.try_into().expect("Atlas index out of bounds"),
@@ -107,6 +112,7 @@ pub(super) struct MegaTextureLayer<ID> {
     pub packer: MaxRectsBin,
 }
 
+/// Single entry within a mega texture layer.
 pub struct MegaTextureEntry<ID> {
     pub pixel_offset: [u32; 2],
     pub image_data: ImageData,
@@ -119,6 +125,7 @@ impl<ID> MegaTextureEntry<ID>
 where
     ID: Clone,
 {
+    /// Converts to a GPU-friendly info struct.
     pub fn into_info(&self, index: MegaTextureIndex, atlas_size: u32) -> MegaTextureEntryInfo<ID> {
         let (width_u32, height_u32) = self.image_data.size();
 
@@ -151,6 +158,7 @@ where
 }
 
 // Does not include ImageData
+/// Runtime info for a mega texture entry.
 #[derive(Clone, Debug)]
 pub struct MegaTextureEntryInfo<ID> {
     pub pixel_offset: [u32; 2],
@@ -162,6 +170,7 @@ pub struct MegaTextureEntryInfo<ID> {
     pub grad_scale: [f32; 2],
 }
 
+/// Summary information for a mega texture.
 #[derive(Clone, Debug)]
 pub struct MegaTextureInfo<ID>
 where
@@ -179,6 +188,7 @@ impl<ID> MegaTexture<ID>
 where
     ID: std::hash::Hash + Eq + Clone + std::fmt::Debug,
 {
+    /// Creates a mega texture based on device limits and padding.
     pub fn new(limits: &web_sys::GpuSupportedLimits, padding: u32) -> Self {
         let (texture_size, max_depth) = max_dimensions(limits);
 
@@ -192,10 +202,12 @@ where
         }
     }
 
+    /// Looks up a stored entry index by custom ID.
     pub fn get_index(&self, custom_id: &ID) -> Option<MegaTextureIndex> {
         self.lookup.get(custom_id).cloned()
     }
 
+    /// Returns summary info for all atlas entries.
     pub fn info(&self, limits: &web_sys::GpuSupportedLimits) -> MegaTextureInfo<ID> {
         let entries: Vec<Vec<Vec<MegaTextureEntryInfo<ID>>>> = self
             .atlases
@@ -241,6 +253,7 @@ where
         }
     }
 
+    /// Returns a stored entry by custom ID.
     pub fn get_entry(&self, custom_id: &ID) -> Option<&MegaTextureEntry<ID>> {
         self.get_index(custom_id).and_then(
             |MegaTextureIndex {
@@ -256,12 +269,14 @@ where
         )
     }
 
+    /// Returns entry info by custom ID.
     pub fn get_entry_info(&self, custom_id: &ID) -> Option<MegaTextureEntryInfo<ID>> {
         let index = self.get_index(custom_id)?;
         self.get_entry(custom_id)
             .map(|entry| entry.into_info(index, self.texture_size))
     }
 
+    /// Returns the number of texture bindings needed for this mega texture.
     pub fn bindings_len(&self, limits: &web_sys::GpuSupportedLimits) -> Result<u32> {
         let max_atlases = limits.max_sampled_textures_per_shader_stage();
         let total_atlases = self.atlases.len() as u32;
@@ -276,6 +291,7 @@ where
         }
     }
 
+    /// Adds images to the mega texture and returns their entry info.
     pub fn add_entries(
         &mut self,
         mut images: Vec<(ImageData, ID, IsSrgbEncoded, TextureType)>,
@@ -320,16 +336,19 @@ where
         }
     }
 
+    /// Returns the number of atlases in use.
     pub fn atlases_len(&self) -> usize {
         self.atlases.len()
     }
 
+    /// Returns the number of layers in the given atlas.
     pub fn layer_len(&self, atlas_index: usize) -> usize {
         self.atlases
             .get(atlas_index)
             .map_or(0, |atlas| atlas.layers.len())
     }
 
+    /// Returns the mipmap level count for the atlas size.
     pub fn mipmap_levels(&self) -> u32 {
         calculate_mipmap_levels(self.texture_size, self.texture_size)
     }
@@ -341,6 +360,7 @@ impl<ID> MegaTextureAtlas<ID>
 where
     ID: std::hash::Hash + Eq + Clone + std::fmt::Debug,
 {
+    /// Creates an empty atlas.
     pub fn new(texture_size: u32, max_depth: u32, padding: u32) -> Self {
         Self {
             layers: Vec::new(),
@@ -351,6 +371,7 @@ where
     }
 
     // return is the rejected images that could not be placed in the atlas due to max depth
+    /// Adds images to this atlas and returns any rejected images.
     pub fn add_entries(
         &mut self,
         lookup: &mut HashMap<ID, MegaTextureIndex>,
@@ -490,6 +511,7 @@ where
 }
 
 impl<ID> MegaTextureLayer<ID> {
+    /// Creates a layer with the given size.
     pub fn new(width: u32, height: u32) -> Self {
         Self {
             entries: Vec::new(),

@@ -2,26 +2,35 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use awsm_renderer::{
-    camera::CameraMatrices, gltf::GltfKeyLookups, mesh::MeshKey, transforms::TransformKey,
+    camera::CameraMatrices,
+    gltf::GltfKeyLookups,
+    meshes::MeshKey,
+    transforms::{Transform, TransformKey},
     AwsmRenderer,
 };
-use glam::{Quat, Vec3, Vec4};
+use glam::{Mat4, Quat, Vec3, Vec4};
 
 #[derive(Clone, Debug)]
 pub struct TransformController {
     pub mesh_keys: TransformControllerMeshKeys,
     pub transform_keys: TransformControllerTransformKeys,
     pub gltf_lookups: Arc<std::sync::Mutex<GltfKeyLookups>>,
-    pub selected_object_transform_key: Option<TransformKey>,
+    pub selected_object: Option<TransformObject>,
     _gizmo_space: GizmoSpace,
     current_gizmo_kind: Option<GizmoKind>,
     drag_state: Option<DragState>,
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
+pub struct TransformObject {
+    pub key: TransformKey,
+    pub instance: Option<usize>,
+}
+
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 pub enum TransformTarget {
     GizmoHit(GizmoKind),
-    ObjectHit(TransformKey),
+    ObjectHit(TransformObject),
 }
 
 /// State tracked during a gizmo drag operation
@@ -111,7 +120,7 @@ impl TransformController {
             mesh_keys,
             transform_keys,
             gltf_lookups: lookups,
-            selected_object_transform_key: None,
+            selected_object: None,
             current_gizmo_kind: None,
             drag_state: None,
             _gizmo_space: gizmo_space,
@@ -196,10 +205,10 @@ impl TransformController {
                 self.current_gizmo_kind = Some(gizmo_kind);
 
                 // Initialize drag state for gizmo manipulation
-                if let Some(selected_key) = self.selected_object_transform_key {
-                    if let (Ok(selected_transform), Ok(world_matrix), Some(camera_matrices)) = (
-                        renderer.transforms.get_local(selected_key).cloned(),
-                        renderer.transforms.get_world(selected_key).cloned(),
+                if let Some(selected_object) = self.selected_object {
+                    if let (Some(selected_transform), Some(world_matrix), Some(camera_matrices)) = (
+                        get_local_transform(renderer, selected_object),
+                        get_world_matrix(renderer, selected_object),
                         renderer.camera.last_matrices.as_ref(),
                     ) {
                         // Extract world position and rotation from world matrix
@@ -208,8 +217,8 @@ impl TransformController {
                         let camera_pos = camera_matrices.position_world;
 
                         // Get parent's world rotation to convert deltas back to parent space
-                        let parent_inverse_rotation = if let Ok(parent_key) =
-                            renderer.transforms.get_parent(selected_key)
+                        let parent_inverse_rotation = if let Some(parent_key) =
+                            get_parent_key(renderer, selected_object)
                         {
                             if let Ok(parent_world) = renderer.transforms.get_world(parent_key) {
                                 let (_, parent_rot, _) =
@@ -361,10 +370,23 @@ impl TransformController {
                 self.current_gizmo_kind = None;
                 self.drag_state = None;
 
-                if let Ok(transform_key) = renderer.meshes.get(mesh_key).map(|m| m.transform_key) {
-                    self.selected_object_transform_key = Some(transform_key);
+                if let Ok(mesh) = renderer.meshes.get(mesh_key) {
+                    let instance = if mesh.instanced {
+                        // TODO - check aabb vs. ray intersection for each index?
+                        Some(0)
+                    } else {
+                        None
+                    };
+
+                    let obj = TransformObject {
+                        key: mesh.transform_key,
+                        instance,
+                    };
+
+                    self.selected_object = Some(obj);
                     self.update_gizmo_transform(renderer);
-                    Some(TransformTarget::ObjectHit(transform_key))
+
+                    Some(TransformTarget::ObjectHit(obj))
                 } else {
                     None
                 }
@@ -376,7 +398,7 @@ impl TransformController {
             return;
         };
 
-        let Some(selected_transform_key) = self.selected_object_transform_key else {
+        let Some(selected_object) = self.selected_object else {
             return;
         };
 
@@ -408,11 +430,7 @@ impl TransformController {
         };
 
         // Apply the transform based on gizmo kind
-        let Ok(mut selected_transform) = renderer
-            .transforms
-            .get_local(selected_transform_key)
-            .cloned()
-        else {
+        let Some(mut selected_transform) = get_local_transform(renderer, selected_object) else {
             return;
         };
 
@@ -488,16 +506,14 @@ impl TransformController {
             }
         }
 
-        let _ = renderer
-            .transforms
-            .set_local(selected_transform_key, selected_transform.clone());
+        let _ = set_local_transform(renderer, selected_object, selected_transform.clone());
 
         // Force update of world matrices so we can get the new world position
         renderer.update_transforms();
 
         // Also update the gizmo position to follow the object's world position
-        if let (Ok(world_matrix), Ok(mut gizmo_transform)) = (
-            renderer.transforms.get_world(selected_transform_key),
+        if let (Some(world_matrix), Ok(mut gizmo_transform)) = (
+            get_world_matrix(renderer, selected_object),
             renderer
                 .transforms
                 .get_local(self.transform_keys.root)
@@ -574,12 +590,12 @@ impl TransformController {
     /// Updates the gizmo's position and rotation to match the selected object.
     /// Call this when the selected object changes or when the gizmo space changes.
     fn update_gizmo_transform(&self, renderer: &mut AwsmRenderer) {
-        let Some(selected_key) = self.selected_object_transform_key else {
+        let Some(selected_object) = self.selected_object else {
             return;
         };
 
-        let (Ok(world_matrix), Ok(gizmo_transform)) = (
-            renderer.transforms.get_world(selected_key),
+        let (Some(world_matrix), Ok(gizmo_transform)) = (
+            get_world_matrix(renderer, selected_object),
             renderer.transforms.get_local(self.transform_keys.root),
         ) else {
             return;
@@ -713,6 +729,7 @@ fn ray_plane_intersection(
 
     // If denom is close to zero, ray is parallel to plane
     if denom.abs() < 1e-6 {
+        tracing::info!("Ray is parallel to plane");
         return None;
     }
 
@@ -720,8 +737,74 @@ fn ray_plane_intersection(
 
     // If t is negative, intersection is behind the camera
     if t < 0.0 {
+        tracing::info!("Intersection is behind the camera");
         return None;
     }
 
     Some(ray_origin + ray_direction * t)
+}
+
+fn get_local_transform(renderer: &AwsmRenderer, object: TransformObject) -> Option<Transform> {
+    let local = match renderer.transforms.get_local(object.key) {
+        Ok(local) => local.clone(),
+        Err(_) => {
+            return None;
+        }
+    };
+
+    match object.instance {
+        Some(index) => {
+            if let Some(t) = renderer.instances.get_transform(object.key, index) {
+                Some(t)
+                // Some(Transform::from_matrix(
+                //     local.to_matrix().mul_mat4(&t.to_matrix()),
+                // ))
+            } else {
+                Some(local)
+            }
+        }
+        None => Some(local),
+    }
+}
+
+fn get_world_matrix(renderer: &AwsmRenderer, object: TransformObject) -> Option<Mat4> {
+    let world = match renderer.transforms.get_world(object.key) {
+        Ok(world) => *world,
+        Err(_) => {
+            return None;
+        }
+    };
+    match object.instance {
+        Some(index) => {
+            if let Some(t) = renderer.instances.get_transform(object.key, index) {
+                Some(world.mul_mat4(&t.to_matrix()))
+            } else {
+                Some(world)
+            }
+        }
+        None => Some(world),
+    }
+}
+
+fn get_parent_key(renderer: &AwsmRenderer, object: TransformObject) -> Option<TransformKey> {
+    renderer.transforms.get_parent(object.key).ok()
+}
+
+fn set_local_transform(
+    renderer: &mut AwsmRenderer,
+    object: TransformObject,
+    transform: Transform,
+) -> Result<()> {
+    match object.instance {
+        None => {
+            renderer.transforms.set_local(object.key, transform)?;
+        }
+        Some(index) => {
+            renderer
+                .instances
+                .transform_update(object.key, index, &transform);
+        }
+    }
+
+    Ok(())
 }

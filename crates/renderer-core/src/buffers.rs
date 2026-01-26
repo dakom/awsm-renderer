@@ -1,7 +1,10 @@
+//! Buffer descriptors and utilities for WebGPU buffers.
+
 use wasm_bindgen_futures::JsFuture;
 
 use crate::error::AwsmCoreError;
 
+/// Builder for a GPU buffer descriptor.
 #[derive(Debug, Clone)]
 pub struct BufferDescriptor<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBuffer#descriptor
@@ -13,6 +16,7 @@ pub struct BufferDescriptor<'a> {
 }
 
 impl<'a> BufferDescriptor<'a> {
+    /// Creates a buffer descriptor.
     pub fn new(label: Option<&'a str>, size: usize, usage: BufferUsage) -> Self {
         Self {
             label,
@@ -22,12 +26,14 @@ impl<'a> BufferDescriptor<'a> {
         }
     }
 
+    /// Sets whether the buffer is mapped at creation.
     pub fn with_mapped_at_creation(mut self, mapped_at_creation: bool) -> Self {
         self.mapped_at_creation = Some(mapped_at_creation);
         self
     }
 }
 
+/// Descriptor for binding an existing buffer to a bind group.
 #[derive(Debug, Clone)]
 pub struct BufferBinding<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroup#gpubufferbinding_objects
@@ -38,6 +44,7 @@ pub struct BufferBinding<'a> {
 }
 
 impl<'a> BufferBinding<'a> {
+    /// Creates a buffer binding for a GPU buffer.
     pub fn new(buffer: &'a web_sys::GpuBuffer) -> Self {
         Self {
             buffer,
@@ -46,19 +53,22 @@ impl<'a> BufferBinding<'a> {
         }
     }
 
+    /// Sets the buffer binding offset in bytes.
     pub fn with_offset(mut self, offset: usize) -> Self {
         self.offset = Some(offset);
         self
     }
 
+    /// Sets the buffer binding size in bytes.
     pub fn with_size(mut self, size: usize) -> Self {
         self.size = Some(size);
         self
     }
 }
 
+/// Bitflags wrapper for WebGPU buffer usage.
+/// See `web_sys::gpu_buffer_usage` for the underlying flags.
 #[derive(Hash, Debug, Clone, Default, Copy, PartialEq, Eq)]
-// https://docs.rs/web-sys/latest/web_sys/gpu_buffer_usage/index.html
 pub struct BufferUsage(u32);
 
 impl From<u32> for BufferUsage {
@@ -73,55 +83,66 @@ impl From<BufferUsage> for u32 {
 }
 
 impl BufferUsage {
+    /// Creates an empty usage bitset.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Adds COPY_DST usage.
     pub fn with_copy_dst(mut self) -> Self {
         self.0 |= web_sys::gpu_buffer_usage::COPY_DST;
         self
     }
 
+    /// Adds COPY_SRC usage.
     pub fn with_copy_src(mut self) -> Self {
         self.0 |= web_sys::gpu_buffer_usage::COPY_SRC;
         self
     }
 
+    /// Adds INDEX usage.
     pub fn with_index(mut self) -> Self {
         self.0 |= web_sys::gpu_buffer_usage::INDEX;
         self
     }
 
+    /// Adds INDIRECT usage.
     pub fn with_indirect(mut self) -> Self {
         self.0 |= web_sys::gpu_buffer_usage::INDIRECT;
         self
     }
 
+    /// Adds MAP_READ usage.
     pub fn with_map_read(mut self) -> Self {
         self.0 |= web_sys::gpu_buffer_usage::MAP_READ;
         self
     }
 
+    /// Adds MAP_WRITE usage.
     pub fn with_map_write(mut self) -> Self {
         self.0 |= web_sys::gpu_buffer_usage::MAP_WRITE;
         self
     }
 
+    /// Adds QUERY_RESOLVE usage.
     pub fn with_query_resolve(mut self) -> Self {
         self.0 |= web_sys::gpu_buffer_usage::QUERY_RESOLVE;
         self
     }
 
+    /// Adds STORAGE usage.
     pub fn with_storage(mut self) -> Self {
         self.0 |= web_sys::gpu_buffer_usage::STORAGE;
         self
     }
 
+    /// Adds UNIFORM usage.
     pub fn with_uniform(mut self) -> Self {
         self.0 |= web_sys::gpu_buffer_usage::UNIFORM;
         self
     }
 
+    /// Adds VERTEX usage.
     pub fn with_vertex(mut self) -> Self {
         self.0 |= web_sys::gpu_buffer_usage::VERTEX;
         self
@@ -129,6 +150,7 @@ impl BufferUsage {
 }
 
 // https://docs.rs/web-sys/latest/src/web_sys/features/gen_gpu_map_mode.rs.html#5
+/// WebGPU buffer map mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum MapMode {
@@ -136,7 +158,7 @@ pub enum MapMode {
     Write = web_sys::gpu_map_mode::WRITE,
 }
 
-/// Extracts GPU buffer data into a new mapped buffer and returns it as a `Vec<u8>`
+/// Extracts GPU buffer data into a new mapped buffer and returns it as a `Vec<u8>`.
 pub async fn extract_buffer_vec(
     read_buffer: &web_sys::GpuBuffer,
     size: Option<u32>,
@@ -164,6 +186,7 @@ pub async fn extract_buffer_vec(
     Ok(vec)
 }
 
+/// Extracts GPU buffer data into a fixed-size array.
 pub async fn extract_buffer_array<const N: usize>(
     read_buffer: &web_sys::GpuBuffer,
     dest: &mut [u8; N],

@@ -1,3 +1,5 @@
+//! Renderer error types and results.
+
 use awsm_renderer_core::{error::AwsmCoreError, pipeline::primitive::CullMode};
 use thiserror::Error;
 
@@ -8,7 +10,7 @@ use crate::{
     instances::AwsmInstanceError,
     lights::AwsmLightError,
     materials::AwsmMaterialError,
-    mesh::{skins::AwsmSkinError, AwsmMeshError},
+    meshes::{error::AwsmMeshError, skins::AwsmSkinError},
     pipeline_layouts::AwsmPipelineLayoutError,
     pipelines::{
         compute_pipeline::AwsmComputePipelineError, render_pipeline::AwsmRenderPipelineError,
@@ -19,6 +21,7 @@ use crate::{
     transforms::AwsmTransformError,
 };
 
+/// Errors returned by the renderer crate.
 #[derive(Error, Debug)]
 pub enum AwsmError {
     #[error("{0}")]
@@ -80,4 +83,5 @@ pub enum AwsmError {
     Texture(#[from] AwsmTextureError),
 }
 
+/// Renderer result type.
 pub type Result<T> = std::result::Result<T, AwsmError>;

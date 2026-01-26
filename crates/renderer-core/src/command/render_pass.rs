@@ -1,3 +1,5 @@
+//! Render pass helpers.
+
 use std::ops::Deref;
 
 use crate::{error::AwsmCoreError, pipeline::primitive::IndexFormat};
@@ -6,16 +8,19 @@ use super::{color::Color, LoadOp, StoreOp};
 
 use crate::error::Result;
 
+/// Wrapper for a WebGPU render pass encoder.
 #[derive(Debug, Clone)]
 pub struct RenderPassEncoder {
     inner: web_sys::GpuRenderPassEncoder,
 }
 
 impl RenderPassEncoder {
+    /// Wraps a render pass encoder.
     pub fn new(inner: web_sys::GpuRenderPassEncoder) -> Self {
         Self { inner }
     }
 
+    /// Sets a vertex buffer binding.
     pub fn set_vertex_buffer(
         &self,
         slot: u32,
@@ -42,6 +47,7 @@ impl RenderPassEncoder {
         }
     }
 
+    /// Sets an index buffer binding.
     pub fn set_index_buffer(
         &self,
         buffer: &web_sys::GpuBuffer,
@@ -68,6 +74,7 @@ impl RenderPassEncoder {
         }
     }
 
+    /// Sets a bind group for the pass.
     pub fn set_bind_group(
         &self,
         index: u32,
@@ -100,9 +107,10 @@ impl Deref for RenderPassEncoder {
     }
 }
 
+/// Descriptor for starting a render pass.
 #[derive(Debug, Clone, Default)]
-pub struct RenderPassDescriptor<'a> {
-    pub color_attachments: Vec<ColorAttachment<'a>>,
+pub struct RenderPassDescriptor<'a, 'b> {
+    pub color_attachments: Vec<ColorAttachment<'a, 'b>>,
     pub depth_stencil_attachment: Option<DepthStencilAttachment<'a>>,
     pub label: Option<&'a str>,
     pub max_draw_count: Option<u64>,
@@ -110,11 +118,12 @@ pub struct RenderPassDescriptor<'a> {
     pub timestamp_writes: Option<RenderTimestampWrites<'a>>,
 }
 
+/// Color attachment configuration for a render pass.
 #[derive(Debug, Clone)]
-pub struct ColorAttachment<'a> {
+pub struct ColorAttachment<'a, 'b> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginRenderPass#color_attachment_object_structure
     // https://docs.rs/web-sys/latest/web_sys/struct.GpuRenderPassColorAttachment.html
-    pub clear_color: Option<Color>,
+    pub clear_color: Option<&'b Color>,
     pub depth_slice: Option<u32>,
     pub resolve_target: Option<&'a web_sys::GpuTextureView>,
     pub load_op: LoadOp,
@@ -122,7 +131,8 @@ pub struct ColorAttachment<'a> {
     pub view: &'a web_sys::GpuTextureView,
 }
 
-impl<'a> ColorAttachment<'a> {
+impl<'a, 'b> ColorAttachment<'a, 'b> {
+    /// Creates a color attachment.
     pub fn new(view: &'a web_sys::GpuTextureView, load_op: LoadOp, store_op: StoreOp) -> Self {
         Self {
             view,
@@ -134,20 +144,24 @@ impl<'a> ColorAttachment<'a> {
         }
     }
 
-    pub fn with_clear_color(mut self, clear_color: Color) -> Self {
+    /// Sets a clear color for the attachment.
+    pub fn with_clear_color(mut self, clear_color: &'b Color) -> Self {
         self.clear_color = Some(clear_color);
         self
     }
+    /// Sets the depth slice for array textures.
     pub fn with_depth_slice(mut self, depth_slice: u32) -> Self {
         self.depth_slice = Some(depth_slice);
         self
     }
+    /// Sets the resolve target view.
     pub fn with_resolve_target(mut self, resolve_target: &'a web_sys::GpuTextureView) -> Self {
         self.resolve_target = Some(resolve_target);
         self
     }
 }
 
+/// Depth/stencil attachment configuration for a render pass.
 #[derive(Debug, Clone)]
 pub struct DepthStencilAttachment<'a> {
     // https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginRenderPass#depthstencil_attachment_object_structure
@@ -164,6 +178,7 @@ pub struct DepthStencilAttachment<'a> {
 }
 
 impl<'a> DepthStencilAttachment<'a> {
+    /// Creates a depth/stencil attachment.
     pub fn new(view: &'a web_sys::GpuTextureView) -> Self {
         Self {
             view,
@@ -178,41 +193,50 @@ impl<'a> DepthStencilAttachment<'a> {
         }
     }
 
+    /// Sets the depth clear value.
     pub fn with_depth_clear_value(mut self, clear_value: f32) -> Self {
         self.depth_clear_value = Some(clear_value);
         self
     }
 
+    /// Sets the depth load operation.
     pub fn with_depth_load_op(mut self, load_op: LoadOp) -> Self {
         self.depth_load_op = Some(load_op);
         self
     }
+    /// Sets the depth read-only flag.
     pub fn with_depth_read_only(mut self, read_only: bool) -> Self {
         self.depth_read_only = Some(read_only);
         self
     }
+    /// Sets the depth store operation.
     pub fn with_depth_store_op(mut self, store_op: StoreOp) -> Self {
         self.depth_store_op = Some(store_op);
         self
     }
+    /// Sets the stencil clear value.
     pub fn with_stencil_clear_value(mut self, clear_value: u32) -> Self {
         self.stencil_clear_value = Some(clear_value);
         self
     }
+    /// Sets the stencil load operation.
     pub fn with_stencil_load_op(mut self, load_op: LoadOp) -> Self {
         self.stencil_load_op = Some(load_op);
         self
     }
+    /// Sets the stencil read-only flag.
     pub fn with_stencil_read_only(mut self, read_only: bool) -> Self {
         self.stencil_read_only = Some(read_only);
         self
     }
+    /// Sets the stencil store operation.
     pub fn with_stencil_store_op(mut self, store_op: StoreOp) -> Self {
         self.stencil_store_op = Some(store_op);
         self
     }
 }
 
+/// Timestamp write configuration for a render pass.
 #[derive(Debug, Clone)]
 pub struct RenderTimestampWrites<'a> {
     pub query_set: &'a web_sys::GpuQuerySet,
@@ -222,7 +246,7 @@ pub struct RenderTimestampWrites<'a> {
 
 // js conversions
 
-impl From<RenderPassDescriptor<'_>> for web_sys::GpuRenderPassDescriptor {
+impl<'a, 'b> From<RenderPassDescriptor<'a, 'b>> for web_sys::GpuRenderPassDescriptor {
     fn from(pass: RenderPassDescriptor) -> web_sys::GpuRenderPassDescriptor {
         let color_attachments = js_sys::Array::new();
         for attachment in pass.color_attachments {
@@ -259,7 +283,7 @@ impl From<RenderPassDescriptor<'_>> for web_sys::GpuRenderPassDescriptor {
     }
 }
 
-impl From<ColorAttachment<'_>> for web_sys::GpuRenderPassColorAttachment {
+impl<'a, 'b> From<ColorAttachment<'a, 'b>> for web_sys::GpuRenderPassColorAttachment {
     fn from(attachment: ColorAttachment) -> web_sys::GpuRenderPassColorAttachment {
         let attachment_js = web_sys::GpuRenderPassColorAttachment::new(
             attachment.load_op,

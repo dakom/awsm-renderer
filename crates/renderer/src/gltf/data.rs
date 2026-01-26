@@ -1,7 +1,10 @@
+//! glTF loader data containers.
+
 use awsm_renderer_core::image::ImageData;
 
 use super::{buffers::GltfBuffers, error::Result, loader::GltfLoader};
 
+/// Loaded glTF document data with buffers and images.
 pub struct GltfData {
     pub doc: gltf::Document,
     pub buffers: GltfBuffers,
@@ -10,6 +13,7 @@ pub struct GltfData {
 }
 
 impl GltfData {
+    /// Clones the document and backing buffers for independent use.
     pub fn heavy_clone(&self) -> Self {
         Self {
             doc: self.doc.clone(),
@@ -20,6 +24,7 @@ impl GltfData {
     }
 }
 
+/// Optional hints used during glTF population.
 #[derive(Default, Clone)]
 pub struct GltfDataHints {
     pub hud: bool,
@@ -27,11 +32,13 @@ pub struct GltfDataHints {
 }
 
 impl GltfDataHints {
+    /// Sets whether this data is for a HUD overlay.
     pub fn with_hud(mut self, hud: bool) -> Self {
         self.hud = hud;
         self
     }
 
+    /// Sets whether this data is initially hidden.
     pub fn with_hidden(mut self, hidden: bool) -> Self {
         self.hidden = hidden;
         self
@@ -39,6 +46,7 @@ impl GltfDataHints {
 }
 
 impl GltfLoader {
+    /// Consumes the loader and returns a `GltfData` bundle.
     pub fn into_data(self, hints: Option<GltfDataHints>) -> Result<GltfData> {
         let hints = hints.unwrap_or_default();
         let buffers = GltfBuffers::new(&self.doc, self.buffers, hints.clone())?;
