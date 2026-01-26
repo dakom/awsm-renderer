@@ -8,7 +8,7 @@ use crate::{
     },
     bind_groups::BindGroupRecreateContext,
     error::Result,
-    mesh::MeshKey,
+    meshes::MeshKey,
     picker::state::{PickerState, OUTPUT_BYTE_SIZE},
     pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts},
     pipelines::{

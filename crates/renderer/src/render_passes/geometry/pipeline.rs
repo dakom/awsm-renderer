@@ -17,7 +17,7 @@ use awsm_renderer_core::texture::TextureFormat;
 
 use crate::anti_alias::AntiAliasing;
 use crate::error::{AwsmError, Result};
-use crate::mesh::MeshBufferVertexInfo;
+use crate::meshes::buffer_info::MeshBufferVertexInfo;
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
 use crate::pipelines::Pipelines;

@@ -8,7 +8,7 @@ use std::{
 use awsm_renderer_core::texture::texture_pool::TextureColorInfo;
 use glam::Mat4;
 
-use crate::{mesh::MeshKey, textures::TextureKey, transforms::TransformKey, AwsmRenderer};
+use crate::{meshes::MeshKey, textures::TextureKey, transforms::TransformKey, AwsmRenderer};
 
 use super::{data::GltfData, error::AwsmGltfError};
 

@@ -10,7 +10,7 @@ use crate::{
     bind_groups::AwsmBindGroupError,
     error::AwsmError,
     materials::AwsmMaterialError,
-    mesh::{skins::AwsmSkinError, AwsmMeshError, MeshBufferInfoKey},
+    meshes::{buffer_info::MeshBufferInfoKey, error::AwsmMeshError, skins::AwsmSkinError},
     pipeline_layouts::AwsmPipelineLayoutError,
     pipelines::render_pipeline::AwsmRenderPipelineError,
     shaders::AwsmShaderError,

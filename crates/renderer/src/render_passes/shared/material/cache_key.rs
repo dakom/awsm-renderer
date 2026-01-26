@@ -1,6 +1,6 @@
 //! Shared material shader cache key helpers.
 
-use crate::mesh::{
+use crate::meshes::buffer_info::{
     MeshBufferCustomVertexAttributeInfo, MeshBufferInfo, MeshBufferVertexAttributeInfo,
     MeshBufferVisibilityVertexAttributeInfo,
 };

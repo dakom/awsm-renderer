@@ -20,7 +20,7 @@ use crate::{
         unlit::UnlitMaterial,
         Material, MaterialAlphaMode, MaterialTexture,
     },
-    mesh::{MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo},
+    meshes::buffer_info::{MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo},
     textures::{SamplerCacheKey, SamplerKey, TextureKey, TextureTransform, TextureTransformKey},
     AwsmRenderer,
 };

@@ -11,7 +11,8 @@ use crate::{
     buffer::helpers::write_buffer_with_dirty_ranges,
     debug::AwsmRendererLogging,
     materials::Materials,
-    mesh::{
+    meshes::{
+        buffer_info::MeshBufferInfo,
         error::{AwsmMeshError, Result},
         meta::{
             geometry_meta::{
@@ -24,10 +25,10 @@ use crate::{
             },
         },
         morphs::Morphs,
-        skins::Skins,
         morphs::{GeometryMorphKey, MaterialMorphKey},
         skins::SkinKey,
-        Mesh, MeshBufferInfo, MeshKey,
+        skins::Skins,
+        Mesh, MeshKey,
     },
     transforms::Transforms,
 };

@@ -7,7 +7,7 @@ use crate::{
     bounds::Aabb,
     error::AwsmError,
     frustum::Frustum,
-    mesh::{Mesh, MeshKey},
+    meshes::{mesh::Mesh, MeshKey},
     pipelines::{compute_pipeline::ComputePipelineKey, render_pipeline::RenderPipelineKey},
     render::RenderContext,
     render_passes::geometry::bind_group::GeometryBindGroups,

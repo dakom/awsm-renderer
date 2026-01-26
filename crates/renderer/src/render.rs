@@ -10,7 +10,7 @@ use crate::bind_groups::{BindGroupCreate, BindGroupRecreateContext, BindGroups};
 use crate::error::{AwsmError, Result};
 use crate::instances::Instances;
 use crate::materials::Materials;
-use crate::mesh::Meshes;
+use crate::meshes::Meshes;
 use crate::pipelines::Pipelines;
 use crate::post_process::PostProcessing;
 use crate::render_passes::RenderPasses;

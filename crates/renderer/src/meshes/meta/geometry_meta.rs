@@ -8,7 +8,7 @@ use slotmap::Key;
 use crate::{
     buffer::dynamic_uniform::DynamicUniformBuffer,
     materials::{MaterialKey, Materials},
-    mesh::{
+    meshes::{
         morphs::{GeometryMorphKey, Morphs},
         skins::{SkinKey, Skins},
         AwsmMeshError, MeshKey,

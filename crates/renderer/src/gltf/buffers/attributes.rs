@@ -8,7 +8,7 @@ use crate::{
         buffers::accessor::accessor_to_bytes,
         error::{AwsmGltfError, Result},
     },
-    mesh::{MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo},
+    meshes::buffer_info::{MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo},
 };
 
 // Helper function to load attribute data (similar to your existing code)
@@ -163,7 +163,7 @@ pub(super) fn convert_attribute_kind(
     semantic: &gltf::Semantic,
     accessor: &gltf::Accessor<'_>,
 ) -> Option<MeshBufferVertexAttributeInfo> {
-    use crate::mesh::{
+    use crate::meshes::buffer_info::{
         MeshBufferCustomVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo,
     };
 

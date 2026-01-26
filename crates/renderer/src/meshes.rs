@@ -1,5 +1,12 @@
 //! Mesh storage and GPU buffer management.
 
+pub mod buffer_info;
+pub mod error;
+pub mod mesh;
+pub mod meta;
+pub mod morphs;
+pub mod skins;
+
 use std::collections::HashMap;
 
 use awsm_renderer_core::buffers::{BufferDescriptor, BufferUsage};
@@ -7,21 +14,215 @@ use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use glam::Mat4;
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
-use crate::bounds::Aabb;
 use crate::bind_groups::{BindGroupCreate, BindGroups};
+use crate::bounds::Aabb;
 use crate::buffer::dynamic_storage::DynamicStorageBuffer;
 use crate::buffer::helpers::write_buffer_with_dirty_ranges;
 use crate::instances::Instances;
 use crate::materials::Materials;
-use crate::mesh::meta::{MeshMeta, MESH_META_INITIAL_CAPACITY};
-use crate::mesh::skins::{SkinKey, Skins};
-use crate::mesh::{MeshBufferInfoKey, MeshBufferInfos};
+use crate::meshes::buffer_info::MeshBufferVertexInfo;
 use crate::transforms::{Transform, TransformKey, Transforms};
-use crate::AwsmRendererLogging;
+use crate::{AwsmRenderer, AwsmRendererLogging};
+use buffer_info::{MeshBufferInfoKey, MeshBufferInfos};
+use meta::{MeshMeta, MESH_META_INITIAL_CAPACITY};
+use skins::{SkinKey, Skins};
 
-use super::error::{AwsmMeshError, Result};
-use super::morphs::{GeometryMorphKey, MaterialMorphKey, Morphs};
-use super::{Mesh, MeshBufferVertexInfo};
+use error::{AwsmMeshError, Result};
+use mesh::Mesh;
+use morphs::{GeometryMorphKey, MaterialMorphKey, Morphs};
+
+impl AwsmRenderer {
+    /// Clones a mesh and its current transform under the same parent.
+    pub fn clone_mesh(&mut self, mesh_key: MeshKey) -> crate::error::Result<MeshKey> {
+        let transform_key = self.meshes.get(mesh_key)?.transform_key;
+        let local_transform = self.transforms.get_local(transform_key)?.clone();
+        let parent_transform = self.transforms.get_parent(transform_key).ok();
+        let new_transform_key = self.transforms.insert(local_transform, parent_transform);
+
+        let new_mesh_key = self.meshes.duplicate_with_transform(
+            mesh_key,
+            new_transform_key,
+            &self.materials,
+            &self.transforms,
+        )?;
+
+        self.render_passes
+            .material_transparent
+            .pipelines
+            .clone_render_pipeline_key(mesh_key, new_mesh_key);
+
+        Ok(new_mesh_key)
+    }
+
+    /// Duplicates all meshes that share a transform, returning the new transform and mesh keys.
+    pub fn duplicate_meshes_by_transform_key(
+        &mut self,
+        transform_key: TransformKey,
+    ) -> crate::error::Result<(TransformKey, Vec<MeshKey>)> {
+        Ok(self.meshes.duplicate_by_transform_key(
+            transform_key,
+            &self.materials,
+            &mut self.transforms,
+        )?)
+    }
+
+    /// Splits a mesh out to a new transform key.
+    pub fn split_mesh(&mut self, mesh_key: MeshKey) -> crate::error::Result<TransformKey> {
+        Ok(self
+            .meshes
+            .split_mesh(mesh_key, &mut self.transforms, &self.materials)?)
+    }
+
+    /// Splits all meshes under a transform into new transform keys.
+    pub fn split_meshes_by_transform_key(
+        &mut self,
+        transform_key: TransformKey,
+    ) -> crate::error::Result<Vec<(MeshKey, TransformKey)>> {
+        Ok(self.meshes.split_meshes_by_transform_key(
+            transform_key,
+            &mut self.transforms,
+            &self.materials,
+        )?)
+    }
+
+    /// Joins meshes under a shared transform, optionally overriding the transform.
+    pub fn join_meshes(
+        &mut self,
+        mesh_keys: &[MeshKey],
+        transform_override: Option<Transform>,
+    ) -> crate::error::Result<(TransformKey, Vec<MeshKey>)> {
+        Ok(self.meshes.join_meshes(
+            mesh_keys,
+            &mut self.transforms,
+            &self.materials,
+            transform_override,
+        )?)
+    }
+
+    /// Enables GPU instancing for a mesh with explicit instance transforms.
+    pub async fn enable_mesh_instancing(
+        &mut self,
+        mesh_key: MeshKey,
+        transforms: &[Transform],
+    ) -> crate::error::Result<()> {
+        let buffer_info_key = self.meshes.buffer_info_key(mesh_key)?;
+        let transform_key = self.meshes.get(mesh_key)?.transform_key;
+        if transforms.is_empty() {
+            return Err(AwsmMeshError::InstancingMissingTransforms(mesh_key).into());
+        }
+        {
+            let mesh = self.meshes.get_mut(mesh_key)?;
+            if mesh.instanced {
+                return Err(AwsmMeshError::InstancingAlreadyEnabled(mesh_key).into());
+            }
+            mesh.instanced = true;
+        }
+
+        self.instances.transform_insert(transform_key, transforms);
+
+        let mesh = self.meshes.get(mesh_key)?;
+        self.render_passes
+            .material_transparent
+            .pipelines
+            .set_render_pipeline_key(
+                &self.gpu,
+                mesh,
+                mesh_key,
+                buffer_info_key,
+                &mut self.shaders,
+                &mut self.pipelines,
+                &self.render_passes.material_transparent.bind_groups,
+                &self.pipeline_layouts,
+                &self.meshes.buffer_infos,
+                &self.anti_aliasing,
+                &self.textures,
+                &self.render_textures.formats,
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    /// Replaces all instance transforms for an instanced mesh.
+    pub fn set_mesh_instances(
+        &mut self,
+        mesh_key: MeshKey,
+        transforms: &[Transform],
+    ) -> crate::error::Result<()> {
+        if transforms.is_empty() {
+            return Err(AwsmMeshError::InstancingMissingTransforms(mesh_key).into());
+        }
+        let mesh = self.meshes.get(mesh_key)?;
+        if !mesh.instanced {
+            return Err(AwsmMeshError::InstancingNotEnabled(mesh_key).into());
+        }
+
+        self.instances
+            .transform_insert(mesh.transform_key, transforms);
+
+        Ok(())
+    }
+
+    /// Appends a single instance transform to an instanced mesh.
+    pub fn append_mesh_instance(
+        &mut self,
+        mesh_key: MeshKey,
+        transform: Transform,
+    ) -> crate::error::Result<usize> {
+        let start_index = self.append_mesh_instances(mesh_key, &[transform])?;
+        Ok(start_index)
+    }
+
+    /// Appends instance transforms to an instanced mesh.
+    pub fn append_mesh_instances(
+        &mut self,
+        mesh_key: MeshKey,
+        transforms: &[Transform],
+    ) -> crate::error::Result<usize> {
+        if transforms.is_empty() {
+            return Err(AwsmMeshError::InstancingMissingTransforms(mesh_key).into());
+        }
+
+        let mesh = self.meshes.get(mesh_key)?;
+        if !mesh.instanced {
+            return Err(AwsmMeshError::InstancingNotEnabled(mesh_key).into());
+        }
+        if self
+            .instances
+            .transform_instance_count(mesh.transform_key)
+            .is_none()
+        {
+            return Err(AwsmMeshError::InstancingMissingTransforms(mesh_key).into());
+        }
+
+        Ok(self
+            .instances
+            .transform_extend(mesh.transform_key, transforms)?)
+    }
+
+    /// Reserves additional instance slots for an instanced mesh.
+    pub fn reserve_mesh_instances(
+        &mut self,
+        mesh_key: MeshKey,
+        additional: usize,
+    ) -> crate::error::Result<usize> {
+        let mesh = self.meshes.get(mesh_key)?;
+        if !mesh.instanced {
+            return Err(AwsmMeshError::InstancingNotEnabled(mesh_key).into());
+        }
+        if self
+            .instances
+            .transform_instance_count(mesh.transform_key)
+            .is_none()
+        {
+            return Err(AwsmMeshError::InstancingMissingTransforms(mesh_key).into());
+        }
+
+        Ok(self
+            .instances
+            .transform_reserve(mesh.transform_key, additional)?)
+    }
+}
 
 /// Shared mesh resource data and buffer offsets.
 #[derive(Debug, Clone)]
@@ -473,7 +674,13 @@ impl Meshes {
 
         let new_transform_key = transforms.duplicate(old_transform_key)?;
 
-        self.update_mesh_transform(mesh_key, old_transform_key, new_transform_key, materials, transforms)?;
+        self.update_mesh_transform(
+            mesh_key,
+            old_transform_key,
+            new_transform_key,
+            materials,
+            transforms,
+        )?;
 
         Ok(new_transform_key)
     }
@@ -544,7 +751,12 @@ impl Meshes {
                         .world_aabb
                         .as_ref()
                         .map(|aabb| aabb.center())
-                        .or_else(|| transforms.get_world(mesh.transform_key).ok().map(|m| m.w_axis.truncate()))
+                        .or_else(|| {
+                            transforms
+                                .get_world(mesh.transform_key)
+                                .ok()
+                                .map(|m| m.w_axis.truncate())
+                        })
                         .unwrap_or(glam::Vec3::ZERO);
                     center_sum += center;
                 }
@@ -566,7 +778,13 @@ impl Meshes {
         let moved = mesh_keys.to_vec();
         for mesh_key in &moved {
             let old_transform_key = self.get(*mesh_key)?.transform_key;
-            self.update_mesh_transform(*mesh_key, old_transform_key, new_transform_key, materials, transforms)?;
+            self.update_mesh_transform(
+                *mesh_key,
+                old_transform_key,
+                new_transform_key,
+                materials,
+                transforms,
+            )?;
         }
 
         Ok((new_transform_key, moved))
@@ -755,7 +973,7 @@ impl Meshes {
     }
 
     /// Returns the buffer info for a mesh.
-    pub fn buffer_info(&self, mesh_key: MeshKey) -> Result<&crate::mesh::MeshBufferInfo> {
+    pub fn buffer_info(&self, mesh_key: MeshKey) -> Result<&buffer_info::MeshBufferInfo> {
         let buffer_info_key = self.buffer_info_key(mesh_key)?;
         self.buffer_infos.get(buffer_info_key)
     }
@@ -1026,7 +1244,12 @@ impl Meshes {
                         gpu.write_buffer(gpu_buffer, None, buffer.raw_slice(), None, None)?;
                     } else {
                         let ranges = buffer.take_dirty_ranges();
-                        write_buffer_with_dirty_ranges(gpu, gpu_buffer, buffer.raw_slice(), ranges)?;
+                        write_buffer_with_dirty_ranges(
+                            gpu,
+                            gpu_buffer,
+                            buffer.raw_slice(),
+                            ranges,
+                        )?;
                     }
                 }
             }

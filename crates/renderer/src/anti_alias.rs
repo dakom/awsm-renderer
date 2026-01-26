@@ -57,9 +57,7 @@ impl AwsmRenderer {
         let mut has_seen_material = SecondaryMap::new();
         for (key, mesh) in self.meshes.iter() {
             let buffer_info_key = self.meshes.buffer_info_key(key)?;
-            if has_seen_buffer_info
-                .insert(buffer_info_key, ())
-                .is_none()
+            if has_seen_buffer_info.insert(buffer_info_key, ()).is_none()
                 || has_seen_material.insert(mesh.material_key, ()).is_none()
             {
                 self.render_passes

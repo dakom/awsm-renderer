@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use awsm_renderer::{
     camera::CameraMatrices,
     gltf::GltfKeyLookups,
-    mesh::MeshKey,
+    meshes::MeshKey,
     transforms::{Transform, TransformKey},
     AwsmRenderer,
 };

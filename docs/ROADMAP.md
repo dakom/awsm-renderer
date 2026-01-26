@@ -1,6 +1,7 @@
 # Next up
-- Instancing transform support for transforms
-  - disambiguate regular transform vs. instancing
+- Move newly added methods in lib.rs to appropriate module
+- Cloning mesh while keeping 1:many transform:mesh semantics
+- Method to split mesh into individual transforms
 - Make transparent meshes pickable
   - Maybe global "editor_mode" on renderer that toggles some less-efficient behavior
     - All meshes get both transparent and opaque geometry 

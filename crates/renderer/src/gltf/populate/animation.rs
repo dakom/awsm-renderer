@@ -10,7 +10,7 @@ use crate::{
         buffers::accessor::accessor_to_bytes,
         error::{AwsmGltfError, Result},
     },
-    mesh::morphs::{GeometryMorphKey, MaterialMorphKey},
+    meshes::morphs::{GeometryMorphKey, MaterialMorphKey},
     transforms::TransformKey,
     AwsmRenderer,
 };

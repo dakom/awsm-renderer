@@ -24,7 +24,7 @@ use crate::{
         },
         data::GltfDataHints,
     },
-    mesh::{
+    meshes::buffer_info::{
         MeshBufferAttributeIndexInfo, MeshBufferGeometryMorphInfo, MeshBufferInfo,
         MeshBufferMaterialMorphAttributes, MeshBufferMaterialMorphInfo, MeshBufferSkinInfo,
         MeshBufferTriangleDataInfo, MeshBufferTriangleInfo, MeshBufferVertexAttributeInfo,

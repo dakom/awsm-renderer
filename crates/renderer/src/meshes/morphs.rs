@@ -11,7 +11,7 @@ use crate::bind_groups::BindGroupCreate;
 use crate::bind_groups::BindGroups;
 use crate::buffer::dynamic_storage::DynamicStorageBuffer;
 use crate::buffer::helpers::write_buffer_with_dirty_ranges;
-use crate::mesh::{MeshBufferGeometryMorphInfo, MeshBufferMaterialMorphInfo};
+use crate::meshes::buffer_info::{MeshBufferGeometryMorphInfo, MeshBufferMaterialMorphInfo};
 use crate::AwsmRendererLogging;
 
 // The weights are dynamic and updated on a per-mesh basis as frequently as needed

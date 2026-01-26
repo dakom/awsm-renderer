@@ -1,28 +1,19 @@
 //! Mesh data and rendering helpers.
 
-mod buffer_info;
-mod error;
-mod meshes;
-pub mod meta;
-pub mod morphs;
-pub mod skins;
-
 use awsm_renderer_core::{
     command::render_pass::RenderPassEncoder, pipeline::primitive::IndexFormat,
 };
 
 use crate::materials::MaterialKey;
+use crate::meshes::error::AwsmMeshError;
+use crate::meshes::MeshKey;
 use crate::render::RenderContext;
 use crate::render_passes::geometry::bind_group::GeometryBindGroups;
 use crate::render_passes::geometry::pipeline::GeometryRenderPipelineKeyOpts;
 use crate::transforms::TransformKey;
 use crate::{bounds::Aabb, pipelines::render_pipeline::RenderPipelineKey};
 
-pub use buffer_info::*;
-pub use error::AwsmMeshError;
-pub use meshes::{MeshKey, MeshResourceKey, Meshes};
-
-use super::error::Result;
+use crate::error::Result;
 
 // this is most like a "primitive" in gltf, not the containing "mesh"
 // because for non-gltf naming, "mesh" makes more sense

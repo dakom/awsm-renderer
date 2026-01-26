@@ -18,9 +18,9 @@ use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::{
     bind_groups::{BindGroupCreate, BindGroups},
-    buffer::helpers::write_buffer_with_dirty_ranges,
     buffer::dynamic_uniform::DynamicUniformBuffer,
-    mesh::skins::AwsmSkinError,
+    buffer::helpers::write_buffer_with_dirty_ranges,
+    meshes::skins::AwsmSkinError,
     AwsmRenderer, AwsmRendererLogging,
 };
 

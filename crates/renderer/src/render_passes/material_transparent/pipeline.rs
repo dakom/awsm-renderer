@@ -18,10 +18,12 @@ use slotmap::SecondaryMap;
 
 use crate::anti_alias::AntiAliasing;
 use crate::error::Result;
-use crate::mesh::{
-    Mesh, MeshBufferInfo, MeshBufferInfoKey, MeshBufferInfos, MeshBufferVertexAttributeInfo,
-    MeshBufferVertexInfo, MeshKey,
+use crate::meshes::buffer_info::{
+    MeshBufferInfo, MeshBufferInfoKey, MeshBufferInfos, MeshBufferVertexAttributeInfo,
+    MeshBufferVertexInfo,
 };
+use crate::meshes::mesh::Mesh;
+use crate::meshes::MeshKey;
 use crate::pipeline_layouts::{PipelineLayoutCacheKey, PipelineLayoutKey, PipelineLayouts};
 use crate::pipelines::render_pipeline::{RenderPipelineCacheKey, RenderPipelineKey};
 use crate::pipelines::Pipelines;

@@ -3,7 +3,7 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
-use crate::{mesh::AwsmMeshError, transforms::AwsmTransformError};
+use crate::{meshes::error::AwsmMeshError, transforms::AwsmTransformError};
 
 use super::AnimationKey;
 

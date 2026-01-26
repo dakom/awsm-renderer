@@ -81,7 +81,11 @@ impl Instances {
     }
 
     /// Appends instance transforms and returns the start index.
-    pub fn transform_extend(&mut self, key: TransformKey, transforms: &[Transform]) -> Result<usize> {
+    pub fn transform_extend(
+        &mut self,
+        key: TransformKey,
+        transforms: &[Transform],
+    ) -> Result<usize> {
         if transforms.is_empty() {
             return Ok(self.transform_instance_count(key).unwrap_or(0));
         }
@@ -179,10 +183,7 @@ impl Instances {
             let offset = index * Transforms::BYTE_SIZE;
             let slice = bytes.get(offset..offset + Transforms::BYTE_SIZE)?;
             let values_f32 = unsafe {
-                std::slice::from_raw_parts(
-                    slice.as_ptr() as *const f32,
-                    Transforms::BYTE_SIZE / 4,
-                )
+                std::slice::from_raw_parts(slice.as_ptr() as *const f32, Transforms::BYTE_SIZE / 4)
             };
             let mat = Mat4::from_cols_slice(values_f32);
             transforms.push(Transform::from_matrix(mat));

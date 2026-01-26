@@ -52,7 +52,7 @@ askama = {workspace = true}
 strum = {workspace = true}
 ordered-float = {workspace = true}
 indexmap = { workspace = true}
-mikktspace = { workspace = true}
+bevy_mikktspace = { workspace = true}
 serde = { workspace = true, optional = true}
 
 # Optional deps

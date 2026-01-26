@@ -7,9 +7,11 @@ use slotmap::Key;
 
 use crate::{
     materials::{MaterialKey, Materials},
-    mesh::{
+    meshes::{
+        buffer_info::MeshBufferInfo,
+        buffer_info::{MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo},
         morphs::{MaterialMorphKey, Morphs},
-        AwsmMeshError, Mesh, MeshBufferInfo, MeshKey,
+        AwsmMeshError, Mesh, MeshKey,
     },
 };
 
@@ -49,10 +51,6 @@ pub struct MaterialMeshMeta<'a> {
 /// Calculate the offset (in floats) to TEXCOORD_0 within the vertex attribute data.
 /// This accounts for any COLOR_n attributes that come before texture coordinates.
 fn calculate_uv_sets_index(buffer_info: &MeshBufferInfo) -> u32 {
-    use crate::mesh::buffer_info::{
-        MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo,
-    };
-
     let mut offset_floats = 0;
     for attr in &buffer_info.triangles.vertex_attributes {
         if let MeshBufferVertexAttributeInfo::Custom(custom) = attr {
@@ -74,10 +72,6 @@ fn calculate_uv_sets_index(buffer_info: &MeshBufferInfo) -> u32 {
 /// Calculate how many UV sets and color sets this mesh has.
 /// Returns (uv_set_count, color_set_count).
 fn calculate_attribute_counts(buffer_info: &MeshBufferInfo) -> (u32, u32) {
-    use crate::mesh::buffer_info::{
-        MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo,
-    };
-
     let mut uv_set_count = 0u32;
     let mut color_set_count = 0u32;
 

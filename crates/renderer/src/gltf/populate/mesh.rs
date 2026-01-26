@@ -7,7 +7,11 @@ use crate::{
         populate::material::pbr_material_mapper,
     },
     materials::Material,
-    mesh::{Mesh, MeshBufferInfo, MeshBufferVertexInfo, MeshKey},
+    meshes::{
+        buffer_info::{MeshBufferInfo, MeshBufferVertexInfo},
+        mesh::Mesh,
+        MeshKey,
+    },
     transforms::{Transform, TransformKey},
     AwsmRenderer,
 };

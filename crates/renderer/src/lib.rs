@@ -17,7 +17,7 @@ pub mod frustum;
 pub mod instances;
 pub mod lights;
 pub mod materials;
-pub mod mesh;
+pub mod meshes;
 pub mod picker;
 pub mod pipeline_layouts;
 pub mod pipelines;
@@ -54,7 +54,7 @@ use camera::CameraBuffer;
 use instances::Instances;
 use lights::Lights;
 use materials::Materials;
-use mesh::Meshes;
+use meshes::Meshes;
 use pipelines::Pipelines;
 use shaders::Shaders;
 use textures::Textures;
@@ -125,200 +125,6 @@ impl AwsmRenderer {
 
         *self = renderer;
         Ok(())
-    }
-
-    /// Clones a mesh and its current transform under the same parent.
-    pub fn clone_mesh(&mut self, mesh_key: mesh::MeshKey) -> crate::error::Result<mesh::MeshKey> {
-        let transform_key = self.meshes.get(mesh_key)?.transform_key;
-        let local_transform = self.transforms.get_local(transform_key)?.clone();
-        let parent_transform = self.transforms.get_parent(transform_key).ok();
-        let new_transform_key = self.transforms.insert(local_transform, parent_transform);
-
-        let new_mesh_key = self.meshes.duplicate_with_transform(
-            mesh_key,
-            new_transform_key,
-            &self.materials,
-            &self.transforms,
-        )?;
-
-        self.render_passes
-            .material_transparent
-            .pipelines
-            .clone_render_pipeline_key(mesh_key, new_mesh_key);
-
-        Ok(new_mesh_key)
-    }
-
-    /// Duplicates all meshes that share a transform, returning the new transform and mesh keys.
-    pub fn duplicate_meshes_by_transform_key(
-        &mut self,
-        transform_key: transforms::TransformKey,
-    ) -> crate::error::Result<(transforms::TransformKey, Vec<mesh::MeshKey>)> {
-        Ok(self.meshes.duplicate_by_transform_key(
-            transform_key,
-            &self.materials,
-            &mut self.transforms,
-        )?)
-    }
-
-    /// Splits a mesh out to a new transform key.
-    pub fn split_mesh(
-        &mut self,
-        mesh_key: mesh::MeshKey,
-    ) -> crate::error::Result<transforms::TransformKey> {
-        Ok(self.meshes.split_mesh(
-            mesh_key,
-            &mut self.transforms,
-            &self.materials,
-        )?)
-    }
-
-    /// Splits all meshes under a transform into new transform keys.
-    pub fn split_meshes_by_transform_key(
-        &mut self,
-        transform_key: transforms::TransformKey,
-    ) -> crate::error::Result<Vec<(mesh::MeshKey, transforms::TransformKey)>> {
-        Ok(self.meshes.split_meshes_by_transform_key(
-            transform_key,
-            &mut self.transforms,
-            &self.materials,
-        )?)
-    }
-
-    /// Joins meshes under a shared transform, optionally overriding the transform.
-    pub fn join_meshes(
-        &mut self,
-        mesh_keys: &[mesh::MeshKey],
-        transform_override: Option<transforms::Transform>,
-    ) -> crate::error::Result<(transforms::TransformKey, Vec<mesh::MeshKey>)> {
-        Ok(self.meshes.join_meshes(
-            mesh_keys,
-            &mut self.transforms,
-            &self.materials,
-            transform_override,
-        )?)
-    }
-
-    /// Enables GPU instancing for a mesh with explicit instance transforms.
-    pub async fn enable_mesh_instancing(
-        &mut self,
-        mesh_key: mesh::MeshKey,
-        transforms: &[transforms::Transform],
-    ) -> crate::error::Result<()> {
-        let buffer_info_key = self.meshes.buffer_info_key(mesh_key)?;
-        let transform_key = self.meshes.get(mesh_key)?.transform_key;
-        if transforms.is_empty() {
-            return Err(mesh::AwsmMeshError::InstancingMissingTransforms(mesh_key).into());
-        }
-        {
-            let mesh = self.meshes.get_mut(mesh_key)?;
-            if mesh.instanced {
-                return Err(mesh::AwsmMeshError::InstancingAlreadyEnabled(mesh_key).into());
-            }
-            mesh.instanced = true;
-        }
-
-        self.instances.transform_insert(transform_key, transforms);
-
-        let mesh = self.meshes.get(mesh_key)?;
-        self.render_passes
-            .material_transparent
-            .pipelines
-            .set_render_pipeline_key(
-                &self.gpu,
-                mesh,
-                mesh_key,
-                buffer_info_key,
-                &mut self.shaders,
-                &mut self.pipelines,
-                &self.render_passes.material_transparent.bind_groups,
-                &self.pipeline_layouts,
-                &self.meshes.buffer_infos,
-                &self.anti_aliasing,
-                &self.textures,
-                &self.render_textures.formats,
-            )
-            .await?;
-
-        Ok(())
-    }
-
-    /// Replaces all instance transforms for an instanced mesh.
-    pub fn set_mesh_instances(
-        &mut self,
-        mesh_key: mesh::MeshKey,
-        transforms: &[transforms::Transform],
-    ) -> crate::error::Result<()> {
-        if transforms.is_empty() {
-            return Err(mesh::AwsmMeshError::InstancingMissingTransforms(mesh_key).into());
-        }
-        let mesh = self.meshes.get(mesh_key)?;
-        if !mesh.instanced {
-            return Err(mesh::AwsmMeshError::InstancingNotEnabled(mesh_key).into());
-        }
-
-        self.instances
-            .transform_insert(mesh.transform_key, transforms);
-
-        Ok(())
-    }
-
-    /// Appends a single instance transform to an instanced mesh.
-    pub fn append_mesh_instance(
-        &mut self,
-        mesh_key: mesh::MeshKey,
-        transform: transforms::Transform,
-    ) -> crate::error::Result<usize> {
-        let start_index = self.append_mesh_instances(mesh_key, &[transform])?;
-        Ok(start_index)
-    }
-
-    /// Appends instance transforms to an instanced mesh.
-    pub fn append_mesh_instances(
-        &mut self,
-        mesh_key: mesh::MeshKey,
-        transforms: &[transforms::Transform],
-    ) -> crate::error::Result<usize> {
-        if transforms.is_empty() {
-            return Err(mesh::AwsmMeshError::InstancingMissingTransforms(mesh_key).into());
-        }
-
-        let mesh = self.meshes.get(mesh_key)?;
-        if !mesh.instanced {
-            return Err(mesh::AwsmMeshError::InstancingNotEnabled(mesh_key).into());
-        }
-        if self
-            .instances
-            .transform_instance_count(mesh.transform_key)
-            .is_none()
-        {
-            return Err(mesh::AwsmMeshError::InstancingMissingTransforms(mesh_key).into());
-        }
-
-        Ok(self.instances.transform_extend(mesh.transform_key, transforms)?)
-    }
-
-    /// Reserves additional instance slots for an instanced mesh.
-    pub fn reserve_mesh_instances(
-        &mut self,
-        mesh_key: mesh::MeshKey,
-        additional: usize,
-    ) -> crate::error::Result<usize> {
-        let mesh = self.meshes.get(mesh_key)?;
-        if !mesh.instanced {
-            return Err(mesh::AwsmMeshError::InstancingNotEnabled(mesh_key).into());
-        }
-        if self
-            .instances
-            .transform_instance_count(mesh.transform_key)
-            .is_none()
-        {
-            return Err(mesh::AwsmMeshError::InstancingMissingTransforms(mesh_key).into());
-        }
-
-        Ok(self
-            .instances
-            .transform_reserve(mesh.transform_key, additional)?)
     }
 }
 

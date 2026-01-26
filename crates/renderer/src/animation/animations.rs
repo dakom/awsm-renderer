@@ -3,7 +3,7 @@
 use slotmap::{new_key_type, DenseSlotMap, SecondaryMap};
 
 use crate::{
-    mesh::morphs::{GeometryMorphKey, MaterialMorphKey},
+    meshes::morphs::{GeometryMorphKey, MaterialMorphKey},
     transforms::TransformKey,
     AwsmRenderer,
 };

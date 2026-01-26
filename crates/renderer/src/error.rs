@@ -10,7 +10,7 @@ use crate::{
     instances::AwsmInstanceError,
     lights::AwsmLightError,
     materials::AwsmMaterialError,
-    mesh::{skins::AwsmSkinError, AwsmMeshError},
+    meshes::{error::AwsmMeshError, skins::AwsmSkinError},
     pipeline_layouts::AwsmPipelineLayoutError,
     pipelines::{
         compute_pipeline::AwsmComputePipelineError, render_pipeline::AwsmRenderPipelineError,

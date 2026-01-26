@@ -14,7 +14,7 @@ use crate::{
         BindGroupLayoutCacheKey, BindGroupLayoutCacheKeyEntry, BindGroupLayoutKey,
     },
     bind_groups::{AwsmBindGroupError, BindGroupRecreateContext},
-    mesh::meta::geometry_meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT,
+    meshes::meta::geometry_meta::GEOMETRY_MESH_META_BYTE_ALIGNMENT,
     render_passes::RenderPassInitContext,
 };
 

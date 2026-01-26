@@ -3,11 +3,9 @@
 use awsm_renderer_core::error::AwsmCoreError;
 use thiserror::Error;
 
+use super::{skins::AwsmSkinError, MeshBufferInfoKey, MeshResourceKey};
 use crate::{
-    bind_groups::AwsmBindGroupError,
-    materials::AwsmMaterialError,
-    mesh::{skins::AwsmSkinError, MeshBufferInfoKey, MeshResourceKey},
-    transforms::AwsmTransformError,
+    bind_groups::AwsmBindGroupError, materials::AwsmMaterialError, transforms::AwsmTransformError,
 };
 
 use super::MeshKey;

@@ -164,8 +164,8 @@ fn write_buffer_with_dirty_ranges_config(
     } else {
         ranges.iter().map(|(_, size)| *size as u64).sum()
     };
-    let use_full_write = dirty_bytes.saturating_mul(100)
-        >= total_bytes.saturating_mul(full_write_threshold_percent);
+    let use_full_write =
+        dirty_bytes.saturating_mul(100) >= total_bytes.saturating_mul(full_write_threshold_percent);
 
     if use_full_write {
         gpu.write_buffer(gpu_buffer, None, raw_data, None, None)?;

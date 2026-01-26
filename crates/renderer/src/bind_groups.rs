@@ -8,7 +8,7 @@ use thiserror::Error;
 
 use crate::{
     anti_alias::AntiAliasing, bind_group_layout::BindGroupLayouts, camera::CameraBuffer,
-    environment::Environment, lights::Lights, materials::Materials, mesh::Meshes, picker::Picker,
+    environment::Environment, lights::Lights, materials::Materials, meshes::Meshes, picker::Picker,
     render_passes::RenderPasses, render_textures::RenderTextureViews, textures::Textures,
     transforms::Transforms,
 };
