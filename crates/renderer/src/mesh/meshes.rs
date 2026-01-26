@@ -9,6 +9,7 @@ use crate::bounds::Aabb;
 use crate::bind_groups::{BindGroupCreate, BindGroups};
 use crate::buffer::dynamic_storage::DynamicStorageBuffer;
 use crate::buffer::helpers::write_buffer_with_dirty_ranges;
+use crate::instances::Instances;
 use crate::materials::Materials;
 use crate::mesh::meta::{MeshMeta, MESH_META_INITIAL_CAPACITY};
 use crate::mesh::skins::{SkinKey, Skins};
@@ -416,17 +417,66 @@ impl Meshes {
         self.insert_instance(new_mesh, resource_key, materials, transforms)
     }
 
-    pub fn update_world(&mut self, dirty_transforms: HashMap<TransformKey, &Mat4>) {
+    pub fn update_world(
+        &mut self,
+        dirty_transforms: HashMap<TransformKey, Mat4>,
+        dirty_instances: &std::collections::HashSet<TransformKey>,
+        transforms: &Transforms,
+        instances: &Instances,
+    ) {
+        let mut update_keys = std::collections::HashSet::new();
+        update_keys.extend(dirty_transforms.keys().copied());
+        update_keys.extend(dirty_instances.iter().copied());
+
         // This doesn't mark anything as dirty, it just updates the world AABB for frustum culling and depth sorting
-        for (transform_key, world_mat) in dirty_transforms.iter() {
-            if let Some(mesh_keys) = self.transform_to_meshes.get(*transform_key) {
+        for transform_key in update_keys {
+            let world_mat = dirty_transforms
+                .get(&transform_key)
+                .copied()
+                .or_else(|| transforms.get_world(transform_key).ok().copied());
+
+            let world_mat = match world_mat {
+                Some(mat) => mat,
+                None => continue,
+            };
+
+            if let Some(mesh_keys) = self.transform_to_meshes.get(transform_key) {
                 for mesh_key in mesh_keys {
-                    if let Some(world_aabb) = self
-                        .list
-                        .get_mut(*mesh_key)
-                        .and_then(|m| m.world_aabb.as_mut())
-                    {
-                        world_aabb.transform(world_mat);
+                    let resource_aabb = self
+                        .resource(*mesh_key)
+                        .ok()
+                        .and_then(|resource| resource.aabb.clone());
+
+                    let world_aabb = match resource_aabb {
+                        Some(aabb) => {
+                            let mesh = match self.list.get(*mesh_key) {
+                                Some(mesh) => mesh,
+                                None => continue,
+                            };
+
+                            if mesh.instanced {
+                                match instances.transform_list(mesh.transform_key) {
+                                    Some(transforms_list) if !transforms_list.is_empty() => {
+                                        let first = world_mat * transforms_list[0].to_matrix();
+                                        let mut combined = aabb.transformed(&first);
+                                        for transform in &transforms_list[1..] {
+                                            let world = world_mat * transform.to_matrix();
+                                            let transformed = aabb.transformed(&world);
+                                            combined.extend(&transformed);
+                                        }
+                                        Some(combined)
+                                    }
+                                    _ => None,
+                                }
+                            } else {
+                                Some(aabb.transformed(&world_mat))
+                            }
+                        }
+                        None => None,
+                    };
+
+                    if let Some(mesh) = self.list.get_mut(*mesh_key) {
+                        mesh.world_aabb = world_aabb;
                     }
                 }
             }

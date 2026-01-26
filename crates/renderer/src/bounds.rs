@@ -53,6 +53,12 @@ impl Aabb {
         }
     }
 
+    pub fn transformed(&self, mat: &Mat4) -> Self {
+        let mut out = self.clone();
+        out.transform(mat);
+        out
+    }
+
     pub fn center(&self) -> Vec3 {
         (self.min + self.max) * 0.5
     }

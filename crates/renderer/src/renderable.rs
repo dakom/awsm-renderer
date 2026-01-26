@@ -4,6 +4,7 @@ use glam::Mat4;
 use crate::{
     bounds::Aabb,
     error::AwsmError,
+    frustum::Frustum,
     mesh::{Mesh, MeshKey},
     pipelines::{compute_pipeline::ComputePipelineKey, render_pipeline::RenderPipelineKey},
     render::RenderContext,
@@ -39,12 +40,17 @@ impl AwsmRenderer {
         let mut transparent = Vec::new();
         let mut hud = Vec::new();
 
+        let frustum = self
+            .camera
+            .last_matrices
+            .as_ref()
+            .map(|matrices| Frustum::from_view_projection(matrices.view_projection()));
+
         for (mesh_key, mesh) in self.meshes.iter().filter(|(_k, m)| !m.hidden) {
-            // TODO - frustum cull here
-            if let Some(_world_aabb) = &mesh.world_aabb {
-                // if !self.camera.frustum.intersects_aabb(&world_aabb) {
-                //     continue; // skip meshes not in the camera frustum
-                // }
+            if let (Some(frustum), Some(world_aabb)) = (&frustum, &mesh.world_aabb) {
+                if !frustum.intersects_aabb(world_aabb) {
+                    continue; // skip meshes not in the camera frustum
+                }
             }
 
             let renderable = Renderable::Mesh {

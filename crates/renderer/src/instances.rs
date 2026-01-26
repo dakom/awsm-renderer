@@ -5,6 +5,7 @@ use awsm_renderer_core::{
 };
 use glam::Mat4;
 use slotmap::SecondaryMap;
+use std::collections::HashSet;
 use thiserror::Error;
 
 use crate::{
@@ -21,6 +22,7 @@ pub struct Instances {
     cpu_transforms: SecondaryMap<TransformKey, Vec<Transform>>,
     gpu_transform_buffer: web_sys::GpuBuffer,
     transform_gpu_dirty: bool,
+    transform_dirty: HashSet<TransformKey>,
 }
 
 impl Instances {
@@ -38,6 +40,7 @@ impl Instances {
             transform_count: SecondaryMap::new(),
             cpu_transforms: SecondaryMap::new(),
             transform_gpu_dirty: false,
+            transform_dirty: HashSet::new(),
         })
     }
 
@@ -47,6 +50,7 @@ impl Instances {
         self.transform_buffer.update(key, &bytes);
         self.transform_count.insert(key, transforms.len());
         self.transform_gpu_dirty = true;
+        self.transform_dirty.insert(key);
     }
 
     pub fn transform_update(&mut self, key: TransformKey, index: usize, transform: &Transform) {
@@ -66,6 +70,7 @@ impl Instances {
             });
 
         self.transform_gpu_dirty = true;
+        self.transform_dirty.insert(key);
     }
 
     pub fn transform_extend(&mut self, key: TransformKey, transforms: &[Transform]) -> Result<usize> {
@@ -108,6 +113,7 @@ impl Instances {
         }
         self.transform_count.insert(key, len);
         self.transform_gpu_dirty = true;
+        self.transform_dirty.insert(key);
 
         Ok(start_index)
     }
@@ -124,6 +130,10 @@ impl Instances {
 
     pub fn transform_instance_count(&self, key: TransformKey) -> Option<usize> {
         self.transform_count.get(key).copied()
+    }
+
+    pub fn transform_list(&self, key: TransformKey) -> Option<&[Transform]> {
+        self.cpu_transforms.get(key).map(|list| list.as_slice())
     }
 
     pub fn get_transform(&self, key: TransformKey, index: usize) -> Option<Transform> {
@@ -165,6 +175,10 @@ impl Instances {
         }
 
         Some(transforms)
+    }
+
+    pub fn take_dirty_transforms(&mut self) -> HashSet<TransformKey> {
+        std::mem::take(&mut self.transform_dirty)
     }
 
     // This *does* write to the gpu, should be called only once per frame
@@ -251,6 +265,7 @@ impl Instances {
         existing_bytes.resize(desired_bytes, 0);
         self.transform_buffer.update(key, &existing_bytes);
         self.transform_gpu_dirty = true;
+        self.transform_dirty.insert(key);
 
         Ok(desired_count)
     }

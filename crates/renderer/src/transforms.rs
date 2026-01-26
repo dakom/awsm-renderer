@@ -25,8 +25,14 @@ use crate::{
 impl AwsmRenderer {
     pub fn update_transforms(&mut self) {
         self.transforms.update_world();
-        self.meshes
-            .update_world(self.transforms.take_dirty_meshes());
+        let dirty_transforms = self.transforms.take_dirty_meshes();
+        let dirty_instances = self.instances.take_dirty_transforms();
+        self.meshes.update_world(
+            dirty_transforms,
+            &dirty_instances,
+            &self.transforms,
+            &self.instances,
+        );
     }
 }
 
@@ -298,12 +304,12 @@ impl Transforms {
         Ok(())
     }
 
-    pub fn take_dirty_meshes(&mut self) -> HashMap<TransformKey, &Mat4> {
+    pub fn take_dirty_meshes(&mut self) -> HashMap<TransformKey, Mat4> {
         self.dirty_meshes
             .drain(..)
             .map(|key| {
                 // this for sure exists since we just drained the key
-                let world_matrix = self.world_matrices.get(key).unwrap();
+                let world_matrix = self.world_matrices.get(key).copied().unwrap();
                 (key, world_matrix)
             })
             .collect()

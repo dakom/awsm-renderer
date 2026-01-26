@@ -11,6 +11,7 @@ pub mod camera;
 pub mod debug;
 pub mod environment;
 pub mod error;
+pub mod frustum;
 pub mod instances;
 pub mod lights;
 pub mod materials;

@@ -148,7 +148,7 @@ impl Skins {
             .ok_or(AwsmSkinError::SkinNotFound(skin_key))
     }
 
-    pub fn update_transforms(&mut self, dirty_skin_joints: HashMap<TransformKey, &Mat4>) {
+    pub fn update_transforms(&mut self, dirty_skin_joints: HashMap<TransformKey, Mat4>) {
         // different skins can theoretically share the same joint, so, iterate over them all
         for (skin_key, transform_keys) in self.skeleton_transforms.iter() {
             for (index, transform_key) in transform_keys.iter().enumerate() {
@@ -157,7 +157,7 @@ impl Skins {
                     let world_matrix = match self.inverse_bind_matrices.get(*transform_key).cloned()
                     {
                         Some(inverse_bind_matrix) => *world_mat * inverse_bind_matrix,
-                        None => **world_mat,
+                        None => *world_mat,
                     };
 
                     // just overwrite this one matrix
