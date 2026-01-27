@@ -491,16 +491,6 @@ impl Transform {
         self
     }
 
-    /// Creates a transform from a matrix.
-    pub fn from_matrix(matrix: Mat4) -> Self {
-        let (scale, rotation, translation) = matrix.to_scale_rotation_translation();
-        Self {
-            translation,
-            rotation,
-            scale,
-        }
-    }
-
     /// Converts the transform to a matrix.
     pub fn to_matrix(&self) -> Mat4 {
         Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
@@ -519,6 +509,39 @@ impl Transform {
         } else {
             FrontFace::Cw
         }
+    }
+}
+
+impl From<&Mat4> for Transform {
+    fn from(matrix: &Mat4) -> Self {
+        let (scale, rotation, translation) = matrix.to_scale_rotation_translation();
+        Self {
+            translation,
+            rotation,
+            scale,
+        }
+    }
+}
+
+impl From<Mat4> for Transform {
+    fn from(matrix: Mat4) -> Self {
+        Self::from(&matrix)
+    }
+}
+
+impl From<&Transform> for Mat4 {
+    fn from(transform: &Transform) -> Self {
+        Mat4::from_scale_rotation_translation(
+            transform.scale,
+            transform.rotation,
+            transform.translation,
+        )
+    }
+}
+
+impl From<Transform> for Mat4 {
+    fn from(transform: Transform) -> Self {
+        Mat4::from(&transform)
     }
 }
 
