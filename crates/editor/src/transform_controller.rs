@@ -12,10 +12,9 @@ use glam::{Mat4, Quat, Vec3, Vec4};
 
 #[derive(Clone, Debug)]
 pub struct TransformController {
-    pub mesh_keys: TransformControllerMeshKeys,
-    pub transform_keys: TransformControllerTransformKeys,
-    pub gltf_lookups: Arc<std::sync::Mutex<GltfKeyLookups>>,
     pub selected_object: Option<TransformObject>,
+    mesh_keys: TransformControllerMeshKeys,
+    transform_keys: TransformControllerTransformKeys,
     _gizmo_space: GizmoSpace,
     current_gizmo_kind: Option<GizmoKind>,
     drag_state: Option<DragState>,
@@ -119,7 +118,6 @@ impl TransformController {
         Ok(Self {
             mesh_keys,
             transform_keys,
-            gltf_lookups: lookups,
             selected_object: None,
             current_gizmo_kind: None,
             drag_state: None,
