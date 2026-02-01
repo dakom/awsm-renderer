@@ -166,7 +166,7 @@ impl Instances {
             };
             let mat = Mat4::from_cols_slice(values_f32);
 
-            Some(Transform::from_matrix(mat))
+            Some(Transform::from(mat))
         })
     }
 
@@ -186,7 +186,7 @@ impl Instances {
                 std::slice::from_raw_parts(slice.as_ptr() as *const f32, Transforms::BYTE_SIZE / 4)
             };
             let mat = Mat4::from_cols_slice(values_f32);
-            transforms.push(Transform::from_matrix(mat));
+            transforms.push(Transform::from(mat));
         }
 
         Some(transforms)

@@ -47,13 +47,13 @@ pub fn transform_gltf_node(node: &gltf::Node) -> Transform {
             matrix: gltf_matrix,
         } => {
             let matrix: Mat4 = Mat4::from_cols_array_2d(&gltf_matrix);
-            Transform::from_matrix(matrix)
+            Transform::from(matrix)
         }
         gltf::scene::Transform::Decomposed {
             translation,
             rotation,
             scale,
-        } => Transform::from_matrix(
+        } => Transform::from(
             glam::Mat4::from_translation(Vec3::from_array(translation))
                 * glam::Mat4::from_quat(Quat::from_array(rotation))
                 * glam::Mat4::from_scale(Vec3::from_array(scale)),
