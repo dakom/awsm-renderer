@@ -6,9 +6,11 @@ use crate::{
         error::{AwsmGltfError, Result},
         populate::material::pbr_material_mapper,
     },
-    materials::Material,
     meshes::{
-        buffer_info::{MeshBufferInfo, MeshBufferVertexInfo},
+        buffer_info::{
+            MeshBufferCustomVertexAttributeInfo, MeshBufferInfo, MeshBufferVertexAttributeInfo,
+            MeshBufferVertexInfo,
+        },
         mesh::Mesh,
         MeshKey,
     },
@@ -17,6 +19,7 @@ use crate::{
 };
 use glam::{Mat4, Vec3};
 
+use super::GltfMaterialLookupKey;
 use super::GltfPopulateContext;
 
 impl AwsmRenderer {
@@ -97,9 +100,25 @@ impl AwsmRenderer {
 
         let native_primitive_buffer_info = MeshBufferInfo::from(primitive_buffer_info.clone());
 
-        let material =
-            pbr_material_mapper(self, ctx, primitive_buffer_info, gltf_primitive.material())
-                .await?;
+        let gltf_material = gltf_primitive.material();
+        let material_lookup_key = GltfMaterialLookupKey {
+            material_index: gltf_material.index(),
+            vertex_color_set_index: primitive_buffer_info
+                .triangles
+                .vertex_attributes
+                .iter()
+                .find_map(|attr| {
+                    if let MeshBufferVertexAttributeInfo::Custom(
+                        MeshBufferCustomVertexAttributeInfo::Colors { index, .. },
+                    ) = attr
+                    {
+                        Some(*index as usize)
+                    } else {
+                        None
+                    }
+                }),
+            hud: ctx.data.hints.hud,
+        };
 
         let geometry_morph_key = match primitive_buffer_info.geometry_morph.clone() {
             None => None,
@@ -153,12 +172,31 @@ impl AwsmRenderer {
             }
         };
 
-        let double_sided = match &material {
-            Material::Pbr(pbr) => pbr.double_sided(),
-            Material::Unlit(pbr) => pbr.double_sided(),
-        };
+        let double_sided = gltf_material.double_sided();
 
-        let material_key = self.materials.insert(material, &self.textures);
+        let material_key = {
+            let existing = ctx
+                .material_keys
+                .lock()
+                .unwrap()
+                .get(&material_lookup_key)
+                .copied();
+
+            match existing {
+                Some(key) => key,
+                None => {
+                    let material =
+                        pbr_material_mapper(self, ctx, primitive_buffer_info, gltf_material)
+                            .await?;
+                    let key = self.materials.insert(material, &self.textures);
+                    ctx.material_keys
+                        .lock()
+                        .unwrap()
+                        .insert(material_lookup_key, key);
+                    key
+                }
+            }
+        };
 
         let buffer_info_key = self
             .meshes
@@ -243,42 +281,17 @@ impl AwsmRenderer {
             )?
         };
 
-        // Load all animations from the GLTF file
-        // TODO: Add proper API for selecting/controlling which animations to play
-        // Heuristic: Only load the first morph animation per node
-        // This prevents multiple conflicting morph animations from playing simultaneously
-        let mut has_morph_animation = false;
-
-        for gltf_animation in ctx.data.doc.animations() {
-            for channel in gltf_animation.channels() {
-                if channel.target().node().index() == gltf_node.index() {
-                    match channel.target().property() {
-                        gltf::animation::Property::MorphTargetWeights => {
-                            if has_morph_animation {
-                                continue;
-                            }
-                            self.populate_gltf_animation_morph(
-                                ctx,
-                                gltf_animation
-                                    .samplers()
-                                    .nth(channel.sampler().index())
-                                    .ok_or(AwsmGltfError::MissingAnimationSampler {
-                                        animation_index: gltf_animation.index(),
-                                        channel_index: channel.index(),
-                                        sampler_index: channel.sampler().index(),
-                                    })?,
-                                geometry_morph_key,
-                                material_morph_key,
-                            )?;
-                            has_morph_animation = true;
-                        }
-                        // transform animations were already populated in the node
-                        gltf::animation::Property::Translation
-                        | gltf::animation::Property::Rotation
-                        | gltf::animation::Property::Scale => {}
-                    }
-                }
-            }
+        if let Some(sampler_ref) = ctx
+            .node_animation_samplers
+            .get(&gltf_node.index())
+            .and_then(|samplers| samplers.morph)
+        {
+            self.populate_gltf_animation_morph(
+                ctx,
+                ctx.resolve_animation_sampler(sampler_ref)?,
+                geometry_morph_key,
+                material_morph_key,
+            )?;
         }
 
         Ok(mesh_key)

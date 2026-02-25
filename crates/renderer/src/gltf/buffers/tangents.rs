@@ -1,10 +1,7 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
 use crate::{
-    gltf::{
-        buffers::{index::extract_triangle_indices, MeshBufferAttributeIndexInfoWithOffset},
-        error::{AwsmGltfError, Result},
-    },
+    gltf::error::{AwsmGltfError, Result},
     meshes::buffer_info::{
         MeshBufferCustomVertexAttributeInfo, MeshBufferVertexAttributeInfo,
         MeshBufferVisibilityVertexAttributeInfo,
@@ -18,8 +15,7 @@ use crate::{
 pub(super) fn ensure_tangents<'a>(
     mut attribute_data: BTreeMap<MeshBufferVertexAttributeInfo, Cow<'a, [u8]>>,
     primitive: &gltf::Primitive<'_>,
-    index: &MeshBufferAttributeIndexInfoWithOffset,
-    index_bytes: &[u8],
+    triangle_indices: &[[usize; 3]],
 ) -> Result<BTreeMap<MeshBufferVertexAttributeInfo, Cow<'a, [u8]>>> {
     // Check if tangents already exist
     let has_tangents = attribute_data.keys().any(|x| {
@@ -87,7 +83,7 @@ pub(super) fn ensure_tangents<'a>(
     };
 
     // Generate tangents
-    let tangents_bytes = compute_tangents(positions, normals, texcoords, index, index_bytes)?;
+    let tangents_bytes = compute_tangents(positions, normals, texcoords, triangle_indices)?;
 
     attribute_data.insert(
         MeshBufferVertexAttributeInfo::Visibility(
@@ -107,7 +103,7 @@ struct MikkTSpaceGeometry<'a> {
     positions: &'a [u8],
     normals: &'a [u8],
     texcoords: &'a [u8],
-    triangles: Vec<[usize; 3]>,
+    triangles: &'a [[usize; 3]],
     tangents: Vec<[f32; 4]>,
 }
 
@@ -116,7 +112,7 @@ impl<'a> MikkTSpaceGeometry<'a> {
         positions: &'a [u8],
         normals: &'a [u8],
         texcoords: &'a [u8],
-        triangles: Vec<[usize; 3]>,
+        triangles: &'a [[usize; 3]],
         vertex_count: usize,
     ) -> Self {
         Self {
@@ -201,8 +197,7 @@ fn compute_tangents(
     positions: &[u8],
     normals: &[u8],
     texcoords: &[u8],
-    index: &MeshBufferAttributeIndexInfoWithOffset,
-    index_bytes: &[u8],
+    triangle_indices: &[[usize; 3]],
 ) -> Result<Vec<u8>> {
     // Validate buffer sizes
     if positions.len() % 12 != 0 {
@@ -223,16 +218,18 @@ fn compute_tangents(
 
     let vertex_count = positions.len() / 12;
 
-    // Extract triangle indices
-    let triangles = extract_triangle_indices(index, index_bytes)?;
-
-    if triangles.is_empty() {
+    if triangle_indices.is_empty() {
         return Ok(Vec::new());
     }
 
     // Create geometry wrapper and generate tangents
-    let mut geometry =
-        MikkTSpaceGeometry::new(positions, normals, texcoords, triangles, vertex_count);
+    let mut geometry = MikkTSpaceGeometry::new(
+        positions,
+        normals,
+        texcoords,
+        triangle_indices,
+        vertex_count,
+    );
 
     if !bevy_mikktspace::generate_tangents(&mut geometry) {
         return Err(AwsmGltfError::GenerateTangents(

@@ -5,6 +5,7 @@ use awsm_renderer_core::pipeline::primitive::FrontFace;
 use gltf::material::AlphaMode;
 
 use crate::gltf::buffers::attributes::{load_attribute_data_by_kind, pack_vertex_attributes};
+use crate::gltf::buffers::index::extract_triangle_indices;
 use crate::gltf::buffers::mesh::transparency::create_transparency_vertices;
 use crate::gltf::buffers::mesh::visibility::create_visibility_vertices;
 use crate::gltf::buffers::morph::convert_morph_targets;
@@ -59,6 +60,7 @@ pub(super) fn mesh_buffer_geometry_kind(
 
 pub(super) fn convert_to_mesh_buffer(
     primitive: &gltf::Primitive,
+    render_timings: bool,
     geometry_kind: GltfMeshBufferGeometryKind,
     front_face: FrontFace,
     buffers: &[Vec<u8>],
@@ -72,18 +74,39 @@ pub(super) fn convert_to_mesh_buffer(
     material_morph_bytes: &mut Vec<u8>,
     skin_joint_index_weight_bytes: &mut Vec<u8>,
 ) -> Result<MeshBufferInfoWithOffset> {
-    // Step 1: Load all GLTF attributes
-    let gltf_attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> = primitive
-        .attributes()
-        .filter(|(semantic, _)| {
-            // Joints and Weights are NOT vertex attributes - they're skinning data
-            // Handled separately by convert_skin(), never enter the attribute system
-            !matches!(
-                semantic,
-                gltf::Semantic::Joints(_) | gltf::Semantic::Weights(_)
+    let _maybe_primitive_span_guard = if render_timings {
+        Some(
+            tracing::span!(
+                tracing::Level::INFO,
+                "GLTF primitive buffer convert",
+                primitive_index = primitive.index(),
+                material_index = primitive.material().index()
             )
-        })
-        .collect();
+            .entered(),
+        )
+    } else {
+        None
+    };
+
+    // Step 1: Load all GLTF attributes
+    let gltf_attributes: Vec<(gltf::Semantic, gltf::Accessor<'_>)> = {
+        let _maybe_stage_span_guard = if render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "collect_attributes").entered())
+        } else {
+            None
+        };
+        primitive
+            .attributes()
+            .filter(|(semantic, _)| {
+                // Joints and Weights are NOT vertex attributes - they're skinning data
+                // Handled separately by convert_skin(), never enter the attribute system
+                !matches!(
+                    semantic,
+                    gltf::Semantic::Joints(_) | gltf::Semantic::Weights(_)
+                )
+            })
+            .collect()
+    };
 
     // this should never be empty, but let's be safe
     let vertex_count = gltf_attributes
@@ -92,104 +115,164 @@ pub(super) fn convert_to_mesh_buffer(
         .unwrap_or(0);
 
     let triangle_count = custom_attribute_index.count / 3;
+    let triangle_indices = {
+        let _maybe_stage_span_guard = if render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "extract_triangle_indices").entered())
+        } else {
+            None
+        };
+        extract_triangle_indices(custom_attribute_index, custom_attribute_index_bytes)?
+    };
 
     // Step 2: Load attribute data by kind
-    let attribute_data_by_kind = load_attribute_data_by_kind(&gltf_attributes, buffers)?;
+    let attribute_data_by_kind = {
+        let _maybe_stage_span_guard = if render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "load_attribute_data_by_kind").entered())
+        } else {
+            None
+        };
+        load_attribute_data_by_kind(&gltf_attributes, buffers)?
+    };
 
     // Step 3: Ensure normals exist (compute if missing)
-    let attribute_data_by_kind = ensure_normals(
-        attribute_data_by_kind,
-        custom_attribute_index,
-        custom_attribute_index_bytes,
-    )?;
+    let attribute_data_by_kind = {
+        let _maybe_stage_span_guard = if render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "ensure_normals").entered())
+        } else {
+            None
+        };
+        ensure_normals(attribute_data_by_kind, &triangle_indices)?
+    };
 
     // Step 3b: Ensure tangents exist (generate with MikkTSpace if missing but normal map present)
-    let attribute_data_by_kind = ensure_tangents(
-        attribute_data_by_kind,
-        primitive,
-        custom_attribute_index,
-        custom_attribute_index_bytes,
-    )?;
+    let attribute_data_by_kind = {
+        let _maybe_stage_span_guard = if render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "ensure_tangents").entered())
+        } else {
+            None
+        };
+        ensure_tangents(attribute_data_by_kind, primitive, &triangle_indices)?
+    };
 
     // Step 4: Create visibility vertices (positions + triangle_index + barycentric)
     // These are expanded such that each vertex gets its own visibility vertex (triangle_index will be repeated for all 3)
-    let visability_vertex_offset = match geometry_kind {
-        GltfMeshBufferGeometryKind::Visibility | GltfMeshBufferGeometryKind::Both => {
-            let offset = visibility_geometry_vertex_bytes.len();
-            create_visibility_vertices(
-                &attribute_data_by_kind,
-                custom_attribute_index,
-                custom_attribute_index_bytes,
-                triangle_count,
-                front_face,
-                visibility_geometry_vertex_bytes,
-            )?;
-            Some(offset)
-        }
+    let visability_vertex_offset = {
+        let _maybe_stage_span_guard = if render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "create_visibility_vertices").entered())
+        } else {
+            None
+        };
+        match geometry_kind {
+            GltfMeshBufferGeometryKind::Visibility | GltfMeshBufferGeometryKind::Both => {
+                let offset = visibility_geometry_vertex_bytes.len();
+                create_visibility_vertices(
+                    &attribute_data_by_kind,
+                    &triangle_indices,
+                    front_face,
+                    visibility_geometry_vertex_bytes,
+                )?;
+                Some(offset)
+            }
 
-        GltfMeshBufferGeometryKind::Transparency => None,
+            GltfMeshBufferGeometryKind::Transparency => None,
+        }
     };
 
-    let transparency_vertex_offset = match geometry_kind {
-        GltfMeshBufferGeometryKind::Transparency | GltfMeshBufferGeometryKind::Both => {
-            let offset = transparency_geometry_vertex_bytes.len();
-            create_transparency_vertices(
-                &attribute_data_by_kind,
-                custom_attribute_index,
-                custom_attribute_index_bytes,
-                triangle_count,
-                front_face,
-                transparency_geometry_vertex_bytes,
-            )?;
-            Some(offset)
-        }
+    let transparency_vertex_offset = {
+        let _maybe_stage_span_guard = if render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "create_transparency_vertices").entered())
+        } else {
+            None
+        };
+        match geometry_kind {
+            GltfMeshBufferGeometryKind::Transparency | GltfMeshBufferGeometryKind::Both => {
+                let offset = transparency_geometry_vertex_bytes.len();
+                create_transparency_vertices(
+                    &attribute_data_by_kind,
+                    custom_attribute_index,
+                    custom_attribute_index_bytes,
+                    triangle_count,
+                    front_face,
+                    transparency_geometry_vertex_bytes,
+                )?;
+                Some(offset)
+            }
 
-        GltfMeshBufferGeometryKind::Visibility => None,
+            GltfMeshBufferGeometryKind::Visibility => None,
+        }
     };
 
     // Step 5: Pack vertex attributes
     // These are the original attributes per-vertex, but only non-visibility ones
     // There is no need to repack or expand these, they are used as-is
-    let attribute_vertex_offset = custom_attribute_vertex_bytes.len();
-    pack_vertex_attributes(
-        attribute_data_by_kind
-            .iter()
-            .filter_map(|x| match x.0 {
-                MeshBufferVertexAttributeInfo::Custom(custom) => Some((custom, x.1)),
-                _ => None,
-            })
-            .collect(),
-        custom_attribute_vertex_bytes,
-    )?;
+    let attribute_vertex_offset = {
+        let _maybe_stage_span_guard = if render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "pack_vertex_attributes").entered())
+        } else {
+            None
+        };
+        let attribute_vertex_offset = custom_attribute_vertex_bytes.len();
+        pack_vertex_attributes(
+            attribute_data_by_kind
+                .iter()
+                .filter_map(|x| match x.0 {
+                    MeshBufferVertexAttributeInfo::Custom(custom) => Some((custom, x.1)),
+                    _ => None,
+                })
+                .collect(),
+            custom_attribute_vertex_bytes,
+        )?;
+        attribute_vertex_offset
+    };
 
     // Step 6: Pack triangle data (vertex indices)
     let triangle_data_offset = triangle_data_bytes.len();
-    let triangle_data_info = pack_triangle_data(
-        custom_attribute_index,
-        custom_attribute_index_bytes,
-        triangle_count,
-        triangle_data_offset,
-        triangle_data_bytes,
-        front_face,
-        primitive.material().double_sided(),
-    )?;
+    let triangle_data_info = {
+        let _maybe_stage_span_guard = if render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "pack_triangle_data").entered())
+        } else {
+            None
+        };
+        pack_triangle_data(
+            &triangle_indices,
+            triangle_count,
+            triangle_data_offset,
+            triangle_data_bytes,
+            front_face,
+            primitive.material().double_sided(),
+        )?
+    };
 
     // Step 7: Handle morph targets (if any)
-    let (geometry_morph, material_morph) = convert_morph_targets(
-        primitive,
-        buffers,
-        vertex_count,
-        geometry_morph_bytes,
-        material_morph_bytes,
-    )?;
+    let (geometry_morph, material_morph) = {
+        let _maybe_stage_span_guard = if render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "convert_morph_targets").entered())
+        } else {
+            None
+        };
+        convert_morph_targets(
+            primitive,
+            buffers,
+            vertex_count,
+            geometry_morph_bytes,
+            material_morph_bytes,
+        )?
+    };
 
     // Step 8: Handle skin (if any)
-    let skin = convert_skin(
-        primitive,
-        buffers,
-        vertex_count,
-        skin_joint_index_weight_bytes,
-    )?;
+    let skin = {
+        let _maybe_stage_span_guard = if render_timings {
+            Some(tracing::span!(tracing::Level::INFO, "convert_skin").entered())
+        } else {
+            None
+        };
+        convert_skin(
+            primitive,
+            buffers,
+            vertex_count,
+            skin_joint_index_weight_bytes,
+        )?
+    };
 
     // Step 7: Build final MeshBufferInfo
     Ok(MeshBufferInfoWithOffset {

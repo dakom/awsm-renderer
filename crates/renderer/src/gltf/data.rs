@@ -29,6 +29,7 @@ impl GltfData {
 pub struct GltfDataHints {
     pub hud: bool,
     pub hidden: bool,
+    pub render_timings: bool,
 }
 
 impl GltfDataHints {
@@ -41,6 +42,12 @@ impl GltfDataHints {
     /// Sets whether this data is initially hidden.
     pub fn with_hidden(mut self, hidden: bool) -> Self {
         self.hidden = hidden;
+        self
+    }
+
+    /// Sets whether glTF loading/population timing spans are emitted.
+    pub fn with_render_timings(mut self, render_timings: bool) -> Self {
+        self.render_timings = render_timings;
         self
     }
 }

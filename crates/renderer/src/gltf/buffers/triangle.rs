@@ -1,24 +1,19 @@
 use awsm_renderer_core::pipeline::primitive::FrontFace;
 
-use crate::gltf::buffers::index::extract_triangle_indices;
-use crate::gltf::buffers::{
-    MeshBufferAttributeIndexInfoWithOffset, MeshBufferTriangleDataInfoWithOffset,
-};
+use crate::gltf::buffers::MeshBufferTriangleDataInfoWithOffset;
 use crate::gltf::error::Result;
 
 // Pack triangle data (vertex indices)
 pub(super) fn pack_triangle_data(
-    index: &MeshBufferAttributeIndexInfoWithOffset,
-    index_bytes: &[u8],
+    triangle_indices: &[[usize; 3]],
     triangle_count: usize,
     offset: usize,
     triangle_data_bytes: &mut Vec<u8>,
     front_face: FrontFace,
     double_sided: bool,
 ) -> Result<MeshBufferTriangleDataInfoWithOffset> {
-    let triangle_indices = extract_triangle_indices(index, index_bytes)?;
-
-    for triangle in triangle_indices {
+    debug_assert_eq!(triangle_indices.len(), triangle_count);
+    for triangle in triangle_indices.iter().copied() {
         // Normalize winding order here
         let normalized_triangle = if double_sided {
             triangle // Keep original winding for double-sided materials
