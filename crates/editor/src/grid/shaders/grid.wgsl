@@ -94,6 +94,8 @@ const GRID_ALPHA_BACKGROUND: f32 = 0.7;
 const GRID_ALPHA_MINOR: f32 = 0.9;
 const GRID_ALPHA_MAJOR: f32 = 1.0;
 const GRID_ALPHA_AXIS: f32 = 1.0;
+// Push grid fragments slightly farther than coplanar scene geometry to avoid z-fighting.
+const GRID_DEPTH_EPSILON: f32 = 1e-4;
 
 @fragment
 fn frag_main(in: FragmentInput) -> FragmentOutput {
@@ -220,7 +222,7 @@ fn frag_main(in: FragmentInput) -> FragmentOutput {
     let ndc_depth = clip_pos_depth.z / clip_pos_depth.w;
 
     // Clamp depth to valid WebGPU range [0, 1]
-    let depth = clamp(ndc_depth, 0.0, 1.0);
+    let depth = clamp(ndc_depth + GRID_DEPTH_EPSILON, 0.0, 1.0);
 
     var output_final: FragmentOutput;
     output_final.color = vec4<f32>(final_color, final_alpha);

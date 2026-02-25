@@ -51,7 +51,7 @@ impl RenderTextureFormats {
             normal_tangent: TextureFormat::Rgba16float,
             barycentric_derivatives: TextureFormat::Rgba16float,
             color: TextureFormat::Rgba16float, // HDR format for bloom/tonemapping
-            depth: TextureFormat::Depth24plus, // Depth format for depth testing
+            depth: TextureFormat::Depth32float, // More precision for thin/close surfaces
         }
     }
 }

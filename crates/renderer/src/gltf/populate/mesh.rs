@@ -172,7 +172,12 @@ impl AwsmRenderer {
             }
         };
 
-        let double_sided = gltf_material.double_sided();
+        let double_sided = gltf_material.double_sided()
+            && !should_force_single_sided_for_opaque_thin_shell(
+                &gltf_primitive,
+                &gltf_material,
+                &ctx.data.buffers.raw,
+            );
 
         let material_key = {
             let existing = ctx
@@ -296,6 +301,91 @@ impl AwsmRenderer {
 
         Ok(mesh_key)
     }
+}
+
+fn should_force_single_sided_for_opaque_thin_shell(
+    primitive: &gltf::Primitive<'_>,
+    material: &gltf::Material<'_>,
+    buffers: &[Vec<u8>],
+) -> bool {
+    if !material.double_sided() {
+        return false;
+    }
+
+    match material.alpha_mode() {
+        gltf::material::AlphaMode::Opaque => {}
+        _ => return false,
+    }
+
+    if let Some(transmission) = material.transmission() {
+        if transmission.transmission_factor() > 0.0 || transmission.transmission_texture().is_some()
+        {
+            return false;
+        }
+    }
+
+    let reader = primitive.reader(|buffer| buffers.get(buffer.index()).map(|b| b.as_slice()));
+
+    let Some(positions) = reader.read_positions() else {
+        return false;
+    };
+
+    let mut min = Vec3::splat(f32::INFINITY);
+    let mut max = Vec3::splat(f32::NEG_INFINITY);
+    for p in positions {
+        let p = Vec3::from_array(p);
+        min = min.min(p);
+        max = max.max(p);
+    }
+
+    let size = max - min;
+    let (thin_axis, thin_extent, thick_extent) = if size.x <= size.y && size.x <= size.z {
+        (0usize, size.x, size.y.max(size.z))
+    } else if size.y <= size.x && size.y <= size.z {
+        (1usize, size.y, size.x.max(size.z))
+    } else {
+        (2usize, size.z, size.x.max(size.y))
+    };
+
+    if thick_extent <= f32::EPSILON {
+        return false;
+    }
+
+    // Heuristic: if one axis is very thin and normals strongly point in opposite directions
+    // along that axis (both +axis and -axis present), geometry likely has top+bottom layers
+    // and culling back faces is more stable than honoring double-sided rendering.
+    if thin_extent / thick_extent > 0.02 {
+        return false;
+    }
+
+    let Some(normals) = reader.read_normals() else {
+        return false;
+    };
+
+    const AXIS_NORMAL_MIN: f32 = 0.25;
+    let mut pos_count = 0usize;
+    let mut neg_count = 0usize;
+    let mut strong_count = 0usize;
+
+    for n in normals {
+        let axis = n[thin_axis];
+        if axis >= AXIS_NORMAL_MIN {
+            pos_count += 1;
+            strong_count += 1;
+        } else if axis <= -AXIS_NORMAL_MIN {
+            neg_count += 1;
+            strong_count += 1;
+        }
+    }
+
+    if strong_count < 16 {
+        return false;
+    }
+
+    let pos_ratio = pos_count as f32 / strong_count as f32;
+    let neg_ratio = neg_count as f32 / strong_count as f32;
+
+    pos_ratio > 0.2 && neg_ratio > 0.2
 }
 
 fn try_position_aabb(gltf_primitive: &gltf::Primitive<'_>) -> Option<Aabb> {

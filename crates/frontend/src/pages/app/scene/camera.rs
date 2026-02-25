@@ -62,6 +62,7 @@ impl Camera {
             aperture: self.aperture,
         }
     }
+
 }
 
 #[derive(Debug, Clone)]
@@ -79,6 +80,12 @@ impl CameraView {
     pub fn look_at(&self) -> Vec3 {
         match self {
             CameraView::Orbit(camera) => camera.look_at,
+        }
+    }
+
+    pub fn view_matrix(&self) -> Mat4 {
+        match self {
+            CameraView::Orbit(camera) => camera.get_view_matrix(),
         }
     }
 }
@@ -176,6 +183,15 @@ impl Camera {
     pub fn on_pointer_move(&mut self, x: i32, y: i32) {
         match &mut self.view {
             CameraView::Orbit(orbit_view) => orbit_view.on_pointer_move(x as f32, y as f32),
+        }
+
+        match &mut self.projection {
+            CameraProjection::Orthographic(ortho) => {
+                ortho.on_view_changed(&self.view, &self.aabb, self.margin);
+            }
+            CameraProjection::Perspective(persp) => {
+                persp.on_view_changed(&self.view, &self.aabb, self.margin);
+            }
         }
     }
 

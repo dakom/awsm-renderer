@@ -104,7 +104,9 @@ struct MikkTSpaceGeometry<'a> {
     normals: &'a [u8],
     texcoords: &'a [u8],
     triangles: &'a [[usize; 3]],
-    tangents: Vec<[f32; 4]>,
+    tangent_sum: Vec<[f32; 3]>,
+    tangent_sign_sum: Vec<f32>,
+    tangent_count: Vec<u32>,
 }
 
 impl<'a> MikkTSpaceGeometry<'a> {
@@ -120,7 +122,9 @@ impl<'a> MikkTSpaceGeometry<'a> {
             normals,
             texcoords,
             triangles,
-            tangents: vec![[0.0, 0.0, 0.0, 1.0]; vertex_count],
+            tangent_sum: vec![[0.0, 0.0, 0.0]; vertex_count],
+            tangent_sign_sum: vec![0.0; vertex_count],
+            tangent_count: vec![0; vertex_count],
         }
     }
 
@@ -158,6 +162,88 @@ impl<'a> MikkTSpaceGeometry<'a> {
             f32::from_le_bytes(self.texcoords[offset + 4..offset + 8].try_into().unwrap()),
         ]
     }
+
+    fn finalize_tangents(&self) -> Vec<[f32; 4]> {
+        let mut out = Vec::with_capacity(self.tangent_sum.len());
+
+        for vertex_index in 0..self.tangent_sum.len() {
+            let count = self.tangent_count[vertex_index];
+            if count == 0 {
+                out.push([1.0, 0.0, 0.0, 1.0]);
+                continue;
+            }
+
+            let sum = self.tangent_sum[vertex_index];
+            let mut tangent = normalize_or_fallback(sum, self.get_normal(vertex_index));
+            // Ensure finite output in all cases.
+            if !tangent.iter().all(|v| v.is_finite()) {
+                tangent = [1.0, 0.0, 0.0];
+            }
+
+            let sign = if self.tangent_sign_sum[vertex_index] >= 0.0 {
+                1.0
+            } else {
+                -1.0
+            };
+
+            out.push([tangent[0], tangent[1], tangent[2], sign]);
+        }
+
+        out
+    }
+}
+
+fn dot3(a: [f32; 3], b: [f32; 3]) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn cross3(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+fn normalize3(v: [f32; 3]) -> [f32; 3] {
+    let len_sq = dot3(v, v);
+    if len_sq > 1e-20 {
+        let inv_len = len_sq.sqrt().recip();
+        [v[0] * inv_len, v[1] * inv_len, v[2] * inv_len]
+    } else {
+        [0.0, 0.0, 0.0]
+    }
+}
+
+fn canonical_tangent_from_normal(normal: [f32; 3]) -> [f32; 3] {
+    let n = normalize3(normal);
+    let axis = if n[1].abs() < 0.999 {
+        [0.0, 1.0, 0.0]
+    } else {
+        [1.0, 0.0, 0.0]
+    };
+    let t = cross3(axis, n);
+    let t_norm = normalize3(t);
+    if dot3(t_norm, t_norm) > 0.0 {
+        t_norm
+    } else {
+        [1.0, 0.0, 0.0]
+    }
+}
+
+fn normalize_or_fallback(v: [f32; 3], normal: [f32; 3]) -> [f32; 3] {
+    let n = normalize3(normal);
+    // Remove any component along the normal before normalization.
+    let v_ortho = {
+        let proj = dot3(v, n);
+        [v[0] - n[0] * proj, v[1] - n[1] * proj, v[2] - n[2] * proj]
+    };
+    let t = normalize3(v_ortho);
+    if dot3(t, t) > 0.0 {
+        t
+    } else {
+        canonical_tangent_from_normal(normal)
+    }
 }
 
 impl bevy_mikktspace::Geometry for MikkTSpaceGeometry<'_> {
@@ -186,10 +272,14 @@ impl bevy_mikktspace::Geometry for MikkTSpaceGeometry<'_> {
 
     fn set_tangent_encoded(&mut self, tangent: [f32; 4], face: usize, vert: usize) {
         let vertex_index = self.triangles[face][vert];
-        // MikkTSpace may call this multiple times for the same vertex from different faces.
-        // We just overwrite - all calls for the same vertex should produce the same result
-        // for well-formed meshes.
-        self.tangents[vertex_index] = tangent;
+        // MikkTSpace can emit different tangents for a shared vertex when UV charts meet.
+        // Accumulate and normalize for deterministic per-vertex tangents instead of
+        // last-write-wins artifacts.
+        self.tangent_sum[vertex_index][0] += tangent[0];
+        self.tangent_sum[vertex_index][1] += tangent[1];
+        self.tangent_sum[vertex_index][2] += tangent[2];
+        self.tangent_sign_sum[vertex_index] += tangent[3];
+        self.tangent_count[vertex_index] += 1;
     }
 }
 
@@ -239,7 +329,8 @@ fn compute_tangents(
 
     // Convert tangents to bytes
     let mut tangents_bytes = Vec::with_capacity(vertex_count * 16); // 4 f32s per tangent
-    for tangent in &geometry.tangents {
+    let final_tangents = geometry.finalize_tangents();
+    for tangent in &final_tangents {
         tangents_bytes.extend_from_slice(&tangent[0].to_le_bytes());
         tangents_bytes.extend_from_slice(&tangent[1].to_le_bytes());
         tangents_bytes.extend_from_slice(&tangent[2].to_le_bytes());
