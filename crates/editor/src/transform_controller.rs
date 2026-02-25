@@ -780,7 +780,27 @@ fn get_world_matrix(renderer: &AwsmRenderer, object: TransformObject) -> Option<
                 Some(world)
             }
         }
-        None => Some(world),
+        None => {
+            let mut world = world;
+            if let Some(mesh_keys) = renderer.meshes.keys_by_transform_key(object.key) {
+                let mut center_sum = Vec3::ZERO;
+                let mut center_count = 0u32;
+                for mesh_key in mesh_keys {
+                    if let Ok(mesh) = renderer.meshes.get(*mesh_key) {
+                        if let Some(aabb) = mesh.world_aabb.as_ref() {
+                            center_sum += aabb.center();
+                            center_count += 1;
+                        }
+                    }
+                }
+                if center_count > 0 {
+                    let center = center_sum / center_count as f32;
+                    world.w_axis = Vec4::new(center.x, center.y, center.z, 1.0);
+                }
+            }
+
+            Some(world)
+        }
     }
 }
 
