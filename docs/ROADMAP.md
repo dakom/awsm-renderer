@@ -1,15 +1,13 @@
 # Next up
+- Fix TextureTransforms
+  - https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/TextureTransformMultiTest#problem-certain-inputs-not-transformed
 - Move newly added methods in lib.rs to appropriate module
-- Cloning mesh while keeping 1:many transform:mesh semantics
-- Method to split mesh into individual transforms
 - Make transparent meshes pickable
   - Maybe global "editor_mode" on renderer that toggles some less-efficient behavior
     - All meshes get both transparent and opaque geometry 
     - Picking pass samples both and uses alpha test to discard transparent fragments below threshold
     
 - Shadows
-
-- Frustum culling
 
 - SSAO
   - Can probably be done in opaque pass 
