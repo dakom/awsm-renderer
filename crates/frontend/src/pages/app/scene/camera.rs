@@ -62,7 +62,6 @@ impl Camera {
             aperture: self.aperture,
         }
     }
-
 }
 
 #[derive(Debug, Clone)]
