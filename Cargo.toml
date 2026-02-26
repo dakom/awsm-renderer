@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 description = "awsm renderer"
 edition = "2021"
-version = "0.1.5"
+version = "0.1.6"
 license = "MIT"
 authors = ["David Komer"]
 rust-version = "1.80.0"
