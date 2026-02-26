@@ -95,7 +95,7 @@ async fn load_grid_pipeline(
 
     let depth_stencil = DepthStencilState::new(renderer.render_textures.formats.depth)
         .with_depth_write_enabled(false)
-        .with_depth_compare(CompareFunction::LessEqual);
+        .with_depth_compare(CompareFunction::Less);
 
     // Standard non-premultiplied alpha blending
     let color_target =

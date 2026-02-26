@@ -5,11 +5,7 @@ use awsm_renderer_core::pipeline::primitive::FrontFace;
 
 use crate::{
     gltf::{
-        buffers::{
-            index::extract_triangle_indices,
-            mesh::{get_position_from_buffer, get_vec3_from_buffer, get_vec4_from_buffer},
-            MeshBufferAttributeIndexInfoWithOffset,
-        },
+        buffers::mesh::{get_position_from_buffer, get_vec3_from_buffer, get_vec4_from_buffer},
         error::AwsmGltfError,
     },
     meshes::buffer_info::{MeshBufferVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo},
@@ -38,9 +34,7 @@ use crate::{
 /// - Hard edges: GLTF duplicated vertices with different normals → respective normals copied → hard edges preserved
 pub(super) fn create_visibility_vertices(
     attribute_data: &BTreeMap<MeshBufferVertexAttributeInfo, Cow<'_, [u8]>>,
-    index: &MeshBufferAttributeIndexInfoWithOffset,
-    index_bytes: &[u8],
-    _triangle_count: usize,
+    triangle_indices: &[[usize; 3]],
     front_face: FrontFace,
     visibility_vertex_bytes: &mut Vec<u8>,
 ) -> Result<()> {
@@ -107,9 +101,6 @@ pub(super) fn create_visibility_vertices(
             )));
         }
     }
-
-    // Extract all triangle indices at once
-    let triangle_indices = extract_triangle_indices(index, index_bytes)?;
 
     // VERTEX EXPLOSION: Process each triangle and create 3 separate vertices per triangle
     // This is necessary because each vertex needs unique triangle_index and barycentric values

@@ -160,6 +160,7 @@ pub struct DeviceRequestLimits {
     pub max_buffer_size: bool,
     pub max_bind_groups: bool,
     pub max_storage_buffer_binding_size: bool,
+    pub max_color_attachment_bytes_per_sample: bool,
 }
 
 impl DeviceRequestLimits {
@@ -174,6 +175,7 @@ impl DeviceRequestLimits {
             max_buffer_size: true,
             max_bind_groups: true,
             max_storage_buffer_binding_size: true,
+            max_color_attachment_bytes_per_sample: true,
         }
     }
 
@@ -187,6 +189,12 @@ impl DeviceRequestLimits {
     /// Enables requesting max storage buffer binding size.
     pub fn with_max_storage_buffer_binding_size(mut self) -> Self {
         self.max_storage_buffer_binding_size = true;
+        self
+    }
+
+    /// Enables requesting max color attachments bytes per sample
+    pub fn with_max_color_attachment_bytes_per_sample(mut self) -> Self {
+        self.max_color_attachment_bytes_per_sample = true;
         self
     }
 
@@ -262,6 +270,15 @@ impl DeviceRequestLimits {
                 &obj,
                 &"maxStorageBufferBindingSize".into(),
                 &JsValue::from_f64(limits.max_storage_buffer_binding_size()),
+            )
+            .unwrap();
+        }
+
+        if self.max_color_attachment_bytes_per_sample {
+            js_sys::Reflect::set(
+                &obj,
+                &"maxColorAttachmentBytesPerSample".into(),
+                &JsValue::from(limits.max_color_attachment_bytes_per_sample()),
             )
             .unwrap();
         }

@@ -2,6 +2,21 @@
 // These functions work with interpolated vertex data (no barycentrics/attribute buffers needed)
 // Hardware automatically handles mip level selection via screen-space derivatives
 
+fn orthonormal_tangent_from_vertex(normal: vec3<f32>, tangent_xyz: vec3<f32>) -> vec3<f32> {
+    var t = tangent_xyz - normal * dot(tangent_xyz, normal);
+    let len_sq = dot(t, t);
+    if (len_sq > 1e-8) {
+        return t * inverseSqrt(len_sq);
+    }
+
+    let fallback_axis = select(
+        vec3<f32>(0.0, 0.0, 1.0),
+        vec3<f32>(0.0, 1.0, 0.0),
+        abs(normal.z) > 0.999
+    );
+    return normalize(cross(fallback_axis, normal));
+}
+
 // Main function: Sample all PBR material textures and return combined material properties
 // Returns PbrMaterialColor with perturbed normal (use material_color.normal for lighting!)
 fn pbr_get_material_color(
@@ -128,7 +143,7 @@ fn pbr_normal(
 
     // Build TBN matrix from interpolated vertex data
     let N = normalize(world_normal);
-    let T = normalize(world_tangent.xyz);
+    let T = orthonormal_tangent_from_vertex(N, world_tangent.xyz);
     let B = cross(N, T) * world_tangent.w;
     let tbn = mat3x3<f32>(T, B, N);
 
@@ -283,7 +298,7 @@ fn pbr_clearcoat_normal(
 
     // Build TBN matrix from interpolated vertex data
     let N = normalize(world_normal);
-    let T = normalize(world_tangent.xyz);
+    let T = orthonormal_tangent_from_vertex(N, world_tangent.xyz);
     let B = cross(N, T) * world_tangent.w;
     let tbn = mat3x3<f32>(T, B, N);
 

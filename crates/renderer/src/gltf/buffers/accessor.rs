@@ -23,7 +23,7 @@ pub fn accessor_to_bytes<'a>(
             match view.stride() {
                 None => Cow::Borrowed(&buffer[..accessor.size() * accessor.count()]),
                 Some(stride) => {
-                    let mut repacked = Vec::new();
+                    let mut repacked = Vec::with_capacity(accessor.size() * accessor.count());
                     for i in 0..accessor.count() {
                         let start = i * stride;
                         repacked.extend_from_slice(&buffer[start..start + accessor.size()])

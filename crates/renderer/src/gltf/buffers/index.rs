@@ -1,9 +1,6 @@
 //! Index buffer extraction helpers for glTF.
 
-use crate::{
-    buffer::helpers::{u8_to_f32_vec, u8_to_i16_vec, u8_to_u16_vec},
-    gltf::buffers::MeshBufferAttributeIndexInfoWithOffset,
-};
+use crate::gltf::buffers::MeshBufferAttributeIndexInfoWithOffset;
 
 use super::{accessor::accessor_to_bytes, AwsmGltfError, Result};
 
@@ -45,6 +42,7 @@ impl GltfMeshBufferIndexInfo {
             Some(accessor) => {
                 let offset = index_bytes.len();
                 let accessor_bytes = accessor_to_bytes(&accessor, buffers)?;
+                index_bytes.reserve(accessor.count() * 4);
 
                 match accessor.data_type() {
                     gltf::accessor::DataType::U32 => {
@@ -52,15 +50,15 @@ impl GltfMeshBufferIndexInfo {
                     }
 
                     gltf::accessor::DataType::U16 => {
-                        let u16_values = u8_to_u16_vec(&accessor_bytes);
-                        for value in u16_values {
+                        for bytes in accessor_bytes.chunks_exact(2) {
+                            let value = u16::from_le_bytes([bytes[0], bytes[1]]);
                             index_bytes.extend_from_slice(&u32::from(value).to_le_bytes());
                         }
                     }
 
                     gltf::accessor::DataType::I16 => {
-                        let i16_values = u8_to_i16_vec(&accessor_bytes);
-                        for value in i16_values {
+                        for bytes in accessor_bytes.chunks_exact(2) {
+                            let value = i16::from_le_bytes([bytes[0], bytes[1]]);
                             if value < 0 {
                                 return Err(AwsmGltfError::NegativeIndexValue(value as i32));
                             }
@@ -83,8 +81,9 @@ impl GltfMeshBufferIndexInfo {
                     }
 
                     gltf::accessor::DataType::F32 => {
-                        let f32_values = u8_to_f32_vec(&accessor_bytes);
-                        for value in f32_values {
+                        for bytes in accessor_bytes.chunks_exact(4) {
+                            let value =
+                                f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
                             let value = value as u32;
                             index_bytes.extend_from_slice(&value.to_le_bytes());
                         }
@@ -218,39 +217,13 @@ pub(super) fn extract_triangle_indices(
     let num_triangles = index.count / 3;
     let mut triangles = Vec::with_capacity(num_triangles);
 
-    for i in 0..num_triangles {
-        let mut triangle = [0usize; 3];
-
-        // Read the 3 vertex indices that form this triangle
-        for (j, triangle_vertex) in triangle.iter_mut().enumerate() {
-            // Calculate byte offset for this specific index
-            // i = triangle number, j = vertex within triangle (0, 1, or 2)
-            let index_offset = (i * 3 + j) * 4; // 4 bytes per u32 index
-
-            // Bounds check to ensure we don't read past the buffer
-            if index_offset + 4 > index_bytes.len() {
-                return Err(AwsmGltfError::ExtractIndices(format!(
-                    "Index data out of bounds at triangle {}, vertex {}",
-                    i, j
-                )));
-            }
-
-            // Extract the raw bytes for this index (4 bytes)
-            let index_slice = &index_bytes[index_offset..index_offset + 4];
-
-            // Convert bytes to vertex index based on format
-            // IMPORTANT: This vertex_idx points to a vertex in the ORIGINAL attribute arrays
-            // For example, if vertex_idx = 5, it means "use the 6th vertex from positions[],
-            // normals[], texcoords[], etc."
-            let vertex_idx = u32::from_le_bytes(index_slice.try_into().unwrap()) as usize;
-
-            // Store the ORIGINAL vertex index (references attribute arrays)
-            *triangle_vertex = vertex_idx;
-        }
-
-        // Add this triangle to our collection
-        // Each triangle contains 3 ORIGINAL vertex indices that reference the attribute data
-        triangles.push(triangle);
+    for triangle_bytes in index_bytes.chunks_exact(12).take(num_triangles) {
+        // IMPORTANT: vertex indices always reference the original per-vertex attribute arrays
+        // (positions, normals, texcoords, etc), before any triangle explosion.
+        let i0 = u32::from_le_bytes(triangle_bytes[0..4].try_into().unwrap()) as usize;
+        let i1 = u32::from_le_bytes(triangle_bytes[4..8].try_into().unwrap()) as usize;
+        let i2 = u32::from_le_bytes(triangle_bytes[8..12].try_into().unwrap()) as usize;
+        triangles.push([i0, i1, i2]);
     }
 
     // Return array of triangles, where each triangle is [vertex_idx_0, vertex_idx_1, vertex_idx_2]

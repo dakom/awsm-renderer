@@ -89,6 +89,18 @@ fn should_apply_volume_attenuation(
 // Microfacet BRDF Components
 // -------------------------------------------------------------
 
+// Compute half-vector robustly.
+// Returns zero when view and light are antiparallel (v + l == 0), which avoids
+// injecting an arbitrary fallback direction into the BRDF.
+fn safe_half_vector(v: vec3<f32>, l: vec3<f32>) -> vec3<f32> {
+    let sum = v + l;
+    let len_sq = dot(sum, sum);
+    if (len_sq > 1e-8) {
+        return sum * inverseSqrt(len_sq);
+    }
+    return vec3<f32>(0.0);
+}
+
 // Fresnel-Schlick approximation: view-dependent reflectance
 fn fresnel_schlick(cos_theta: f32, F0: vec3<f32>) -> vec3<f32> {
     let ct = saturate(cos_theta);
@@ -148,7 +160,10 @@ fn clearcoat_brdf_direct(
     }
 
     let cc_n = safe_normalize(clearcoat_normal);
-    let h = safe_normalize(v + l);
+    let h = safe_half_vector(v, l);
+    if (dot(h, h) == 0.0) {
+        return 0.0;
+    }
 
     let cc_n_dot_l = max(dot(cc_n, l), 0.0);
     let cc_n_dot_v = max(dot(cc_n, v), 1e-4);
@@ -208,7 +223,10 @@ fn sheen_brdf_direct(
         return vec3<f32>(0.0);
     }
 
-    let h = safe_normalize(v + l);
+    let h = safe_half_vector(v, l);
+    if (dot(h, h) == 0.0) {
+        return vec3<f32>(0.0);
+    }
 
     let n_dot_l = max(dot(n, l), 0.0);
     let n_dot_v = max(dot(n, v), 1e-4);
@@ -291,7 +309,7 @@ fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera
     let n = safe_normalize(light_brdf.normal);
     let v = safe_normalize(surface_to_camera);
     let l = safe_normalize(light_brdf.light_dir);
-    let h = safe_normalize(v + l);
+    let h = safe_half_vector(v, l);
 
     // Material properties
     let base_color = color.base.rgb;
@@ -302,8 +320,9 @@ fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera
     // Lighting geometry
     let n_dot_l = max(dot(n, l), 0.0);
     let n_dot_v = max(dot(n, v), 1e-4);
-    let n_dot_h = max(dot(n, h), 0.0);
-    let v_dot_h = max(dot(v, h), 0.0);
+    let has_half = dot(h, h) > 0.0;
+    let n_dot_h = select(0.0, max(dot(n, h), 0.0), has_half);
+    let v_dot_h = select(0.0, max(dot(v, h), 0.0), has_half);
 
     // F0: base reflectivity at normal incidence
     // KHR_materials_ior: dielectric_f0_base = ((ior - 1) / (ior + 1))^2
@@ -316,10 +335,20 @@ fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera
     let f90 = mix(color.specular, 1.0, metallic);
 
     // Cook-Torrance specular BRDF: DFG / (4 * N·L * N·V)
-    let F = fresnel_schlick_f90(v_dot_h, F0, f90);
+    // When V and L are antiparallel, H is undefined. Treat that as zero specular
+    // and use view-Fresnel for diffuse energy conservation.
+    let F = select(
+        fresnel_schlick_f90(n_dot_v, F0, f90),
+        fresnel_schlick_f90(v_dot_h, F0, f90),
+        has_half
+    );
     let D = distribution_ggx(n_dot_h, alpha);
     let G = geometry_smith(n, v, l, alpha);
-    let specular = F * (D * G) / max(4.0 * n_dot_l * n_dot_v, EPSILON);
+    let specular = select(
+        vec3<f32>(0.0),
+        F * (D * G) / max(4.0 * n_dot_l * n_dot_v, EPSILON),
+        has_half
+    );
 
     // Lambertian diffuse (energy-conserving: scaled by (1-F_max) and non-metallic portion)
     // Note: transmission modifies diffuse in brdf_ibl, but for direct lighting we keep

@@ -60,6 +60,7 @@ impl GltfLoader {
                     .await?
                     .text()
                     .await?;
+
                 let bytes: &[u8] = text.as_bytes();
                 Gltf::from_slice(bytes)
             }

@@ -32,75 +32,29 @@ impl AwsmRenderer {
             .cloned()
             .unwrap();
 
-        // Load all animations from the GLTF file
-        // TODO: Add proper API for selecting/controlling which animations to play
-        // Heuristic: Only load the first animation per property per node
-        // This prevents multiple conflicting animations from playing simultaneously
-        let mut has_translation = false;
-        let mut has_rotation = false;
-        let mut has_scale = false;
+        if let Some(node_samplers) = ctx.node_animation_samplers.get(&gltf_node.index()) {
+            if let Some(sampler_ref) = node_samplers.translation {
+                self.populate_gltf_animation_transform_translation(
+                    ctx,
+                    ctx.resolve_animation_sampler(sampler_ref)?,
+                    transform_key,
+                )?;
+            }
 
-        for gltf_animation in ctx.data.doc.animations() {
-            for channel in gltf_animation.channels() {
-                if channel.target().node().index() == gltf_node.index() {
-                    match channel.target().property() {
-                        gltf::animation::Property::Translation => {
-                            if !has_translation {
-                                self.populate_gltf_animation_transform_translation(
-                                    ctx,
-                                    gltf_animation
-                                        .samplers()
-                                        .nth(channel.sampler().index())
-                                        .ok_or(AwsmGltfError::MissingAnimationSampler {
-                                            animation_index: gltf_animation.index(),
-                                            channel_index: channel.index(),
-                                            sampler_index: channel.sampler().index(),
-                                        })?,
-                                    transform_key,
-                                )?;
-                                has_translation = true;
-                            }
-                        }
-                        gltf::animation::Property::Rotation => {
-                            if !has_rotation {
-                                self.populate_gltf_animation_transform_rotation(
-                                    ctx,
-                                    gltf_animation
-                                        .samplers()
-                                        .nth(channel.sampler().index())
-                                        .ok_or(AwsmGltfError::MissingAnimationSampler {
-                                            animation_index: gltf_animation.index(),
-                                            channel_index: channel.index(),
-                                            sampler_index: channel.sampler().index(),
-                                        })?,
-                                    transform_key,
-                                )?;
-                                has_rotation = true;
-                            }
-                        }
-                        gltf::animation::Property::Scale => {
-                            if !has_scale {
-                                self.populate_gltf_animation_transform_scale(
-                                    ctx,
-                                    gltf_animation
-                                        .samplers()
-                                        .nth(channel.sampler().index())
-                                        .ok_or(AwsmGltfError::MissingAnimationSampler {
-                                            animation_index: gltf_animation.index(),
-                                            channel_index: channel.index(),
-                                            sampler_index: channel.sampler().index(),
-                                        })?,
-                                    transform_key,
-                                )?;
-                                has_scale = true;
-                            }
-                        }
-                        gltf::animation::Property::MorphTargetWeights => {
-                            // morph targets will be dealt with later when we populate the mesh
-                            // by calling populate_gltf_animation_morph
-                        }
-                    }
-                }
+            if let Some(sampler_ref) = node_samplers.rotation {
+                self.populate_gltf_animation_transform_rotation(
+                    ctx,
+                    ctx.resolve_animation_sampler(sampler_ref)?,
+                    transform_key,
+                )?;
+            }
+
+            if let Some(sampler_ref) = node_samplers.scale {
+                self.populate_gltf_animation_transform_scale(
+                    ctx,
+                    ctx.resolve_animation_sampler(sampler_ref)?,
+                    transform_key,
+                )?;
             }
         }
 

@@ -3,17 +3,13 @@ use std::{borrow::Cow, collections::BTreeMap};
 use glam::Vec3;
 
 use crate::{
-    gltf::{
-        buffers::{index::extract_triangle_indices, MeshBufferAttributeIndexInfoWithOffset},
-        error::{AwsmGltfError, Result},
-    },
+    gltf::error::{AwsmGltfError, Result},
     meshes::buffer_info::{MeshBufferVertexAttributeInfo, MeshBufferVisibilityVertexAttributeInfo},
 };
 
 pub(super) fn ensure_normals<'a>(
     mut attribute_data: BTreeMap<MeshBufferVertexAttributeInfo, Cow<'a, [u8]>>,
-    index: &MeshBufferAttributeIndexInfoWithOffset,
-    index_bytes: &[u8],
+    triangle_indices: &[[usize; 3]],
 ) -> Result<BTreeMap<MeshBufferVertexAttributeInfo, Cow<'a, [u8]>>> {
     if !attribute_data.keys().any(|x| {
         matches!(
@@ -33,7 +29,7 @@ pub(super) fn ensure_normals<'a>(
             })
             .ok_or_else(|| AwsmGltfError::ConstructNormals("missing positions".to_string()))?;
 
-        let normals_bytes = compute_normals(positions, index, index_bytes)?;
+        let normals_bytes = compute_normals(positions, triangle_indices)?;
         attribute_data.insert(
             MeshBufferVertexAttributeInfo::Visibility(
                 MeshBufferVisibilityVertexAttributeInfo::Normals {
@@ -50,8 +46,7 @@ pub(super) fn ensure_normals<'a>(
 
 pub(super) fn compute_normals(
     positions_bytes: &[u8],
-    index: &MeshBufferAttributeIndexInfoWithOffset,
-    index_bytes: &[u8],
+    triangle_indices: &[[usize; 3]],
 ) -> Result<Vec<u8>> {
     tracing::info!("no baked normals, computing from positions and indices...");
 
@@ -76,9 +71,6 @@ pub(super) fn compute_normals(
         return Ok(Vec::new());
     }
 
-    // Get index data - we know indices are required now
-    let triangle_indices = extract_triangle_indices(index, index_bytes)?;
-
     if triangle_indices.is_empty() {
         return Ok(Vec::new());
     }
@@ -87,7 +79,7 @@ pub(super) fn compute_normals(
     let mut normals = vec![Vec3::ZERO; vertices.len()];
 
     // Compute face normals and accumulate to vertices
-    for triangle in &triangle_indices {
+    for triangle in triangle_indices {
         // Bounds check
         for &vertex_idx in triangle {
             if vertex_idx >= vertices.len() {

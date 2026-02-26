@@ -8,6 +8,7 @@ use std::{
 use awsm_renderer_core::texture::texture_pool::TextureColorInfo;
 use glam::Mat4;
 
+use crate::materials::MaterialKey;
 use crate::{meshes::MeshKey, textures::TextureKey, transforms::TransformKey, AwsmRenderer};
 
 use super::{data::GltfData, error::AwsmGltfError};
@@ -23,10 +24,12 @@ pub(super) mod transforms;
 pub struct GltfPopulateContext {
     pub data: Arc<GltfData>,
     pub textures: Mutex<HashMap<GltfTextureKey, TextureKey>>,
+    pub(super) material_keys: Mutex<HashMap<GltfMaterialLookupKey, MaterialKey>>,
     pub node_to_skin_transform:
         Mutex<HashMap<GltfIndex, Arc<(Vec<TransformKey>, Vec<SkinInverseBindMatrix>)>>>,
     pub transform_is_joint: Mutex<HashSet<TransformKey>>,
     pub transform_is_instanced: Mutex<HashSet<TransformKey>>,
+    pub(super) node_animation_samplers: HashMap<GltfIndex, GltfNodeAnimationSamplers>,
     pub key_lookups: Arc<Mutex<GltfKeyLookups>>,
 }
 
@@ -115,6 +118,28 @@ type SkinInverseBindMatrix = Mat4;
 
 type GltfIndex = usize;
 
+#[derive(Clone, Copy, Debug)]
+pub(super) struct GltfAnimationSamplerRef {
+    pub animation_index: usize,
+    pub channel_index: usize,
+    pub sampler_index: usize,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(super) struct GltfNodeAnimationSamplers {
+    pub translation: Option<GltfAnimationSamplerRef>,
+    pub rotation: Option<GltfAnimationSamplerRef>,
+    pub scale: Option<GltfAnimationSamplerRef>,
+    pub morph: Option<GltfAnimationSamplerRef>,
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub(super) struct GltfMaterialLookupKey {
+    pub material_index: Option<usize>,
+    pub vertex_color_set_index: Option<usize>,
+    pub hud: bool,
+}
+
 impl AwsmRenderer {
     /// Populates renderer resources from a glTF asset.
     pub async fn populate_gltf(
@@ -126,13 +151,16 @@ impl AwsmRenderer {
         self.gltf.raw_datas.push(gltf_data.clone());
 
         let mut mesh_keys = Vec::new();
+        let node_animation_samplers = build_node_animation_sampler_lookup(&gltf_data.doc);
 
         let ctx = GltfPopulateContext {
             data: gltf_data,
             textures: Mutex::new(HashMap::new()),
+            material_keys: Mutex::new(HashMap::new()),
             node_to_skin_transform: Mutex::new(HashMap::new()),
             transform_is_joint: Mutex::new(HashSet::new()),
             transform_is_instanced: Mutex::new(HashSet::new()),
+            node_animation_samplers,
             key_lookups: Arc::new(Mutex::new(GltfKeyLookups::default())),
         };
 
@@ -178,4 +206,65 @@ impl AwsmRenderer {
 
         Ok(ctx)
     }
+}
+
+impl GltfPopulateContext {
+    pub(super) fn resolve_animation_sampler(
+        &self,
+        sampler_ref: GltfAnimationSamplerRef,
+    ) -> Result<gltf::animation::Sampler<'_>, AwsmGltfError> {
+        self.data
+            .doc
+            .animations()
+            .nth(sampler_ref.animation_index)
+            .and_then(|animation| animation.samplers().nth(sampler_ref.sampler_index))
+            .ok_or(AwsmGltfError::MissingAnimationSampler {
+                animation_index: sampler_ref.animation_index,
+                channel_index: sampler_ref.channel_index,
+                sampler_index: sampler_ref.sampler_index,
+            })
+    }
+}
+
+fn build_node_animation_sampler_lookup(
+    doc: &gltf::Document,
+) -> HashMap<GltfIndex, GltfNodeAnimationSamplers> {
+    let mut out = HashMap::<GltfIndex, GltfNodeAnimationSamplers>::new();
+
+    for animation in doc.animations() {
+        for channel in animation.channels() {
+            let node_index = channel.target().node().index();
+            let entry = out.entry(node_index).or_default();
+            let sampler_ref = GltfAnimationSamplerRef {
+                animation_index: animation.index(),
+                channel_index: channel.index(),
+                sampler_index: channel.sampler().index(),
+            };
+
+            match channel.target().property() {
+                gltf::animation::Property::Translation => {
+                    if entry.translation.is_none() {
+                        entry.translation = Some(sampler_ref);
+                    }
+                }
+                gltf::animation::Property::Rotation => {
+                    if entry.rotation.is_none() {
+                        entry.rotation = Some(sampler_ref);
+                    }
+                }
+                gltf::animation::Property::Scale => {
+                    if entry.scale.is_none() {
+                        entry.scale = Some(sampler_ref);
+                    }
+                }
+                gltf::animation::Property::MorphTargetWeights => {
+                    if entry.morph.is_none() {
+                        entry.morph = Some(sampler_ref);
+                    }
+                }
+            }
+        }
+    }
+
+    out
 }

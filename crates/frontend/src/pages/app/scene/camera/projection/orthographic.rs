@@ -3,6 +3,8 @@ use glam::Mat4;
 
 use crate::pages::app::scene::camera::CameraView;
 
+use super::clip_planes::tight_clip_planes_from_aabb;
+
 /// Orthographic projection camera for WebGPU (depth range [0,1])
 #[derive(Debug, Clone)]
 pub struct OrthographicCamera {
@@ -45,14 +47,16 @@ impl OrthographicCamera {
         self.update_near_far(view, aabb, margin);
     }
 
+    /// Recomputes near/far after camera view changes (orbit/pan/rotate).
+    pub fn on_view_changed(&mut self, view: &CameraView, aabb: &Aabb, margin: f32) {
+        self.update_near_far(view, aabb, margin);
+    }
+
     // internal helper, whenever zoom changes to adjust clipping dynamically.
     fn update_near_far(&mut self, view: &CameraView, aabb: &Aabb, margin: f32) {
-        let bounding_radius = aabb.size().length() * 0.5;
-
-        let distance = view.position().distance(view.look_at());
-
-        self.near = (distance - bounding_radius * margin * 2.0).max(0.01);
-        self.far = distance + bounding_radius * margin * 2.0;
+        let (near, far) = tight_clip_planes_from_aabb(view, aabb, margin);
+        self.near = near;
+        self.far = far;
 
         // eh, whatever
         // self.near = 0.1;
