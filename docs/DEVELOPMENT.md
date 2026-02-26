@@ -71,6 +71,11 @@ High-res for skybox
 cmgen -s 2048 -f exr -x skybox myHDR.exr
 ```
 
+or, if simple png
+```bash
+cmgen -s 2048 -f png -x skybox myimage.png
+```
+
 Lower res for specular (roughness-prefiltered faces) IBL
 ```bash
 cmgen -s 512 -f exr --ibl-ld ibl-env myHDR.exr
@@ -87,7 +92,17 @@ After all these are done, you probably want to move the created subdirectories i
 
 _if your EXRs come in flipped, use --convert-texcoord-origin top-left (rarely needed with cmgen output)_
 
-Skybox
+Skybox (if simple png)
+
+```bash
+
+ktx create \
+    --cubemap \
+    --format R8G8B8A8_SRGB \
+    skybox/px.png skybox/nx.png skybox/py.png skybox/ny.png skybox/pz.png skybox/nz.png \
+    skybox.ktx2
+```
+Skybox (with mips?)
 
 ```bash
 
