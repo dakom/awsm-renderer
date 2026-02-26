@@ -322,7 +322,7 @@ fn brdf_direct(color: PbrMaterialColor, light_brdf: LightBrdf, surface_to_camera
     let n_dot_v = max(dot(n, v), 1e-4);
     let has_half = dot(h, h) > 0.0;
     let n_dot_h = select(0.0, max(dot(n, h), 0.0), has_half);
-    var v_dot_h = select(0.0, max(dot(v, h), 0.0), has_half);
+    let v_dot_h = select(0.0, max(dot(v, h), 0.0), has_half);
 
     // F0: base reflectivity at normal incidence
     // KHR_materials_ior: dielectric_f0_base = ((ior - 1) / (ior + 1))^2
