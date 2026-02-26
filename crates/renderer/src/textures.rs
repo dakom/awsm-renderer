@@ -5,6 +5,7 @@ use std::{collections::HashMap, sync::LazyLock};
 use awsm_renderer_core::{
     buffers::{BufferDescriptor, BufferUsage},
     compare::CompareFunction,
+    cubemap::{self, CubemapBytesLayout, CubemapFace},
     error::AwsmCoreError,
     image::ImageData,
     renderer::AwsmRendererWebGpu,
@@ -111,6 +112,54 @@ impl AwsmRenderer {
                     .await?;
             }
         }
+        Ok(())
+    }
+
+    /// Updates one face of a cubemap texture in-place from raw bytes.
+    pub fn update_cubemap_texture_face(
+        &self,
+        texture_key: CubemapTextureKey,
+        face: CubemapFace,
+        mip_level: u32,
+        width: u32,
+        height: u32,
+        data: &[u8],
+        layout: CubemapBytesLayout,
+    ) -> crate::error::Result<()> {
+        let texture = self.textures.get_cubemap(texture_key)?;
+        cubemap::update_texture_face(
+            &self.gpu, texture, face, mip_level, width, height, data, layout,
+        )?;
+        Ok(())
+    }
+
+    /// Updates all six faces of a cubemap texture in-place from one contiguous byte buffer.
+    ///
+    /// Data must be packed in face order: +X, -X, +Y, -Y, +Z, -Z.
+    pub fn update_cubemap_texture_all_faces(
+        &self,
+        texture_key: CubemapTextureKey,
+        mip_level: u32,
+        width: u32,
+        height: u32,
+        data: &[u8],
+        layout: CubemapBytesLayout,
+    ) -> crate::error::Result<()> {
+        let texture = self.textures.get_cubemap(texture_key)?;
+        cubemap::update_texture_all_faces(
+            &self.gpu, texture, mip_level, width, height, data, layout,
+        )?;
+        Ok(())
+    }
+
+    /// Regenerates mipmaps for an existing cubemap texture.
+    pub async fn regenerate_cubemap_texture_mipmaps(
+        &self,
+        texture_key: CubemapTextureKey,
+        mip_levels: u32,
+    ) -> crate::error::Result<()> {
+        let texture = self.textures.get_cubemap(texture_key)?;
+        cubemap::regenerate_texture_mipmaps(&self.gpu, texture, mip_levels).await?;
         Ok(())
     }
 }

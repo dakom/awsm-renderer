@@ -3,7 +3,7 @@
 use std::sync::LazyLock;
 
 use awsm_renderer_core::cubemap::images::CubemapBitmapColors;
-use awsm_renderer_core::cubemap::CubemapImage;
+use awsm_renderer_core::cubemap::{CubemapBytesLayout, CubemapFace, CubemapImage};
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use awsm_renderer_core::sampler::{AddressMode, FilterMode, MipmapFilterMode};
 
@@ -18,6 +18,55 @@ impl AwsmRenderer {
         self.environment.skybox = skybox;
         self.bind_groups
             .mark_create(BindGroupCreate::EnvironmentSkyboxCreate);
+    }
+
+    /// Updates one skybox cubemap face in-place.
+    pub fn update_skybox_face(
+        &self,
+        face: CubemapFace,
+        mip_level: u32,
+        width: u32,
+        height: u32,
+        data: &[u8],
+        layout: CubemapBytesLayout,
+    ) -> crate::error::Result<()> {
+        self.update_cubemap_texture_face(
+            self.environment.skybox.texture_key,
+            face,
+            mip_level,
+            width,
+            height,
+            data,
+            layout,
+        )
+    }
+
+    /// Updates all six skybox cubemap faces in-place.
+    pub fn update_skybox_all_faces(
+        &self,
+        mip_level: u32,
+        width: u32,
+        height: u32,
+        data: &[u8],
+        layout: CubemapBytesLayout,
+    ) -> crate::error::Result<()> {
+        self.update_cubemap_texture_all_faces(
+            self.environment.skybox.texture_key,
+            mip_level,
+            width,
+            height,
+            data,
+            layout,
+        )
+    }
+
+    /// Regenerates skybox cubemap mipmaps from mip level 0.
+    pub async fn regenerate_skybox_mipmaps(&self) -> crate::error::Result<()> {
+        self.regenerate_cubemap_texture_mipmaps(
+            self.environment.skybox.texture_key,
+            self.environment.skybox.mip_count,
+        )
+        .await
     }
 }
 

@@ -7,6 +7,7 @@ use std::sync::LazyLock;
 use awsm_renderer_core::{
     brdf_lut::generate::BrdfLut,
     buffers::{BufferDescriptor, BufferUsage},
+    cubemap::{CubemapBytesLayout, CubemapFace},
     error::AwsmCoreError,
     renderer::AwsmRendererWebGpu,
 };
@@ -37,6 +38,104 @@ impl AwsmRenderer {
         self.lights.ibl = ibl;
         self.bind_groups.mark_create(BindGroupCreate::IblTextures);
         self.lights.lighting_info_gpu_dirty = true;
+    }
+
+    /// Updates one IBL `prefiltered_env` cubemap face in-place.
+    pub fn update_ibl_prefiltered_env_face(
+        &self,
+        face: CubemapFace,
+        mip_level: u32,
+        width: u32,
+        height: u32,
+        data: &[u8],
+        layout: CubemapBytesLayout,
+    ) -> crate::error::Result<()> {
+        self.update_cubemap_texture_face(
+            self.lights.ibl.prefiltered_env.texture_key,
+            face,
+            mip_level,
+            width,
+            height,
+            data,
+            layout,
+        )
+    }
+
+    /// Updates all six IBL `prefiltered_env` cubemap faces in-place.
+    pub fn update_ibl_prefiltered_env_all_faces(
+        &self,
+        mip_level: u32,
+        width: u32,
+        height: u32,
+        data: &[u8],
+        layout: CubemapBytesLayout,
+    ) -> crate::error::Result<()> {
+        self.update_cubemap_texture_all_faces(
+            self.lights.ibl.prefiltered_env.texture_key,
+            mip_level,
+            width,
+            height,
+            data,
+            layout,
+        )
+    }
+
+    /// Regenerates IBL `prefiltered_env` mipmaps from mip level 0.
+    pub async fn regenerate_ibl_prefiltered_env_mipmaps(&self) -> crate::error::Result<()> {
+        self.regenerate_cubemap_texture_mipmaps(
+            self.lights.ibl.prefiltered_env.texture_key,
+            self.lights.ibl.prefiltered_env.mip_count,
+        )
+        .await
+    }
+
+    /// Updates one IBL irradiance cubemap face in-place.
+    pub fn update_ibl_irradiance_face(
+        &self,
+        face: CubemapFace,
+        mip_level: u32,
+        width: u32,
+        height: u32,
+        data: &[u8],
+        layout: CubemapBytesLayout,
+    ) -> crate::error::Result<()> {
+        self.update_cubemap_texture_face(
+            self.lights.ibl.irradiance.texture_key,
+            face,
+            mip_level,
+            width,
+            height,
+            data,
+            layout,
+        )
+    }
+
+    /// Updates all six IBL irradiance cubemap faces in-place.
+    pub fn update_ibl_irradiance_all_faces(
+        &self,
+        mip_level: u32,
+        width: u32,
+        height: u32,
+        data: &[u8],
+        layout: CubemapBytesLayout,
+    ) -> crate::error::Result<()> {
+        self.update_cubemap_texture_all_faces(
+            self.lights.ibl.irradiance.texture_key,
+            mip_level,
+            width,
+            height,
+            data,
+            layout,
+        )
+    }
+
+    /// Regenerates IBL irradiance mipmaps from mip level 0.
+    pub async fn regenerate_ibl_irradiance_mipmaps(&self) -> crate::error::Result<()> {
+        self.regenerate_cubemap_texture_mipmaps(
+            self.lights.ibl.irradiance.texture_key,
+            self.lights.ibl.irradiance.mip_count,
+        )
+        .await
     }
 }
 
