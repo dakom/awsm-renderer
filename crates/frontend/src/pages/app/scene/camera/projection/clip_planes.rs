@@ -5,7 +5,10 @@ use crate::pages::app::scene::camera::CameraView;
 
 const MIN_NEAR: f32 = 0.001;
 const MIN_RANGE: f32 = 0.1;
-const MAX_DEPTH_RATIO: f32 = 1_000_000_000.0;
+const MAX_DEPTH_RATIO: f32 = 1_000_000.0;
+// Conservative safety margin for fallback far plane when bounds are suspicious.
+// Large enough to avoid accidental clipping from camera drift, but still bounded by MAX_DEPTH_RATIO.
+const CONSERVATIVE_FAR_RADIUS_MULTIPLIER: f32 = 256.0;
 
 pub(super) fn tight_clip_planes_from_aabb(
     view: &CameraView,
@@ -55,7 +58,8 @@ pub(super) fn tight_clip_planes_from_aabb(
     if !use_tight_range || !has_tight_near {
         let view_distance = (view.position() - view.look_at()).length();
         let scene_radius = (aabb.size().length() * 0.5 * margin.max(1.0)).max(1.0);
-        let conservative_far = (view_distance + scene_radius * 256.0).max(10_000.0);
+        let conservative_far =
+            (view_distance + scene_radius * CONSERVATIVE_FAR_RADIUS_MULTIPLIER).max(10_000.0);
         near = MIN_NEAR;
         far = far.max(conservative_far).max(near + MIN_RANGE);
     }

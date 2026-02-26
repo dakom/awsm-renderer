@@ -106,6 +106,8 @@ struct MikkTSpaceGeometry<'a> {
     triangles: &'a [[usize; 3]],
     tangent_sum: Vec<[f32; 3]>,
     tangent_sign_sum: Vec<f32>,
+    tangent_sign_positive_count: Vec<u32>,
+    tangent_sign_negative_count: Vec<u32>,
     tangent_count: Vec<u32>,
 }
 
@@ -124,6 +126,8 @@ impl<'a> MikkTSpaceGeometry<'a> {
             triangles,
             tangent_sum: vec![[0.0, 0.0, 0.0]; vertex_count],
             tangent_sign_sum: vec![0.0; vertex_count],
+            tangent_sign_positive_count: vec![0; vertex_count],
+            tangent_sign_negative_count: vec![0; vertex_count],
             tangent_count: vec![0; vertex_count],
         }
     }
@@ -180,7 +184,21 @@ impl<'a> MikkTSpaceGeometry<'a> {
                 tangent = [1.0, 0.0, 0.0];
             }
 
-            let sign = if self.tangent_sign_sum[vertex_index] >= 0.0 {
+            let sign_sum = self.tangent_sign_sum[vertex_index];
+            // UV seams can produce nearly-canceling signed tangents for the same shared vertex.
+            // Use sign_sum when stable; otherwise fall back to majority vote by sign count.
+            const SIGN_EPSILON: f32 = 1e-4;
+            let sign = if !sign_sum.is_finite() {
+                1.0
+            } else if sign_sum.abs() >= SIGN_EPSILON {
+                if sign_sum > 0.0 {
+                    1.0
+                } else {
+                    -1.0
+                }
+            } else if self.tangent_sign_positive_count[vertex_index]
+                >= self.tangent_sign_negative_count[vertex_index]
+            {
                 1.0
             } else {
                 -1.0
@@ -279,6 +297,11 @@ impl bevy_mikktspace::Geometry for MikkTSpaceGeometry<'_> {
         self.tangent_sum[vertex_index][1] += tangent[1];
         self.tangent_sum[vertex_index][2] += tangent[2];
         self.tangent_sign_sum[vertex_index] += tangent[3];
+        if tangent[3] > 0.0 {
+            self.tangent_sign_positive_count[vertex_index] += 1;
+        } else if tangent[3] < 0.0 {
+            self.tangent_sign_negative_count[vertex_index] += 1;
+        }
         self.tangent_count[vertex_index] += 1;
     }
 }

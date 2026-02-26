@@ -99,24 +99,13 @@ impl AwsmRenderer {
             &ctx.data.buffers.meshes[gltf_mesh.index()][gltf_primitive.index()];
 
         let native_primitive_buffer_info = MeshBufferInfo::from(primitive_buffer_info.clone());
+        let vertex_color_set_index =
+            extract_vertex_color_set_index(&primitive_buffer_info.triangles.vertex_attributes);
 
         let gltf_material = gltf_primitive.material();
         let material_lookup_key = GltfMaterialLookupKey {
             material_index: gltf_material.index(),
-            vertex_color_set_index: primitive_buffer_info
-                .triangles
-                .vertex_attributes
-                .iter()
-                .find_map(|attr| {
-                    if let MeshBufferVertexAttributeInfo::Custom(
-                        MeshBufferCustomVertexAttributeInfo::Colors { index, .. },
-                    ) = attr
-                    {
-                        Some(*index as usize)
-                    } else {
-                        None
-                    }
-                }),
+            vertex_color_set_index,
             hud: ctx.data.hints.hud,
         };
 
@@ -262,11 +251,30 @@ impl AwsmRenderer {
                 .triangles
                 .vertex_attribute_indices
                 .offset;
+            let custom_attribute_index_size = primitive_buffer_info
+                .triangles
+                .vertex_attribute_indices
+                .checked_total_size()
+                .ok_or_else(|| {
+                    AwsmGltfError::AttributeData(
+                        "Custom attribute index byte size overflowed usize".to_string(),
+                    )
+                })?;
             let custom_attribute_index_end = custom_attribute_index_start
-                + primitive_buffer_info
-                    .triangles
-                    .vertex_attribute_indices
-                    .total_size();
+                .checked_add(custom_attribute_index_size)
+                .ok_or_else(|| {
+                    AwsmGltfError::AttributeData(
+                        "Custom attribute index byte range overflowed usize".to_string(),
+                    )
+                })?;
+            if custom_attribute_index_end > ctx.data.buffers.index_bytes.len() {
+                return Err(AwsmGltfError::AttributeData(format!(
+                    "Custom attribute index byte range [{}..{}) exceeds index buffer length {}",
+                    custom_attribute_index_start,
+                    custom_attribute_index_end,
+                    ctx.data.buffers.index_bytes.len()
+                )));
+            }
             let attribute_index = &ctx.data.buffers.index_bytes
                 [custom_attribute_index_start..custom_attribute_index_end];
 
@@ -303,11 +311,31 @@ impl AwsmRenderer {
     }
 }
 
+fn extract_vertex_color_set_index(attributes: &[MeshBufferVertexAttributeInfo]) -> Option<usize> {
+    attributes.iter().find_map(|attr| {
+        if let MeshBufferVertexAttributeInfo::Custom(
+            MeshBufferCustomVertexAttributeInfo::Colors { index, .. },
+        ) = attr
+        {
+            Some(*index as usize)
+        } else {
+            None
+        }
+    })
+}
+
 fn should_force_single_sided_for_opaque_thin_shell(
     primitive: &gltf::Primitive<'_>,
     material: &gltf::Material<'_>,
     buffers: &[Vec<u8>],
 ) -> bool {
+    // Tuned for opaque "thin shell" meshes where double-sided rendering causes unstable depth
+    // ordering; values are conservative to avoid forcing single-sided on regular solids.
+    const THIN_SHELL_RATIO_THRESHOLD: f32 = 0.02;
+    const AXIS_NORMAL_MIN: f32 = 0.25;
+    const MIN_STRONG_NORMAL_SAMPLES: usize = 16;
+    const MIN_AXIS_SIDE_RATIO: f32 = 0.2;
+
     if !material.double_sided() {
         return false;
     }
@@ -354,7 +382,7 @@ fn should_force_single_sided_for_opaque_thin_shell(
     // Heuristic: if one axis is very thin and normals strongly point in opposite directions
     // along that axis (both +axis and -axis present), geometry likely has top+bottom layers
     // and culling back faces is more stable than honoring double-sided rendering.
-    if thin_extent / thick_extent > 0.02 {
+    if thin_extent / thick_extent > THIN_SHELL_RATIO_THRESHOLD {
         return false;
     }
 
@@ -362,7 +390,6 @@ fn should_force_single_sided_for_opaque_thin_shell(
         return false;
     };
 
-    const AXIS_NORMAL_MIN: f32 = 0.25;
     let mut pos_count = 0usize;
     let mut neg_count = 0usize;
     let mut strong_count = 0usize;
@@ -378,14 +405,14 @@ fn should_force_single_sided_for_opaque_thin_shell(
         }
     }
 
-    if strong_count < 16 {
+    if strong_count < MIN_STRONG_NORMAL_SAMPLES {
         return false;
     }
 
     let pos_ratio = pos_count as f32 / strong_count as f32;
     let neg_ratio = neg_count as f32 / strong_count as f32;
 
-    pos_ratio > 0.2 && neg_ratio > 0.2
+    pos_ratio > MIN_AXIS_SIDE_RATIO && neg_ratio > MIN_AXIS_SIDE_RATIO
 }
 
 fn try_position_aabb(gltf_primitive: &gltf::Primitive<'_>) -> Option<Aabb> {

@@ -34,6 +34,16 @@ use crate::{
 
 use super::error::{AwsmGltfError, Result};
 
+macro_rules! maybe_enter_span {
+    ($enabled:expr, $($span_args:tt)*) => {{
+        if $enabled {
+            Some(tracing::span!($($span_args)*).entered())
+        } else {
+            None
+        }
+    }};
+}
+
 /// Packed buffers extracted from a glTF asset.
 #[derive(Debug)]
 pub struct GltfBuffers {
@@ -226,9 +236,15 @@ pub struct MeshBufferAttributeIndexInfoWithOffset {
 }
 
 impl MeshBufferAttributeIndexInfoWithOffset {
+    /// Returns total byte size if it fits in `usize`.
+    pub fn checked_total_size(&self) -> Option<usize> {
+        self.count.checked_mul(4) // guaranteed u32
+    }
+
     /// Returns the total size in bytes for the index data.
     pub fn total_size(&self) -> usize {
-        self.count * 4 // guaranteed u32
+        self.checked_total_size()
+            .expect("index byte size overflowed usize")
     }
 }
 
@@ -316,18 +332,12 @@ impl From<MeshBufferTriangleDataInfoWithOffset> for MeshBufferTriangleDataInfo {
 impl GltfBuffers {
     /// Builds packed buffers from a glTF document and raw buffer data.
     pub fn new(doc: &gltf::Document, buffers: Vec<Vec<u8>>, hints: GltfDataHints) -> Result<Self> {
-        let _maybe_total_span_guard = if hints.render_timings {
-            Some(
-                tracing::span!(
-                    tracing::Level::INFO,
-                    "GLTF buffers build",
-                    mesh_count = doc.meshes().len()
-                )
-                .entered(),
-            )
-        } else {
-            None
-        };
+        let _maybe_total_span_guard = maybe_enter_span!(
+            hints.render_timings,
+            tracing::Level::INFO,
+            "GLTF buffers build",
+            mesh_count = doc.meshes().len()
+        );
         let world_matrices = compute_world_matrices(doc);
 
         // refactor original buffers into the format we want
@@ -346,45 +356,33 @@ impl GltfBuffers {
         let mut meshes: Vec<Vec<MeshBufferInfoWithOffset>> = Vec::new();
 
         for mesh in doc.meshes() {
-            let _maybe_mesh_span_guard = if hints.render_timings {
-                Some(
-                    tracing::span!(
-                        tracing::Level::INFO,
-                        "GLTF mesh build",
-                        mesh_index = mesh.index(),
-                        primitive_count = mesh.primitives().len()
-                    )
-                    .entered(),
-                )
-            } else {
-                None
-            };
+            let _maybe_mesh_span_guard = maybe_enter_span!(
+                hints.render_timings,
+                tracing::Level::INFO,
+                "GLTF mesh build",
+                mesh_index = mesh.index(),
+                primitive_count = mesh.primitives().len()
+            );
             let mut primitive_buffer_infos = Vec::new();
 
             let front_face = determine_front_face(mesh.index(), doc, &world_matrices);
             for primitive in mesh.primitives() {
-                let _maybe_primitive_span_guard = if hints.render_timings {
-                    Some(
-                        tracing::span!(
-                            tracing::Level::INFO,
-                            "GLTF primitive build",
-                            mesh_index = mesh.index(),
-                            primitive_index = primitive.index()
-                        )
-                        .entered(),
-                    )
-                } else {
-                    None
-                };
-                #[allow(clippy::blocks_in_conditions)]
-                let index: MeshBufferAttributeIndexInfoWithOffset = match {
-                    let _maybe_index_stage_span_guard = if hints.render_timings {
-                        Some(tracing::span!(tracing::Level::INFO, "build_indices").entered())
-                    } else {
-                        None
-                    };
-                    GltfMeshBufferIndexInfo::maybe_new(&primitive, &buffers, &mut index_bytes)?
-                } {
+                let _maybe_primitive_span_guard = maybe_enter_span!(
+                    hints.render_timings,
+                    tracing::Level::INFO,
+                    "GLTF primitive build",
+                    mesh_index = mesh.index(),
+                    primitive_index = primitive.index()
+                );
+                let maybe_index_info = {
+                    let _maybe_index_stage_span_guard = maybe_enter_span!(
+                        hints.render_timings,
+                        tracing::Level::INFO,
+                        "build_indices"
+                    );
+                    GltfMeshBufferIndexInfo::maybe_new(&primitive, &buffers, &mut index_bytes)
+                }?;
+                let index: MeshBufferAttributeIndexInfoWithOffset = match maybe_index_info {
                     Some(info) => info.into(),
                     None => generate_fresh_indices_from_primitive(&primitive, &mut index_bytes)?,
                 };
@@ -393,14 +391,11 @@ impl GltfBuffers {
 
                 // Step 2: Convert to mesh buffer format
                 let mesh_buffer_info = {
-                    let _maybe_convert_stage_span_guard = if hints.render_timings {
-                        Some(
-                            tracing::span!(tracing::Level::INFO, "convert_to_mesh_buffer")
-                                .entered(),
-                        )
-                    } else {
-                        None
-                    };
+                    let _maybe_convert_stage_span_guard = maybe_enter_span!(
+                        hints.render_timings,
+                        tracing::Level::INFO,
+                        "convert_to_mesh_buffer"
+                    );
                     convert_to_mesh_buffer(
                         &primitive,
                         hints.render_timings,

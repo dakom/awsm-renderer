@@ -341,7 +341,7 @@ async fn render_pipeline_key(
 
     let depth_stencil = DepthStencilState::new(depth_texture_format)
         .with_depth_write_enabled(true)
-        .with_depth_compare(CompareFunction::Less);
+        .with_depth_compare(CompareFunction::LessEqual);
 
     let mut pipeline_cache_key = RenderPipelineCacheKey::new(shader_key, pipeline_layout_key)
         .with_primitive(primitive_state.clone())

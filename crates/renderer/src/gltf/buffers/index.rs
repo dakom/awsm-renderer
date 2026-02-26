@@ -14,10 +14,16 @@ pub struct GltfMeshBufferIndexInfo {
 }
 
 impl GltfMeshBufferIndexInfo {
+    /// Returns total byte size if it fits in `usize`.
+    pub fn checked_total_size(&self) -> Option<usize> {
+        self.count.checked_mul(4) // guaranteed u32
+    }
+
     // the size in bytes of the index buffer for this primitive
     /// Returns the total size in bytes for this index buffer.
     pub fn total_size(&self) -> usize {
-        self.count * 4 // guaranteed u32
+        self.checked_total_size()
+            .expect("index byte size overflowed usize")
     }
 }
 
@@ -42,7 +48,10 @@ impl GltfMeshBufferIndexInfo {
             Some(accessor) => {
                 let offset = index_bytes.len();
                 let accessor_bytes = accessor_to_bytes(&accessor, buffers)?;
-                index_bytes.reserve(accessor.count() * 4);
+                let required_bytes = accessor.count().checked_mul(4).ok_or_else(|| {
+                    AwsmGltfError::ExtractIndices("Index byte size overflowed usize".to_string())
+                })?;
+                index_bytes.reserve(required_bytes);
 
                 match accessor.data_type() {
                     gltf::accessor::DataType::U32 => {
@@ -95,7 +104,7 @@ impl GltfMeshBufferIndexInfo {
                     count: accessor.count(),
                 };
 
-                assert_eq!(index_bytes.len() - offset, info.total_size());
+                assert_eq!(index_bytes.len() - offset, required_bytes);
 
                 Ok(Some(info))
             }
@@ -211,13 +220,39 @@ pub(super) fn extract_triangle_indices(
         return Ok(Vec::new());
     }
 
+    let byte_size = index.checked_total_size().ok_or_else(|| {
+        AwsmGltfError::ExtractIndices("Index byte size overflowed usize".to_string())
+    })?;
+    let end = index.offset.checked_add(byte_size).ok_or_else(|| {
+        AwsmGltfError::ExtractIndices("Index byte range overflowed usize".to_string())
+    })?;
+    if end > all_index_bytes.len() {
+        return Err(AwsmGltfError::ExtractIndices(format!(
+            "Index byte range [{}..{}) exceeds buffer length {}",
+            index.offset,
+            end,
+            all_index_bytes.len()
+        )));
+    }
+
     // we're just working with the bytes of this primitive
-    let index_bytes = &all_index_bytes[index.offset..index.offset + index.total_size()];
+    let index_bytes = &all_index_bytes[index.offset..end];
 
     let num_triangles = index.count / 3;
+    let expected_bytes = num_triangles.checked_mul(12).ok_or_else(|| {
+        AwsmGltfError::ExtractIndices("Triangle byte count overflowed usize".to_string())
+    })?;
+    if index_bytes.len() != expected_bytes {
+        return Err(AwsmGltfError::ExtractIndices(format!(
+            "Index byte length mismatch: expected {}, got {}",
+            expected_bytes,
+            index_bytes.len()
+        )));
+    }
+
     let mut triangles = Vec::with_capacity(num_triangles);
 
-    for triangle_bytes in index_bytes.chunks_exact(12).take(num_triangles) {
+    for triangle_bytes in index_bytes.chunks_exact(12) {
         // IMPORTANT: vertex indices always reference the original per-vertex attribute arrays
         // (positions, normals, texcoords, etc), before any triangle explosion.
         let i0 = u32::from_le_bytes(triangle_bytes[0..4].try_into().unwrap()) as usize;
