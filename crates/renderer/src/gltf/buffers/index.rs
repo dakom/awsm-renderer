@@ -211,13 +211,39 @@ pub(super) fn extract_triangle_indices(
         return Ok(Vec::new());
     }
 
+    let end = index
+        .offset
+        .checked_add(index.total_size())
+        .ok_or_else(|| {
+            AwsmGltfError::ExtractIndices("Index byte range overflowed usize".to_string())
+        })?;
+    if end > all_index_bytes.len() {
+        return Err(AwsmGltfError::ExtractIndices(format!(
+            "Index byte range [{}..{}) exceeds buffer length {}",
+            index.offset,
+            end,
+            all_index_bytes.len()
+        )));
+    }
+
     // we're just working with the bytes of this primitive
-    let index_bytes = &all_index_bytes[index.offset..index.offset + index.total_size()];
+    let index_bytes = &all_index_bytes[index.offset..end];
 
     let num_triangles = index.count / 3;
+    let expected_bytes = num_triangles.checked_mul(12).ok_or_else(|| {
+        AwsmGltfError::ExtractIndices("Triangle byte count overflowed usize".to_string())
+    })?;
+    if index_bytes.len() != expected_bytes {
+        return Err(AwsmGltfError::ExtractIndices(format!(
+            "Index byte length mismatch: expected {}, got {}",
+            expected_bytes,
+            index_bytes.len()
+        )));
+    }
+
     let mut triangles = Vec::with_capacity(num_triangles);
 
-    for triangle_bytes in index_bytes.chunks_exact(12).take(num_triangles) {
+    for triangle_bytes in index_bytes.chunks_exact(12) {
         // IMPORTANT: vertex indices always reference the original per-vertex attribute arrays
         // (positions, normals, texcoords, etc), before any triangle explosion.
         let i0 = u32::from_le_bytes(triangle_bytes[0..4].try_into().unwrap()) as usize;
