@@ -541,18 +541,15 @@ impl TransformController {
         scale_hidden: bool,
     ) -> Result<()> {
         for mesh_key in self.translation_keys() {
-            let mesh = renderer.meshes.get_mut(*mesh_key)?;
-            mesh.hidden = translation_hidden;
+            renderer.set_mesh_hidden(*mesh_key, translation_hidden)?;
         }
 
         for mesh_key in self.rotation_keys() {
-            let mesh = renderer.meshes.get_mut(*mesh_key)?;
-            mesh.hidden = rotation_hidden;
+            renderer.set_mesh_hidden(*mesh_key, rotation_hidden)?;
         }
 
         for mesh_key in self.scale_keys() {
-            let mesh = renderer.meshes.get_mut(*mesh_key)?;
-            mesh.hidden = scale_hidden;
+            renderer.set_mesh_hidden(*mesh_key, scale_hidden)?;
         }
 
         Ok(())
