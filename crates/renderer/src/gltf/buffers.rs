@@ -376,6 +376,7 @@ impl GltfBuffers {
                 } else {
                     None
                 };
+                #[allow(clippy::blocks_in_conditions)]
                 let index: MeshBufferAttributeIndexInfoWithOffset = match {
                     let _maybe_index_stage_span_guard = if hints.render_timings {
                         Some(tracing::span!(tracing::Level::INFO, "build_indices").entered())
