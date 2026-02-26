@@ -14,10 +14,16 @@ pub struct GltfMeshBufferIndexInfo {
 }
 
 impl GltfMeshBufferIndexInfo {
+    /// Returns total byte size if it fits in `usize`.
+    pub fn checked_total_size(&self) -> Option<usize> {
+        self.count.checked_mul(4) // guaranteed u32
+    }
+
     // the size in bytes of the index buffer for this primitive
     /// Returns the total size in bytes for this index buffer.
     pub fn total_size(&self) -> usize {
-        self.count * 4 // guaranteed u32
+        self.checked_total_size()
+            .expect("index byte size overflowed usize")
     }
 }
 
@@ -42,7 +48,10 @@ impl GltfMeshBufferIndexInfo {
             Some(accessor) => {
                 let offset = index_bytes.len();
                 let accessor_bytes = accessor_to_bytes(&accessor, buffers)?;
-                index_bytes.reserve(accessor.count() * 4);
+                let required_bytes = accessor.count().checked_mul(4).ok_or_else(|| {
+                    AwsmGltfError::ExtractIndices("Index byte size overflowed usize".to_string())
+                })?;
+                index_bytes.reserve(required_bytes);
 
                 match accessor.data_type() {
                     gltf::accessor::DataType::U32 => {
@@ -95,7 +104,7 @@ impl GltfMeshBufferIndexInfo {
                     count: accessor.count(),
                 };
 
-                assert_eq!(index_bytes.len() - offset, info.total_size());
+                assert_eq!(index_bytes.len() - offset, required_bytes);
 
                 Ok(Some(info))
             }
@@ -211,12 +220,12 @@ pub(super) fn extract_triangle_indices(
         return Ok(Vec::new());
     }
 
-    let end = index
-        .offset
-        .checked_add(index.total_size())
-        .ok_or_else(|| {
-            AwsmGltfError::ExtractIndices("Index byte range overflowed usize".to_string())
-        })?;
+    let byte_size = index.checked_total_size().ok_or_else(|| {
+        AwsmGltfError::ExtractIndices("Index byte size overflowed usize".to_string())
+    })?;
+    let end = index.offset.checked_add(byte_size).ok_or_else(|| {
+        AwsmGltfError::ExtractIndices("Index byte range overflowed usize".to_string())
+    })?;
     if end > all_index_bytes.len() {
         return Err(AwsmGltfError::ExtractIndices(format!(
             "Index byte range [{}..{}) exceeds buffer length {}",

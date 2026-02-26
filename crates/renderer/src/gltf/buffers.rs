@@ -236,9 +236,15 @@ pub struct MeshBufferAttributeIndexInfoWithOffset {
 }
 
 impl MeshBufferAttributeIndexInfoWithOffset {
+    /// Returns total byte size if it fits in `usize`.
+    pub fn checked_total_size(&self) -> Option<usize> {
+        self.count.checked_mul(4) // guaranteed u32
+    }
+
     /// Returns the total size in bytes for the index data.
     pub fn total_size(&self) -> usize {
-        self.count * 4 // guaranteed u32
+        self.checked_total_size()
+            .expect("index byte size overflowed usize")
     }
 }
 

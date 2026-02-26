@@ -251,11 +251,30 @@ impl AwsmRenderer {
                 .triangles
                 .vertex_attribute_indices
                 .offset;
+            let custom_attribute_index_size = primitive_buffer_info
+                .triangles
+                .vertex_attribute_indices
+                .checked_total_size()
+                .ok_or_else(|| {
+                    AwsmGltfError::AttributeData(
+                        "Custom attribute index byte size overflowed usize".to_string(),
+                    )
+                })?;
             let custom_attribute_index_end = custom_attribute_index_start
-                + primitive_buffer_info
-                    .triangles
-                    .vertex_attribute_indices
-                    .total_size();
+                .checked_add(custom_attribute_index_size)
+                .ok_or_else(|| {
+                    AwsmGltfError::AttributeData(
+                        "Custom attribute index byte range overflowed usize".to_string(),
+                    )
+                })?;
+            if custom_attribute_index_end > ctx.data.buffers.index_bytes.len() {
+                return Err(AwsmGltfError::AttributeData(format!(
+                    "Custom attribute index byte range [{}..{}) exceeds index buffer length {}",
+                    custom_attribute_index_start,
+                    custom_attribute_index_end,
+                    ctx.data.buffers.index_bytes.len()
+                )));
+            }
             let attribute_index = &ctx.data.buffers.index_bytes
                 [custom_attribute_index_start..custom_attribute_index_end];
 
