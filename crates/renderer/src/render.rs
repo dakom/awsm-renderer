@@ -1,7 +1,12 @@
 //! Render entry points and render context.
 
-use awsm_renderer_core::command::color::Color;
-use awsm_renderer_core::command::CommandEncoder;
+use awsm_renderer_core::command::{
+    color::Color,
+    render_pass::{
+        ColorAttachment, DepthStencilAttachment, RenderPassDescriptor, RenderPassEncoder,
+    },
+    CommandEncoder, LoadOp, StoreOp,
+};
 use awsm_renderer_core::renderer::AwsmRendererWebGpu;
 use awsm_renderer_core::texture::blit::blit_tex;
 
@@ -21,10 +26,22 @@ use crate::{AwsmRenderer, AwsmRendererLogging};
 /// Optional callbacks around render passes.
 #[derive(Default)]
 pub struct RenderHooks {
+    /// Runs before per-frame CPU->GPU writes and pass execution.
     pub pre_render: Option<Box<dyn Fn(&mut AwsmRenderer) -> Result<()>>>,
+    /// Runs before geometry/light/material passes (advanced setup use-cases).
     pub first_pass: Option<Box<dyn Fn(&RenderContext) -> Result<()>>>,
+    /// Runs after geometry passes and before light culling/material opaque shading.
+    ///
+    /// Use this for advanced visibility-buffer extensions that need to contribute additional
+    /// world-space opaque geometry.
+    pub after_geometry_pass: Option<Box<dyn Fn(&RenderContext) -> Result<()>>>,
+    /// Runs after opaque->transparent blit and before world transparent materials.
     pub before_transparent_pass: Option<Box<dyn Fn(&RenderContext) -> Result<()>>>,
+    /// Runs after world transparent materials and before HUD transparent rendering.
+    pub after_transparent_pass: Option<Box<dyn Fn(&RenderContext) -> Result<()>>>,
+    /// Runs after display pass and before command submission.
     pub last_pass: Option<Box<dyn Fn(&RenderContext) -> Result<()>>>,
+    /// Runs after command submission.
     pub post_render: Option<Box<dyn Fn(&mut AwsmRenderer) -> Result<()>>>,
 }
 
@@ -161,6 +178,17 @@ impl AwsmRenderer {
                 .render(&ctx, &renderables.hud, true)?;
         }
 
+        if let Some(hook) = hooks.and_then(|h| h.after_geometry_pass.as_ref()) {
+            {
+                let _maybe_span_guard = if self.logging.render_timings {
+                    Some(tracing::span!(tracing::Level::INFO, "AfterGeometryPass Hook").entered())
+                } else {
+                    None
+                };
+                hook(&ctx)?;
+            }
+        }
+
         {
             let _maybe_span_guard = if self.logging.render_timings {
                 Some(tracing::span!(tracing::Level::INFO, "Light Culling RenderPass").entered())
@@ -261,6 +289,19 @@ impl AwsmRenderer {
                 .render(&ctx, renderables.transparent, false)?;
         }
 
+        if let Some(hook) = hooks.and_then(|h| h.after_transparent_pass.as_ref()) {
+            {
+                let _maybe_span_guard = if self.logging.render_timings {
+                    Some(
+                        tracing::span!(tracing::Level::INFO, "AfterTransparentPass Hook").entered(),
+                    )
+                } else {
+                    None
+                };
+                hook(&ctx)?;
+            }
+        }
+
         {
             let _maybe_span_guard = if self.logging.render_timings {
                 Some(tracing::span!(tracing::Level::INFO, "HUD RenderPass").entered())
@@ -359,4 +400,147 @@ pub struct RenderContext<'a> {
     pub anti_aliasing: &'a AntiAliasing,
     pub post_processing: &'a PostProcessing,
     pub clear_color: &'a Color,
+}
+
+impl<'a> RenderContext<'a> {
+    /// Begins a visibility-buffer extension pass for world-space opaque geometry.
+    ///
+    /// This pass loads the existing visibility attachments and world depth, allowing custom hooks
+    /// to append opaque geometry before light culling/material-opaque shading.
+    pub fn begin_world_geometry_extension_pass(
+        &'a self,
+        label: Option<&'a str>,
+    ) -> Result<RenderPassEncoder> {
+        self.command_encoder
+            .begin_render_pass(
+                &RenderPassDescriptor {
+                    label,
+                    color_attachments: vec![
+                        ColorAttachment::new(
+                            &self.render_texture_views.visibility_data,
+                            LoadOp::Load,
+                            StoreOp::Store,
+                        ),
+                        ColorAttachment::new(
+                            &self.render_texture_views.barycentric,
+                            LoadOp::Load,
+                            StoreOp::Store,
+                        ),
+                        ColorAttachment::new(
+                            &self.render_texture_views.normal_tangent,
+                            LoadOp::Load,
+                            StoreOp::Store,
+                        ),
+                        ColorAttachment::new(
+                            &self.render_texture_views.barycentric_derivatives,
+                            LoadOp::Load,
+                            StoreOp::Store,
+                        ),
+                    ],
+                    depth_stencil_attachment: Some(
+                        DepthStencilAttachment::new(&self.render_texture_views.depth)
+                            .with_depth_load_op(LoadOp::Load)
+                            .with_depth_store_op(StoreOp::Store),
+                    ),
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .map_err(Into::into)
+    }
+
+    /// Begins a world-space transparent effect pass that targets the transparent color buffer and
+    /// shared scene depth.
+    pub fn begin_world_transparent_pass(
+        &'a self,
+        label: Option<&'a str>,
+    ) -> Result<RenderPassEncoder> {
+        let mut color_attachment = ColorAttachment::new(
+            &self.render_texture_views.transparent,
+            LoadOp::Load,
+            StoreOp::Store,
+        );
+
+        if self.anti_aliasing.msaa_sample_count.is_some() {
+            color_attachment =
+                color_attachment.with_resolve_target(&self.render_texture_views.composite);
+        }
+
+        self.command_encoder
+            .begin_render_pass(
+                &RenderPassDescriptor {
+                    label,
+                    color_attachments: vec![color_attachment],
+                    depth_stencil_attachment: Some(
+                        DepthStencilAttachment::new(&self.render_texture_views.depth)
+                            .with_depth_load_op(LoadOp::Load)
+                            .with_depth_store_op(StoreOp::Store),
+                    ),
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .map_err(Into::into)
+    }
+
+    /// Begins a HUD transparent pass using the shared transparent color target and HUD depth.
+    ///
+    /// This matches the renderer's built-in HUD pass behavior:
+    /// depth is cleared to `1.0` and then depth-tested/written within HUD space.
+    pub fn begin_hud_transparent_pass(
+        &'a self,
+        label: Option<&'a str>,
+    ) -> Result<RenderPassEncoder> {
+        let mut color_attachment = ColorAttachment::new(
+            &self.render_texture_views.transparent,
+            LoadOp::Load,
+            StoreOp::Store,
+        );
+
+        if self.anti_aliasing.msaa_sample_count.is_some() {
+            color_attachment =
+                color_attachment.with_resolve_target(&self.render_texture_views.composite);
+        }
+
+        self.command_encoder
+            .begin_render_pass(
+                &RenderPassDescriptor {
+                    label,
+                    color_attachments: vec![color_attachment],
+                    depth_stencil_attachment: Some(
+                        DepthStencilAttachment::new(&self.render_texture_views.hud_depth)
+                            .with_depth_load_op(LoadOp::Clear)
+                            .with_depth_clear_value(1.0)
+                            .with_depth_store_op(StoreOp::Store),
+                    ),
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .map_err(Into::into)
+    }
+
+    /// Begins a pass that loads the already-rendered swapchain image.
+    ///
+    /// This is intended for `RenderHooks::last_pass` overlays, where you want to draw on top of
+    /// the display output without clearing it.
+    pub fn begin_display_overlay_pass(
+        &'a self,
+        label: Option<&'a str>,
+    ) -> Result<RenderPassEncoder> {
+        self.command_encoder
+            .begin_render_pass(
+                &RenderPassDescriptor {
+                    label,
+                    color_attachments: vec![ColorAttachment::new(
+                        &self.gpu.current_context_texture_view()?,
+                        LoadOp::Load,
+                        StoreOp::Store,
+                    )],
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .map_err(Into::into)
+    }
 }

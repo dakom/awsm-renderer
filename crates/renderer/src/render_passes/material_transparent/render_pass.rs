@@ -11,10 +11,6 @@ use crate::{
     },
     renderable::Renderable,
 };
-use awsm_renderer_core::command::{
-    render_pass::{ColorAttachment, DepthStencilAttachment, RenderPassDescriptor},
-    LoadOp, StoreOp,
-};
 
 /// Transparent material pass bind groups and pipelines.
 pub struct MaterialTransparentRenderPass {
@@ -52,37 +48,11 @@ impl MaterialTransparentRenderPass {
         renderables: Vec<Renderable>,
         is_hud: bool,
     ) -> Result<()> {
-        let mut color_attachment = ColorAttachment::new(
-            &ctx.render_texture_views.transparent,
-            LoadOp::Load,
-            StoreOp::Store,
-        );
-
-        if ctx.anti_aliasing.msaa_sample_count.is_some() {
-            color_attachment =
-                color_attachment.with_resolve_target(&ctx.render_texture_views.composite);
-        }
-
-        let depth_stencil_attachment = if is_hud {
-            DepthStencilAttachment::new(&ctx.render_texture_views.hud_depth)
-                .with_depth_load_op(LoadOp::Clear)
-                .with_depth_clear_value(1.0)
-                .with_depth_store_op(StoreOp::Store)
+        let render_pass = if is_hud {
+            ctx.begin_hud_transparent_pass(Some("Material Transparent Pass (HUD)"))?
         } else {
-            DepthStencilAttachment::new(&ctx.render_texture_views.depth)
-                .with_depth_load_op(LoadOp::Load)
-                .with_depth_store_op(StoreOp::Store)
+            ctx.begin_world_transparent_pass(Some("Material Transparent Pass"))?
         };
-
-        let render_pass = ctx.command_encoder.begin_render_pass(
-            &RenderPassDescriptor {
-                label: Some("Material Transparent Pass"),
-                color_attachments: vec![color_attachment],
-                depth_stencil_attachment: Some(depth_stencil_attachment),
-                ..Default::default()
-            }
-            .into(),
-        )?;
 
         let (main_bind_group, mesh_material_bind_group, lights_bind_group, texture_bind_group) =
             self.bind_groups.get_bind_groups()?;
