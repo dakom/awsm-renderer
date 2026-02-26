@@ -32,13 +32,12 @@ use mesh::Mesh;
 use morphs::{GeometryMorphKey, MaterialMorphKey, Morphs};
 
 impl AwsmRenderer {
-    /// Clones a mesh and its current transform under the same parent.
-    pub fn clone_mesh(&mut self, mesh_key: MeshKey) -> crate::error::Result<MeshKey> {
-        let transform_key = self.meshes.get(mesh_key)?.transform_key;
-        let local_transform = self.transforms.get_local(transform_key)?.clone();
-        let parent_transform = self.transforms.get_parent(transform_key).ok();
-        let new_transform_key = self.transforms.insert(local_transform, parent_transform);
-
+    /// Duplicates a mesh into an existing transform key and mirrors transparent pass pipeline state.
+    pub fn duplicate_mesh_with_transform(
+        &mut self,
+        mesh_key: MeshKey,
+        new_transform_key: TransformKey,
+    ) -> crate::error::Result<MeshKey> {
         let new_mesh_key = self.meshes.duplicate_with_transform(
             mesh_key,
             new_transform_key,
@@ -54,16 +53,91 @@ impl AwsmRenderer {
         Ok(new_mesh_key)
     }
 
+    /// Clones a mesh and its current transform under the same parent.
+    pub fn clone_mesh(&mut self, mesh_key: MeshKey) -> crate::error::Result<MeshKey> {
+        let transform_key = self.meshes.get(mesh_key)?.transform_key;
+        let local_transform = self.transforms.get_local(transform_key)?.clone();
+        let parent_transform = self.transforms.get_parent(transform_key).ok();
+        let new_transform_key = self.transforms.insert(local_transform, parent_transform);
+
+        self.duplicate_mesh_with_transform(mesh_key, new_transform_key)
+    }
+
     /// Duplicates all meshes that share a transform, returning the new transform and mesh keys.
+    ///
+    /// Transparent pass pipeline mappings are copied per duplicated mesh.
     pub fn duplicate_meshes_by_transform_key(
         &mut self,
         transform_key: TransformKey,
     ) -> crate::error::Result<(TransformKey, Vec<MeshKey>)> {
-        Ok(self.meshes.duplicate_by_transform_key(
+        let source_mesh_keys = self
+            .meshes
+            .keys_by_transform_key(transform_key)
+            .cloned()
+            .ok_or(AwsmMeshError::TransformHasNoMeshes(transform_key))?;
+
+        let (new_transform_key, new_mesh_keys) = self.meshes.duplicate_by_transform_key(
             transform_key,
             &self.materials,
             &mut self.transforms,
-        )?)
+        )?;
+
+        for (source_mesh_key, new_mesh_key) in source_mesh_keys
+            .into_iter()
+            .zip(new_mesh_keys.iter().copied())
+        {
+            self.render_passes
+                .material_transparent
+                .pipelines
+                .clone_render_pipeline_key(source_mesh_key, new_mesh_key);
+        }
+
+        Ok((new_transform_key, new_mesh_keys))
+    }
+
+    /// Sets mesh visibility state.
+    pub fn set_mesh_hidden(&mut self, mesh_key: MeshKey, hidden: bool) -> crate::error::Result<()> {
+        let mesh = self.meshes.get_mut(mesh_key)?;
+        mesh.hidden = hidden;
+        Ok(())
+    }
+
+    /// Removes all meshes under a transform and clears any pass-local mesh state.
+    pub fn remove_meshes_by_transform_key(&mut self, transform_key: TransformKey) -> Vec<MeshKey> {
+        let mesh_keys = self
+            .meshes
+            .keys_by_transform_key(transform_key)
+            .cloned()
+            .unwrap_or_default();
+
+        if mesh_keys.is_empty() {
+            return mesh_keys;
+        }
+
+        self.meshes.remove_by_transform_key(transform_key);
+
+        for mesh_key in &mesh_keys {
+            self.render_passes
+                .material_transparent
+                .pipelines
+                .remove_render_pipeline_key(*mesh_key);
+        }
+
+        mesh_keys
+    }
+
+    /// Removes one mesh and clears any pass-local mesh state.
+    pub fn remove_mesh(&mut self, mesh_key: MeshKey) -> bool {
+        let removed = self.meshes.remove(mesh_key).is_some();
+
+        if removed {
+            self.render_passes
+                .material_transparent
+                .pipelines
+                .remove_render_pipeline_key(mesh_key);
+        }
+
+        removed
     }
 
     /// Splits a mesh out to a new transform key.
@@ -378,7 +452,7 @@ impl Meshes {
     }
 
     /// Inserts a mesh and its backing resource data, returning a mesh key.
-    pub fn insert(
+    pub(crate) fn insert(
         &mut self,
         mesh: Mesh,
         materials: &Materials,
@@ -600,7 +674,11 @@ impl Meshes {
     }
 
     /// Duplicates a mesh instance and assigns a new transform key.
-    pub fn duplicate_with_transform(
+    ///
+    /// This low-level API only duplicates mesh storage state. Callers that need pass-specific
+    /// renderer mappings (for example transparent material pipeline keys) should use
+    /// `AwsmRenderer::duplicate_mesh_with_transform`.
+    pub(crate) fn duplicate_with_transform(
         &mut self,
         mesh_key: MeshKey,
         new_transform_key: TransformKey,
@@ -626,7 +704,7 @@ impl Meshes {
     }
 
     /// Duplicates all meshes under a transform into a new transform key.
-    pub fn duplicate_by_transform_key(
+    pub(crate) fn duplicate_by_transform_key(
         &mut self,
         transform_key: TransformKey,
         materials: &Materials,
@@ -661,7 +739,7 @@ impl Meshes {
     }
 
     /// Splits a mesh into a new transform key so it can move independently.
-    pub fn split_mesh(
+    pub(crate) fn split_mesh(
         &mut self,
         mesh_key: MeshKey,
         transforms: &mut Transforms,
@@ -686,7 +764,7 @@ impl Meshes {
     }
 
     /// Splits all meshes under a transform into independent transforms.
-    pub fn split_meshes_by_transform_key(
+    pub(crate) fn split_meshes_by_transform_key(
         &mut self,
         transform_key: TransformKey,
         transforms: &mut Transforms,
@@ -712,7 +790,7 @@ impl Meshes {
     }
 
     /// Joins multiple meshes under a single transform key.
-    pub fn join_meshes(
+    pub(crate) fn join_meshes(
         &mut self,
         mesh_keys: &[MeshKey],
         transforms: &mut Transforms,
@@ -1071,14 +1149,17 @@ impl Meshes {
     }
 
     /// Returns a mutable mesh by key.
-    pub fn get_mut(&mut self, mesh_key: MeshKey) -> Result<&mut Mesh> {
+    pub(crate) fn get_mut(&mut self, mesh_key: MeshKey) -> Result<&mut Mesh> {
         self.list
             .get_mut(mesh_key)
             .ok_or(AwsmMeshError::MeshNotFound(mesh_key))
     }
 
     /// Removes all meshes that share the given transform key.
-    pub fn remove_by_transform_key(&mut self, transform_key: TransformKey) -> Option<Vec<Mesh>> {
+    pub(crate) fn remove_by_transform_key(
+        &mut self,
+        transform_key: TransformKey,
+    ) -> Option<Vec<Mesh>> {
         if let Some(mesh_keys) = self.transform_to_meshes.get(transform_key).cloned() {
             let mut removed_meshes = Vec::with_capacity(mesh_keys.capacity());
             for mesh_key in mesh_keys.iter() {
@@ -1092,7 +1173,7 @@ impl Meshes {
         }
     }
     /// Removes a mesh by key and returns it if found.
-    pub fn remove(&mut self, mesh_key: MeshKey) -> Option<Mesh> {
+    pub(crate) fn remove(&mut self, mesh_key: MeshKey) -> Option<Mesh> {
         if let Some(mesh) = self.list.remove(mesh_key) {
             self.meta.remove(mesh_key);
 

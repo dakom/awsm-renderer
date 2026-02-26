@@ -148,6 +148,11 @@ impl MaterialTransparentPipelines {
             self.render_pipeline_keys.insert(to, key);
         }
     }
+
+    /// Removes the cached render pipeline key for a mesh, if present.
+    pub fn remove_render_pipeline_key(&mut self, mesh_key: MeshKey) -> Option<RenderPipelineKey> {
+        self.render_pipeline_keys.remove(mesh_key)
+    }
 }
 
 async fn render_pipeline_key(
