@@ -216,8 +216,22 @@ impl AwsmRenderer {
                 match primitive_buffer_info.visibility_geometry_vertex.clone() {
                     Some(info) => {
                         let geometry_data_start = info.offset;
-                        let geometry_data_end = geometry_data_start
-                            + MeshBufferVertexInfo::from(info).visibility_geometry_size();
+                        let vertex_info = MeshBufferVertexInfo::from(info);
+                        let geometry_size =
+                            vertex_info.checked_visibility_geometry_size().ok_or_else(|| {
+                                AwsmGltfError::GeometryDataSizeOverflow(format!(
+                                    "visibility geometry: {} vertices * {} bytes/vertex overflows usize",
+                                    vertex_info.count,
+                                    MeshBufferVertexInfo::VISIBILITY_GEOMETRY_BYTE_SIZE
+                                ))
+                            })?;
+                        let geometry_data_end =
+                            geometry_data_start.checked_add(geometry_size).ok_or_else(|| {
+                                AwsmGltfError::GeometryDataSizeOverflow(format!(
+                                    "visibility geometry: offset {} + size {} overflows usize",
+                                    geometry_data_start, geometry_size
+                                ))
+                            })?;
                         Some(
                             &ctx.data.buffers.visibility_geometry_vertex_bytes
                                 [geometry_data_start..geometry_data_end],
@@ -230,8 +244,23 @@ impl AwsmRenderer {
                 match primitive_buffer_info.transparency_geometry_vertex.clone() {
                     Some(info) => {
                         let geometry_data_start = info.offset;
-                        let geometry_data_end = geometry_data_start
-                            + MeshBufferVertexInfo::from(info).transparency_geometry_size();
+                        let vertex_info = MeshBufferVertexInfo::from(info);
+                        let geometry_size = vertex_info
+                            .checked_transparency_geometry_size()
+                            .ok_or_else(|| {
+                                AwsmGltfError::GeometryDataSizeOverflow(format!(
+                                    "transparency geometry: {} vertices * {} bytes/vertex overflows usize",
+                                    vertex_info.count,
+                                    MeshBufferVertexInfo::TRANSPARENCY_GEOMETRY_BYTE_SIZE
+                                ))
+                            })?;
+                        let geometry_data_end =
+                            geometry_data_start.checked_add(geometry_size).ok_or_else(|| {
+                                AwsmGltfError::GeometryDataSizeOverflow(format!(
+                                    "transparency geometry: offset {} + size {} overflows usize",
+                                    geometry_data_start, geometry_size
+                                ))
+                            })?;
                         Some(
                             &ctx.data.buffers.transparency_geometry_vertex_bytes
                                 [geometry_data_start..geometry_data_end],

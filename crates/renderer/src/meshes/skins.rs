@@ -124,12 +124,17 @@ impl Skins {
 
         let skin_key = self.skeleton_transforms.insert(skeleton_joint_transforms);
 
-        self.skin_matrices.update(skin_key, &initial_fill);
+        self.skin_matrices
+            .update(skin_key, &initial_fill)
+            .map_err(|e| AwsmSkinError::BufferCapacityOverflow(format!("skin matrices: {e}")))?;
 
         self.sets_len.insert(skin_key, set_len);
 
         self.joint_index_weights
-            .update(skin_key, joint_index_weights);
+            .update(skin_key, joint_index_weights)
+            .map_err(|e| {
+                AwsmSkinError::BufferCapacityOverflow(format!("joint index weights: {e}"))
+            })?;
 
         self.matrices_gpu_dirty = true;
         self.joint_index_weights_gpu_dirty = true;
@@ -334,4 +339,7 @@ pub enum AwsmSkinError {
 
     #[error("[skin] {0:?}")]
     BindGroup(#[from] AwsmBindGroupError),
+
+    #[error("[skin] buffer capacity overflow: {0}")]
+    BufferCapacityOverflow(String),
 }
