@@ -192,8 +192,7 @@ impl AwsmRenderer {
             mesh.instanced = true;
         }
 
-        self.instances
-            .transform_insert(transform_key, transforms)?;
+        self.instances.transform_insert(transform_key, transforms)?;
 
         let mesh = self.meshes.get(mesh_key)?;
         self.render_passes

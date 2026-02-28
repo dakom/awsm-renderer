@@ -50,11 +50,7 @@ impl Instances {
     }
 
     /// Inserts instance transforms for a key.
-    pub fn transform_insert(
-        &mut self,
-        key: TransformKey,
-        transforms: &[Transform],
-    ) -> Result<()> {
+    pub fn transform_insert(&mut self, key: TransformKey, transforms: &[Transform]) -> Result<()> {
         self.cpu_transforms.insert(key, transforms.to_vec());
         let bytes = Self::transforms_to_bytes(transforms);
         self.transform_buffer.update(key, &bytes).map_err(|e| {
@@ -128,9 +124,11 @@ impl Instances {
                 .get(key)
                 .ok_or(AwsmInstanceError::TransformNotFound(key))?;
             let full_bytes = Self::transforms_to_bytes(full_list);
-            self.transform_buffer.update(key, &full_bytes).map_err(|e| {
-                AwsmInstanceError::BufferCapacityOverflow(format!("instance transforms: {e}"))
-            })?;
+            self.transform_buffer
+                .update(key, &full_bytes)
+                .map_err(|e| {
+                    AwsmInstanceError::BufferCapacityOverflow(format!("instance transforms: {e}"))
+                })?;
         }
         self.transform_count.insert(key, len);
         self.transform_gpu_dirty = true;

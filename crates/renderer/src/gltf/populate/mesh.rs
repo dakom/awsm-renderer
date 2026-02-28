@@ -212,12 +212,14 @@ impl AwsmRenderer {
         let aabb = try_position_aabb(&gltf_primitive);
 
         let mesh_key = {
-            let visibility_geometry_data =
-                match primitive_buffer_info.visibility_geometry_vertex.clone() {
-                    Some(info) => {
-                        let geometry_data_start = info.offset;
-                        let vertex_info = MeshBufferVertexInfo::from(info);
-                        let geometry_size =
+            let visibility_geometry_data = match primitive_buffer_info
+                .visibility_geometry_vertex
+                .clone()
+            {
+                Some(info) => {
+                    let geometry_data_start = info.offset;
+                    let vertex_info = MeshBufferVertexInfo::from(info);
+                    let geometry_size =
                             vertex_info.checked_visibility_geometry_size().ok_or_else(|| {
                                 AwsmGltfError::GeometryDataSizeOverflow(format!(
                                     "visibility geometry: {} vertices * {} bytes/vertex overflows usize",
@@ -225,27 +227,30 @@ impl AwsmRenderer {
                                     MeshBufferVertexInfo::VISIBILITY_GEOMETRY_BYTE_SIZE
                                 ))
                             })?;
-                        let geometry_data_end =
-                            geometry_data_start.checked_add(geometry_size).ok_or_else(|| {
-                                AwsmGltfError::GeometryDataSizeOverflow(format!(
-                                    "visibility geometry: offset {} + size {} overflows usize",
-                                    geometry_data_start, geometry_size
-                                ))
-                            })?;
-                        Some(
-                            &ctx.data.buffers.visibility_geometry_vertex_bytes
-                                [geometry_data_start..geometry_data_end],
-                        )
-                    }
-                    None => None,
-                };
+                    let geometry_data_end = geometry_data_start
+                        .checked_add(geometry_size)
+                        .ok_or_else(|| {
+                            AwsmGltfError::GeometryDataSizeOverflow(format!(
+                                "visibility geometry: offset {} + size {} overflows usize",
+                                geometry_data_start, geometry_size
+                            ))
+                        })?;
+                    Some(
+                        &ctx.data.buffers.visibility_geometry_vertex_bytes
+                            [geometry_data_start..geometry_data_end],
+                    )
+                }
+                None => None,
+            };
 
-            let transparency_geometry_data =
-                match primitive_buffer_info.transparency_geometry_vertex.clone() {
-                    Some(info) => {
-                        let geometry_data_start = info.offset;
-                        let vertex_info = MeshBufferVertexInfo::from(info);
-                        let geometry_size = vertex_info
+            let transparency_geometry_data = match primitive_buffer_info
+                .transparency_geometry_vertex
+                .clone()
+            {
+                Some(info) => {
+                    let geometry_data_start = info.offset;
+                    let vertex_info = MeshBufferVertexInfo::from(info);
+                    let geometry_size = vertex_info
                             .checked_transparency_geometry_size()
                             .ok_or_else(|| {
                                 AwsmGltfError::GeometryDataSizeOverflow(format!(
@@ -254,20 +259,21 @@ impl AwsmRenderer {
                                     MeshBufferVertexInfo::TRANSPARENCY_GEOMETRY_BYTE_SIZE
                                 ))
                             })?;
-                        let geometry_data_end =
-                            geometry_data_start.checked_add(geometry_size).ok_or_else(|| {
-                                AwsmGltfError::GeometryDataSizeOverflow(format!(
-                                    "transparency geometry: offset {} + size {} overflows usize",
-                                    geometry_data_start, geometry_size
-                                ))
-                            })?;
-                        Some(
-                            &ctx.data.buffers.transparency_geometry_vertex_bytes
-                                [geometry_data_start..geometry_data_end],
-                        )
-                    }
-                    None => None,
-                };
+                    let geometry_data_end = geometry_data_start
+                        .checked_add(geometry_size)
+                        .ok_or_else(|| {
+                            AwsmGltfError::GeometryDataSizeOverflow(format!(
+                                "transparency geometry: offset {} + size {} overflows usize",
+                                geometry_data_start, geometry_size
+                            ))
+                        })?;
+                    Some(
+                        &ctx.data.buffers.transparency_geometry_vertex_bytes
+                            [geometry_data_start..geometry_data_end],
+                    )
+                }
+                None => None,
+            };
 
             let custom_attribute_data_start =
                 primitive_buffer_info.triangles.vertex_attributes_offset;

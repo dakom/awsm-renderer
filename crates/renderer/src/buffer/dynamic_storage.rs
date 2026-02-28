@@ -107,11 +107,7 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
     ///
     /// Returns the byte offset of the data in the buffer, or an error if the
     /// buffer cannot grow large enough to accommodate the data.
-    pub fn update(
-        &mut self,
-        key: K,
-        bytes: &[u8],
-    ) -> Result<usize, DynamicStorageBufferError> {
+    pub fn update(&mut self, key: K, bytes: &[u8]) -> Result<usize, DynamicStorageBufferError> {
         // remove & reinsert if new size doesn’t fit existing block
         if let Some((off, old_size)) = self.slot_indices.get(key).copied() {
             if bytes.len() <= old_size {
@@ -145,11 +141,7 @@ impl<K: Key, const ZERO: u8> DynamicStorageBuffer<K, ZERO> {
     }
 
     // Use update() instead; this always inserts a new allocation.
-    fn insert(
-        &mut self,
-        key: K,
-        bytes: &[u8],
-    ) -> Result<usize, DynamicStorageBufferError> {
+    fn insert(&mut self, key: K, bytes: &[u8]) -> Result<usize, DynamicStorageBufferError> {
         let req = bytes
             .len()
             .max(MIN_BLOCK)
