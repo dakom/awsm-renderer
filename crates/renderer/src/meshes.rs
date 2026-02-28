@@ -192,7 +192,7 @@ impl AwsmRenderer {
             mesh.instanced = true;
         }
 
-        self.instances.transform_insert(transform_key, transforms);
+        self.instances.transform_insert(transform_key, transforms)?;
 
         let mesh = self.meshes.get(mesh_key)?;
         self.render_passes
@@ -232,7 +232,7 @@ impl AwsmRenderer {
         }
 
         self.instances
-            .transform_insert(mesh.transform_key, transforms);
+            .transform_insert(mesh.transform_key, transforms)?;
 
         Ok(())
     }
@@ -517,7 +517,12 @@ impl Meshes {
                         geometry_index.extend_from_slice(&(i as u32).to_le_bytes());
                     }
                     self.visibility_geometry_index_buffers
-                        .update(resource_key, &geometry_index);
+                        .update(resource_key, &geometry_index)
+                        .map_err(|e| {
+                            AwsmMeshError::BufferCapacityOverflow(format!(
+                                "visibility geometry index: {e}"
+                            ))
+                        })?;
                 } else {
                     return Err(AwsmMeshError::VisibilityGeometryBufferInfoNotFound(
                         buffer_info_key,
@@ -527,7 +532,12 @@ impl Meshes {
                 self.visibility_geometry_index_dirty = true;
                 let offset = self
                     .visibility_geometry_data_buffers
-                    .update(resource_key, geometry_data);
+                    .update(resource_key, geometry_data)
+                    .map_err(|e| {
+                        AwsmMeshError::BufferCapacityOverflow(format!(
+                            "visibility geometry data: {e}"
+                        ))
+                    })?;
                 self.visibility_geometry_data_dirty = true;
 
                 Some(offset)
@@ -539,7 +549,12 @@ impl Meshes {
             Some(geometry_data) => {
                 let offset = self
                     .transparency_geometry_data_buffers
-                    .update(resource_key, geometry_data);
+                    .update(resource_key, geometry_data)
+                    .map_err(|e| {
+                        AwsmMeshError::BufferCapacityOverflow(format!(
+                            "transparency geometry data: {e}"
+                        ))
+                    })?;
                 self.transparency_geometry_data_dirty = true;
 
                 Some(offset)
@@ -549,12 +564,18 @@ impl Meshes {
 
         let custom_attribute_indices_offset = self
             .custom_attribute_index_buffers
-            .update(resource_key, attribute_index);
+            .update(resource_key, attribute_index)
+            .map_err(|e| {
+                AwsmMeshError::BufferCapacityOverflow(format!("custom attribute index: {e}"))
+            })?;
         self.custom_attribute_index_dirty = true;
 
         let custom_attribute_data_offset = self
             .custom_attribute_data_buffers
-            .update(resource_key, attribute_data);
+            .update(resource_key, attribute_data)
+            .map_err(|e| {
+                AwsmMeshError::BufferCapacityOverflow(format!("custom attribute data: {e}"))
+            })?;
         self.custom_attribute_data_dirty = true;
 
         // KEEP THIS AROUND FOR DEBUGGING
